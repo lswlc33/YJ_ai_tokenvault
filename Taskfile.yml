@@ -1,0 +1,34 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: '3'
+
+vars:
+  DIST_DIR: dist
+  FLUTTER: D:/flutter_sdk/bin/flutter.bat
+
+tasks:
+  build:windows:
+    desc: Build Windows Release
+    cmds:
+      - cmd /c "{{.FLUTTER}} build windows --release"
+      - powershell -Command "Copy-Item -Path 'build\windows\x64\runner\Release\*' -Destination '{{.DIST_DIR}}\windows' -Recurse -Force"
+    status:
+      - Test-Path "{{.DIST_DIR}}\windows\ai_token_vault.exe"
+
+  build:android:
+    desc: Build Android APK Release (arm64-v8a + armeabi-v7a)
+    cmds:
+      - cmd /c "{{.FLUTTER}} build apk --release --split-per-abi --target-platform android-arm64,android-arm --obfuscate --split-debug-info=build/debug-info"
+      - powershell -Command "New-Item -ItemType Directory -Path '{{.DIST_DIR}}\android' -Force | Out-Null; Copy-Item -Path 'build\app\outputs\flutter-apk\app-arm64-v8a-release.apk','build\app\outputs\flutter-apk\app-armeabi-v7a-release.apk' -Destination '{{.DIST_DIR}}\android' -Force"
+
+  build:all:
+    desc: Build all platforms
+    cmds:
+      - task: build:windows
+      - task: build:android
+
+  clean:
+    desc: Clean build artifacts and dist
+    cmds:
+      - cmd /c "{{.FLUTTER}} clean"
+      - powershell -Command "Remove-Item -Path '{{.DIST_DIR}}' -Recurse -Force -ErrorAction SilentlyContinue"

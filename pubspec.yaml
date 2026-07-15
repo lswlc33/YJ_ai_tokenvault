@@ -1,0 +1,50 @@
+name: ai_token_vault
+description: "元记 —— 词元 API Key 记录本，纯本地加密存储，集中管理端点与余额。"
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # 状态管理
+  flutter_riverpod: ^2.5.1
+
+  # 本地库（桌面靠 ffi；sqflite 供移动端默认 factory）
+  sqflite: ^2.3.0
+  sqflite_common_ffi: ^2.3.0
+
+  # 加密
+  pointycastle: ^3.9.1
+
+  # 动态取色（Material You）
+  dynamic_color: ^1.7.0
+
+  # 路径
+  path_provider: ^2.1.0
+  path: ^1.9.0
+
+  # 货币 / 本地化格式
+  intl: ^0.19.0
+
+  # 桌面窗口（缩放 / 最小尺寸）
+  window_manager: ^0.3.7
+
+  # 生物识别 + 安全存储（毫秒级解锁）
+  local_auth: ^2.3.0
+  # WebDAV 备份
+  dio: ^5.4.0
+  webdav_client: ^1.2.2
+  # 本地文件选择（导入/导出备份）
+  file_picker: ^9.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true

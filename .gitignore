@@ -1,0 +1,85 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.kilo/
+migrate_working_dir/
+
+# IntelliJ / Android Studio
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# VS Code
+.vscode/
+
+# Flutter / Dart
+**/doc/api/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.metadata
+.pub-cache/
+.pub/
+
+# Build outputs
+/build/
+/dist/
+/android/build/
+/android/app/build/
+/android/.gradle/
+/android/local.properties
+
+# Generated files (Flutter auto-generates these)
+windows/flutter/generated_plugin_registrant.cc
+windows/flutter/generated_plugin_registrant.h
+windows/flutter/generated_plugins.cmake
+
+# Symbolication / Obfuscation
+app.*.symbols
+app.*.map.json
+
+# Android
+/android/app/debug/
+/android/app/profile/
+/android/app/release/
+/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
+/android/gradlew
+/android/gradlew.bat
+/android/gradle/wrapper/gradle-wrapper.jar
+/android/captures/
+/android/.cxx/
+/android/key.properties
+/android/**/*.keystore
+/android/**/*.jks
+
+# Windows
+windows/x64/
+windows/x86/
+windows/*.suo
+windows/*.user
+windows/*.userosscache
+windows/*.sln.docstates
+windows/*.[Cc]ache
+!windows/*.[Cc]ache/
+
+# Coverage
+coverage/
+
+# Environment / Secrets
+.env
+.env.*
+*.pem
+*.key
+*.cert
