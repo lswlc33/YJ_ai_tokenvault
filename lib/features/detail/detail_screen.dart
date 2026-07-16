@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter/widget_previews.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/model_metadata/model_metadata_service.dart';
@@ -670,39 +669,3 @@ class _ModelTile extends StatelessWidget {
   }
 }
 
-@Preview(name: 'ModelTile - Basic')
-Widget previewModelTileBasic() {
-  return const _ModelTile(
-    model: ModelInfo(id: 'gpt-4o'),
-  );
-}
-
-@Preview(name: 'ModelTile - With Metadata')
-Widget previewModelTileWithMetadata() {
-  return const _ModelTile(
-    model: ModelInfo(id: 'claude-3-5-sonnet'),
-    metadata: ModelMetadataEntry(
-      id: 'claude-3-5-sonnet',
-      name: 'Claude 3.5 Sonnet',
-      contextLimit: 200000,
-      outputLimit: 8192,
-      inputModalities: ['text', 'image'],
-      outputModalities: ['text'],
-      reasoning: false,
-      toolCall: true,
-    ),
-  );
-}
-
-@Preview(name: 'ModelTile - Free Model')
-Widget previewModelTileFree() {
-  return const _ModelTile(
-    model: ModelInfo(
-      id: 'deepseek-chat-free',
-      raw: {
-        'context_length': 64000,
-        'pricing': {'prompt': '0', 'completion': '0'},
-      },
-    ),
-  );
-}

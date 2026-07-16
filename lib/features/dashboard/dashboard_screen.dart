@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter/widget_previews.dart';
 
 import '../../core/theme/responsive.dart';
 import '../../core/theme/theme_ext.dart';
@@ -340,28 +339,3 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-@Preview(name: 'Empty State')
-Widget previewEmptyState() {
-  return const _EmptyState();
-}
-
-@Preview(name: 'Category Chips')
-Widget previewCategoryChips() {
-  return Center(
-    child: Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      child: SizedBox(
-        width: 400,
-        child: _CategoryChips(
-          categories: const [
-            Category(id: 1, name: '常用'),
-            Category(id: 2, name: '备用'),
-            Category(id: 3, name: '测试'),
-          ],
-          selected: 1,
-          onSelect: (_) {},
-        ),
-      ),
-    ),
-  );
-}

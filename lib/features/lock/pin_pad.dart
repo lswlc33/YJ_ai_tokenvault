@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widget_previews.dart';
 
 /// 6 位 PIN 输入组件：圆点指示 + 数字键盘（桌面也可键盘直接打字）。
 class PinPad extends StatefulWidget {
@@ -161,17 +160,3 @@ class _NumberGrid extends StatelessWidget {
   }
 }
 
-@Preview(name: 'PinPad - Default')
-Widget previewPinPad() {
-  return PinPad(onCompleted: (_) {});
-}
-
-@Preview(name: 'PinPad - Error')
-Widget previewPinPadError() {
-  return PinPad(onCompleted: (_) {}, error: '密码错误，请重试');
-}
-
-@Preview(name: 'PinPad - Busy')
-Widget previewPinPadBusy() {
-  return PinPad(onCompleted: (_) {}, busy: true);
-}

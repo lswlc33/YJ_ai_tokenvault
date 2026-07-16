@@ -41,7 +41,7 @@ class _CategoryManagerScreenState
           return ReorderableListView.builder(
             buildDefaultDragHandles: false,
             itemCount: sorted.length,
-            onReorderItem: (oldIndex, newIndex) => _onReorder(ref, sorted, oldIndex, newIndex),
+            onReorder: (oldIndex, newIndex) => _onReorder(ref, sorted, oldIndex, newIndex),
             itemBuilder: (context, index) {
               final c = sorted[index];
               return ReorderableDragStartListener(

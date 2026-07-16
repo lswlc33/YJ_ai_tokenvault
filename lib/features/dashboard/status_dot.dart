@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/widget_previews.dart';
 
 import '../../models/key_status.dart';
 
@@ -60,32 +59,3 @@ class StatusDot extends StatelessWidget {
   }
 }
 
-@Preview(name: 'StatusDot - OK')
-Widget previewStatusDotOk() {
-  return const StatusDot(KeyStatus.ok, size: 12, label: true);
-}
-
-@Preview(name: 'StatusDot - Invalid')
-Widget previewStatusDotInvalid() {
-  return const StatusDot(KeyStatus.invalid, size: 12, label: true);
-}
-
-@Preview(name: 'StatusDot - Insufficient')
-Widget previewStatusDotInsufficient() {
-  return const StatusDot(KeyStatus.insufficient, size: 12, label: true);
-}
-
-@Preview(name: 'StatusDot - Overdue')
-Widget previewStatusDotOverdue() {
-  return const StatusDot(KeyStatus.overdue, size: 12, label: true);
-}
-
-@Preview(name: 'StatusDot - Unknown')
-Widget previewStatusDotUnknown() {
-  return const StatusDot(KeyStatus.unknown, size: 12, label: true);
-}
-
-@Preview(name: 'StatusDot - Dot Only')
-Widget previewStatusDotNoLabel() {
-  return const StatusDot(KeyStatus.ok);
-}

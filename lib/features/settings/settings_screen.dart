@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter/widget_previews.dart';
 
 import '../../core/backup/local_backup_service.dart';
 import '../../core/log/log_service.dart';
@@ -733,7 +732,3 @@ class _AboutScreen extends StatelessWidget {
   }
 }
 
-@Preview(name: 'About Screen')
-Widget previewAboutScreen() {
-  return const _AboutScreen();
-}
