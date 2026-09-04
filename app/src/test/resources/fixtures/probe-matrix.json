@@ -1,0 +1,191 @@
+{
+  "_说明": [
+    "M0.5 协议踩点（计划.md §16）实测到的**去重后**响应形态，采集于 2026-09-04，源站是 示例数据.md 里那三家。",
+    "每条给出 status + 真实响应体 + 该条要证明什么，expectOutcome / expectHealth 是 §8.4 分类矩阵应当得出的结论；",
+    "M5 的 classify() 单测直接读这个文件，一条 case 一个断言。",
+    "已脱敏：密钥、访问令牌、邮箱、用户名、第三方账号 id。过长的 base64（Anthropic thinking signature）已截断并标注。",
+    "原始未脱敏响应在 .local/spike/（gitignored），不入库。"
+  ],
+  "cases": [
+    {
+      "id": "agentrouter-client-blocked-401",
+      "provider": "Agent Router",
+      "request": "GET /v1/models  ·  Authorization: Bearer <有效密钥>  ·  User-Agent: YuanJi/0.1.0 (Android 15; arm64)",
+      "status": 401,
+      "contentType": "application/json; charset=utf-8",
+      "body": "{\"error\":{\"message\":\"unauthorized client detected, contact support for assistance at https://discord.gg/HgekCyHJqB\"},\"message\":\"UNAUTHENTICATED\",\"success\":false,\"type\":\"unauthorized_client_error\"}",
+      "expectOutcome": "CONCLUSIVE_FAIL",
+      "expectHealth": "CLIENT_BLOCKED",
+      "证明": "客户端校验用的是 401、不是 403，而且发生在鉴权之前——密钥有效也照样这一条。响应体里的关键词是 `unauthorized client` / `unauthorized_client_error`，§8.2 原来的关键词表（invalid client / client not allowed / forbidden client）一条都不命中，照原表这张好 Key 会被判成 UNAUTHORIZED。该站 /api/status 的 FAQ 里自己写了「401 Unauthorized → 请使用官方支持的客户端」。"
+    },
+    {
+      "id": "agentrouter-no-token-401",
+      "provider": "Agent Router",
+      "request": "GET /v1/models  ·  完全不带鉴权头",
+      "status": 401,
+      "contentType": "application/json; charset=utf-8",
+      "body": "{\"error\":{\"message\":\"未提供令牌 (request id: 20260904162518263535066f2zffvl2bGwQ3)\",\"type\":\"new_api_error\"}}",
+      "expectOutcome": "CONCLUSIVE_FAIL",
+      "expectHealth": "UNAUTHORIZED",
+      "证明": "同一条路由、同一个 UA，只是去掉了 Authorization，就绕过了客户端闸拿到网关自己的鉴权错误。所以那道闸只在**带 Bearer 时**生效。也说明 /v1/models 是鉴权的（问题 1）。上游文案是中文的，`request id` 每次不同，分类器不能拿整串 message 做相等比较。"
+    },
+    {
+      "id": "agentrouter-models-ok-xapikey",
+      "provider": "Agent Router",
+      "request": "GET /v1/models  ·  x-api-key: <有效密钥>  ·  User-Agent: YuanJi/0.1.0",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "bodyFile": "models/newapi-models-agentrouter.json",
+      "expectOutcome": "SUCCESS",
+      "expectHealth": "OK",
+      "证明": "换成 Anthropic 风格的鉴权头，同一个 UA 就直接过了——客户端闸只挂在 Bearer 那条路径上。另外 new-api 会在每个模型上给 `supported_endpoint_types`，这是「协议属于模型」（红线 18）的现成数据源，不用猜。"
+    },
+    {
+      "id": "agentrouter-chat-ok-client-ua",
+      "provider": "Agent Router",
+      "request": "POST /v1/chat/completions  ·  Authorization: Bearer <有效密钥>  ·  User-Agent: claude-cli/1.0.119 (external, cli)  ·  无其它特征头",
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"id\":\"resp_0a5353071175ee22016a9a808e938487d0bbe97915479e23e6\",\"object\":\"chat.completion\",\"created\":1788510351,\"model\":\"gpt-5.6-sol\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"pong\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":7,\"completion_tokens\":5,\"total_tokens\":12},\"service_tier\":\"default\"}",
+      "expectOutcome": "SUCCESS",
+      "expectHealth": "OK",
+      "证明": "**只换 User-Agent 就过闸**，`x-stainless-*` 那一整套特征头不是必需的（同一请求加上全套头结果一样是 200）。而 okhttp 自报的 UA 与 curl/8.7.1 都被拦。所以 §8.2 的嗅探把 UA 换掉就够，特征头是加分项不是前提。注意这里是 CHAT 协议用 claude_code 预设过的闸——预设表里的「适用协议」不能当硬过滤条件。"
+    },
+    {
+      "id": "justdowork-invalid-token-401",
+      "provider": "JustDoWork",
+      "request": "GET /v1/models  ·  Authorization: Bearer yj-probe-invalid",
+      "status": 401,
+      "contentType": "application/json; charset=utf-8",
+      "body": "{\"error\":{\"code\":\"\",\"message\":\"Invalid token (request id: 202609040826274483189378268d9d6Ft5dsaDX)\",\"type\":\"new_api_error\"}}",
+      "expectOutcome": "CONCLUSIVE_FAIL",
+      "expectHealth": "UNAUTHORIZED",
+      "证明": "new-api 的标准无效令牌响应。这一条同时是 §8.3「不鉴权基线检测」的实测结果：错误 Key 拿到 401 而不是 200，说明这家的 models 路由**鉴权**，L2 不需要升级成真实推理调用。"
+    },
+    {
+      "id": "justdowork-cf1015-text-429",
+      "provider": "JustDoWork",
+      "request": "GET /v1/models  ·  该 host 本轮第 3 个请求（约 2.4 秒内）",
+      "status": 429,
+      "contentType": "text/plain; charset=UTF-8",
+      "responseHeaders": { "server": "cloudflare", "retry-after": "10", "server-timing": "cfEdge;dur=2,cfOrigin;dur=0" },
+      "body": "error code: 1015",
+      "expectOutcome": "RATE_LIMITED",
+      "expectHealth": null,
+      "证明": "**Cloudflare 边缘限流，源站根本没收到**（`cfOrigin;dur=0`）。响应体是纯文本、不是 JSON，所以任何「2xx/4xx 必须能解析成 JSON」的前置断言都会在这里炸。expectHealth 为 null = 红线 11：不许改写持久结论。触发门槛低得可怕——同 host 三四个请求就够，直接否掉「只限并发不限间隔」的做法。"
+    },
+    {
+      "id": "justdowork-cf1015-json-429",
+      "provider": "JustDoWork",
+      "request": "POST /v1/messages  ·  同 host 连续请求",
+      "status": 429,
+      "contentType": "application/json; charset=utf-8",
+      "responseHeaders": { "retry-after": "10" },
+      "body": "{\"type\":\"https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/error-1015/\",\"title\":\"Error 1015: You are being rate limited\",\"status\":429,\"detail\":\"You are being rate-limited by the website owner's configuration.\",\"instance\":\"a35b9cfa5cdff85f\",\"error_code\":1015,\"error_name\":\"rate_limited\",\"error_category\":\"rate_limit\",\"ray_id\":\"a35b9cfa5cdff85f\",\"timestamp\":\"2026-09-04T08:27:07Z\",\"zone\":\"api.justwoker.icu\",\"cloudflare_error\":true,\"retryable\":true,\"retry_after\":30,\"owner_action_required\":false}",
+      "expectOutcome": "RATE_LIMITED",
+      "expectHealth": null,
+      "证明": "**同一个 1015 有两种响应体形态**（纯文本与 RFC 7807 JSON），所以不能按 body 形状识别限流，只能按状态码。而且 body 里的 `retry_after: 30` 与响应头 `Retry-After: 10` **不一致**：只读响应头会退避得太短、马上又撞一次。退避应取两者较大值。"
+    },
+    {
+      "id": "justdowork-forbidden-empty-403",
+      "provider": "JustDoWork",
+      "request": "两种请求都会得到它：① POST /v1/messages 指定不存在的模型；② POST /v1/messages 带 User-Agent: curl/8.7.1",
+      "status": 403,
+      "contentType": null,
+      "body": "",
+      "expectOutcome": "CONCLUSIVE_FAIL",
+      "expectHealth": "FORBIDDEN",
+      "证明": "**403 + 完全空的响应体**，而且「模型不存在」与「客户端被拦」给的是同一条。这直接打穿了 §8.4「关键词优先」的策略：没有 body 就没有关键词，分类器只能落到按状态码分流的 FORBIDDEN，UI 必须承认「上游没说原因」而不是编一个。也说明 curl 形态的 UA 在这家是被拦的（但 okhttp 自报的 UA 反而放行）。"
+    },
+    {
+      "id": "justdowork-anthropic-ok",
+      "provider": "JustDoWork",
+      "request": "POST /v1/messages  ·  x-api-key 与 Authorization: Bearer **两种鉴权头都返回 200**  ·  max_tokens=16",
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"content\":[{\"signature\":\"<已截断：约 700 字节 base64>\",\"thinking\":\"The user just sent \\\"ping\\\" — I should keep my response brief and direct.\",\"type\":\"thinking\"},{\"text\":\"Pong. Ready when you are — what are we working on?\",\"type\":\"text\"}],\"id\":\"msg_578f2fa676354a8d961da87dd1e2b67a\",\"model\":\"claude-opus-5\",\"role\":\"assistant\",\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"type\":\"message\",\"usage\":{\"cost\":0.0010836076504145936,\"input_tokens\":7021,\"kiro_credits\":0.05418038,\"output_tokens\":57}}",
+      "expectOutcome": "SUCCESS",
+      "expectHealth": "OK",
+      "证明": "§5.2 的「鉴权风格兜底」在这家用不上——x-api-key 与 Bearer 都收，所以 authStyle=auto 的重试路径不会被触发；但它仍要留着，因为只测了三家。两个额外观察：`usage` 里带非标准的 `cost` / `kiro_credits`；`input_tokens` 是 7021 而我们只发了「ping」，说明中转站注入了很大的 system prompt——**探测的实际成本按 token 算会比预估高两个数量级**，成本说明不能只按「16 token」讲。"
+    },
+    {
+      "id": "deepseek-invalid-key-401",
+      "provider": "DeepSeek",
+      "request": "GET /v1/models  ·  Authorization: Bearer yj-probe-invalid",
+      "status": 401,
+      "contentType": "application/json",
+      "body": "{\"error\":{\"message\":\"Authentication Fails, Your api key: ****alid is invalid\",\"type\":\"authentication_error\",\"param\":null,\"code\":\"invalid_request_error\"}}",
+      "expectOutcome": "CONCLUSIVE_FAIL",
+      "expectHealth": "UNAUTHORIZED",
+      "证明": "**上游把密钥的后 4 位回显在错误消息里**（`****alid` 是 `yj-probe-invalid` 的尾巴）。§7.5 原来只规定替换「已知明文值及其 ≥8 字符前缀」，挡不住这一形态——`Redactor` 必须同时替换后缀。这条是红线 32 的直接证据，`Redactor` 的单测要把它收进去。"
+    },
+    {
+      "id": "deepseek-no-auth-401-plaintext",
+      "provider": "DeepSeek",
+      "request": "GET /v1/models  ·  完全不带鉴权头",
+      "status": 401,
+      "contentType": "text/plain",
+      "body": "Authentication Fails (governor)",
+      "expectOutcome": "CONCLUSIVE_FAIL",
+      "expectHealth": "UNAUTHORIZED",
+      "证明": "**纯文本 401**，来自 DeepSeek 前面的一层 governor 而不是 API 本身。与 justdowork-cf1015-text-429 一起说明：非 2xx 的响应体经常不是 JSON，解析失败必须走兜底而不是把整条探测判成异常。"
+    },
+    {
+      "id": "deepseek-model-not-found-400",
+      "provider": "DeepSeek",
+      "request": "POST /v1/responses  ·  model=no-such-model-yj-0000  ·  有效密钥",
+      "status": 400,
+      "contentType": "application/json",
+      "body": "{\"error\":{\"message\":\"The supported API model names are deepseek-v4-pro, deepseek-v4-flash, and deepseek-v4-flash-vision-exp, but you passed no-such-model-yj-0000.\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}}",
+      "expectOutcome": "CONCLUSIVE_FAIL",
+      "expectHealth": "模型级 NOT_FOUND；供应商与密钥的 health 不改写",
+      "证明": "**模型不存在返回的是 400，不是 404。** §8.4 原表只在第 12 行写了「404（模型级 L3）→ NOT_FOUND」，按原表这条会掉进第 11 行判成 CONFIG_ERROR，UI 就会说「端点配置有问题」而真相是模型名写错了。矩阵需要补一条「400 且 message 命中模型关键词 → 模型不存在」，且要排在 400 的其它分支之前。"
+    },
+    {
+      "id": "deepseek-responses-incomplete-200",
+      "provider": "DeepSeek",
+      "request": "POST /v1/responses  ·  max_output_tokens=16",
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"id\":\"45d9236d-9aeb-4bd3-bb0d-1db452f8d0e7\",\"object\":\"response\",\"created_at\":1788510503,\"status\":\"incomplete\",\"incomplete_details\":{\"reason\":\"max_output_tokens\"},\"max_output_tokens\":16,\"model\":\"deepseek-v4-flash\",\"output\":[{\"type\":\"reasoning\",\"id\":\"0ec8ca6f-e272-44e4-bdad-2f8f89f11f99\",\"status\":\"incomplete\",\"content\":[{\"type\":\"reasoning_text\",\"text\":\"We need answer ping. User just said \\\"ping\\\". Probably wants ping response?\"}],\"summary\":[]}],\"store\":false,\"usage\":{\"input_tokens\":84,\"output_tokens\":16}}",
+      "expectOutcome": "SUCCESS",
+      "expectHealth": "OK",
+      "证明": "**200 但 `status: \"incomplete\"`，而且 `output` 里只有 reasoning、没有 message。** 16 个 token 全被思考吃掉了。§8.4 第 15 行「2xx 但内容不是预期结构 → CONFIG_ERROR」必须把这一形态排除在外：SUCCESS 的判据只能是「200 + 能解析成 JSON + 没有 error 字段」，**不能要求拿到文本内容**。"
+    },
+    {
+      "id": "deepseek-chat-empty-content-200",
+      "provider": "DeepSeek",
+      "request": "POST /v1/chat/completions  ·  max_tokens=16",
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"id\":\"628c5884-a8bc-440b-a290-72f22e882803\",\"object\":\"chat.completion\",\"created\":1788510505,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"reasoning_content\":\"We need answer to user \\\"ping\\\" likely wants ping? We need respond appropriately\"},\"logprobs\":null,\"finish_reason\":\"length\"}],\"usage\":{\"prompt_tokens\":84,\"completion_tokens\":16,\"total_tokens\":100,\"completion_tokens_details\":{\"reasoning_tokens\":16}}}",
+      "expectOutcome": "SUCCESS",
+      "expectHealth": "OK",
+      "证明": "同上，CHAT 协议的版本：`content` 是**空串**、`finish_reason: \"length\"`、内容全在 `reasoning_content` 里。判 SUCCESS 的代码若要求 `choices[0].message.content` 非空，这家的推理模型会被全部判成失败。§5.2 里「max_tokens 取 16」的理由要补一句：16 只够保证请求被接受，不保证拿到内容。"
+    },
+    {
+      "id": "deepseek-messages-404-empty",
+      "provider": "DeepSeek",
+      "request": "POST /v1/messages  ·  x-api-key + anthropic-version（协议表里的默认路径）",
+      "status": 404,
+      "contentType": null,
+      "body": "",
+      "expectOutcome": "CONCLUSIVE_FAIL",
+      "expectHealth": "CONFIG_ERROR「路径不对，检查 API 地址与路径覆盖」",
+      "证明": "**空 body 的 404。** 与下一条一起证明了 §5.2 里 DeepSeek 需要 `pathOverrides` 这个判断是对的，也证明「不要用启发式猜路径、让用户覆盖」这个决定是对的——猜错时上游一个字都不给你。"
+    },
+    {
+      "id": "deepseek-anthropic-ok",
+      "provider": "DeepSeek",
+      "request": "POST /anthropic/v1/messages  ·  同样的头与 body",
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"id\":\"79548a76-e8e4-4926-a3d5-a1f495769bdb\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"We need answer. User says \\\"ping\\\". Need respond likely test. We can\",\"signature\":\"79548a76-e8e4-4926-a3d5-a1f495769bdb\"}],\"stop_reason\":\"max_tokens\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":84,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":16,\"service_tier\":\"standard\"}}",
+      "expectOutcome": "SUCCESS",
+      "expectHealth": "OK",
+      "证明": "DeepSeek 的 Anthropic 兼容端点确实在 `/anthropic` 下（§5.2 的 pathOverrides 实测确认）。`content` 里同样只有 thinking 没有 text。"
+    }
+  ]
+}
+
+

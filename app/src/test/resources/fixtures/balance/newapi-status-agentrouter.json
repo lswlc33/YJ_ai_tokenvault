@@ -1,0 +1,34 @@
+{
+  "_采集说明": "真实响应 5398 字节，绝大部分是 announcements / faq。这里把那两段替换成占位串，但保留它们排在 quota_per_unit 之前的位置——适配器如果先截断响应体再找字段，就会漏掉换算比（§9.2）。其余字段原样保留，站点自己的 OAuth client id / turnstile site key 已删。",
+  "data": {
+    "announcements": [
+      { "content": "<已省略：公告正文，真实响应里这一段约 3.5 KB>", "extra": "", "id": 15, "publishDate": "2026-07-28T11:36:56.123Z", "type": "default" }
+    ],
+    "announcements_enabled": true,
+    "api_info": [
+      { "color": "blue", "description": "默认 API", "id": 1, "route": "默认 API", "url": "https://agentrouter.org/" }
+    ],
+    "api_info_enabled": true,
+    "display_in_currency": true,
+    "email_verification": false,
+    "faq": [
+      { "answer": "<已省略：原文指向官方支持的客户端列表，并说明 401 就是客户端不被放行>", "id": 8, "question": "401 Unauthorized" }
+    ],
+    "faq_enabled": true,
+    "min_topup": 1,
+    "price": 7.3,
+    "quota_for_invitee": 25000000,
+    "quota_for_inviter": 25000000,
+    "quota_per_unit": 500000,
+    "self_use_mode_enabled": false,
+    "server_address": "https://agentrouter.org",
+    "setup": true,
+    "start_time": 1788244929,
+    "stripe_unit_price": 8,
+    "system_name": "Agent Router",
+    "usd_exchange_rate": 7.12,
+    "version": "init-20260901-138138e7"
+  },
+  "message": "",
+  "success": true
+}

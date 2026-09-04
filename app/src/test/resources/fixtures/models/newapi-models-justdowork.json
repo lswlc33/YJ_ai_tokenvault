@@ -1,0 +1,20 @@
+{
+  "data": [
+    {
+      "id": "claude-opus-5-thinking",
+      "object": "model",
+      "created": 1626777600,
+      "owned_by": "claude",
+      "supported_endpoint_types": ["anthropic", "openai"]
+    },
+    {
+      "id": "claude-opus-5",
+      "object": "model",
+      "created": 1626777600,
+      "owned_by": "claude",
+      "supported_endpoint_types": ["anthropic", "openai"]
+    }
+  ],
+  "object": "list",
+  "success": true
+}

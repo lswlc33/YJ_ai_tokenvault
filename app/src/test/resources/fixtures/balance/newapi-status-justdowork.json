@@ -1,0 +1,30 @@
+{
+  "_采集说明": "真实响应 3136 字节。announcements / faq 与站点自己的 OAuth client id、turnstile site key 已删，其余原样。注意这一家有 quota_display_type 而 Agent Router 没有——所以它不能当必选字段读。",
+  "data": {
+    "announcements": [],
+    "announcements_enabled": true,
+    "custom_currency_exchange_rate": 1,
+    "custom_currency_symbol": "¤",
+    "display_in_currency": true,
+    "password_login_enabled": true,
+    "password_register_enabled": false,
+    "price": 7.3,
+    "privacy_policy_enabled": false,
+    "quota_display_type": "USD",
+    "quota_per_unit": 500000,
+    "register_enabled": true,
+    "self_use_mode_enabled": false,
+    "server_address": "https://api.justwoker.icu",
+    "setup": true,
+    "start_time": 1787058112,
+    "stripe_unit_price": 8,
+    "system_name": "JustDoWork",
+    "theme": "default",
+    "turnstile_check": true,
+    "usd_exchange_rate": 7.3,
+    "user_agreement_enabled": false,
+    "version": "v1.0.0-rc.23"
+  },
+  "message": "",
+  "success": true
+}

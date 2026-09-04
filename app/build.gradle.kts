@@ -112,6 +112,20 @@ android {
     // 分出来的包内容完全一样。
 }
 
+// 会真的联网、会消耗额度的本地探针（M0.5 的协议踩点、M7 的余额适配器实测）默认跳过：
+// 它们靠 `assumeTrue` 自己让开，所以 CI 与 pre-commit 都不会碰到网络。
+// 需要跑的时候显式打开：
+//
+//     .\gradlew.bat :app:testDebugUnitTest --tests "*ProtocolSpike*" -DvaultSpike=true --info
+//
+// 用系统属性而不是环境变量，是因为 Gradle 守护进程可能带着上一次的环境活很久。
+tasks.withType<Test>().configureEach {
+    systemProperty("vaultSpike", providers.systemProperty("vaultSpike").getOrElse(""))
+    testLogging {
+        showStandardStreams = true
+    }
+}
+
 // 用 Room Gradle 插件声明 schema 目录，不用 ksp arg（计划.md §15.9）。
 // schemas/*.json 提交进仓库，否则迁移测试没有基线。
 room {

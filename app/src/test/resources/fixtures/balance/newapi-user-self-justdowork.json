@@ -1,0 +1,42 @@
+{
+  "data": {
+    "aff_code": "<已省略>",
+    "aff_count": 1,
+    "aff_history_quota": 20000000,
+    "aff_quota": 0,
+    "discord_id": "",
+    "display_name": "<已省略>",
+    "email": "<已省略>",
+    "github_id": "<已省略>",
+    "group": "default",
+    "id": 100003,
+    "inviter_id": 0,
+    "linux_do_id": "",
+    "oidc_id": "",
+    "permissions": {
+      "admin_permissions": {
+        "channel": {
+          "operate": false,
+          "read": false,
+          "secret_view": false,
+          "sensitive_write": false,
+          "write": false
+        }
+      },
+      "sidebar_modules": { "admin": false },
+      "sidebar_settings": true
+    },
+    "quota": 127482212,
+    "request_count": 4514,
+    "role": 1,
+    "setting": "{\"gotify_priority\":0}",
+    "status": 1,
+    "stripe_customer": "",
+    "telegram_id": "",
+    "used_quota": 286810320,
+    "username": "<已省略>",
+    "wechat_id": ""
+  },
+  "message": "",
+  "success": true
+}

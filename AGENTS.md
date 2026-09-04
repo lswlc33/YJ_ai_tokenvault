@@ -71,6 +71,25 @@ CI 与单测都会检查。
 `rememberAppTopBarScrollState()` + `Modifier.appTopBarScroll(state)` 绑到本页的
 可滚动容器上。
 
+## 会联网的本地探针
+
+`ProtocolSpike`（M0.5 协议踩点）会真的打 `示例数据.md` 里那三家中转站、真的消耗额度，
+所以它靠 `assumeTrue` **默认跳过**：需要 `-DvaultSpike=true` **且**仓库根存在
+`示例数据.md`，两个条件缺一个就自己让开。CI 与 pre-commit 因此不会碰到网络。
+
+```powershell
+.\gradlew.bat :app:testDebugUnitTest --tests "*ProtocolSpike*" -DvaultSpike=true
+```
+
+跑完在 `.local/spike/` 落两份 JSON：`spike-<ts>.json` 是**未脱敏**的原始响应
+（`.gitignore` 写死 `.local/`，绝不入库），`spike-<ts>-scrubbed.json` 是脱敏版，
+整理 fixture 时读后者。**入库前必须自己再核一遍**——上游会把密钥后 4 位回显在错误消息里，
+new-api 的 `/api/user/self` 还会回显访问令牌、邮箱与用户名。
+
+已经采到的结果在 `app/src/test/resources/fixtures/`，结论写进了 `计划.md` §16
+「M0.5 实测结论」。**不要为了"验证一下"重跑它**：一轮约 30 个请求，上次花掉了
+Agent Router 约 $0.5 的免费额度。
+
 ## 端到端验收（真实数据，只在本机跑）
 
 `示例数据.md` 里是**真实可用的密钥与访问令牌**，永不入库（`.gitignore` 写死）。

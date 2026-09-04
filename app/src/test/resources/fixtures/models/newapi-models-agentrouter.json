@@ -1,0 +1,40 @@
+{
+  "data": [
+    {
+      "id": "claude-opus-4-8",
+      "object": "model",
+      "created": 1626777600,
+      "owned_by": "custom",
+      "supported_endpoint_types": ["anthropic", "openai"]
+    },
+    {
+      "id": "claude-opus-5",
+      "object": "model",
+      "created": 1626777600,
+      "owned_by": "custom",
+      "supported_endpoint_types": ["anthropic", "openai"]
+    },
+    {
+      "id": "deepseek-v4-flash",
+      "object": "model",
+      "created": 1626777600,
+      "owned_by": "custom",
+      "supported_endpoint_types": ["openai", "anthropic"]
+    },
+    {
+      "id": "glm-5.3",
+      "object": "model",
+      "created": 1626777600,
+      "owned_by": "custom",
+      "supported_endpoint_types": ["anthropic", "openai"]
+    },
+    {
+      "id": "gpt-5.6-sol",
+      "object": "model",
+      "created": 1626777600,
+      "owned_by": "custom",
+      "supported_endpoint_types": ["openai"]
+    }
+  ],
+  "success": true
+}

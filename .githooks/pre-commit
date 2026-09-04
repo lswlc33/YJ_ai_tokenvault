@@ -31,6 +31,41 @@ if git diff --cached --name-only | grep -q '示例数据\.md'; then
     exit 1
 fi
 
+# 红线 32 的两道闸，在提交这一层也照做：**先按已知明文值比对，正则只作兜底**。
+#
+# 为什么需要第一道：`n6wrp0Tu…=` 这种 base64 访问令牌不匹配任何 `sk-` / `Bearer` 规则，
+# 下面那条正则完全挡不住它。而这件事真的发生过——计划.md 里曾经把真实访问令牌
+# 当"base64 形态的例子"原样写进正文，三处，靠正则一次都没被拦下来。
+#
+# 只取 示例数据.md 里**明确标注**的那几个值（API Key 行、访问令牌的下一行），
+# 不拿"所有长字符串"去比：域名 api.justwoker.icu 这类本来就该出现在文档里。
+if [ -f 示例数据.md ]; then
+    # 只看**新增**行。整个 diff 一起 grep 会把"这次提交正在删掉一处泄漏"也判成泄漏，
+    # 于是修泄漏的那个提交永远提交不上去。
+    staged_added=$(git diff --cached -U0 | grep '^+' | grep -v '^+++')
+    if [ -n "$staged_added" ]; then
+        known_secrets=$(
+            awk '
+                /^API Key/ { v = $0; sub(/^API Key[[:space:]]*/, "", v); print v; next }
+                /^访问令牌/ { if ((getline v) > 0) print v; next }
+            ' 示例数据.md | tr -d ' \t\r' | awk 'length($0) >= 12' | sort -u
+        )
+        hits=0
+        for secret in $known_secrets; do
+            if printf '%s' "$staged_added" | grep -qF -- "$secret"; then
+                hits=$((hits + 1))
+            fi
+        done
+        if [ "$hits" -gt 0 ]; then
+            echo
+            echo "pre-commit: 暂存区的新增内容里出现了 示例数据.md 中的真实凭据值（$hits 个）。"
+            echo "            这里故意不打印是哪一个——打出来就等于又泄一次。"
+            echo "            自己去 grep 一遍，换成占位串再提交。"
+            exit 1
+        fi
+    fi
+fi
+
 if git diff --cached -U0 | grep -Eq '^\+.*sk-[A-Za-z0-9]{20,}'; then
     echo
     echo "pre-commit: 暂存区里出现了疑似真实 API 密钥的字面量。"
