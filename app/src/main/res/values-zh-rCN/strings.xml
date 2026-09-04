@@ -1,4 +1,4 @@
-<resources>
+﻿<resources>
     <string name="app_name">元记</string>
 
     <!-- Generic -->
@@ -135,4 +135,19 @@
     <string name="sample_key_spare">备用</string>
     <string name="sample_account_github">GitHub 登录</string>
     <string name="sample_account_email">邮箱登录</string>
-</resources>
+    <string name="group_all">全部</string>
+    <string name="manage_search_hint">搜索供应商</string>
+    <string name="manage_groups_cd">分组管理</string>
+    <string name="manage_empty_group_title">这个分组下没有供应商</string>
+    <string name="manage_empty_group_desc">还没有供应商归到这个分组。可以在供应商编辑页里改分组，或者回到「全部」。</string>
+    <string name="groups_title">分组</string>
+    <string name="provider_editor_title">编辑供应商</string>
+    <string name="detail_edit_cd">编辑</string>
+    <string name="detail_section_keys">密钥</string>
+    <string name="detail_section_models">模型</string>
+    <string name="detail_section_accounts">平台账号</string>
+    <string name="detail_accounts_empty">这家还没有平台账号。只存在本地，永远不会替你填写。</string>
+    <string name="detail_add_account">添加平台账号</string>
+    <string name="sample_group_work">工作</string>
+    <string name="sample_group_spare">备用</string>
+    <string name="sample_group_official">官方</string></resources>

@@ -1,4 +1,4 @@
-package com.lc33.tokenvault.screens.dashboard
+﻿package com.lc33.tokenvault.screens.dashboard
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -17,7 +17,6 @@ import com.lc33.tokenvault.screens.model.BalanceSummary
 import com.lc33.tokenvault.screens.model.ContentCounts
 import com.lc33.tokenvault.screens.model.DashboardUiState
 import com.lc33.tokenvault.screens.model.HealthBreakdown
-import com.lc33.tokenvault.screens.model.ManageTab
 import com.lc33.tokenvault.screens.model.UiHealth
 import com.lc33.tokenvault.ui.common.BarSegment
 import com.lc33.tokenvault.ui.common.SegmentedBar
@@ -108,9 +107,11 @@ internal fun BalanceCard(balance: BalanceSummary, onRefresh: () -> Unit) {
 }
 
 @Composable
-internal fun CountsCard(counts: ContentCounts, onOpenTab: (ManageTab) -> Unit) {
+internal fun CountsCard(counts: ContentCounts, onOpenManage: () -> Unit) {
     val tokens = LocalAppTokens.current
-    AppCard(modifier = cardModifier()) {
+    // 整张卡可点，不做"每格跳到各自的表"：管理页只有供应商一张表，
+    // 四格分别跳会是假的路径指示。
+    AppCard(modifier = cardModifier(), onClick = onOpenManage) {
         CardTitle(stringResource(R.string.dashboard_counts_title))
         Row(
             modifier = Modifier
@@ -118,26 +119,10 @@ internal fun CountsCard(counts: ContentCounts, onOpenTab: (ManageTab) -> Unit) {
                 .padding(top = tokens.itemSpacing),
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
-            StatTile(
-                value = counts.providers.toString(),
-                label = stringResource(R.string.count_providers),
-                onClick = { onOpenTab(ManageTab.Providers) },
-            )
-            StatTile(
-                value = counts.keys.toString(),
-                label = stringResource(R.string.count_keys),
-                onClick = { onOpenTab(ManageTab.Keys) },
-            )
-            StatTile(
-                value = counts.models.toString(),
-                label = stringResource(R.string.count_models),
-                onClick = { onOpenTab(ManageTab.Models) },
-            )
-            StatTile(
-                value = counts.accounts.toString(),
-                label = stringResource(R.string.count_accounts),
-                onClick = { onOpenTab(ManageTab.Accounts) },
-            )
+            StatTile(value = counts.providers.toString(), label = stringResource(R.string.count_providers))
+            StatTile(value = counts.keys.toString(), label = stringResource(R.string.count_keys))
+            StatTile(value = counts.models.toString(), label = stringResource(R.string.count_models))
+            StatTile(value = counts.accounts.toString(), label = stringResource(R.string.count_accounts))
         }
     }
 }

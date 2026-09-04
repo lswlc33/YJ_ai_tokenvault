@@ -1,4 +1,4 @@
-package com.lc33.tokenvault.screens.sample
+﻿package com.lc33.tokenvault.screens.sample
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
@@ -11,6 +11,8 @@ import com.lc33.tokenvault.screens.model.DashboardUiState
 import com.lc33.tokenvault.screens.model.HealthBreakdown
 import com.lc33.tokenvault.screens.model.ManageUiState
 import com.lc33.tokenvault.screens.model.ProbeRunSummary
+import com.lc33.tokenvault.screens.model.ProviderDetailUiState
+import com.lc33.tokenvault.screens.model.UiGroup
 import com.lc33.tokenvault.screens.model.UiAccountRow
 import com.lc33.tokenvault.screens.model.UiHealth
 import com.lc33.tokenvault.screens.model.UiKeyRow
@@ -75,12 +77,30 @@ object SampleContent {
     )
 
     @Composable
-    fun manage(): ManageUiState = ManageUiState(
-        providers = providers(),
-        keys = keys(),
-        models = models(),
-        accounts = accounts(),
-    )
+    fun manage(): ManageUiState {
+        val providers = providers()
+        return ManageUiState(
+            groups = listOf(
+                UiGroup(id = null, name = stringResource(R.string.group_all), providerCount = providers.size),
+                UiGroup(id = 1L, name = stringResource(R.string.sample_group_work), providerCount = 1),
+                UiGroup(id = 2L, name = stringResource(R.string.sample_group_spare), providerCount = 1),
+                UiGroup(id = 3L, name = stringResource(R.string.sample_group_official), providerCount = 1),
+            ),
+            providers = providers,
+        )
+    }
+
+    /** 供应商详情。找不到就退回第一家——M0.8 阶段没有"这一家被删了"这种状态。 */
+    @Composable
+    fun detail(providerId: Long): ProviderDetailUiState {
+        val provider = providers().firstOrNull { it.id == providerId } ?: providers().first()
+        return ProviderDetailUiState(
+            provider = provider,
+            keys = keys().filter { it.providerId == provider.id },
+            models = models().filter { it.providerId == provider.id },
+            accounts = accounts().filter { it.providerId == provider.id },
+        )
+    }
 
     @Composable
     private fun providers(): List<UiProviderRow> = listOf(
@@ -92,6 +112,7 @@ object SampleContent {
             protocols = listOf("Chat", "Responses", "Anthropic"),
             colorIndex = 0,
             pinned = true,
+            groupId = 1L,
             keyCount = 1,
             okKeyCount = 0,
             modelCount = 5,
@@ -107,6 +128,7 @@ object SampleContent {
             protocols = listOf("Anthropic"),
             colorIndex = 1,
             pinned = false,
+            groupId = 2L,
             keyCount = 2,
             okKeyCount = 2,
             modelCount = 2,
@@ -122,6 +144,7 @@ object SampleContent {
             protocols = listOf("Chat", "Responses"),
             colorIndex = 2,
             pinned = false,
+            groupId = 3L,
             keyCount = 1,
             okKeyCount = 1,
             modelCount = 3,
@@ -138,7 +161,6 @@ object SampleContent {
             id = 11L,
             label = stringResource(R.string.sample_key_main),
             providerId = 1L,
-            providerName = "Agent Router",
             masked = "sk-LWxU…JrG0",
             health = UiHealth.Warn,
             latencyMs = null,
@@ -149,7 +171,6 @@ object SampleContent {
             id = 21L,
             label = stringResource(R.string.sample_key_main),
             providerId = 2L,
-            providerName = "JustDoWork",
             masked = "sk-k7Ks…Xp9G",
             health = UiHealth.Ok,
             latencyMs = 412,
@@ -160,7 +181,6 @@ object SampleContent {
             id = 22L,
             label = stringResource(R.string.sample_key_spare),
             providerId = 2L,
-            providerName = "JustDoWork",
             masked = "sk-9fQ2…mA7T",
             health = UiHealth.Unknown,
             latencyMs = null,
@@ -171,7 +191,6 @@ object SampleContent {
             id = 31L,
             label = stringResource(R.string.sample_key_main),
             providerId = 3L,
-            providerName = "DeepSeek",
             masked = "sk-74ac…3ae3",
             health = UiHealth.Ok,
             latencyMs = 236,
@@ -182,20 +201,19 @@ object SampleContent {
 
     @Composable
     private fun models(): List<UiModelRow> = listOf(
-        model(101L, "gpt-5.6-sol", 1L, "Agent Router", "Responses", UiModelSource.Manual, UiHealth.Warn, true, "400K"),
-        model(102L, "claude-opus-5", 1L, "Agent Router", "Anthropic", UiModelSource.Discovered, UiHealth.Unknown, true, "200K"),
-        model(103L, "glm-5.3", 1L, "Agent Router", "Anthropic", UiModelSource.Discovered, UiHealth.Unknown, false, null),
-        model(201L, "claude-opus-5", 2L, "JustDoWork", "Anthropic", UiModelSource.Manual, UiHealth.Ok, true, "200K"),
-        model(202L, "claude-opus-5-thinking", 2L, "JustDoWork", "Anthropic", UiModelSource.Discovered, UiHealth.Ok, true, "200K"),
-        model(301L, "deepseek-v4-flash", 3L, "DeepSeek", "Responses", UiModelSource.Manual, UiHealth.Ok, true, "128K"),
-        model(302L, "deepseek-v4-pro", 3L, "DeepSeek", "Chat", UiModelSource.Discovered, UiHealth.Unknown, true, "128K"),
+        model(101L, "gpt-5.6-sol", 1L, "Responses", UiModelSource.Manual, UiHealth.Warn, true, "400K"),
+        model(102L, "claude-opus-5", 1L, "Anthropic", UiModelSource.Discovered, UiHealth.Unknown, true, "200K"),
+        model(103L, "glm-5.3", 1L, "Anthropic", UiModelSource.Discovered, UiHealth.Unknown, false, null),
+        model(201L, "claude-opus-5", 2L, "Anthropic", UiModelSource.Manual, UiHealth.Ok, true, "200K"),
+        model(202L, "claude-opus-5-thinking", 2L, "Anthropic", UiModelSource.Discovered, UiHealth.Ok, true, "200K"),
+        model(301L, "deepseek-v4-flash", 3L, "Responses", UiModelSource.Manual, UiHealth.Ok, true, "128K"),
+        model(302L, "deepseek-v4-pro", 3L, "Chat", UiModelSource.Discovered, UiHealth.Unknown, true, "128K"),
     )
 
     private fun model(
         id: Long,
         modelId: String,
         providerId: Long,
-        providerName: String,
         protocol: String,
         source: UiModelSource,
         health: UiHealth,
@@ -206,7 +224,6 @@ object SampleContent {
         modelId = modelId,
         displayName = null,
         providerId = providerId,
-        providerName = providerName,
         protocol = protocol,
         source = source,
         health = health,
@@ -220,14 +237,12 @@ object SampleContent {
             id = 41L,
             label = stringResource(R.string.sample_account_github),
             providerId = 1L,
-            providerName = "Agent Router",
             maskedUsername = "gith…9627",
         ),
         UiAccountRow(
             id = 42L,
             label = stringResource(R.string.sample_account_email),
             providerId = 2L,
-            providerName = "JustDoWork",
             maskedUsername = "lswl….com",
         ),
     )

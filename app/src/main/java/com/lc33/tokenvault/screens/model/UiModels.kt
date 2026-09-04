@@ -1,4 +1,4 @@
-package com.lc33.tokenvault.screens.model
+﻿package com.lc33.tokenvault.screens.model
 
 /**
  * 页面层的展示模型。
@@ -21,6 +21,17 @@ enum class UiHealth {
 /** 已格式化的金额。币种单独存，因为首页按币种分组且**不做汇率换算**（§9.3）。 */
 data class UiMoney(val currency: String, val amount: String)
 
+/**
+ * 用户自定义的分组。管理页的筛选条就是它们。
+ *
+ * [id] 为 null 表示「全部」那一枚伪分组——它不入库，只是筛选条上的第一项。
+ */
+data class UiGroup(
+    val id: Long?,
+    val name: String,
+    val providerCount: Int,
+)
+
 data class UiProviderRow(
     val id: Long,
     val name: String,
@@ -29,6 +40,7 @@ data class UiProviderRow(
     val protocols: List<String>,
     val colorIndex: Int,
     val pinned: Boolean,
+    val groupId: Long?,
     val keyCount: Int,
     val okKeyCount: Int,
     val modelCount: Int,
@@ -43,8 +55,7 @@ data class UiKeyRow(
     val id: Long,
     val label: String,
     val providerId: Long,
-    val providerName: String,
-    /** 入库时算好的静态遮蔽串。列表页不解密，所以这里不可能是明文。 */
+    /** 入库时算好的静态遮蔽串。这个类里**没有明文字段**，所以画不出明文（§6.1 推论 3）。 */
     val masked: String,
     val health: UiHealth,
     val latencyMs: Long?,
@@ -62,7 +73,6 @@ data class UiModelRow(
     val modelId: String,
     val displayName: String?,
     val providerId: Long,
-    val providerName: String,
     val protocol: String,
     val source: UiModelSource,
     val health: UiHealth,
@@ -74,7 +84,6 @@ data class UiAccountRow(
     val id: Long,
     val label: String,
     val providerId: Long,
-    val providerName: String,
-    /** 只给遮蔽串。密码连遮蔽串都不进列表——它只在详情页展开（红线 21）。 */
+    /** 只给遮蔽串。密码连遮蔽串都不给——它只在展开时现算（红线 21）。 */
     val maskedUsername: String,
 )

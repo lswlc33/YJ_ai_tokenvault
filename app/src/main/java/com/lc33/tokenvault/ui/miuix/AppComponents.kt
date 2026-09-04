@@ -306,6 +306,57 @@ fun AppChip(text: String, modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * 可选中的筛选标签。管理页的分组筛选条由一排它组成。
+ *
+ * 用 chip 而不是 `AppTabRow`：分组数量由用户决定（可能 2 个也可能 15 个），
+ * 固定分段放不下；chip 行放在 `LazyRow` 里天然可横滑。
+ */
+@Composable
+fun AppFilterChip(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    trailingText: String? = null,
+) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(10.dp),
+        color = if (selected) {
+            MiuixTheme.colorScheme.surfaceContainerHighest
+        } else {
+            MiuixTheme.colorScheme.surfaceContainer
+        },
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+            Text(
+                text = text,
+                color = if (selected) {
+                    MiuixTheme.colorScheme.onSurface
+                } else {
+                    MiuixTheme.colorScheme.onSurfaceVariantSummary
+                },
+                style = MiuixTheme.textStyles.body2,
+                maxLines = 1,
+            )
+            if (trailingText != null) {
+                Text(
+                    text = trailingText,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    style = MiuixTheme.textStyles.footnote1,
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
 /** 进度条。`progress` 为 null 时是不确定进度。 */
 @Composable
 fun AppLinearProgress(progress: Float?, modifier: Modifier = Modifier) {

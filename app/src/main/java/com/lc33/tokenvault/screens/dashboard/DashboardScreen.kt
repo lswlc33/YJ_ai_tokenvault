@@ -1,4 +1,4 @@
-package com.lc33.tokenvault.screens.dashboard
+﻿package com.lc33.tokenvault.screens.dashboard
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -16,7 +16,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.lc33.tokenvault.R
 import com.lc33.tokenvault.screens.model.DashboardUiState
-import com.lc33.tokenvault.screens.model.ManageTab
 import com.lc33.tokenvault.ui.common.EmptyState
 import com.lc33.tokenvault.ui.miuix.AppScaffold
 import com.lc33.tokenvault.ui.miuix.AppTopBar
@@ -38,7 +37,7 @@ import com.lc33.tokenvault.ui.theme.LocalAppTokens
 fun DashboardScreen(
     state: DashboardUiState,
     onOpenProvider: (Long) -> Unit,
-    onOpenManageTab: (ManageTab) -> Unit,
+    onOpenManage: () -> Unit,
     onOpenProbeRun: () -> Unit,
     onOpenSync: () -> Unit,
     onStartProbe: () -> Unit,
@@ -61,7 +60,7 @@ fun DashboardScreen(
                 title = stringResource(R.string.dashboard_empty_title),
                 description = stringResource(R.string.dashboard_empty_desc),
                 actionText = stringResource(R.string.dashboard_empty_new),
-                onAction = { onOpenManageTab(ManageTab.Providers) },
+                onAction = onOpenManage,
                 modifier = Modifier.padding(padding),
             )
             return@AppScaffold
@@ -74,7 +73,7 @@ fun DashboardScreen(
             verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
         ) {
             item { BalanceCard(state.balance, onRefreshBalance) }
-            item { CountsCard(state.counts, onOpenManageTab) }
+            item { CountsCard(state.counts, onOpenManage) }
             item { HealthCard(state.health) }
             item { AttentionCard(state.attention, onOpenProvider) }
             item { ProbeCard(state, onStartProbe, onCancelProbe, onOpenProbeRun) }

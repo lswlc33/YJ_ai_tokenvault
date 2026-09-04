@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -147,9 +148,9 @@ internal fun ProviderRow(row: UiProviderRow, onClick: (Long) -> Unit) {
 }
 
 @Composable
-internal fun KeyRow(row: UiKeyRow, onClick: (Long) -> Unit) {
+internal fun KeyRow(row: UiKeyRow, onClick: () -> Unit) {
     val tokens = LocalAppTokens.current
-    AppCard(modifier = rowModifier(), onClick = { onClick(row.providerId) }) {
+    AppCard(modifier = rowModifier(), onClick = onClick) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
@@ -167,13 +168,7 @@ internal fun KeyRow(row: UiKeyRow, onClick: (Long) -> Unit) {
                     )
                     if (row.isDefault) AppChip(text = stringResource(R.string.manage_default_key))
                 }
-                AppText(
-                    text = row.providerName,
-                    style = AppTextStyle.Footnote,
-                    color = appSecondaryTextColor,
-                    maxLines = 1,
-                )
-                // 列表页只有遮蔽串。明文是详情页借 DEK 现算的（§6.1 推论 3），
+                // 只有遮蔽串。明文是借 DEK 现算的（§6.1 推论 3），UiKeyRow 里没有明文字段，
                 // 所以这里连"想画明文"都做不到。
                 AppText(
                     text = row.masked,
@@ -205,9 +200,9 @@ internal fun KeyRow(row: UiKeyRow, onClick: (Long) -> Unit) {
 }
 
 @Composable
-internal fun ModelRow(row: UiModelRow, onClick: (Long) -> Unit) {
+internal fun ModelRow(row: UiModelRow, onClick: () -> Unit) {
     val tokens = LocalAppTokens.current
-    AppCard(modifier = rowModifier(), onClick = { onClick(row.providerId) }) {
+    AppCard(modifier = rowModifier(), onClick = onClick) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
@@ -217,13 +212,7 @@ internal fun ModelRow(row: UiModelRow, onClick: (Long) -> Unit) {
                     text = row.modelId,
                     style = AppTextStyle.Body,
                     fontFamily = tokens.monoFontFamily,
-                    color = if (row.enabled) androidx.compose.ui.graphics.Color.Unspecified else appSecondaryTextColor,
-                    maxLines = 1,
-                )
-                AppText(
-                    text = row.providerName,
-                    style = AppTextStyle.Footnote,
-                    color = appSecondaryTextColor,
+                    color = if (row.enabled) Color.Unspecified else appSecondaryTextColor,
                     maxLines = 1,
                 )
                 Row(
@@ -257,22 +246,16 @@ internal fun ModelRow(row: UiModelRow, onClick: (Long) -> Unit) {
 }
 
 @Composable
-internal fun AccountRow(row: UiAccountRow, onClick: (Long) -> Unit) {
+internal fun AccountRow(row: UiAccountRow, onClick: () -> Unit) {
     val tokens = LocalAppTokens.current
-    AppCard(modifier = rowModifier(), onClick = { onClick(row.providerId) }) {
+    AppCard(modifier = rowModifier(), onClick = onClick) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 AppText(text = row.label, style = AppTextStyle.Body, maxLines = 1)
-                AppText(
-                    text = row.providerName,
-                    style = AppTextStyle.Footnote,
-                    color = appSecondaryTextColor,
-                    maxLines = 1,
-                )
-                // 账号给遮蔽串，密码**连遮蔽串都不给**——它只在详情页展开（红线 21）
+                // 账号给遮蔽串，密码**连遮蔽串都不给**——它只在展开时现算（红线 21）
                 AppText(
                     text = row.maskedUsername,
                     style = AppTextStyle.Footnote,

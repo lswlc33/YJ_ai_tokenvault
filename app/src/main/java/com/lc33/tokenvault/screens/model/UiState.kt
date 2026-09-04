@@ -78,18 +78,27 @@ data class DashboardUiState(
     val isEmpty: Boolean get() = counts.providers == 0
 }
 
-enum class ManageTab {
-    Providers,
-    Keys,
-    Models,
-    Accounts,
+/**
+ * 管理页。**只列供应商**——密钥 / 模型 / 平台账号在 [ProviderDetailUiState] 里。
+ *
+ * 第一版做成四个分段是过度设计：四张表里三张的每一行都得带"所属供应商"才看得懂，
+ * 等于把详情页的信息拆碎摊在四个地方。
+ */
+data class ManageUiState(
+    val query: String = "",
+    /** 第一枚固定是「全部」（`id == null`），其余是用户自定义分组。 */
+    val groups: List<UiGroup> = emptyList(),
+    val selectedGroupId: Long? = null,
+    val providers: List<UiProviderRow> = emptyList(),
+) {
+    /** 当前分组下要显示的行。分组是纯 UI 筛选，不需要回数据层重查。 */
+    val visibleProviders: List<UiProviderRow>
+        get() = if (selectedGroupId == null) providers else providers.filter { it.groupId == selectedGroupId }
 }
 
-data class ManageUiState(
-    val tab: ManageTab = ManageTab.Providers,
-    val query: String = "",
-    val providers: List<UiProviderRow> = emptyList(),
-    val keys: List<UiKeyRow> = emptyList(),
-    val models: List<UiModelRow> = emptyList(),
-    val accounts: List<UiAccountRow> = emptyList(),
+data class ProviderDetailUiState(
+    val provider: UiProviderRow,
+    val keys: List<UiKeyRow>,
+    val models: List<UiModelRow>,
+    val accounts: List<UiAccountRow>,
 )

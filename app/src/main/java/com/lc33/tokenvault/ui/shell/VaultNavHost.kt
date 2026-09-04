@@ -14,7 +14,7 @@ import com.lc33.tokenvault.R
 import com.lc33.tokenvault.screens.common.PlaceholderScreen
 import com.lc33.tokenvault.screens.dashboard.DashboardScreen
 import com.lc33.tokenvault.screens.manage.ManageScreen
-import com.lc33.tokenvault.screens.model.ManageTab
+import com.lc33.tokenvault.screens.manage.ProviderDetailScreen
 import com.lc33.tokenvault.screens.sample.SampleContent
 import com.lc33.tokenvault.screens.settings.AboutScreen
 import com.lc33.tokenvault.screens.settings.SettingsScreen
@@ -31,11 +31,10 @@ fun VaultNavHost(
     nav: NavHostController,
     modifier: Modifier = Modifier,
 ) {
-    // 分段选择跨导航保留：从仪表盘点"密钥"进管理页，回来再进还应该停在密钥分段。
-    var manageTab by remember { mutableStateOf(ManageTab.Providers) }
+    // 分组筛选跨导航保留：进详情再返回，应该还停在刚才那个分组。
+    var selectedGroupId by remember { mutableStateOf<Long?>(null) }
 
-    fun openManage(tab: ManageTab) {
-        manageTab = tab
+    fun openManage() {
         nav.navigate(ManageRoute) {
             popUpTo<DashboardRoute> { saveState = true }
             launchSingleTop = true
@@ -52,7 +51,7 @@ fun VaultNavHost(
             DashboardScreen(
                 state = SampleContent.dashboard(),
                 onOpenProvider = { id -> nav.navigate(ProviderDetailRoute(id)) },
-                onOpenManageTab = ::openManage,
+                onOpenManage = ::openManage,
                 onOpenProbeRun = { nav.navigate(ProbeRunRoute) },
                 onOpenSync = { nav.navigate(SyncRoute) },
                 onStartProbe = {},
@@ -63,9 +62,10 @@ fun VaultNavHost(
 
         composable<ManageRoute> {
             ManageScreen(
-                state = SampleContent.manage().copy(tab = manageTab),
-                onSelectTab = { tab -> manageTab = tab },
+                state = SampleContent.manage().copy(selectedGroupId = selectedGroupId),
+                onSelectGroup = { id -> selectedGroupId = id },
                 onOpenProvider = { id -> nav.navigate(ProviderDetailRoute(id)) },
+                onOpenGroups = { nav.navigate(GroupsRoute) },
                 onNewProvider = { nav.navigate(ProviderEditorRoute()) },
                 onImport = { nav.navigate(ImportRoute) },
             )
@@ -86,16 +86,21 @@ fun VaultNavHost(
 
         composable<AboutRoute> { AboutScreen(onBack = { nav.popBackStack() }) }
 
-        // 以下都是 M0.8 立起来的空壳，内容各归各的里程碑（见 §16）
         val back: () -> Unit = { nav.popBackStack() }
+
         composable<ProviderDetailRoute> { entry ->
-            // 取一下参数，确认类型安全路由真的把 id 传进来了
-            entry.toRoute<ProviderDetailRoute>()
-            PlaceholderScreen(titleRes = R.string.provider_detail_title, onBack = back)
+            val route = entry.toRoute<ProviderDetailRoute>()
+            ProviderDetailScreen(
+                state = SampleContent.detail(route.id),
+                onBack = back,
+                onEdit = { nav.navigate(ProviderEditorRoute(route.id)) },
+            )
         }
-        composable<ProviderEditorRoute> { PlaceholderScreen(R.string.provider_detail_title, back) }
+
+        // 以下都是 M0.8 立起来的空壳，内容各归各的里程碑（见 §16）
+        composable<ProviderEditorRoute> { PlaceholderScreen(R.string.provider_editor_title, back) }
         composable<ImportRoute> { PlaceholderScreen(R.string.dashboard_empty_import, back) }
-        composable<GroupsRoute> { PlaceholderScreen(R.string.settings_data, back) }
+        composable<GroupsRoute> { PlaceholderScreen(R.string.groups_title, back) }
         composable<ProbeRunRoute> { PlaceholderScreen(R.string.probe_run_title, back) }
         composable<BalanceBreakdownRoute> { PlaceholderScreen(R.string.dashboard_balance_title, back) }
         composable<AppearanceRoute> { PlaceholderScreen(R.string.appearance_title, back) }

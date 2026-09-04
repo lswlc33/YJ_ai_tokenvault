@@ -1,4 +1,4 @@
-<resources>
+﻿<resources>
     <string name="app_name">YuanJi</string>
 
     <!-- Generic -->
@@ -135,4 +135,19 @@
     <string name="sample_key_spare">Spare</string>
     <string name="sample_account_github">GitHub sign-in</string>
     <string name="sample_account_email">Email sign-in</string>
-</resources>
+    <string name="group_all">All</string>
+    <string name="manage_search_hint">Search providers</string>
+    <string name="manage_groups_cd">Manage groups</string>
+    <string name="manage_empty_group_title">Nothing in this group</string>
+    <string name="manage_empty_group_desc">No provider is assigned to this group yet. Assign one in the provider editor, or go back to All.</string>
+    <string name="groups_title">Groups</string>
+    <string name="provider_editor_title">Edit provider</string>
+    <string name="detail_edit_cd">Edit</string>
+    <string name="detail_section_keys">Keys</string>
+    <string name="detail_section_models">Models</string>
+    <string name="detail_section_accounts">Platform accounts</string>
+    <string name="detail_accounts_empty">No platform account for this provider. Stored locally, never filled in for you.</string>
+    <string name="detail_add_account">Add platform account</string>
+    <string name="sample_group_work">Work</string>
+    <string name="sample_group_spare">Spare</string>
+    <string name="sample_group_official">Official</string></resources>
