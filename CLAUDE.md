@@ -157,16 +157,23 @@ M0.5（协议踩点）已完成，2026-09-04。`ProtocolSpike.kt` 打了三家�
 M5 的 `classify()` 单测直接读它）。红线 33–35 就是这一轮补的。
 唯一没拿到的是**额度耗尽的真实响应**（三个账号都还有余额），记在 §18。
 
-M0.8（界面骨架）**第一轮已完成**：底栏改成仪表盘 · 管理 · 设置，三个一级页按 §13.4 做出外观
-（仪表盘六块卡、管理页四个分段与四种行样式、设置页四块导航），全部路由与二级页壳立起来，
-`ui/miuix` 补了 `AppTabRow` / `AppChip` / `AppSearchField` / `AppFab` / `AppBottomSheet` /
-`AppLinearProgress` / `AppSwitchRow` / `AppDropdownRow`，`ui/common` 补了 `StatusDot` /
-`SegmentedBar` / `StatTile` / `HealthVisuals`，样例数据在 `screens/sample/`（M3 删掉）。
-模拟器上中英双语都验过。**还没做**：五个二级设置页与同步/更新页的真实内容（现在是空壳）、
-深浅色对比截图、宽屏双栏、`SecretText` / `RelativeTime` / `AppRefreshBox`。
+M0.8（界面骨架）**已完成第二轮**：底栏是仪表盘 · 管理 · 设置；仪表盘六块卡；管理页
+**只列供应商** + 用户自定义分组的横滑筛选条；供应商详情页（头部卡 + 密钥 / 模型 /
+平台账号三段）；设置页四块导航 + **七个二级页做出真实内容**（外观 / 安全 / 探测 /
+客户端预设 / 数据 / 同步 / 更新）。`ui/miuix` 补了 `AppTabRow` / `AppChip` /
+`AppFilterChip` / `AppSearchField` / `AppFab` / `AppBottomSheet` / `AppLinearProgress` /
+`AppSwitchRow` / `AppDropdownRow`，`ui/common` 补了 `StatusDot` / `SegmentedBar` /
+`StatTile` / `HealthVisuals`，样例数据在 `screens/sample/`（M3 删掉）。
+模拟器上中英双语都验过，strings 两份键名用脚本对齐过（各 226 条 + 5 个 string-array）。
+
+**还剩**：供应商编辑 / 导入 / 分组管理 / 探测明细 / 余额明细五个二级页仍是空壳；
+`SecretText` / `RelativeTime` / `AppRefreshBox` 没做；深浅色对比截图、宽屏双栏没做。
 
 `AppTabRow` **没有用 MIUIX 的 `TabRow`**：它给所有分段算同一个固定宽度再加内边距，
 四个英文标签在 360dp 宽的屏上必然被截断，而 `minWidth` / `maxWidth` 都改不动
 （真正的上限是"可用宽度 ÷ 分段数"）。现在是自己用 `Surface` + `weight` 拼的。
+它当前没有使用者，留给 M3 的详情页按协议给模型分组。
+
+**strings.xml 里不要写 Markdown**：`**加粗**` 会原样显示成星号。强调靠断句和词序。
 
 下一步 M1（安全底座）。里程碑表见 `计划.md` §16。

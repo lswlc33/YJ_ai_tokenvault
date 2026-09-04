@@ -150,4 +150,135 @@
     <string name="detail_add_account">Add platform account</string>
     <string name="sample_group_work">Work</string>
     <string name="sample_group_spare">Spare</string>
-    <string name="sample_group_official">Official</string></resources>
+    <string name="sample_group_official">Official</string>    <!-- Appearance -->
+    <string name="appearance_section_theme">Theme</string>
+    <string name="appearance_color_scheme">Color scheme</string>
+    <string name="appearance_squircle">Squircle corners</string>
+    <string name="appearance_squircle_summary">MIUIX-style continuous curvature instead of plain rounded corners</string>
+    <string name="appearance_blur">Blur the navigation bar</string>
+    <string name="appearance_blur_summary">Looks better, costs a little GPU time. Turn it off on older phones.</string>
+    <string name="appearance_section_language">Language</string>
+    <string name="appearance_language">App language</string>
+    <string name="appearance_language_summary">Opens the system per-app language page, so there is only one place that owns it</string>
+    <string-array name="color_scheme_modes">
+        <item>Follow system</item>
+        <item>Light</item>
+        <item>Dark</item>
+        <item>Wallpaper colors, follow system</item>
+        <item>Wallpaper colors, light</item>
+        <item>Wallpaper colors, dark</item>
+    </string-array>
+
+    <!-- Security -->
+    <string name="security_section_credential">Credentials</string>
+    <string name="security_change_pin">Change PIN or use a passphrase</string>
+    <string name="security_change_pin_summary">Only re-wraps the data key, so it is instant and touches no records</string>
+    <string name="security_recovery_key">Recovery key</string>
+    <string name="security_recovery_key_summary">The only way back in if you forget the PIN. Write it down somewhere else.</string>
+    <string name="security_biometric">Unlock with biometrics</string>
+    <string name="security_biometric_summary">Another path to the same data key, not a second lock. Re-enrolling a fingerprint invalidates it.</string>
+    <string name="security_section_lock">Auto-lock</string>
+    <string name="security_auto_lock">Lock after leaving the app</string>
+    <string name="security_idle_lock">Lock when idle in the foreground</string>
+    <string name="security_idle_lock_summary">Paused while a probe or a backup is running, otherwise the job would interrupt itself</string>
+    <string name="security_lock_on_screen_off">Lock when the screen turns off</string>
+    <string name="security_section_leak">Leak surface</string>
+    <string name="security_secure_flag">Block screenshots of plaintext</string>
+    <string name="security_secure_flag_summary">Turning this off lets screenshots and screen recording capture keys and passwords</string>
+    <string name="security_clipboard_clear">Clear the clipboard after copying</string>
+    <string name="security_clipboard_clear_summary">Applies to keys, accounts and passwords alike</string>
+    <string-array name="auto_lock_options">
+        <item>Immediately</item>
+        <item>After 30 seconds</item>
+        <item>After 1 minute</item>
+        <item>After 5 minutes</item>
+        <item>Never</item>
+    </string-array>
+    <string-array name="clipboard_clear_options">
+        <item>After 30 seconds</item>
+        <item>After 60 seconds</item>
+        <item>After 5 minutes</item>
+        <item>Never</item>
+    </string-array>    <!-- Probe settings -->
+    <string name="probe_section_when">When to probe</string>
+    <string name="probe_auto_when">Automatic probing</string>
+    <string name="probe_section_cost">Cost</string>
+    <string name="probe_enable_l3">Probe each model</string>
+    <string name="probe_enable_l3_summary">One real call per model. Off by default; automatic probing never includes it.</string>
+    <string name="probe_allow_upgraded_l2">Let key checks spend credit when needed</string>
+    <string name="probe_allow_upgraded_l2_summary">If a gateway does not authenticate its model list, checking a key falls back to one real call. Output is capped at 16 tokens, but the input token count is decided by the gateway and can run into the thousands — measured 7021 for a single "ping".</string>
+    <string name="probe_thresholds">Low-balance thresholds</string>
+    <string name="probe_thresholds_summary">Per currency. Defaults: USD 5, CNY 30.</string>
+    <string name="probe_section_rate">Rate limiting</string>
+    <string name="probe_pacing">Per-host pacing and budget</string>
+    <string name="probe_pacing_summary">Concurrency alone is not enough: a Cloudflare-fronted gateway returned error 1015 on the third request within 2.4 seconds. There is a minimum gap between requests to the same host.</string>
+    <string name="probe_section_client">Client disguise</string>
+    <string name="probe_sniff">Match a client profile automatically</string>
+    <string name="probe_sniff_summary">On a manual probe only. Stops immediately if the host rate-limits us.</string>
+    <string name="probe_keywords">Client-block keywords</string>
+    <string name="probe_keywords_summary">Response text that means "wrong client" rather than "bad key". Some gateways answer 401 for this.</string>
+    <string name="probe_section_network">Network</string>
+    <string name="probe_verbose_log">Verbose HTTP log</string>
+    <string name="probe_verbose_log_summary">Records response bodies, truncated to 2 KB and redacted. Off by default because upstream errors echo parts of your key.</string>
+    <string name="probe_proxy">Manual HTTP proxy</string>
+    <string name="probe_proxy_summary">Empty means use the system proxy</string>
+    <string-array name="auto_probe_options">
+        <item>Off</item>
+        <item>After unlocking</item>
+        <item>Every 6 hours, Wi-Fi only</item>
+        <item>Daily, Wi-Fi only</item>
+    </string-array>
+
+    <!-- Data -->
+    <string name="data_section_catalog">Model metadata</string>
+    <string name="data_catalog">Sync from models.dev</string>
+    <string name="data_catalog_summary">Context window, output limit, pricing and modalities. Runs even while the vault is locked — it touches no secrets.</string>
+    <string name="data_section_organize">Organise</string>
+    <string name="data_groups_summary">Create, rename, reorder and delete the groups used on the manage page</string>
+    <string name="data_section_log">Log</string>
+    <string name="data_log">Open the log</string>
+    <string name="data_log_summary">Redacted before it is written. Survives restarts, capped by count and age.</string>
+    <string name="data_section_danger">Destructive</string>
+    <string name="data_clear_probe">Clear probe results</string>
+    <string name="data_clear_probe_summary">Everything goes back to "not probed". Keys, models and accounts are kept.</string>
+    <string name="data_clear_log">Clear the log</string>
+    <string name="data_clear_log_summary">Cannot be undone</string>    <!-- Sync -->
+    <string name="sync_section_local">Backup file</string>
+    <string name="sync_export">Export an encrypted backup</string>
+    <string name="sync_export_summary">Self-contained: it carries its own KDF parameters and salt, so it restores on a phone that has never seen this one</string>
+    <string name="sync_import">Restore from a backup</string>
+    <string name="sync_import_summary">Preview first, then choose how to merge. A local snapshot is taken before anything is written.</string>
+    <string name="sync_passphrase">Backup passphrase</string>
+    <string name="sync_passphrase_summary">Defaults to your PIN. A 6-digit PIN is minutes-to-crack offline, so set a long passphrase before putting a backup on the cloud.</string>
+    <string name="sync_section_webdav">WebDAV</string>
+    <string name="sync_webdav">Server, credentials and folder</string>
+    <string name="sync_webdav_summary">https only. Plain http would send Basic credentials and the whole backup in the clear, so it is refused rather than warned about.</string>
+    <string name="sync_section_auto">Scheduled backup</string>
+    <string name="sync_auto">Back up automatically</string>
+    <string name="sync_auto_summary">Skipped while the vault is locked, and made up after the next unlock</string>
+    <string name="sync_auto_wifi">Wi-Fi only</string>
+
+    <!-- Update -->
+    <string name="update_section_channel">Channel</string>
+    <string name="update_channel">Update channel</string>
+    <string name="update_channel_summary">Nightly is not release-tested</string>
+    <string name="update_auto_check">Check automatically</string>
+    <string name="update_auto_check_summary">Off by default</string>
+    <string name="update_section_honesty">What this actually does</string>
+    <string name="update_check_now">Check now</string>
+    <string name="update_honesty_default_off">· Automatic checking is off unless you turn it on.</string>
+    <string name="update_honesty_anonymous">· A check is one anonymous request to the GitHub releases API. No device information, no identifier, nothing about your vault.</string>
+    <string name="update_honesty_no_silent_install">· There is no in-app install. That would need the install-packages permission, and an app that holds your keys should not ask for it — the download and the install go through your browser and the system installer.</string>
+    <string-array name="update_channels">
+        <item>Release</item>
+        <item>Nightly</item>
+    </string-array>
+
+    <!-- Client profiles -->
+    <string name="profiles_section_builtin">Profiles</string>
+    <string name="profiles_section_add">Add</string>
+    <string name="profiles_from_curl">Import from cURL</string>
+    <string name="profiles_from_curl_summary">Capture a real client request, paste the cURL. Authorization and cookies are stripped and the preview says which.</string>
+    <string name="profiles_disclaimer">Version numbers and header sets here come from community observation, not official documentation, and they drift as those clients are updated. They are a working starting point, not authoritative values. The reliable path is importing a cURL you captured yourself.</string>
+    <string name="profiles_verified">Verified</string>
+    <string name="profiles_custom">Custom</string></resources>

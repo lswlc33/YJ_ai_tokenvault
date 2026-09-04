@@ -150,4 +150,135 @@
     <string name="detail_add_account">添加平台账号</string>
     <string name="sample_group_work">工作</string>
     <string name="sample_group_spare">备用</string>
-    <string name="sample_group_official">官方</string></resources>
+    <string name="sample_group_official">官方</string>    <!-- Appearance -->
+    <string name="appearance_section_theme">主题</string>
+    <string name="appearance_color_scheme">配色模式</string>
+    <string name="appearance_squircle">连续圆角</string>
+    <string name="appearance_squircle_summary">MIUIX 那种曲率连续的圆角，而不是普通圆角</string>
+    <string name="appearance_blur">底栏模糊</string>
+    <string name="appearance_blur_summary">好看，但要花一点 GPU。老机器上可以关掉。</string>
+    <string name="appearance_section_language">语言</string>
+    <string name="appearance_language">应用语言</string>
+    <string name="appearance_language_summary">跳到系统的「应用语言」页——这一项只有系统一个权威，应用里不再存一份</string>
+    <string-array name="color_scheme_modes">
+        <item>跟随系统</item>
+        <item>浅色</item>
+        <item>深色</item>
+        <item>取色壁纸 · 跟随系统</item>
+        <item>取色壁纸 · 浅色</item>
+        <item>取色壁纸 · 深色</item>
+    </string-array>
+
+    <!-- Security -->
+    <string name="security_section_credential">凭据</string>
+    <string name="security_change_pin">修改 PIN 或改用口令</string>
+    <string name="security_change_pin_summary">只重新包裹一次数据密钥，所以是瞬间完成的，一条业务数据都不动</string>
+    <string name="security_recovery_key">恢复密钥</string>
+    <string name="security_recovery_key_summary">忘记 PIN 之后唯一的出路。抄下来放在别的地方。</string>
+    <string name="security_biometric">用生物识别解锁</string>
+    <string name="security_biometric_summary">它是通向同一个数据密钥的另一条路，不是第二道锁。重新录指纹会让它自动失效。</string>
+    <string name="security_section_lock">自动锁定</string>
+    <string name="security_auto_lock">离开应用后锁定</string>
+    <string name="security_idle_lock">前台空闲时锁定</string>
+    <string name="security_idle_lock_summary">探测或备份进行中会暂停计时，否则任务会把自己打断</string>
+    <string name="security_lock_on_screen_off">屏幕关闭即锁定</string>
+    <string name="security_section_leak">泄漏面</string>
+    <string name="security_secure_flag">展示明文时防截屏</string>
+    <string name="security_secure_flag_summary">关掉之后，截屏与录屏会把密钥和密码一起拍进去</string>
+    <string name="security_clipboard_clear">复制后自动清除剪贴板</string>
+    <string name="security_clipboard_clear_summary">密钥、账号、密码走同一条路径，没有例外</string>
+    <string-array name="auto_lock_options">
+        <item>立即</item>
+        <item>30 秒后</item>
+        <item>1 分钟后</item>
+        <item>5 分钟后</item>
+        <item>从不</item>
+    </string-array>
+    <string-array name="clipboard_clear_options">
+        <item>30 秒后</item>
+        <item>60 秒后</item>
+        <item>5 分钟后</item>
+        <item>从不</item>
+    </string-array>    <!-- Probe settings -->
+    <string name="probe_section_when">探测时机</string>
+    <string name="probe_auto_when">自动探测</string>
+    <string name="probe_section_cost">成本</string>
+    <string name="probe_enable_l3">逐个探测模型</string>
+    <string name="probe_enable_l3_summary">每个模型一次真实调用。默认关，自动探测永远不含它。</string>
+    <string name="probe_allow_upgraded_l2">允许验证密钥时消耗额度</string>
+    <string name="probe_allow_upgraded_l2_summary">如果某个中转站的模型列表接口不鉴权，验证密钥会退化成一次真实调用。输出限 16 token，但输入 token 数由中转站决定，可能上千——实测只发一个「ping」，对方回的是 7021。</string>
+    <string name="probe_thresholds">余额低额阈值</string>
+    <string name="probe_thresholds_summary">按币种配置。默认 USD 5、CNY 30。</string>
+    <string name="probe_section_rate">限流</string>
+    <string name="probe_pacing">每 host 的间隔与请求预算</string>
+    <string name="probe_pacing_summary">只限并发是不够的：挂 Cloudflare 的站在 2.4 秒内第 3 个请求就回了 error 1015。所以同一个 host 的相邻请求之间有最小间隔。</string>
+    <string name="probe_section_client">客户端伪装</string>
+    <string name="probe_sniff">自动匹配客户端预设</string>
+    <string name="probe_sniff_summary">只在手动探测时做。一旦这个 host 撞了限流就立即停止。</string>
+    <string name="probe_keywords">客户端拦截关键词</string>
+    <string name="probe_keywords_summary">哪些响应文案意味着「客户端不对」而不是「密钥无效」。有的站用 401 回这件事。</string>
+    <string name="probe_section_network">网络</string>
+    <string name="probe_verbose_log">详细 HTTP 日志</string>
+    <string name="probe_verbose_log_summary">会记响应体，截断到 2 KB 并脱敏。默认关，因为上游的错误消息里经常回显密钥的一部分。</string>
+    <string name="probe_proxy">手动 HTTP 代理</string>
+    <string name="probe_proxy_summary">留空表示走系统代理</string>
+    <string-array name="auto_probe_options">
+        <item>关闭</item>
+        <item>解锁后</item>
+        <item>每 6 小时 · 仅 Wi-Fi</item>
+        <item>每天 · 仅 Wi-Fi</item>
+    </string-array>
+
+    <!-- Data -->
+    <string name="data_section_catalog">模型元数据</string>
+    <string name="data_catalog">从 models.dev 同步</string>
+    <string name="data_catalog_summary">上下文窗口、输出上限、价格与模态。它不碰任何秘密，所以金库锁定时也能跑。</string>
+    <string name="data_section_organize">组织</string>
+    <string name="data_groups_summary">新建、重命名、排序、删除管理页用的那些分组</string>
+    <string name="data_section_log">日志</string>
+    <string name="data_log">打开日志</string>
+    <string name="data_log_summary">落库前已脱敏。重启后仍在，有条数与天数上限。</string>
+    <string name="data_section_danger">危险操作</string>
+    <string name="data_clear_probe">清空探测结果</string>
+    <string name="data_clear_probe_summary">全部回到「未探测」。密钥、模型、账号都保留。</string>
+    <string name="data_clear_log">清空日志</string>
+    <string name="data_clear_log_summary">不可撤销</string>    <!-- Sync -->
+    <string name="sync_section_local">备份文件</string>
+    <string name="sync_export">导出加密备份</string>
+    <string name="sync_export_summary">自包含：KDF 参数与盐都在包里，所以能在一台从没见过这台机器的手机上恢复</string>
+    <string name="sync_import">从备份恢复</string>
+    <string name="sync_import_summary">先预览，再选合并方式。写入之前会先给本地拍一份快照。</string>
+    <string name="sync_passphrase">备份口令</string>
+    <string name="sync_passphrase_summary">默认沿用 PIN。6 位数字 PIN 在离线场景下是分钟级可破的，所以要往云上放之前，先单独设一个长口令。</string>
+    <string name="sync_section_webdav">WebDAV</string>
+    <string name="sync_webdav">服务器、凭据与目录</string>
+    <string name="sync_webdav_summary">只允许 https。明文 http 会把 Basic 凭据和整个备份包一起明文送出去，所以这里是直接拒绝，不是弹个警告让你确认。</string>
+    <string name="sync_section_auto">定时备份</string>
+    <string name="sync_auto">自动备份</string>
+    <string name="sync_auto_summary">金库锁定时跳过，下次解锁后补做</string>
+    <string name="sync_auto_wifi">仅 Wi-Fi</string>
+
+    <!-- Update -->
+    <string name="update_section_channel">渠道</string>
+    <string name="update_channel">更新渠道</string>
+    <string name="update_channel_summary">nightly 没过发布前的回归</string>
+    <string name="update_auto_check">自动检查</string>
+    <string name="update_auto_check_summary">默认关闭</string>
+    <string name="update_section_honesty">这件事到底做了什么</string>
+    <string name="update_check_now">立即检查</string>
+    <string name="update_honesty_default_off">· 自动检查默认关闭，除非你自己打开。</string>
+    <string name="update_honesty_anonymous">· 一次检查就是向 GitHub 的 releases 接口发一个匿名请求。不带设备信息、不带任何标识、不带你库里的任何东西。</string>
+    <string name="update_honesty_no_silent_install">· 没有应用内安装。那需要「安装未知应用」权限，而一个替你管密钥的应用不该去要这个权限——下载和安装交给你的浏览器和系统安装器。</string>
+    <string-array name="update_channels">
+        <item>正式版</item>
+        <item>nightly</item>
+    </string-array>
+
+    <!-- Client profiles -->
+    <string name="profiles_section_builtin">预设</string>
+    <string name="profiles_section_add">添加</string>
+    <string name="profiles_from_curl">从 cURL 导入</string>
+    <string name="profiles_from_curl_summary">抓一次真实客户端的请求，把 cURL 粘进来。Authorization 与 cookie 会被剔除，预览页会说明剔除了哪些。</string>
+    <string name="profiles_disclaimer">这里的版本号与头部集合来自社区观察，没有官方文档，而且会随那些客户端升级而漂移。它们的作用是给一个能用的起点，不是权威值。可靠的路径是自己抓一次包再用 cURL 导入。</string>
+    <string name="profiles_verified">已实测</string>
+    <string name="profiles_custom">自定义</string></resources>

@@ -1,11 +1,16 @@
 package com.lc33.tokenvault.ui.shell
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -15,9 +20,17 @@ import com.lc33.tokenvault.screens.common.PlaceholderScreen
 import com.lc33.tokenvault.screens.dashboard.DashboardScreen
 import com.lc33.tokenvault.screens.manage.ManageScreen
 import com.lc33.tokenvault.screens.manage.ProviderDetailScreen
+import com.lc33.tokenvault.screens.model.SettingsDraft
 import com.lc33.tokenvault.screens.sample.SampleContent
 import com.lc33.tokenvault.screens.settings.AboutScreen
+import com.lc33.tokenvault.screens.settings.AppearanceScreen
+import com.lc33.tokenvault.screens.settings.DataScreen
+import com.lc33.tokenvault.screens.settings.ProbeSettingsScreen
+import com.lc33.tokenvault.screens.settings.ProfileListScreen
+import com.lc33.tokenvault.screens.settings.SecurityScreen
 import com.lc33.tokenvault.screens.settings.SettingsScreen
+import com.lc33.tokenvault.screens.settings.SyncScreen
+import com.lc33.tokenvault.screens.settings.UpdateScreen
 
 /**
  * 导航图。
@@ -33,6 +46,9 @@ fun VaultNavHost(
 ) {
     // 分组筛选跨导航保留：进详情再返回，应该还停在刚才那个分组。
     var selectedGroupId by remember { mutableStateOf<Long?>(null) }
+    // M0.8 的设置项由这里兜着：切页保留、杀进程丢弃。M1 / M2 换成 SettingsRepository。
+    var settings by remember { mutableStateOf(SettingsDraft()) }
+    val context = LocalContext.current
 
     fun openManage() {
         nav.navigate(ManageRoute) {
@@ -97,18 +113,92 @@ fun VaultNavHost(
             )
         }
 
-        // 以下都是 M0.8 立起来的空壳，内容各归各的里程碑（见 §16）
+        composable<AppearanceRoute> {
+            AppearanceScreen(
+                draft = settings,
+                onChange = { settings = it },
+                onBack = back,
+                onOpenSystemLocaleSettings = { openAppLocaleSettings(context) },
+            )
+        }
+        composable<SecurityRoute> {
+            SecurityScreen(
+                draft = settings,
+                onChange = { settings = it },
+                onBack = back,
+                onChangePin = {},
+                onRecoveryKey = {},
+            )
+        }
+        composable<ProbeSettingsRoute> {
+            ProbeSettingsScreen(
+                draft = settings,
+                onChange = { settings = it },
+                onBack = back,
+                onEditThresholds = {},
+                onEditKeywords = {},
+                onEditProxy = {},
+            )
+        }
+        composable<ProfileListRoute> {
+            ProfileListScreen(
+                profiles = SampleContent.profiles(),
+                onBack = back,
+                onOpenProfile = {},
+                onNewFromCurl = {},
+            )
+        }
+        composable<DataRoute> {
+            DataScreen(
+                onBack = back,
+                onSyncCatalog = {},
+                onOpenGroups = { nav.navigate(GroupsRoute) },
+                onOpenLog = {},
+                onClearProbeResults = {},
+                onClearLog = {},
+            )
+        }
+        composable<SyncRoute> {
+            SyncScreen(
+                draft = settings,
+                backup = SampleContent.dashboard().backup,
+                onChange = { settings = it },
+                onBack = back,
+                onExport = {},
+                onImport = {},
+                onBackupPassphrase = {},
+                onWebDav = {},
+            )
+        }
+        composable<UpdateRoute> {
+            UpdateScreen(
+                draft = settings,
+                onChange = { settings = it },
+                onBack = back,
+                onCheckNow = {},
+            )
+        }
+
+        // 剩下这几个还是 M0.8 立起来的空壳，内容各归各的里程碑（见 §16）
         composable<ProviderEditorRoute> { PlaceholderScreen(R.string.provider_editor_title, back) }
         composable<ImportRoute> { PlaceholderScreen(R.string.dashboard_empty_import, back) }
         composable<GroupsRoute> { PlaceholderScreen(R.string.groups_title, back) }
         composable<ProbeRunRoute> { PlaceholderScreen(R.string.probe_run_title, back) }
         composable<BalanceBreakdownRoute> { PlaceholderScreen(R.string.dashboard_balance_title, back) }
-        composable<AppearanceRoute> { PlaceholderScreen(R.string.appearance_title, back) }
-        composable<SecurityRoute> { PlaceholderScreen(R.string.security_title, back) }
-        composable<ProbeSettingsRoute> { PlaceholderScreen(R.string.probe_settings_title, back) }
-        composable<ProfileListRoute> { PlaceholderScreen(R.string.settings_profiles, back) }
-        composable<DataRoute> { PlaceholderScreen(R.string.data_title, back) }
-        composable<SyncRoute> { PlaceholderScreen(R.string.sync_title, back) }
-        composable<UpdateRoute> { PlaceholderScreen(R.string.update_title, back) }
     }
+}
+
+/**
+ * 跳系统的「应用语言」页。
+ *
+ * 应用内不再做一份语言选择器：Android 13+ 有系统级的 per-app locale，自己再做一个
+ * 就有两个权威（红线 31 的精神）。取不到那个页面时退回应用详情页，不静默失败。
+ */
+private fun openAppLocaleSettings(context: Context) {
+    val locale = Intent(Settings.ACTION_APP_LOCALE_SETTINGS, Uri.fromParts("package", context.packageName, null))
+    val details = Intent(
+        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+        Uri.fromParts("package", context.packageName, null),
+    )
+    runCatching { context.startActivity(locale) }.onFailure { context.startActivity(details) }
 }

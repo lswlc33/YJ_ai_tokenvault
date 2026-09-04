@@ -20,6 +20,7 @@ import com.lc33.tokenvault.screens.model.UiModelRow
 import com.lc33.tokenvault.screens.model.UiModelSource
 import com.lc33.tokenvault.screens.model.UiMoney
 import com.lc33.tokenvault.screens.model.UiProviderRow
+import com.lc33.tokenvault.screens.settings.ProfileRow
 
 /**
  * M0.8 的样例内容。
@@ -101,6 +102,51 @@ object SampleContent {
             accounts = accounts().filter { it.providerId == provider.id },
         )
     }
+
+    /**
+     * 内置客户端预设（§8.2 那张表）。
+     *
+     * `claude_code` 是唯一带「已实测」的那条：M0.5 在 Agent Router 上验证过它能过闸，
+     * 而且只需要换 UA。其余的置信度都只是社区观察。
+     */
+    @Composable
+    fun profiles(): List<ProfileRow> = listOf(
+        ProfileRow(
+            id = null,
+            name = stringResource(R.string.app_name),
+            userAgent = "YuanJi/0.1.0 (Android 15; arm64)",
+            builtin = true,
+            verified = false,
+        ),
+        ProfileRow(
+            id = 2L,
+            name = "Claude Code",
+            userAgent = "claude-cli/1.0.119 (external, cli)",
+            builtin = true,
+            verified = true,
+        ),
+        ProfileRow(
+            id = 3L,
+            name = "Codex CLI",
+            userAgent = "codex_cli_rs/0.44.0 (Mac OS 15.5.0; arm64) Apple_Terminal",
+            builtin = true,
+            verified = false,
+        ),
+        ProfileRow(
+            id = 4L,
+            name = "Anthropic SDK (Python)",
+            userAgent = "Anthropic/Python 0.40.0",
+            builtin = true,
+            verified = false,
+        ),
+        ProfileRow(
+            id = 5L,
+            name = "Cherry Studio",
+            userAgent = "CherryStudio/1.4.0 (Windows NT 10.0; x64)",
+            builtin = true,
+            verified = false,
+        ),
+    )
 
     @Composable
     private fun providers(): List<UiProviderRow> = listOf(
