@@ -51,6 +51,13 @@ data class AppTokens(
     val animShort: Int = 150,
     /** 中等动效（页面内容切换） */
     val animMedium: Int = 250,
+    /**
+     * 带 FAB 的列表末尾要留出的空白。
+     *
+     * FAB 不是 inset，`Scaffold` 不会替列表让位，所以最后一行会被压在 FAB 底下——
+     * 而那一行往往是"删除"这种不能误触的操作。取 FAB 直径 + 两倍间距。
+     */
+    val fabListBottomSpace: Dp = 88.dp,
 )
 
 val LocalAppTokens = staticCompositionLocalOf { AppTokens() }

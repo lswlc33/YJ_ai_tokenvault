@@ -1,32 +1,121 @@
 <resources>
     <string name="app_name">元记</string>
 
-    <!-- 通用 -->
+    <!-- Generic -->
     <string name="dialog_ok">好的</string>
     <string name="back_cd">返回</string>
+    <string name="refresh_cd">刷新</string>
+    <string name="add_cd">新建</string>
+    <string name="search_hint">搜索</string>
 
-    <!-- 底部导航 -->
-    <string name="nav_vault">金库</string>
-    <string name="nav_probe">探测</string>
+    <!-- Bottom navigation -->
+    <string name="nav_dashboard">仪表盘</string>
+    <string name="nav_manage">管理</string>
     <string name="nav_settings">设置</string>
 
-    <!-- 金库 -->
-    <string name="vault_title">金库</string>
-    <string name="vault_empty_title">还没有供应商</string>
-    <string name="vault_empty_desc">可以手动新建，也可以粘贴一段文本，一次性导入密钥、端点、模型列表与余额配置。</string>
+    <!-- Aggregate health labels. One wording per state, app wide (invariant 17). -->
+    <string name="health_ok">可用</string>
+    <string name="health_warn">需处理</string>
+    <string name="health_error">不可用</string>
+    <string name="health_unknown">未探测</string>
+    <string name="health_stale_this_round">本轮未验证</string>
 
-    <!-- 探测 -->
-    <string name="probe_title">探测</string>
-    <string name="probe_empty_title">尚未探测</string>
-    <string name="probe_empty_desc">探测一次就知道哪张密钥失效了、哪个模型不存在、哪个号欠费。</string>
+    <!-- Dashboard -->
+    <string name="dashboard_title">仪表盘</string>
+    <string name="dashboard_balance_title">余额</string>
+    <string name="dashboard_balance_no_fx">按币种分别列出。不做汇率换算，所以这几个数不是一个总和。</string>
+    <string name="dashboard_balance_updated">更新于 %1$s</string>
+    <string name="dashboard_balance_failed">%1$d 个供应商的余额查询失败</string>
+    <string name="dashboard_balance_none">还没有配置余额查询</string>
+    <string name="dashboard_counts_title">内容</string>
+    <string name="count_providers">供应商</string>
+    <string name="count_keys">密钥</string>
+    <string name="count_models">模型</string>
+    <string name="count_accounts">平台账号</string>
+    <string name="dashboard_health_title">密钥健康</string>
+    <string name="dashboard_health_all_ok">%1$d 张全部可用</string>
+    <string name="dashboard_attention_title">需要处理</string>
+    <string name="dashboard_attention_none">暂无需要处理的项</string>
+    <string name="dashboard_attention_fix_client">换客户端预设</string>
+    <string name="dashboard_probe_title">上次探测</string>
+    <string name="dashboard_probe_never">还没探测过</string>
+    <string name="dashboard_probe_start">开始探测</string>
+    <string name="dashboard_probe_detail">查看明细</string>
+    <string name="dashboard_probe_finished">完成于 %1$s · 耗时 %2$s</string>
+    <string name="dashboard_probe_counts">共 %1$d 项 · 成功 %2$d · 失败 %3$d · 未探测 %4$d</string>
+    <string name="dashboard_probe_running">%1$d / %2$d · %3$s</string>
+    <string name="dashboard_probe_no_autolock">探测进行中不会自动锁定</string>
+    <string name="dashboard_probe_cancel">取消</string>
+    <string name="dashboard_backup_title">备份</string>
+    <string name="dashboard_backup_never">还没有备份。忘记 PIN 或者换手机，全部数据就没了。</string>
+    <string name="dashboard_backup_last">上次备份 %1$s · %2$s</string>
+    <string name="dashboard_backup_now">立即备份</string>
+    <string name="dashboard_empty_title">还没有内容</string>
+    <string name="dashboard_empty_desc">可以手动新建，也可以粘贴一段文本，一次性导入密钥、端点、模型列表与余额配置。</string>
+    <string name="dashboard_empty_import">粘贴导入</string>
+    <string name="dashboard_empty_new">手动新建</string>
 
-    <!-- 设置 -->
+    <!-- Manage -->
+    <string name="manage_title">管理</string>
+    <string name="manage_tab_providers">供应商</string>
+    <string name="manage_tab_keys">密钥</string>
+    <string name="manage_tab_models">模型</string>
+    <string name="manage_tab_accounts">账号</string>
+    <string name="manage_pinned">置顶</string>
+    <string name="manage_default_key">默认</string>
+    <string name="manage_source_manual">手动</string>
+    <string name="manage_source_discovered">发现</string>
+    <string name="manage_disabled">已停用</string>
+    <string name="manage_local_only">仅本地记录</string>
+    <string name="manage_keys_ratio">%1$d / %2$d 张可用</string>
+    <string name="manage_models_count">%1$d 个模型</string>
+    <string name="manage_latency">%1$d 毫秒</string>
+    <string name="manage_context">上下文 %1$s</string>
+    <string name="manage_empty_providers_title">还没有供应商</string>
+    <string name="manage_empty_providers_desc">可以手动新建，也可以粘贴一段文本一次性导入。</string>
+    <string name="manage_empty_keys_title">还没有密钥</string>
+    <string name="manage_empty_keys_desc">密钥挂在供应商下面。先建一个供应商，再往里加密钥。</string>
+    <string name="manage_empty_models_title">还没有模型</string>
+    <string name="manage_empty_models_desc">可以手动填模型 id，也可以从供应商的接口拉一份列表。</string>
+    <string name="manage_empty_accounts_title">还没有平台账号</string>
+    <string name="manage_empty_accounts_desc">平台账号是你在供应商官网上的登录凭据。只存在本地，永远不会替你填写。</string>
+
+    <!-- Settings hub -->
     <string name="settings_title">设置</string>
-    <string name="settings_section_about">关于</string>
+    <string name="settings_group_settings">设置</string>
+    <string name="settings_group_sync">同步</string>
+    <string name="settings_group_about">关于</string>
+    <string name="settings_group_update">更新</string>
+    <string name="settings_appearance">外观</string>
+    <string name="settings_appearance_summary">配色模式、圆角风格、语言</string>
+    <string name="settings_security">安全</string>
+    <string name="settings_security_summary">PIN、生物识别、自动锁定、剪贴板</string>
+    <string name="settings_probe">探测</string>
+    <string name="settings_probe_summary">级别、时机、限流、余额阈值</string>
+    <string name="settings_profiles">客户端预设</string>
+    <string name="settings_profiles_summary">让请求看起来像真实 AI 客户端的那套请求头</string>
+    <string name="settings_data">数据</string>
+    <string name="settings_data_summary">模型元数据、分组、日志</string>
+    <string name="settings_sync_row">备份与 WebDAV</string>
+    <string name="settings_sync_row_summary">加密备份、恢复、定时上传</string>
+    <string name="settings_update_row">检查更新</string>
+    <string name="settings_update_row_summary">当前版本 %1$s</string>
     <string name="settings_about_row">关于元记</string>
     <string name="settings_about_row_summary">版本、加密边界、威胁模型</string>
 
-    <!-- 关于 -->
+    <!-- Secondary page titles -->
+    <string name="appearance_title">外观</string>
+    <string name="security_title">安全</string>
+    <string name="probe_settings_title">探测</string>
+    <string name="data_title">数据</string>
+    <string name="sync_title">同步</string>
+    <string name="update_title">更新</string>
+    <string name="probe_run_title">探测明细</string>
+    <string name="provider_detail_title">供应商</string>
+    <string name="placeholder_title">还没做</string>
+    <string name="placeholder_desc">这一页的路由与外壳已经在了，内容留给对应的里程碑——见计划里的里程碑表。</string>
+
+    <!-- About -->
     <string name="about_title">关于</string>
     <string name="about_version">版本 %1$s（%2$d）</string>
     <string name="about_encryption_row">加密边界</string>
@@ -34,4 +123,16 @@
     <string name="about_encryption_dialog_summary">API 密钥、平台账号密码、余额访问令牌与 WebDAV 凭据按字段用 AES-256-GCM 加密。其余内容——供应商名称、备注、端点、模型列表、余额金额、时间戳——以明文存放在应用私有目录里。这句话是刻意说准的：本应用不做整库加密。</string>
     <string name="about_not_password_manager_row">这不是密码管理器</string>
     <string name="about_not_password_manager_summary">平台账号只是本地记录：不填充、无 TOTP、不做泄露检测</string>
+
+    <!-- M0.8 sample content. Deleted together with screens/sample/ once M3 wires up real data. -->
+    <string name="sample_ago_12min">12 分钟前</string>
+    <string name="sample_ago_2hour">2 小时前</string>
+    <string name="sample_attention_client_blocked">被客户端校验拦住 —— 换个 User-Agent 就能通</string>
+    <string name="sample_attention_low_balance">余额低于该币种的阈值</string>
+    <string name="sample_note_company">公司专用账号</string>
+    <string name="sample_note_backup">备用账号</string>
+    <string name="sample_key_main">主号</string>
+    <string name="sample_key_spare">备用</string>
+    <string name="sample_account_github">GitHub 登录</string>
+    <string name="sample_account_email">邮箱登录</string>
 </resources>

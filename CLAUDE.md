@@ -22,6 +22,18 @@ ui/shell    AppRoot / LockGate / VaultShell / NavHost / Routes
 screens/    页面。不出现 SQL，不构造 HTTP 请求，不直接接触 crypto/
 ```
 
+## 三个一级页的分工
+
+底栏三项：**仪表盘 · 管理 · 设置**。分工是一条硬规则——改坏了不会报错，但会长出两套真相：
+
+- **仪表盘只读**。不提供任何编辑入口，每一行的点击结果都是"跳到管理页的某个详情"。
+- **管理负责改**。全部内容（供应商 / 密钥 / 模型 / 平台账号四个分段）的列表 + 唯一的编辑入口。
+  它**不放汇总卡**——同一个数字在两个页面各算一遍，迟早对不上。
+- **设置只管软件自己**：设置（外观 / 安全 / 探测 / 客户端预设 / 数据）、同步、关于、更新。
+
+"探测"**不是**一级页：它是动作不是内容。入口在仪表盘（一个按钮），逐项结果在
+`ProbeRunRoute` 二级页，"去改"永远只有一个去处——管理页。详见 `计划.md` §13.1、§13.4。
+
 - 仓库接口定义在 `domain/repo/`，实现在 `data/`。ViewModel 只依赖接口。
 - Room 实体只存在于 `data/`，与 `domain/` 的模型是两套类，中间有显式映射器。
 - 这几条由 `ArchitectureRulesTest`（JVM 单测，pre-commit 会跑）与 `ci.yml` 的 grep
@@ -143,5 +155,17 @@ M0.5（协议踩点）已完成，2026-09-04。`ProtocolSpike.kt` 打了三家�
 `app/src/test/resources/fixtures/`（`probe-matrix.json` 是 16 条去重响应形态，
 M5 的 `classify()` 单测直接读它）。红线 33–35 就是这一轮补的。
 唯一没拿到的是**额度耗尽的真实响应**（三个账号都还有余额），记在 §18。
+
+M0.8（界面骨架）**第一轮已完成**：底栏改成仪表盘 · 管理 · 设置，三个一级页按 §13.4 做出外观
+（仪表盘六块卡、管理页四个分段与四种行样式、设置页四块导航），全部路由与二级页壳立起来，
+`ui/miuix` 补了 `AppTabRow` / `AppChip` / `AppSearchField` / `AppFab` / `AppBottomSheet` /
+`AppLinearProgress` / `AppSwitchRow` / `AppDropdownRow`，`ui/common` 补了 `StatusDot` /
+`SegmentedBar` / `StatTile` / `HealthVisuals`，样例数据在 `screens/sample/`（M3 删掉）。
+模拟器上中英双语都验过。**还没做**：五个二级设置页与同步/更新页的真实内容（现在是空壳）、
+深浅色对比截图、宽屏双栏、`SecretText` / `RelativeTime` / `AppRefreshBox`。
+
+`AppTabRow` **没有用 MIUIX 的 `TabRow`**：它给所有分段算同一个固定宽度再加内边距，
+四个英文标签在 360dp 宽的屏上必然被截断，而 `minWidth` / `maxWidth` 都改不动
+（真正的上限是"可用宽度 ÷ 分段数"）。现在是自己用 `Surface` + `weight` 拼的。
 
 下一步 M1（安全底座）。里程碑表见 `计划.md` §16。

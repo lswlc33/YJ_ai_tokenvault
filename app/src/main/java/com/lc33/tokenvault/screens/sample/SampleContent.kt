@@ -1,0 +1,234 @@
+package com.lc33.tokenvault.screens.sample
+
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import com.lc33.tokenvault.R
+import com.lc33.tokenvault.screens.model.AttentionItem
+import com.lc33.tokenvault.screens.model.BackupStatus
+import com.lc33.tokenvault.screens.model.BalanceSummary
+import com.lc33.tokenvault.screens.model.ContentCounts
+import com.lc33.tokenvault.screens.model.DashboardUiState
+import com.lc33.tokenvault.screens.model.HealthBreakdown
+import com.lc33.tokenvault.screens.model.ManageUiState
+import com.lc33.tokenvault.screens.model.ProbeRunSummary
+import com.lc33.tokenvault.screens.model.UiAccountRow
+import com.lc33.tokenvault.screens.model.UiHealth
+import com.lc33.tokenvault.screens.model.UiKeyRow
+import com.lc33.tokenvault.screens.model.UiModelRow
+import com.lc33.tokenvault.screens.model.UiModelSource
+import com.lc33.tokenvault.screens.model.UiMoney
+import com.lc33.tokenvault.screens.model.UiProviderRow
+
+/**
+ * M0.8 的样例内容。
+ *
+ * 它的唯一用途是**让界面有东西可画**，好在真正接数据之前把布局、密度、状态色、
+ * 空态都看清楚（计划.md §16 M0.8）。M3 会把它换成 ViewModel + 仓库，届时整个
+ * `screens/sample/` 包删掉。
+ *
+ * 两条约束照真实实现来，免得布局做完才发现放不下：
+ * - 密钥只有**遮蔽串**，因为列表页永远拿不到明文（§6.1 推论 3）。
+ * - 金额是**已格式化的字符串**，页面不做浮点运算（§9.1）。
+ *
+ * 数字与站点形态取自 M0.5 实测的那三家，这样密度是真实的——`gpt-5.6-sol` 这种
+ * 长模型 id 和 `USD 0.45` 这种小余额都会真的出现。
+ */
+object SampleContent {
+
+    @Composable
+    fun dashboard(): DashboardUiState = DashboardUiState(
+        balance = BalanceSummary(
+            perCurrency = listOf(
+                UiMoney(currency = "USD", amount = "255.41"),
+                UiMoney(currency = "CNY", amount = "0.89"),
+            ),
+            updatedAgo = stringResource(R.string.sample_ago_12min),
+            failedProviderCount = 1,
+        ),
+        counts = ContentCounts(providers = 3, keys = 4, models = 10, accounts = 2),
+        health = HealthBreakdown(ok = 2, warn = 1, error = 0, unknown = 1),
+        attention = listOf(
+            AttentionItem(
+                providerId = 1L,
+                providerName = "Agent Router",
+                health = UiHealth.Warn,
+                message = stringResource(R.string.sample_attention_client_blocked),
+                offerClientProfileFix = true,
+            ),
+            AttentionItem(
+                providerId = 3L,
+                providerName = "DeepSeek",
+                health = UiHealth.Warn,
+                message = stringResource(R.string.sample_attention_low_balance),
+            ),
+        ),
+        lastRun = ProbeRunSummary(
+            finishedAgo = stringResource(R.string.sample_ago_2hour),
+            total = 14,
+            succeeded = 11,
+            failed = 1,
+            skipped = 2,
+            durationLabel = "18s",
+        ),
+        progress = null,
+        backup = BackupStatus(lastBackupAgo = null, targetLabel = null, sizeLabel = null),
+    )
+
+    @Composable
+    fun manage(): ManageUiState = ManageUiState(
+        providers = providers(),
+        keys = keys(),
+        models = models(),
+        accounts = accounts(),
+    )
+
+    @Composable
+    private fun providers(): List<UiProviderRow> = listOf(
+        UiProviderRow(
+            id = 1L,
+            name = "Agent Router",
+            note = stringResource(R.string.sample_note_company),
+            host = "ps.air-outer.com",
+            protocols = listOf("Chat", "Responses", "Anthropic"),
+            colorIndex = 0,
+            pinned = true,
+            keyCount = 1,
+            okKeyCount = 0,
+            modelCount = 5,
+            accountCount = 1,
+            balance = UiMoney("USD", "0.45"),
+            health = UiHealth.Warn,
+        ),
+        UiProviderRow(
+            id = 2L,
+            name = "JustDoWork",
+            note = stringResource(R.string.sample_note_backup),
+            host = "api.justwoker.icu",
+            protocols = listOf("Anthropic"),
+            colorIndex = 1,
+            pinned = false,
+            keyCount = 2,
+            okKeyCount = 2,
+            modelCount = 2,
+            accountCount = 1,
+            balance = UiMoney("USD", "254.96"),
+            health = UiHealth.Ok,
+        ),
+        UiProviderRow(
+            id = 3L,
+            name = "DeepSeek",
+            note = null,
+            host = "api.deepseek.com",
+            protocols = listOf("Chat", "Responses"),
+            colorIndex = 2,
+            pinned = false,
+            keyCount = 1,
+            okKeyCount = 1,
+            modelCount = 3,
+            accountCount = 0,
+            balance = UiMoney("CNY", "0.89"),
+            health = UiHealth.Ok,
+            staleThisRound = true,
+        ),
+    )
+
+    @Composable
+    private fun keys(): List<UiKeyRow> = listOf(
+        UiKeyRow(
+            id = 11L,
+            label = stringResource(R.string.sample_key_main),
+            providerId = 1L,
+            providerName = "Agent Router",
+            masked = "sk-LWxU…JrG0",
+            health = UiHealth.Warn,
+            latencyMs = null,
+            checkedAgo = stringResource(R.string.sample_ago_2hour),
+            isDefault = true,
+        ),
+        UiKeyRow(
+            id = 21L,
+            label = stringResource(R.string.sample_key_main),
+            providerId = 2L,
+            providerName = "JustDoWork",
+            masked = "sk-k7Ks…Xp9G",
+            health = UiHealth.Ok,
+            latencyMs = 412,
+            checkedAgo = stringResource(R.string.sample_ago_2hour),
+            isDefault = true,
+        ),
+        UiKeyRow(
+            id = 22L,
+            label = stringResource(R.string.sample_key_spare),
+            providerId = 2L,
+            providerName = "JustDoWork",
+            masked = "sk-9fQ2…mA7T",
+            health = UiHealth.Unknown,
+            latencyMs = null,
+            checkedAgo = null,
+            isDefault = false,
+        ),
+        UiKeyRow(
+            id = 31L,
+            label = stringResource(R.string.sample_key_main),
+            providerId = 3L,
+            providerName = "DeepSeek",
+            masked = "sk-74ac…3ae3",
+            health = UiHealth.Ok,
+            latencyMs = 236,
+            checkedAgo = stringResource(R.string.sample_ago_2hour),
+            isDefault = true,
+        ),
+    )
+
+    @Composable
+    private fun models(): List<UiModelRow> = listOf(
+        model(101L, "gpt-5.6-sol", 1L, "Agent Router", "Responses", UiModelSource.Manual, UiHealth.Warn, true, "400K"),
+        model(102L, "claude-opus-5", 1L, "Agent Router", "Anthropic", UiModelSource.Discovered, UiHealth.Unknown, true, "200K"),
+        model(103L, "glm-5.3", 1L, "Agent Router", "Anthropic", UiModelSource.Discovered, UiHealth.Unknown, false, null),
+        model(201L, "claude-opus-5", 2L, "JustDoWork", "Anthropic", UiModelSource.Manual, UiHealth.Ok, true, "200K"),
+        model(202L, "claude-opus-5-thinking", 2L, "JustDoWork", "Anthropic", UiModelSource.Discovered, UiHealth.Ok, true, "200K"),
+        model(301L, "deepseek-v4-flash", 3L, "DeepSeek", "Responses", UiModelSource.Manual, UiHealth.Ok, true, "128K"),
+        model(302L, "deepseek-v4-pro", 3L, "DeepSeek", "Chat", UiModelSource.Discovered, UiHealth.Unknown, true, "128K"),
+    )
+
+    private fun model(
+        id: Long,
+        modelId: String,
+        providerId: Long,
+        providerName: String,
+        protocol: String,
+        source: UiModelSource,
+        health: UiHealth,
+        enabled: Boolean,
+        contextLabel: String?,
+    ) = UiModelRow(
+        id = id,
+        modelId = modelId,
+        displayName = null,
+        providerId = providerId,
+        providerName = providerName,
+        protocol = protocol,
+        source = source,
+        health = health,
+        enabled = enabled,
+        contextLabel = contextLabel,
+    )
+
+    @Composable
+    private fun accounts(): List<UiAccountRow> = listOf(
+        UiAccountRow(
+            id = 41L,
+            label = stringResource(R.string.sample_account_github),
+            providerId = 1L,
+            providerName = "Agent Router",
+            maskedUsername = "gith…9627",
+        ),
+        UiAccountRow(
+            id = 42L,
+            label = stringResource(R.string.sample_account_email),
+            providerId = 2L,
+            providerName = "JustDoWork",
+            maskedUsername = "lswl….com",
+        ),
+    )
+}

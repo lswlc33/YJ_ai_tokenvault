@@ -7,7 +7,9 @@ import androidx.compose.runtime.remember
 import com.lc33.tokenvault.ui.theme.AppColorSchemeMode
 import com.lc33.tokenvault.ui.theme.AppTokens
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
+import com.lc33.tokenvault.ui.theme.LocalProviderPalette
 import com.lc33.tokenvault.ui.theme.LocalStatusPalette
+import com.lc33.tokenvault.ui.theme.providerPaletteFor
 import com.lc33.tokenvault.ui.theme.statusPaletteFor
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -35,10 +37,12 @@ fun AppTheme(
         AppColorSchemeMode.System, AppColorSchemeMode.MonetSystem -> isSystemInDarkTheme()
     }
     val statusPalette = remember(dark) { statusPaletteFor(dark) }
+    val providerPalette = remember(dark) { providerPaletteFor(dark) }
     MiuixTheme(controller = controller) {
         CompositionLocalProvider(
             LocalAppTokens provides DefaultTokens,
             LocalStatusPalette provides statusPalette,
+            LocalProviderPalette provides providerPalette,
             content = content,
         )
     }

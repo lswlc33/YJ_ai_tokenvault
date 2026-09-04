@@ -4,27 +4,116 @@
     <!-- Generic -->
     <string name="dialog_ok">OK</string>
     <string name="back_cd">Back</string>
+    <string name="refresh_cd">Refresh</string>
+    <string name="add_cd">Add</string>
+    <string name="search_hint">Search</string>
 
     <!-- Bottom navigation -->
-    <string name="nav_vault">Vault</string>
-    <string name="nav_probe">Probe</string>
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_manage">Manage</string>
     <string name="nav_settings">Settings</string>
 
-    <!-- Vault -->
-    <string name="vault_title">Vault</string>
-    <string name="vault_empty_title">No providers yet</string>
-    <string name="vault_empty_desc">Add a provider by hand, or paste a block of text to import keys, endpoints, models and balance settings at once.</string>
+    <!-- Aggregate health labels. One wording per state, app wide (invariant 17). -->
+    <string name="health_ok">Available</string>
+    <string name="health_warn">Needs attention</string>
+    <string name="health_error">Not usable</string>
+    <string name="health_unknown">Not probed</string>
+    <string name="health_stale_this_round">Not verified this round</string>
 
-    <!-- Probe -->
-    <string name="probe_title">Probe</string>
-    <string name="probe_empty_title">Never probed</string>
-    <string name="probe_empty_desc">A probe tells you which key is dead, which model is missing, and which account is out of credit.</string>
+    <!-- Dashboard -->
+    <string name="dashboard_title">Dashboard</string>
+    <string name="dashboard_balance_title">Balance</string>
+    <string name="dashboard_balance_no_fx">Listed per currency. No exchange-rate conversion, so these are not a single total.</string>
+    <string name="dashboard_balance_updated">Updated %1$s</string>
+    <string name="dashboard_balance_failed">%1$d provider(s) failed the balance query</string>
+    <string name="dashboard_balance_none">No balance query configured yet</string>
+    <string name="dashboard_counts_title">Content</string>
+    <string name="count_providers">Providers</string>
+    <string name="count_keys">Keys</string>
+    <string name="count_models">Models</string>
+    <string name="count_accounts">Accounts</string>
+    <string name="dashboard_health_title">Key health</string>
+    <string name="dashboard_health_all_ok">All %1$d keys available</string>
+    <string name="dashboard_attention_title">Needs attention</string>
+    <string name="dashboard_attention_none">Nothing needs attention</string>
+    <string name="dashboard_attention_fix_client">Switch client profile</string>
+    <string name="dashboard_probe_title">Last probe</string>
+    <string name="dashboard_probe_never">Never probed</string>
+    <string name="dashboard_probe_start">Start probe</string>
+    <string name="dashboard_probe_detail">View details</string>
+    <string name="dashboard_probe_finished">Finished %1$s · %2$s</string>
+    <string name="dashboard_probe_counts">%1$d checked · %2$d ok · %3$d failed · %4$d skipped</string>
+    <string name="dashboard_probe_running">%1$d / %2$d · %3$s</string>
+    <string name="dashboard_probe_no_autolock">Auto-lock is paused while a probe is running</string>
+    <string name="dashboard_probe_cancel">Cancel</string>
+    <string name="dashboard_backup_title">Backup</string>
+    <string name="dashboard_backup_never">No backup yet. Forgetting your PIN or switching phones would lose everything.</string>
+    <string name="dashboard_backup_last">Last backup %1$s · %2$s</string>
+    <string name="dashboard_backup_now">Back up now</string>
+    <string name="dashboard_empty_title">Nothing here yet</string>
+    <string name="dashboard_empty_desc">Add a provider by hand, or paste a block of text to import keys, endpoints, models and balance settings at once.</string>
+    <string name="dashboard_empty_import">Paste to import</string>
+    <string name="dashboard_empty_new">Add by hand</string>
 
-    <!-- Settings -->
+    <!-- Manage -->
+    <string name="manage_title">Manage</string>
+    <string name="manage_tab_providers">Providers</string>
+    <string name="manage_tab_keys">Keys</string>
+    <string name="manage_tab_models">Models</string>
+    <string name="manage_tab_accounts">Accounts</string>
+    <string name="manage_pinned">Pinned</string>
+    <string name="manage_default_key">Default</string>
+    <string name="manage_source_manual">Manual</string>
+    <string name="manage_source_discovered">Discovered</string>
+    <string name="manage_disabled">Disabled</string>
+    <string name="manage_local_only">Local record only</string>
+    <string name="manage_keys_ratio">%1$d / %2$d keys</string>
+    <string name="manage_models_count">%1$d models</string>
+    <string name="manage_latency">%1$d ms</string>
+    <string name="manage_context">Context %1$s</string>
+    <string name="manage_empty_providers_title">No providers yet</string>
+    <string name="manage_empty_providers_desc">Add one by hand, or paste a block of text to import everything at once.</string>
+    <string name="manage_empty_keys_title">No keys yet</string>
+    <string name="manage_empty_keys_desc">Keys belong to a provider. Create a provider first, then add keys to it.</string>
+    <string name="manage_empty_models_title">No models yet</string>
+    <string name="manage_empty_models_desc">Add model ids by hand, or pull the list from the provider endpoint.</string>
+    <string name="manage_empty_accounts_title">No platform accounts</string>
+    <string name="manage_empty_accounts_desc">A platform account is the login you use on the provider website. Stored locally, never filled in for you.</string>
+
+    <!-- Settings hub -->
     <string name="settings_title">Settings</string>
-    <string name="settings_section_about">About</string>
+    <string name="settings_group_settings">Settings</string>
+    <string name="settings_group_sync">Sync</string>
+    <string name="settings_group_about">About</string>
+    <string name="settings_group_update">Update</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_appearance_summary">Color scheme, corner style, language</string>
+    <string name="settings_security">Security</string>
+    <string name="settings_security_summary">PIN, biometrics, auto-lock, clipboard</string>
+    <string name="settings_probe">Probe</string>
+    <string name="settings_probe_summary">Levels, timing, rate limits, balance thresholds</string>
+    <string name="settings_profiles">Client profiles</string>
+    <string name="settings_profiles_summary">Headers used to look like a real AI client</string>
+    <string name="settings_data">Data</string>
+    <string name="settings_data_summary">Model metadata, groups, logs</string>
+    <string name="settings_sync_row">Backup and WebDAV</string>
+    <string name="settings_sync_row_summary">Encrypted backup, restore, scheduled upload</string>
+    <string name="settings_update_row">Check for updates</string>
+    <string name="settings_update_row_summary">Current version %1$s</string>
     <string name="settings_about_row">About YuanJi</string>
     <string name="settings_about_row_summary">Version, encryption boundary, threat model</string>
+
+    <!-- Secondary page titles -->
+    <string name="appearance_title">Appearance</string>
+    <string name="security_title">Security</string>
+    <string name="probe_settings_title">Probe</string>
+    <string name="data_title">Data</string>
+    <string name="sync_title">Sync</string>
+    <string name="update_title">Update</string>
+    <string name="probe_run_title">Probe details</string>
+    <string name="provider_detail_title">Provider</string>
+    <string name="placeholder_title">Not built yet</string>
+    <string name="placeholder_desc">This page has its route and its shell. The content lands in the milestone that owns it — see the roadmap in the plan.</string>
 
     <!-- About -->
     <string name="about_title">About</string>
@@ -34,4 +123,16 @@
     <string name="about_encryption_dialog_summary">API keys, platform account passwords, balance access tokens and WebDAV credentials are encrypted per field with AES-256-GCM. Everything else — provider names, notes, endpoints, model lists, balance amounts, timestamps — is stored as plain text in the app private directory. The wording is deliberately precise: this is not whole-database encryption.</string>
     <string name="about_not_password_manager_row">Not a password manager</string>
     <string name="about_not_password_manager_summary">Platform accounts are a local record: no autofill, no TOTP, no leak checks</string>
+
+    <!-- M0.8 sample content. Deleted together with screens/sample/ once M3 wires up real data. -->
+    <string name="sample_ago_12min">12 minutes ago</string>
+    <string name="sample_ago_2hour">2 hours ago</string>
+    <string name="sample_attention_client_blocked">Blocked by client check — a different User-Agent gets through</string>
+    <string name="sample_attention_low_balance">Balance below the threshold for this currency</string>
+    <string name="sample_note_company">Company account</string>
+    <string name="sample_note_backup">Spare account</string>
+    <string name="sample_key_main">Main</string>
+    <string name="sample_key_spare">Spare</string>
+    <string name="sample_account_github">GitHub sign-in</string>
+    <string name="sample_account_email">Email sign-in</string>
 </resources>

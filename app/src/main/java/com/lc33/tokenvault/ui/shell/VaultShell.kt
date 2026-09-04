@@ -36,8 +36,8 @@ fun VaultShell() {
     val snackbar = rememberAppSnackbarState()
 
     val items = listOf(
-        AppNavBarItem(label = stringResource(R.string.nav_vault), icon = AppIcon.Vault),
-        AppNavBarItem(label = stringResource(R.string.nav_probe), icon = AppIcon.Probe),
+        AppNavBarItem(label = stringResource(R.string.nav_dashboard), icon = AppIcon.Dashboard),
+        AppNavBarItem(label = stringResource(R.string.nav_manage), icon = AppIcon.Manage),
         AppNavBarItem(label = stringResource(R.string.nav_settings), icon = AppIcon.Settings),
     )
     val selectedIndex = remember(entry) { topLevelIndexOf(entry?.destination) }
@@ -68,20 +68,20 @@ fun VaultShell() {
 /** 一级页返回 0/1/2，二级页返回 -1（此时不显示底栏）。 */
 private fun topLevelIndexOf(destination: NavDestination?): Int = when {
     destination == null -> 0
-    destination.hasRoute<VaultRoute>() -> 0
-    destination.hasRoute<ProbeRoute>() -> 1
+    destination.hasRoute<DashboardRoute>() -> 0
+    destination.hasRoute<ManageRoute>() -> 1
     destination.hasRoute<SettingsRoute>() -> 2
     else -> -1
 }
 
 private fun NavHostController.navigateTopLevel(index: Int) {
     val route: Any = when (index) {
-        0 -> VaultRoute
-        1 -> ProbeRoute
+        0 -> DashboardRoute
+        1 -> ManageRoute
         else -> SettingsRoute
     }
     navigate(route) {
-        popUpTo<VaultRoute> { saveState = true }
+        popUpTo<DashboardRoute> { saveState = true }
         launchSingleTop = true
         restoreState = true
     }
