@@ -1,0 +1,37 @@
+<resources>
+    <string name="app_name">元记</string>
+
+    <!-- 通用 -->
+    <string name="dialog_ok">好的</string>
+    <string name="back_cd">返回</string>
+
+    <!-- 底部导航 -->
+    <string name="nav_vault">金库</string>
+    <string name="nav_probe">探测</string>
+    <string name="nav_settings">设置</string>
+
+    <!-- 金库 -->
+    <string name="vault_title">金库</string>
+    <string name="vault_empty_title">还没有供应商</string>
+    <string name="vault_empty_desc">可以手动新建，也可以粘贴一段文本，一次性导入密钥、端点、模型列表与余额配置。</string>
+
+    <!-- 探测 -->
+    <string name="probe_title">探测</string>
+    <string name="probe_empty_title">尚未探测</string>
+    <string name="probe_empty_desc">探测一次就知道哪张密钥失效了、哪个模型不存在、哪个号欠费。</string>
+
+    <!-- 设置 -->
+    <string name="settings_title">设置</string>
+    <string name="settings_section_about">关于</string>
+    <string name="settings_about_row">关于元记</string>
+    <string name="settings_about_row_summary">版本、加密边界、威胁模型</string>
+
+    <!-- 关于 -->
+    <string name="about_title">关于</string>
+    <string name="about_version">版本 %1$s（%2$d）</string>
+    <string name="about_encryption_row">加密边界</string>
+    <string name="about_encryption_row_summary">哪些加密、哪些明文</string>
+    <string name="about_encryption_dialog_summary">API 密钥、平台账号密码、余额访问令牌与 WebDAV 凭据按字段用 AES-256-GCM 加密。其余内容——供应商名称、备注、端点、模型列表、余额金额、时间戳——以明文存放在应用私有目录里。这句话是刻意说准的：本应用不做整库加密。</string>
+    <string name="about_not_password_manager_row">这不是密码管理器</string>
+    <string name="about_not_password_manager_summary">平台账号只是本地记录：不填充、无 TOTP、不做泄露检测</string>
+</resources>

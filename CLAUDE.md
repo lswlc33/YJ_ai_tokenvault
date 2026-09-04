@@ -1,0 +1,131 @@
+# CLAUDE.md
+
+架构与不变量。这里写的都是**改坏了不会立刻报错**的东西——编译通过、测试也可能通过，
+但会在某个时刻造成不可挽回的后果。动到相关代码时先读这一页。
+
+怎么动手在 `AGENTS.md`，完整设计与每条规则的推导在 `计划.md`。
+
+## 分层
+
+```
+domain/ endpoint/ probe/ balance/ catalog/ importer/ backup/ crypto/
+    纯 Kotlin。零 android/androidx/okhttp3 import，零 Clock.System。
+    平台能力（含当前时间）以接口或 lambda 注入，所以这八个包在 JVM 单测里全覆盖。
+net/        OkHttp 实现层：HttpEngine 的实现 + 脱敏拦截器
+data/       Room 实体 / DAO / 迁移 / 映射器 / 仓库实现
+platform/   Keystore、BiometricPrompt、剪贴板、SAF、WorkManager、窗口安全
+di/         Hilt Module
+ui/theme    AppTokens / StatusPalette / AppColorSchemeMode（无 MIUIX 依赖）
+ui/miuix    **唯一允许 import top.yukonga.miuix 的包**，含 AppTheme
+ui/common   StatusDot / SecretText / RelativeTime / EmptyState …
+ui/shell    AppRoot / LockGate / VaultShell / NavHost / Routes
+screens/    页面。不出现 SQL，不构造 HTTP 请求，不直接接触 crypto/
+```
+
+- 仓库接口定义在 `domain/repo/`，实现在 `data/`。ViewModel 只依赖接口。
+- Room 实体只存在于 `data/`，与 `domain/` 的模型是两套类，中间有显式映射器。
+- 这几条由 `ArchitectureRulesTest`（JVM 单测，pre-commit 会跑）与 `ci.yml` 的 grep
+  双重守住。
+
+## 六条推论（数据层）
+
+1. **Room 实例是应用级单例**，启动即建。锁定 = 清零 DEK + 跳锁屏，**不关库**。
+   需要明文秘密的调用在锁定态抛 `VaultLockedException`。
+2. 因此只碰公开数据的后台任务（models.dev 同步、`dataRevision` 检查、日志清理）
+   **在锁定状态下也能跑**；只有需要加解密的任务才要求已解锁。
+3. **DAO 与映射器一律不解密。** `Flow<List<Entity>>` → 领域对象只搬密文 `ByteArray`，
+   明文只出现在明确借用 DEK 的 UseCase 里。否则列表页在锁定瞬间会在 Flow 内部抛异常，
+   把整条订阅打断。遮蔽串是解密后现算的，所以它只出现在详情页。
+4. **`BootStore` 的写入必须原子**（临时文件 → fsync → rename），解析失败落到
+   `LockPhase.BootCorrupt`，引导用户去恢复备份，绝不静默重建。
+5. **同一个配置项只能有一个权威存储。** `boot` 只存解锁前必须可读的那几项
+   （KDF 参数、包裹后的 DEK、退避计数、`themeMode` / `localeTag` / `onboarded`），
+   `app_settings` 不得重复这些键。备份的 `appSettings` 白名单要显式包含它们。
+6. **默认 Key 恰好一张。** 新增第一张自动设默认；设默认时同事务清掉其它；
+   删除默认那张后自动把 `sortOrder` 最小的启用 Key 顶上——否则四个余额适配器会静默失效。
+
+## 加密边界（"关于"页必须与此一致）
+
+| 加密（字段级 AES-256-GCM） | 明文 |
+| --- | --- |
+| `api_keys.secretEnc` | 供应商名称、备注、官网、端点、协议、路径覆盖 |
+| `provider_accounts.usernameEnc` / `passwordEnc` | 模型 id、显示名、探测状态、延迟 |
+| `providers.balanceTokenEnc` | 余额金额、币种、原始文本 |
+| `app_settings.valueBlob`（WebDAV 凭据） | 分组、颜色、排序、时间戳、日志、客户端预设 |
+
+数据库跑在系统自带 SQLite 上，**不上 SQLCipher**：真正的秘密已经字段级加密，
+SQLCipher 额外保护的只是元数据，代价是每 ABI 多 1–2 MB 原生库、库只能解锁后打开。
+代价必须诚实写出来：**元数据在应用私有目录里是明文的**。宣传语因此只能说
+"密钥与账号密码经 AES-256-GCM 加密存储"，不能说"整库加密"。
+
+## 32 条红线（一句话版，推导见 `计划.md` §3）
+
+**密钥与加密**
+
+1. 明文密钥只允许存在于内存的 `ByteArray`/`CharArray` 和 HTTP 请求头里。
+2. DEK 随机生成，PIN 只用来包裹它；**改 PIN 必须是 O(1)**，不允许全库重加密。
+3. KDF 参数与盐随密文一起存；"发现与编译期常量不一致就改写存储值"是永久锁库的定时炸弹。
+4. 生物识别必须由 Keystore 硬件密钥保护且 `setUserAuthenticationRequired(true)`。
+5. 生物识别开关由独立持久化偏好决定，关闭后任何解锁路径都不得悄悄打开。
+6. 锁定时 DEK 与派生子密钥置零；DEK 只由唯一会话对象持有，他人短暂借用。
+24. 每条字段级密文的 AAD **必须绑定行身份**（`"表名:主键"`），否则密文可被跨行覆盖。
+25. DEK 可以有多种包裹（PIN / 生物识别 / **恢复密钥**），但明文 DEK 只有一份。
+
+**数据完整性**
+
+7. 备份包必须自包含：内含 KDF 参数、盐与**明文密钥**（整包已加密），绝不搬运旧设备密文。
+8. 解密失败必须报错并中断，不允许静默降级成 `null`。
+9. 任何跨版本恢复都走显式迁移函数，不允许把旧结构的行直接插入新表。
+10. 数据库是唯一数据源，UI 通过 Flow 观察，不允许"写完手动通知刷新"。
+26. boot 存储每次写入必须原子，并且必须存在显式的 `BootCorrupt` 状态。
+27. 备份包里的跨表引用一律用自然键（分组名、`builtinKey`、指纹重算），绝不搬自增主键。
+28. 备份包**不搬运探测结果**，恢复后一律重置为未探测。
+
+**探测正确性**
+
+11. **瞬时失败绝不修改健康结论。** 网络失败 / 429 / 5xx 只写 `lastOutcome`，
+    `health` 保留上一次的持久结论。
+12. `GET /v1/models` 返回 200 不等于 Key 有效；反过来，除 401/403 之外的结构化响应
+    都证明鉴权已通过，400 只说明请求参数不被接受。
+13. 自动同步时手动录入的条目永不被改；上游消失的条目标停用而非删除。
+14. 余额是"可用额度"，减法只写在明确提供两个量的那个适配器内部。
+15. 余额必须带币种；不硬编码货币符号，不硬编码阈值。
+29. **探测不允许把自己探成失败**：每 host 每轮有请求上限，撞 429 后停发所有可选请求。
+30. 发现来的模型必须记住来自哪个协议的列表；"上游消失即停用"只在该协议内生效。
+
+**产品完整性**
+
+16. 每个持久化字段都必须有 UI 入口或明确的产生路径。
+17. 同一状态全应用只有一套文案和一套颜色；状态必须同时用颜色和文字表达。
+18. 协议属于**模型**，能力集合属于**供应商**，二者不能互相推导。
+19. 用户可见文本一律进两份 strings.xml，Compose 代码里不留中文字面量。
+20. 领域逻辑是不依赖 Android 的纯 Kotlin，**当前时间也算平台能力**，必须注入 `Clock`。
+31. 同一个配置项只能有一个权威存储（见上面推论 5）。
+
+**凭据边界与可解释性**
+
+21. 平台账号的用户名与密码与 API 密钥同等对待：同一套加密、遮蔽、回遮、脱敏、剪贴板策略。
+22. 客户端伪装预设是**数据不是代码**：探测代码里不允许硬编码任何 `User-Agent` 或特征头。
+23. 明确记录哪些列加密、哪些明文，并在"关于"页说明。
+32. 落库前的脱敏**以已知明文值替换为主，正则只作兜底**——正则挡不住 base64 形态的访问令牌。
+
+## 两个状态列，不是一个
+
+`KeyHealth`（持久结论，只被判定性响应改写）与 `ProbeOutcome`（最近一次探测发生了什么，
+每次都写）分成两列，是红线 11 在类型层面的表达。`KeyHealth` 里**没有**
+`NETWORK_ERROR` / `RATE_LIMITED` / `UPSTREAM_ERROR`：它们是瞬时状况，留在那里迟早
+有人写进去。`models` 表同理。
+
+## 弹层与截屏
+
+只用 MIUIX 的 `Overlay*`：它画在 `Scaffold` 内的同一窗口里，继承 `FLAG_SECURE`。
+`Window*` 系列是独立系统窗口、**不继承**，而本项目的弹层里就有展示明文密钥和密码的。
+Compose 原生的 `Dialog` 也是独立窗口，用它必须单独设 `SecureFlagPolicy.SecureOn`。
+
+## 当前进度
+
+M0（仓库与骨架）已完成：Gradle + 版本目录 + Hilt + MIUIX 主题 + 分层 Scaffold Shell +
+三个一级页占位 + 类型安全路由 + `AppTokens`/`StatusPalette` + `.githooks` + `ci.yml` +
+`ArchitectureRulesTest`。
+
+下一步 M0.5（协议踩点 spike），然后 M1（安全底座）。里程碑表见 `计划.md` §16。

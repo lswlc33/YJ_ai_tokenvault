@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 单色版由系统按主题着色，路径与前景一致。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M54,30c-7.18,0 -13,5.82 -13,13c0,4.86 2.67,9.1 6.62,11.32L44,74h20l-3.62,-19.68C64.33,52.1 67,47.86 67,43C67,35.82 61.18,30 54,30zM54,37c3.31,0 6,2.69 6,6c0,3.31 -2.69,6 -6,6c-3.31,0 -6,-2.69 -6,-6C48,39.69 50.69,37 54,37z" />
+</vector>

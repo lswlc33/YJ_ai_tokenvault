@@ -1,0 +1,133 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # 分层规则的第二道闸。第一道是 ArchitectureRulesTest（本地 pre-commit 就会跑），
+      # 这里再 grep 一遍，防的是"有人没装 hook 直接推"。
+      # 放在编译之前，因为它零成本，而且违规是设计问题不是编译问题。
+      - name: 架构规则检查
+        run: |
+          set -u
+          fail=0
+          src=app/src/main/java/com/lc33/tokenvault
+          check() { # check <说明> <命中即失败的命令>
+            if eval "$2" > /tmp/hit 2>/dev/null && [ -s /tmp/hit ]; then
+              echo "::error::$1"; sed 's/^/    /' /tmp/hit; fail=1
+            fi
+          }
+
+          # 1. 八个纯 Kotlin 包：零 Android / 零 AndroidX / 零 OkHttp，且不许直接读当前时间
+          pure="$src/domain $src/endpoint $src/probe $src/balance $src/catalog $src/importer $src/backup $src/crypto"
+          existing=""
+          for d in $pure; do [ -d "$d" ] && existing="$existing $d"; done
+          if [ -n "$existing" ]; then
+            check "纯 Kotlin 层出现了平台依赖（计划.md 红线 20）" \
+              "grep -rnE 'import (android|androidx)\.|import okhttp3\.|Clock\.System' $existing --include='*.kt'"
+          fi
+
+          # 2. 只有 ui/miuix 能 import MIUIX（实验期库，升级时只改这一层）
+          check "ui/miuix 之外直接 import 了 MIUIX（计划.md §4.3）" \
+            "grep -rn 'import top.yukonga.miuix' $src --include='*.kt' | grep -v '/ui/miuix/'"
+
+          # 3. MIUIX 的 Window* 弹层一律禁用：独立系统窗口，FLAG_SECURE 不继承
+          check "用了 MIUIX 的 Window* 弹层（计划.md §7.5、§13.2）" \
+            "grep -rnE 'Window(Dialog|BottomSheet|[A-Za-z]*Popup|[A-Za-z]*Menu|[A-Za-z]*Preference)' $src --include='*.kt'"
+
+          # 4. screens/ 不碰 SQL，也不构造 HTTP 请求
+          if [ -d "$src/screens" ]; then
+            check "screens/ 里出现 SQL 或 HTTP 构造（计划.md §4.3）" \
+              "grep -rnE '(SELECT |INSERT +INTO|UPDATE +[A-Za-z_]+ +SET|DELETE +FROM|CREATE +TABLE|Request\.Builder)' $src/screens --include='*.kt'"
+          fi
+
+          # 5. 真实凭据永不入库
+          check "仓库里出现疑似真实 API 密钥的字面量（计划.md §0）" \
+            "grep -rnE 'sk-[A-Za-z0-9]{20,}' app gradle --include='*.kt' --include='*.kts' --include='*.xml' --include='*.toml'"
+          if git ls-files --error-unmatch '示例数据.md' > /dev/null 2>&1; then
+            echo "::error::示例数据.md 被提交进了仓库（计划.md §0）"; fail=1
+          fi
+
+          exit $fail
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-37 build-tools;37.0.0'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: JVM 单测
+        run: ./gradlew :app:testDebugUnitTest --console=plain
+
+      - name: Lint
+        run: ./gradlew :app:lint --console=plain
+
+      # 只编译不运行：仪器测试要设备，值得在 CI 里守的是"它还编得过"。
+      - name: 仪器测试编译
+        run: ./gradlew :app:assembleDebugAndroidTest --console=plain
+
+      # 发布页上那个 APK。跑 R8，所以它同时是"release 配置能不能构建"的回归。
+      - name: 构建 nightly
+        env:
+          VAULT_RELEASE_KEYSTORE_BASE64: ${{ secrets.VAULT_RELEASE_KEYSTORE_BASE64 }}
+          VAULT_RELEASE_STORE_PASSWORD: ${{ secrets.VAULT_RELEASE_STORE_PASSWORD }}
+          VAULT_RELEASE_KEY_ALIAS: ${{ secrets.VAULT_RELEASE_KEY_ALIAS }}
+          VAULT_RELEASE_KEY_PASSWORD: ${{ secrets.VAULT_RELEASE_KEY_PASSWORD }}
+        run: |
+          set -eu
+          if [ -n "${VAULT_RELEASE_KEYSTORE_BASE64:-}" ]; then
+            printf '%s' "$VAULT_RELEASE_KEYSTORE_BASE64" | base64 -d > release.keystore
+            export VAULT_RELEASE_STORE_FILE=release.keystore
+            echo "signed=true" >> "$GITHUB_ENV"
+          else
+            echo "未配置签名 secret，产出未签名包（无法安装，仅用于验证 R8 配置）"
+            echo "signed=false" >> "$GITHUB_ENV"
+          fi
+          ./gradlew :app:assembleNightly --console=plain
+          rm -f release.keystore
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightly-apk
+          path: app/build/outputs/apk/nightly/*.apk
+          if-no-files-found: error
+
+      # 只有签过名的包才值得挂到预发布上：未签名的 APK 装不上，
+      # 放上去只会让人下到一个不能用的文件。
+      - name: 刷新 nightly 预发布
+        if: github.ref == 'refs/heads/master' && github.event_name == 'push' && env.signed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          apk=$(find app/build/outputs/apk/nightly -name '*.apk' | head -n 1)
+          if gh release view nightly > /dev/null 2>&1; then
+            gh release delete-asset nightly "$(basename "$apk")" --yes || true
+            gh release upload nightly "$apk" --clobber
+            gh release edit nightly --target "$GITHUB_SHA" \
+              --notes "自动构建于 $GITHUB_SHA（$(date -u '+%Y-%m-%d %H:%M UTC')）"
+          else
+            gh release create nightly "$apk" \
+              --prerelease --target "$GITHUB_SHA" --title nightly \
+              --notes "自动构建于 $GITHUB_SHA（$(date -u '+%Y-%m-%d %H:%M UTC')）"
+          fi

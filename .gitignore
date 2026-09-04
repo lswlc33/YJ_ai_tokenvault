@@ -2,6 +2,10 @@
 # 本地模拟器 / ADB 端到端验收用；CI 单测用 app/src/test/resources/sample_import.txt
 示例数据.md
 
+# 本机临时产物：M0.5 协议踩点抓到的**原始**响应先落在这里（可能含密钥回显），
+# 脱敏之后才复制成 app/src/test/resources/fixtures/ 下的 fixture。
+.local/
+
 # Gradle / Android
 .gradle/
 build/

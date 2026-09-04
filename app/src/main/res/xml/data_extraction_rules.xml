@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    金库不允许被云备份或设备迁移搬走。真正的迁移路径是应用内的加密备份包（计划.md §12.1），
+    它自带 KDF 参数与盐，换设备也能恢复；而系统备份搬走的是用旧设备密钥加密的密文，
+    换设备即永久丢失（红线 7）。
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude
+            domain="database"
+            path="." />
+        <exclude
+            domain="file"
+            path="." />
+        <exclude
+            domain="sharedpref"
+            path="." />
+        <exclude
+            domain="external"
+            path="." />
+    </cloud-backup>
+    <device-transfer>
+        <exclude
+            domain="database"
+            path="." />
+        <exclude
+            domain="file"
+            path="." />
+        <exclude
+            domain="sharedpref"
+            path="." />
+        <exclude
+            domain="external"
+            path="." />
+    </device-transfer>
+</data-extraction-rules>

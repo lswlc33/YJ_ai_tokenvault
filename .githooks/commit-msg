@@ -1,0 +1,28 @@
+#!/bin/sh
+# commit-msg 闸门：提交信息必须用中文书写。
+#
+# 与 pre-commit 一起由这一条命令启用：
+#
+#     git config core.hooksPath .githooks
+#
+# 为什么要机器检查：提交信息就是历史。推上去之后想改措辞就得重写提交，
+# 所以最便宜的时机是它还不存在的时候。这里刻意不留 SKIP_VERIFY 逃生口——
+# 和"编译不过的工作中提交"不同，写错语言从来不是更快的路。
+set -e
+
+subject=$(sed -n '1p' "$1")
+
+# git merge / git revert 生成的默认信息不强求
+case "$subject" in
+    Merge*|Revert*) exit 0 ;;
+esac
+
+# 判据是"首行至少有一个汉字"。这里按字节匹配 UTF-8 里 CJK 的首字节区间
+# （U+4E00–U+9FFF 编成 E4 B8 80 … E9 BE A5），这样不依赖 shell 的 locale。
+if printf '%s' "$subject" | LC_ALL=C grep -q "[$(printf '\344')-$(printf '\351')]"; then
+    exit 0
+fi
+
+echo "commit-msg: 提交信息必须用中文书写（当前首行：$subject）"
+echo "            例：feat: 金库首页接入供应商列表"
+exit 1

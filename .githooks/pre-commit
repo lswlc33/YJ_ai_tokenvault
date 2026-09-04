@@ -1,0 +1,46 @@
+#!/bin/sh
+# 提交前闸门。克隆后执行一次即可启用：
+#
+#     git config core.hooksPath .githooks
+#
+# 为什么要有它：一个编译不过的提交只能靠 bisect 掉进去才发现。AGENTS.md 声明
+# 每个提交都要能独立构建，这个 hook 把那条声明变成机器检查，而且是在推送之前
+# 而不是一分钟后在 CI 里。
+#
+# :app:testDebugUnitTest 会把 debug 源码与单测一起编译，所以它同时覆盖了
+# 编译错误、测试失败，以及 ArchitectureRulesTest 里那几条分层规则
+# （只有 ui/miuix 能 import MIUIX、禁用 Window* 弹层、代码里不留中文字面量……）。
+#
+# 故意做工作中提交时的逃生口：
+#
+#     SKIP_VERIFY=1 git commit ...
+set -e
+
+if [ -n "$SKIP_VERIFY" ]; then
+    echo "pre-commit: 已跳过（SKIP_VERIFY 已设置）"
+    exit 0
+fi
+
+cd "$(git rev-parse --show-toplevel)"
+
+# 真实凭据永不入库（计划.md §0）。这条最先查，因为它是唯一不可挽回的错误：
+# 一旦推到公开仓库，轮换密钥之外没有别的补救。
+if git diff --cached --name-only | grep -q '示例数据\.md'; then
+    echo
+    echo "pre-commit: 示例数据.md 里是真实密钥与访问令牌，不允许提交。"
+    exit 1
+fi
+
+if git diff --cached -U0 | grep -Eq '^\+.*sk-[A-Za-z0-9]{20,}'; then
+    echo
+    echo "pre-commit: 暂存区里出现了疑似真实 API 密钥的字面量。"
+    exit 1
+fi
+
+echo "pre-commit: ./gradlew :app:compileDebugKotlin :app:testDebugUnitTest"
+if ! ./gradlew :app:compileDebugKotlin :app:testDebugUnitTest --console=plain --quiet; then
+    echo
+    echo "pre-commit: 编译或单测失败，提交已中止。"
+    echo "            修好它，或者用 SKIP_VERIFY=1 强行提交。"
+    exit 1
+fi

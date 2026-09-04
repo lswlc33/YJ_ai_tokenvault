@@ -1,0 +1,37 @@
+<resources>
+    <string name="app_name">YuanJi</string>
+
+    <!-- Generic -->
+    <string name="dialog_ok">OK</string>
+    <string name="back_cd">Back</string>
+
+    <!-- Bottom navigation -->
+    <string name="nav_vault">Vault</string>
+    <string name="nav_probe">Probe</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Vault -->
+    <string name="vault_title">Vault</string>
+    <string name="vault_empty_title">No providers yet</string>
+    <string name="vault_empty_desc">Add a provider by hand, or paste a block of text to import keys, endpoints, models and balance settings at once.</string>
+
+    <!-- Probe -->
+    <string name="probe_title">Probe</string>
+    <string name="probe_empty_title">Never probed</string>
+    <string name="probe_empty_desc">A probe tells you which key is dead, which model is missing, and which account is out of credit.</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_section_about">About</string>
+    <string name="settings_about_row">About YuanJi</string>
+    <string name="settings_about_row_summary">Version, encryption boundary, threat model</string>
+
+    <!-- About -->
+    <string name="about_title">About</string>
+    <string name="about_version">Version %1$s (%2$d)</string>
+    <string name="about_encryption_row">Encryption boundary</string>
+    <string name="about_encryption_row_summary">What is encrypted, and what is not</string>
+    <string name="about_encryption_dialog_summary">API keys, platform account passwords, balance access tokens and WebDAV credentials are encrypted per field with AES-256-GCM. Everything else — provider names, notes, endpoints, model lists, balance amounts, timestamps — is stored as plain text in the app private directory. The wording is deliberately precise: this is not whole-database encryption.</string>
+    <string name="about_not_password_manager_row">Not a password manager</string>
+    <string name="about_not_password_manager_summary">Platform accounts are a local record: no autofill, no TOTP, no leak checks</string>
+</resources>

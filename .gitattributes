@@ -1,0 +1,8 @@
+# 统一行尾。.githooks 下的脚本由 Git 自带的 sh 执行，CRLF 会让 shebang 失效，
+# 所以仓库内一律 LF，只有 Windows 批处理保留 CRLF。
+* text=auto eol=lf
+*.bat text eol=crlf
+*.jar binary
+*.png binary
+*.keystore binary
+*.jks binary
