@@ -81,8 +81,19 @@ class VaultSession(
     }
 
     private fun computePhase(): LockPhase {
-        if (dek != null) return LockPhase.Unlocked
-        return when (val state = bootStore.read()) {
+        val state = bootStore.read()
+        if (dek != null) {
+            // DEK 在内存里，但**引导可能还没走完**：`onboard()` 之后还有"抄下恢复密钥"那一步，
+            // 而 `onboarded` 要到用户确认之后才落盘。这里不看这一眼的后果很具体——
+            // Activity 被销毁（系统返回键、进程被回收、"不保留活动"）之后重建时，
+            // 阶段会直接报 Unlocked，于是恢复密钥那一页被跳过去，而那串明文只活在
+            // ViewModel 的一个字段里，跳过就等于永久丢失，用户手上一把恢复密钥都没有。
+            if (state is BootState.Ok && !state.record.onboarded) return LockPhase.Onboarding
+            // boot 读不出来（Missing / Corrupt）时**不**把用户踢出已解锁的会话：
+            // DEK 还在内存里，这一刻还能导出备份，踢出去等于把唯一的救命窗口关掉。
+            return LockPhase.Unlocked
+        }
+        return when (state) {
             BootState.Missing -> LockPhase.Onboarding
             is BootState.Corrupt -> LockPhase.BootCorrupt(state.reason)
             is BootState.Ok -> {
@@ -111,6 +122,8 @@ class VaultSession(
     /**
      * 引导：生成 DEK、跑基准挑参数、包裹 PIN 与恢复密钥两条路、写一次 boot。
      *
+     * **这不是引导的终点**：`onboarded` 要到 [completeOnboarding] 才落盘，理由见那个方法。
+     *
      * **不擦 [pin]**：调用方通常还要用它做"两次输入一致"的比对，擦除时机只有调用方知道。
      * 返回的恢复密钥由调用方负责擦。
      */
@@ -133,7 +146,10 @@ class VaultSession(
             try {
                 bootStore.update { current ->
                     current.copy(
-                        onboarded = true,
+                        // **这里刻意还不写 `onboarded = true`**：引导要到用户确认"我已抄下恢复密钥"
+                        // 才算走完（[completeOnboarding]）。在那之前被杀掉，下次启动应当回到引导，
+                        // 而不是进到一个用户手上没有恢复密钥的库里。
+                        onboarded = false,
                         pinKdf = pinKdf,
                         recoveryKdf = recoveryKdf,
                         dekWrappedByPin = dekEnvelope.wrap(newDek, pinKek, DekSlot.Pin),
@@ -147,13 +163,32 @@ class VaultSession(
                     )
                 }
                 adoptDek(newDek)
-                phase = LockPhase.Unlocked
+                // 仍是 Onboarding：DEK 已经在内存里（[isUnlocked] 为真，所以
+                // [regenerateRecoveryKey] 这条补救路能用），但阶段上还没走完。
+                phase = computePhase()
                 return OnboardResult(recoveryKey)
             } finally {
                 pinKek.zeroize()
                 recoveryKek.zeroize()
             }
         }
+    }
+
+    /**
+     * 引导的最后一步：用户勾了"我已保存恢复密钥"。**只有到这一刻 `onboarded` 才落盘。**
+     *
+     * 分成两次写入是刻意的。恢复密钥的明文只在展示那一页存在（它擦不掉，所以存在时间越短
+     * 越好），一旦这个阶段报了 `Unlocked`，那一页就再没有第二次机会——用户会带着一个
+     * 只有 PIN 能打开的库继续用下去，而 §7.1 要求的三条解锁路径少了一条，他自己还不知道。
+     * 代价是引导期间多写一次 boot 文件，这点风险远小于"用户没有恢复密钥"。
+     *
+     * @throws VaultLockedException 未解锁。走到这一步必然是刚 [onboard] 完，所以真抛了
+     *   说明调用顺序错了，而不是用户做了什么。
+     */
+    fun completeOnboarding() = synchronized(guard) {
+        if (dek == null) throw VaultLockedException()
+        bootStore.update { it.copy(onboarded = true) }
+        phase = computePhase()
     }
 
     // ------------------------------------------------------------------ 解锁

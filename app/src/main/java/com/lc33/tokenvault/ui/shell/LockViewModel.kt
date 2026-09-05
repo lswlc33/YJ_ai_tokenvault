@@ -17,6 +17,7 @@ import com.lc33.tokenvault.screens.lock.LockUiState
 import com.lc33.tokenvault.screens.lock.OnboardingStep
 import com.lc33.tokenvault.screens.lock.PinError
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.io.IOException
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -69,10 +70,43 @@ class LockViewModel @Inject constructor(
     fun refresh() {
         viewModelScope.launch {
             val phase = withContext(Dispatchers.Default) { session.refresh() }
+            // 引导被打断在最后一步：PIN 与两条包裹都已经写好、DEK 还在会话里，只有"抄下
+            // 恢复密钥"没做完（系统返回键、进程被回收、"不保留活动"都会走到这里）。
+            // 旧的那串明文随 ViewModel 一起没了，所以轮换一把新的接着展示——不接的话，
+            // 用户会带着一个自己没有恢复密钥的库继续用下去，而他并不知道。
+            if (phase == LockPhase.Onboarding && session.isUnlocked) {
+                resumeRecoveryKeyStep()
+                return@launch
+            }
             _phase.value = phase
             if (phase is LockPhase.Locked) {
                 _uiState.update { it.copy(unlock = it.unlock.copy(pinSlots = PinPolicy.DEFAULT_SLOTS)) }
             }
+        }
+    }
+
+    /**
+     * 重入恢复密钥那一页。
+     *
+     * 用**轮换**而不是"把旧的再显示一遍"：旧的那串明文已经不存在了（这正是重入的原因），
+     * 而 boot 里只有它的包裹。轮换的副作用恰好是想要的——万一用户上一次已经抄下了旧的，
+     * 旧的立刻失效，不会留下一把"看着像对、其实解不开"的密钥。
+     */
+    private suspend fun resumeRecoveryKeyStep() {
+        val key = withContext(Dispatchers.Default) { session.regenerateRecoveryKey() }
+        recoveryKeyPlain?.zeroize()
+        recoveryKeyPlain = key
+        _phase.value = LockPhase.Onboarding
+        _uiState.update {
+            it.copy(
+                onboarding = it.onboarding.copy(
+                    step = OnboardingStep.RecoveryKey,
+                    recoveryKeyDisplay = RecoveryKey.formatForDisplay(key),
+                    recoveryKeySaved = false,
+                    busy = false,
+                    error = null,
+                ),
+            )
         }
     }
 
@@ -298,13 +332,28 @@ class LockViewModel @Inject constructor(
 
             OnboardingStep.RecoveryKey -> {
                 if (!current.recoveryKeySaved) return
-                // 离开这一页就丢引用并擦掉明文
-                recoveryKeyPlain?.zeroize()
-                recoveryKeyPlain = null
-                _uiState.update {
-                    it.copy(onboarding = it.onboarding.copy(recoveryKeyDisplay = null))
+                setBusy(true)
+                viewModelScope.launch {
+                    // 「引导走完了」这一刻才落盘。顺序不能反过来：先擦明文再写 boot，
+                    // 写失败就得到一个"阶段没推进、明文也没了"的死角——那正是这一整段要防的。
+                    val landed = withContext(Dispatchers.Default) {
+                        try {
+                            session.completeOnboarding()
+                            true
+                        } catch (_: IOException) {
+                            false
+                        }
+                    }
+                    setBusy(false)
+                    if (!landed) return@launch
+                    // 落盘了才丢引用并擦掉明文
+                    recoveryKeyPlain?.zeroize()
+                    recoveryKeyPlain = null
+                    _uiState.update {
+                        it.copy(onboarding = it.onboarding.copy(recoveryKeyDisplay = null))
+                    }
+                    _phase.value = session.currentPhase()
                 }
-                _phase.value = session.currentPhase()
             }
 
             else -> Unit

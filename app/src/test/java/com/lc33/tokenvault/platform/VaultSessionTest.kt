@@ -52,7 +52,17 @@ class VaultSessionTest {
         )
     }
 
-    private fun onboard(): CharArray = session.onboard(pin.copyOf(), slowClock()).recoveryKey
+    /**
+     * 走**完整**一条引导：`onboard` 之后还要 `completeOnboarding`。
+     *
+     * 两步分开是产品行为的一部分（用户得先抄下恢复密钥），所以这个辅助函数代表"引导真的走完了"，
+     * 下面那几个用例才是专门测中间那个窗口的。
+     */
+    private fun onboard(): CharArray {
+        val key = session.onboard(pin.copyOf(), slowClock()).recoveryKey
+        session.completeOnboarding()
+        return key
+    }
 
     // ------------------------------------------------------------------ 阶段
 
@@ -74,6 +84,55 @@ class VaultSessionTest {
         onboard()
         assertEquals(LockPhase.Unlocked, session.currentPhase())
         assertTrue(session.isUnlocked)
+    }
+
+    // ---- 引导的最后一步：恢复密钥还没被确认的那个窗口
+
+    @Test
+    fun `恢复密钥还没确认时留在引导阶段，但 DEK 已经可用`() {
+        session.onboard(pin.copyOf(), slowClock())
+        // 报 Unlocked 的后果很具体：恢复密钥那一页会被跳过去，而那串明文只活在 ViewModel 里
+        assertEquals(LockPhase.Onboarding, session.currentPhase())
+        // 同时 DEK 必须已经在内存里——"重新轮换一把恢复密钥"这条补救路要用它
+        assertTrue(session.isUnlocked)
+    }
+
+    @Test
+    fun `确认之后 onboarded 才落盘`() {
+        session.onboard(pin.copyOf(), slowClock())
+        assertFalse((store.read() as BootState.Ok).record.onboarded)
+        session.completeOnboarding()
+        assertTrue((store.read() as BootState.Ok).record.onboarded)
+        assertEquals(LockPhase.Unlocked, session.currentPhase())
+    }
+
+    @Test
+    fun `引导没走完就杀进程，重启回到引导而不是锁屏`() {
+        session.onboard(pin.copyOf(), slowClock())
+        // 换一个全新实例 = 杀进程。boot 里已经有 PIN 包裹了，但引导没走完，
+        // 所以这里必须是引导而不是"输 PIN 解锁"——用户手上还没有恢复密钥。
+        val restarted = VaultSession(bootStore = store, nowEpochMs = { now })
+        assertEquals(LockPhase.Onboarding, restarted.refresh())
+    }
+
+    @Test
+    fun `引导没走完时能轮换出新的恢复密钥，旧的立刻失效`() {
+        val first = session.onboard(pin.copyOf(), slowClock()).recoveryKey
+        // Activity 被销毁后那串明文没了，但会话还解锁着，所以能换一把新的接着展示
+        val second = session.regenerateRecoveryKey()
+        assertFalse(first.contentEquals(second))
+        session.completeOnboarding()
+
+        session.lock()
+        assertEquals(UnlockResult.Success, session.unlockWithRecoveryKey(second.copyOf()))
+        session.lock()
+        assertTrue(session.unlockWithRecoveryKey(first.copyOf()) is UnlockResult.WrongCredential)
+    }
+
+    @Test
+    fun `completeOnboarding 在锁定态抛而不是静默写 onboarded`() {
+        assertThrows(VaultLockedException::class.java) { session.completeOnboarding() }
+        assertEquals(BootState.Missing, store.read())
     }
 
     @Test
