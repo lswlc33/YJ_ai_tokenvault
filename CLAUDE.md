@@ -193,4 +193,59 @@ M0.8（界面骨架）**已完成**。底栏是仪表盘 · 管理 · 设置，�
 
 **strings.xml 里不要写 Markdown**：`**加粗**` 会原样显示成星号。强调靠断句和词序。
 
-下一步 M1（安全底座）。里程碑表见 `计划.md` §16。
+M1（安全底座）**已完成**，2026-09-06。引导 → 设 PIN → 抄恢复密钥 → 锁定 → 解锁 →
+自动锁定，整条路在设备（Android 15，adb `127.0.0.1:7555`）上逐屏走通。
+**生物识别那一条只有单测，没有设备验证**：这台设备报"没有生物识别硬件"，
+安全页那一行因此是禁用态。要验它得换一台有指纹的机器。
+
+- `crypto/`：Argon2id 包裹 DEK（红线 2 的 O(1) 改 PIN）、AES-256-GCM 字段级加解密、
+  HKDF 派生子密钥、`RecoveryKey`（32 个 hex 字符 = 128 位熵，`normalize` 吃掉全部空白、
+  连字符与大小写差异）。
+- `platform/VaultSession` 是**唯一持有明文 DEK 的对象**（红线 6/25），阶段机
+  `Loading | Onboarding | Locked | Unlocked | BootCorrupt`；`FileBootStore` 原子写
+  （临时文件 → fsync → rename，红线 26），`Missing` 与 `Corrupt` 是两个状态。
+- `UnlockBackoff`：前 4 次不罚，之后 30/60/300/900/3600 秒。**改 PIN 页验旧 PIN 走
+  `unlockWithPin` 而不是另做一个不计次的 `verifyPin`**——后者等于给那一页开一个绕过
+  §7.2 的入口。
+- `platform/AutoLocker` 接 `ProcessLifecycleOwner` 的**进程级** ON_STOP/ON_START，
+  不用 Activity 的生命周期（那个在转屏和弹系统框时也走 onStop，于是每次转屏都锁一次）。
+  切后台到点在后台真的锁掉，不等用户回来补锁。时间用注入的 `elapsedRealtime`（红线 20）。
+- `BootStore.revision` 是个落盘计数：观察者从数据源知道该重读了，而不是靠每个写入点
+  顺手通知一声（红线 10 的精神）。**生物识别开关与配色模式都从它派生，不自己记一份**——
+  `AppRoot` 与外观页各自 `hiltViewModel()`，后者的宿主是导航栈里的一个 entry，
+  两处拿到的是两个实例；而 `BiometricUnlocker` 在密钥失效时会自己关掉开关，那条路
+  不经过任何 ViewModel。自己记一份的表现是"设置页画着已开启、锁屏页照旧弹指纹框"。
+- `SecureClipboard` / `BiometricUnlocker` 都是接口 + 实现，为的是能在 JVM 单测里换掉：
+  真实的生物识别实现连"构造出来但不调用"都做不到（`KeyStore.getInstance("AndroidKeyStore")`
+  在 JVM 上直接抛）。
+
+**M1 的设备验证清单**（2026-09-06，逐屏 `uiautomator dump` 核对）：改 PIN 三步 → 旧 PIN
+当场失效、新 PIN 能解锁（红线 2 的 O(1) 重包裹在设备上成立）；错一次 PIN 后提示
+"还能再错 3 次"、解锁成功后计数清零（退避计数确实落 boot）；恢复密钥轮换 → 换掉旧的那把、
+`screencap` 出来整屏全黑（`FLAG_SECURE` 生效）、离开那一页再进去只剩"这个库有恢复密钥"
+（明文与展示串都丢了）；恢复密钥**大写带空格**照样解锁（`normalize`）；
+自动锁定切后台 66 秒后回到前台是锁屏，而且 `pidof` 前后同一个 PID——所以是**那个活着的
+进程自己锁的**，不是进程被杀之后的假阳性。
+
+**已知缺口：安全设置里"离开应用后锁定"那个下拉还没接上。** 五个选项
+（立即 / 30 秒 / 1 分钟 / 5 分钟 / 从不）只改内存里的 `SettingsDraft`，
+`AutoLocker.timeoutSeconds` 始终是默认的 60 秒。刻意没做半截接线：这一项的权威存储
+应该是 `app_settings`（红线 31），而那要等 M3 的 `SettingsRepository`；
+接在 boot 上是错的权威，将来还得再迁一次。选"立即"却仍然等 60 秒是"设置项撒谎"，
+所以它排在 M3 的第一批。
+
+M2（数据层）**部分完成**：10 张表 + 10 个 DAO + v1 schema JSON 已提交，
+`data/mapper` 的列编解码（CSV 与 JSON 列往返）17 个单测全绿。
+**仓库层还没有**——`domain/repo/` 接口与 `data/` 实现都不存在，10 个 DAO 目前零注入方。
+
+下一步 M3（接真数据）：`domain/repo/` 接口 + `data/` 实现，然后把管理页从
+`screens/sample/` 换成真数据。**在这一步做完之前，这个 app 存不下任何一个真密钥。**
+里程碑表见 `计划.md` §16。
+
+单测 200 个全绿（1 个 spike 按设计跳过），17 个 suite；`lint` 0 error / 23 warning
+（12 个 UnusedResources 是 M0.8 留下的死文案，M3 会用上或删掉；剩下的是 6 个
+PluralsCandidate、2 个依赖有新版、2 个 Modifier 工厂命名、1 个拼写）；
+strings 两份各 408 条 string + 7 条 string-array，键名零差异。
+**仪器测试仍然是空的**（只有 `HiltTestRunner.kt`），所以 `计划.md` §14.3 里需要设备的三项
+——Keystore 往返、boot 原子写杀进程、`FLAG_SECURE` + 剪贴板——目前只有手工验证，
+没有自动化覆盖。
