@@ -1,4 +1,4 @@
-package com.lc33.tokenvault.platform
+﻿package com.lc33.tokenvault.platform
 
 import com.lc33.tokenvault.crypto.FieldAad
 import com.lc33.tokenvault.crypto.SecretBox
@@ -238,7 +238,7 @@ class VaultSessionTest {
         val aad = FieldAad.of("api_keys", 1L, "secretEnc")
         val cipher = session.withFieldKey { box.seal("sk-value".encodeToByteArray(), it, aad) }
 
-        assertTrue(session.changePin(charArrayOf('6', '5', '4', '3', '2', '1')))
+        session.changePin(charArrayOf('6', '5', '4', '3', '2', '1'))
         session.lock()
         assertEquals(UnlockResult.Success, session.unlockWithPin(charArrayOf('6', '5', '4', '3', '2', '1')))
 
@@ -266,7 +266,7 @@ class VaultSessionTest {
     @Test
     fun `重新生成恢复密钥让旧的立刻失效`() {
         val old = onboard()
-        val new = session.regenerateRecoveryKey()!!
+        val new = session.regenerateRecoveryKey()
         assertFalse(old.concatToString() == new.concatToString())
 
         session.lock()

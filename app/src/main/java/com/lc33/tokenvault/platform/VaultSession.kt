@@ -290,16 +290,26 @@ class VaultSession(
     /**
      * 改 PIN。**必须 O(1)**（红线 2）：只重新包裹一次 DEK，一次 boot 写入，业务表零 UPDATE。
      *
-     * 用内存里的 DEK 而不是"用旧 PIN 解一次再用新 PIN 包一次"，所以要求当前已解锁——
-     * 这也顺带保证了调用方确实证明过自己知道旧 PIN。
+     * 用内存里的 DEK 而不是"用旧 PIN 解一次再用新 PIN 包一次"，所以要求当前已解锁。
+     * **这里刻意不验旧 PIN**：验旧 PIN 该走 [unlockWithPin]，那样它才受退避约束——
+     * 单独做一个不计次的 `verifyPin()` 等于给改 PIN 页开一个绕过 §7.2 的入口。
      *
      * 换新盐：不换的话，改 PIN 之后旧 PIN 派生出的 KEK 与新的只差在口令上，
      * 而攻击者手里那份旧密文仍然对应同一个盐。
+     *
+     * @throws VaultLockedException 未解锁。
+     * @throws IllegalStateException boot 记录读不出来或缺 PIN 参数——**不返回 false**：
+     *   返回布尔值会让调用方拿不到原因，而红线 8 的同一条道理在这里也成立
+     *   （一个返回 false 的写操作迟早被写成 `if (!ok) {}`）。这两种情况在"已解锁"的前提下
+     *   都不该发生，真发生了说明 boot 在解锁之后被改坏了，属于要让用户知道的事。
      */
-    fun changePin(newPin: CharArray): Boolean = synchronized(guard) {
+    fun changePin(newPin: CharArray) = synchronized(guard) {
         val currentDek = dek ?: throw VaultLockedException()
-        val record = (bootStore.read() as? BootState.Ok)?.record ?: return false
-        val params = (record.pinKdf ?: return false).copy(salt = random.nextBytes(KdfParams.SALT_BYTES))
+        val record = (bootStore.read() as? BootState.Ok)?.record
+            ?: throw IllegalStateException("boot record unavailable while changing PIN")
+        val existing = record.pinKdf
+            ?: throw IllegalStateException("boot record has no PIN kdf params")
+        val params = existing.copy(salt = random.nextBytes(KdfParams.SALT_BYTES))
         val kek = Argon2idKdf.derive(newPin, params)
         try {
             bootStore.update {
@@ -313,15 +323,18 @@ class VaultSession(
         } finally {
             kek.zeroize()
         }
-        return true
     }
 
     /**
      * 重新生成恢复密钥（设置里的那个入口）。旧的**立刻失效**：包裹被覆盖，旧密钥再也解不开。
+     *
+     * @throws VaultLockedException 未解锁。
+     * @throws IllegalStateException boot 记录读不出来。理由同 [changePin]。
      */
-    fun regenerateRecoveryKey(): CharArray? = synchronized(guard) {
+    fun regenerateRecoveryKey(): CharArray = synchronized(guard) {
         val currentDek = dek ?: throw VaultLockedException()
-        val record = (bootStore.read() as? BootState.Ok)?.record ?: return null
+        val record = (bootStore.read() as? BootState.Ok)?.record
+            ?: throw IllegalStateException("boot record unavailable while rotating recovery key")
         val params = (record.recoveryKdf ?: KdfParams(salt = ByteArray(KdfParams.SALT_BYTES)))
             .copy(salt = random.nextBytes(KdfParams.SALT_BYTES))
         val key = RecoveryKey.generate(random)

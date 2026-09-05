@@ -37,19 +37,27 @@ object RecoveryKey {
     }
 
     /**
-     * 规范化用户输入：去掉空格与连字符、转小写。
+     * 规范化用户输入：去掉所有空白与连字符、转小写。
      *
      * 用户会照着分组抄，回填时几乎一定带空格或短横线。不做规范化的表现是
      * "我抄得没错但它说不对"，而这是恢复密钥最不能出现的体验。
+     *
+     * **换行也必须跳掉**：恢复密钥的正常保管方式是密码管理器的备注或一个 txt 文件，
+     * 粘贴过来几乎一定带一个结尾换行；多行输入框里用户也能直接按回车。带着 `\n` 就是
+     * 33 个字符，于是应用告诉他"恢复密钥是 32 个字符"——正是上面那句 KDoc 说绝不能出现的
+     * 体验。所以这里用 [Char.isWhitespace] 而不是枚举几个字符：枚举早晚漏一个。
      */
     fun normalize(input: CharArray): CharArray {
         val kept = CharArray(input.size)
         var n = 0
         for (c in input) {
-            if (c == ' ' || c == '-' || c == '\t') continue
+            if (c.isWhitespace() || c == '-') continue
             kept[n++] = c.lowercaseChar()
         }
-        return kept.copyOf(n).also { if (n != kept.size) kept.zeroize() }
+        // 无条件擦 `kept`：`copyOf(n)` **永远**新分配一份，所以 `kept` 每次都是该丢掉的
+        // 中间产物。写成"长度变了才擦"会恰好漏掉最常见的那条路径——用户直接粘贴、
+        // 输入里没有分隔符时 `n == kept.size`，于是完整的明文恢复密钥留在堆上不擦。
+        return kept.copyOf(n).also { kept.zeroize() }
     }
 
     /** 是不是 32 个 hex 字符。规范化之后再判。 */
