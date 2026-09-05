@@ -270,6 +270,21 @@ class VaultSession(
         block(fingerprintKey ?: throw VaultLockedException())
     }
 
+    /**
+     * 借用 **DEK 本身**。
+     *
+     * 只有一个合法调用方：生物识别的**启用**流程——它必须把 DEK 交给 Keystore 的 Cipher
+     * 去加密（§7.3 的启用流程），而那是这个应用里唯一需要 DEK 原文的地方。
+     * 其余所有加解密都该走 [withFieldKey]，因为字段级密钥是从 DEK 派生的、暴露它不等于
+     * 暴露 DEK（红线 6 的"他人短暂借用"就是这个意思）。
+     *
+     * 之所以不提供"复制一份 DEK 出去"的 API：复制出去的那一份没人负责擦，
+     * 而 `finally` 里擦不掉别人存下来的引用。
+     */
+    fun <R> withDek(block: (ByteArray) -> R): R = synchronized(guard) {
+        block(dek ?: throw VaultLockedException())
+    }
+
     // ------------------------------------------------------------------ 改 PIN
 
     /**
