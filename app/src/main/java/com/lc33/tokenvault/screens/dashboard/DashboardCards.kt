@@ -48,10 +48,14 @@ private fun CardTitle(text: String) {
 }
 
 @Composable
-internal fun BalanceCard(balance: BalanceSummary, onRefresh: () -> Unit) {
+internal fun BalanceCard(
+    balance: BalanceSummary,
+    onRefresh: () -> Unit,
+    onOpenBreakdown: () -> Unit,
+) {
     val tokens = LocalAppTokens.current
     val palette = LocalStatusPalette.current
-    AppCard(modifier = cardModifier()) {
+    AppCard(modifier = cardModifier(), onClick = onOpenBreakdown) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,

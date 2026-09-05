@@ -112,8 +112,6 @@
     <string name="update_title">更新</string>
     <string name="probe_run_title">探测明细</string>
     <string name="provider_detail_title">供应商</string>
-    <string name="placeholder_title">还没做</string>
-    <string name="placeholder_desc">这一页的路由与外壳已经在了，内容留给对应的里程碑——见计划里的里程碑表。</string>
 
     <!-- About -->
     <string name="about_title">关于</string>
@@ -281,4 +279,106 @@
     <string name="profiles_from_curl_summary">抓一次真实客户端的请求，把 cURL 粘进来。Authorization 与 cookie 会被剔除，预览页会说明剔除了哪些。</string>
     <string name="profiles_disclaimer">这里的版本号与头部集合来自社区观察，没有官方文档，而且会随那些客户端升级而漂移。它们的作用是给一个能用的起点，不是权威值。可靠的路径是自己抓一次包再用 cURL 导入。</string>
     <string name="profiles_verified">已实测</string>
-    <string name="profiles_custom">自定义</string></resources>
+    <string name="profiles_custom">自定义</string>    <!-- Secret reveal / relative time -->
+    <string name="secret_reveal_cd">展开</string>
+    <string name="secret_conceal_cd">遮蔽</string>
+    <string name="secret_copy_cd">复制</string>
+    <string name="secret_auto_conceal">%1$d 秒后自动回遮</string>
+    <string name="time_just_now">刚刚</string>
+    <string name="time_minutes_ago">%1$d 分钟前</string>
+    <string name="time_hours_ago">%1$d 小时前</string>
+    <string name="time_days_ago">%1$d 天前</string>
+    <string name="time_future">时间戳在未来</string>    <!-- Provider editor -->
+    <string name="editor_save">保存</string>
+    <string name="editor_section_basic">基本信息</string>
+    <string name="editor_name">名称</string>
+    <string name="editor_note">备注</string>
+    <string name="editor_website">官网</string>
+    <string name="editor_base_url">API 请求地址</string>
+    <string name="editor_base_url_hint">只填到路径，不要带问号后面的参数。粘贴供应商说的那个「Base URL」即可。</string>
+    <string name="editor_preview_title">它会变成这些</string>
+    <string name="editor_preview_chat">Chat Completions</string>
+    <string name="editor_preview_responses">Responses</string>
+    <string name="editor_preview_anthropic">Anthropic Messages</string>
+    <string name="editor_preview_models">模型列表</string>
+    <string name="editor_preview_balance">余额默认地址</string>
+    <string name="editor_url_err_empty">请填写 API 请求地址</string>
+    <string name="editor_url_err_scheme">只支持 http 与 https</string>
+    <string name="editor_url_err_query">请去掉 ? 或 # 后面的部分，只填到路径。静默丢掉参数会得到一个看起来对、其实永远 401 的端点。</string>
+    <string name="editor_url_err_host">这个地址里没有主机名</string>
+    <string name="editor_insecure_warning">这是明文 http。你的密钥会以明文经过网络。</string>
+    <string name="editor_allow_insecure">仍然允许走明文 http</string>
+    <string name="editor_section_look">外观</string>
+    <string name="editor_group">分组</string>
+    <string name="editor_color">色块</string>
+    <string name="editor_pinned">置顶</string>
+    <string name="editor_section_protocols">协议</string>
+    <string name="editor_section_balance">余额</string>
+    <string name="editor_balance_kind">查询类型</string>
+    <string name="editor_balance_kind_summary">去问哪个管理接口</string>
+    <string name="editor_balance_token">访问令牌</string>
+    <string name="editor_balance_token_hint">在中转站个人安全设置里获取的那个独立令牌——不是 API 密钥</string>
+    <string name="editor_balance_user_id">用户 ID</string>
+    <string name="editor_balance_none_hint">这家不查余额。</string>
+    <string name="editor_balance_default_key_hint">用这家的默认密钥去查，不需要额外填字段。</string>
+    <string name="editor_section_client">客户端预设</string>
+    <string name="editor_section_advanced">高级</string>
+    <string name="editor_advanced_expand">展开高级</string>
+    <string name="editor_advanced_collapse">收起高级</string>
+    <string name="editor_path_override">Anthropic 路径覆盖</string>
+    <string name="editor_path_override_hint">DeepSeek 的在 /anthropic/v1/messages 下。留空用默认路径。</string>
+    <string name="editor_timeout">单独超时（秒）</string>
+    <string name="editor_timeout_hint">留空表示用全局值</string>
+    <string name="editor_auth_style">鉴权头风格</string>
+    <string name="editor_auth_style_summary">自动会先发 x-api-key、再退回 Bearer。有的中转站只在 Bearer 那条路径上挂客户端校验。</string>
+    <string name="editor_discard_title">放弃修改？</string>
+    <string name="editor_discard_summary">刚填的内容会丢掉。</string>
+    <string name="editor_discard_confirm">放弃</string>
+    <string-array name="balance_kinds">
+        <item>不查</item>
+        <item>new-api / one-api</item>
+        <item>DeepSeek 官方</item>
+        <item>OpenRouter</item>
+        <item>硅基流动</item>
+        <item>Moonshot</item>
+        <item>自定义 JSON</item>
+    </string-array>
+    <string-array name="auth_styles">
+        <item>自动</item>
+        <item>Authorization: Bearer</item>
+        <item>x-api-key</item>
+    </string-array>    <!-- Groups -->
+    <string name="groups_add">新建分组</string>
+    <string name="groups_rename">重命名</string>
+    <string name="groups_delete">删除</string>
+    <string name="groups_count">%1$d 个供应商</string>
+    <string name="groups_empty_title">还没有分组</string>
+    <string name="groups_empty_desc">分组就是管理页上那排筛选 chip。供应商多到一屏放不下时再建几个。</string>
+    <string name="groups_delete_note">删除分组不会删掉里面的供应商——它们会落回「全部」。</string>
+
+    <!-- Import -->
+    <string name="import_title">粘贴导入</string>
+    <string name="import_section_paste">粘贴</string>
+    <string name="import_paste_label">文本块</string>
+    <string name="import_paste_hint">名称、密钥、请求地址、支持的协议、模型列表、余额配置。一家一块，块与块之间用一行三个短横线隔开。</string>
+    <string name="import_from_clipboard">从剪贴板填充</string>
+    <string name="import_parse">解析</string>
+    <string name="import_no_preview">还没有解析结果。粘贴一段文本再点解析。</string>
+    <string name="import_section_preview">预览</string>
+    <string name="import_selected">将导入</string>
+    <string name="import_skipped">跳过</string>
+    <string name="import_counts">%1$d 张密钥 · %2$d 个模型 · %3$d 个账号</string>
+    <string name="import_confirm">导入 %1$d 家</string>
+
+    <!-- Probe run -->
+    <string name="probe_run_failed">失败</string>
+    <string name="probe_run_skipped">本轮未探测</string>
+    <string name="probe_run_succeeded">成功</string>
+    <string name="probe_run_retry">仅重试失败项与未探测项</string>
+
+    <!-- Balance breakdown -->
+    <string name="balance_failed_section">查询失败</string>
+    <string name="balance_failed_hint">没能读到余额——这与「余额是 0」不是一回事</string>    <string name="sample_import_issue_model_name">「DeepSeek V4 Pro」看起来是显示名而不是模型 id，导入前先确认一下</string>
+    <string name="sample_probe_detail_client">401 unauthorized client detected —— 换个 User-Agent 就能通</string>
+    <string name="sample_probe_detail_ratelimited">本轮该 host 撞了限流，后续可选请求已停发</string>
+    <string name="sample_probe_detail_budget">本轮该 host 的请求预算已用完</string></resources>

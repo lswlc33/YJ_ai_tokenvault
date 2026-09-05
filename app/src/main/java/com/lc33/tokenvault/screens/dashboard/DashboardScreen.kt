@@ -40,6 +40,7 @@ fun DashboardScreen(
     onOpenManage: () -> Unit,
     onOpenProbeRun: () -> Unit,
     onOpenSync: () -> Unit,
+    onOpenBalanceBreakdown: () -> Unit,
     onStartProbe: () -> Unit,
     onCancelProbe: () -> Unit,
     onRefreshBalance: () -> Unit,
@@ -72,7 +73,7 @@ fun DashboardScreen(
             contentPadding = padding,
             verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
         ) {
-            item { BalanceCard(state.balance, onRefreshBalance) }
+            item { BalanceCard(state.balance, onRefreshBalance, onOpenBalanceBreakdown) }
             item { CountsCard(state.counts, onOpenManage) }
             item { HealthCard(state.health) }
             item { AttentionCard(state.attention, onOpenProvider) }

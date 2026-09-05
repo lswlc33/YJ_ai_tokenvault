@@ -112,8 +112,6 @@
     <string name="update_title">Update</string>
     <string name="probe_run_title">Probe details</string>
     <string name="provider_detail_title">Provider</string>
-    <string name="placeholder_title">Not built yet</string>
-    <string name="placeholder_desc">This page has its route and its shell. The content lands in the milestone that owns it — see the roadmap in the plan.</string>
 
     <!-- About -->
     <string name="about_title">About</string>
@@ -281,4 +279,106 @@
     <string name="profiles_from_curl_summary">Capture a real client request, paste the cURL. Authorization and cookies are stripped and the preview says which.</string>
     <string name="profiles_disclaimer">Version numbers and header sets here come from community observation, not official documentation, and they drift as those clients are updated. They are a working starting point, not authoritative values. The reliable path is importing a cURL you captured yourself.</string>
     <string name="profiles_verified">Verified</string>
-    <string name="profiles_custom">Custom</string></resources>
+    <string name="profiles_custom">Custom</string>    <!-- Secret reveal / relative time -->
+    <string name="secret_reveal_cd">Reveal</string>
+    <string name="secret_conceal_cd">Hide</string>
+    <string name="secret_copy_cd">Copy</string>
+    <string name="secret_auto_conceal">Hidden again in %1$d s</string>
+    <string name="time_just_now">just now</string>
+    <string name="time_minutes_ago">%1$d min ago</string>
+    <string name="time_hours_ago">%1$d h ago</string>
+    <string name="time_days_ago">%1$d d ago</string>
+    <string name="time_future">timestamp is in the future</string>    <!-- Provider editor -->
+    <string name="editor_save">Save</string>
+    <string name="editor_section_basic">Basics</string>
+    <string name="editor_name">Name</string>
+    <string name="editor_note">Note</string>
+    <string name="editor_website">Website</string>
+    <string name="editor_base_url">API base URL</string>
+    <string name="editor_base_url_hint">Path only — no query string. Paste what the provider calls the "base URL".</string>
+    <string name="editor_preview_title">What this becomes</string>
+    <string name="editor_preview_chat">Chat Completions</string>
+    <string name="editor_preview_responses">Responses</string>
+    <string name="editor_preview_anthropic">Anthropic Messages</string>
+    <string name="editor_preview_models">Model list</string>
+    <string name="editor_preview_balance">Balance base</string>
+    <string name="editor_url_err_empty">Fill in the API base URL</string>
+    <string name="editor_url_err_scheme">Only http and https are supported</string>
+    <string name="editor_url_err_query">Remove the ? or # part. Keep the path only — dropping the query silently would give you an endpoint that looks right and always answers 401.</string>
+    <string name="editor_url_err_host">No host in that address</string>
+    <string name="editor_insecure_warning">This is plain http. Your key would travel the network in the clear.</string>
+    <string name="editor_allow_insecure">Send over plain http anyway</string>
+    <string name="editor_section_look">Appearance</string>
+    <string name="editor_group">Group</string>
+    <string name="editor_color">Colour</string>
+    <string name="editor_pinned">Pin to the top</string>
+    <string name="editor_section_protocols">Protocols</string>
+    <string name="editor_section_balance">Balance</string>
+    <string name="editor_balance_kind">Query type</string>
+    <string name="editor_balance_kind_summary">Which management API to ask</string>
+    <string name="editor_balance_token">Access token</string>
+    <string name="editor_balance_token_hint">A separate token from the provider account settings — not your API key</string>
+    <string name="editor_balance_user_id">User ID</string>
+    <string name="editor_balance_none_hint">No balance query for this provider.</string>
+    <string name="editor_balance_default_key_hint">Uses this provider default key. No extra field needed.</string>
+    <string name="editor_section_client">Client profile</string>
+    <string name="editor_section_advanced">Advanced</string>
+    <string name="editor_advanced_expand">Show advanced</string>
+    <string name="editor_advanced_collapse">Hide advanced</string>
+    <string name="editor_path_override">Anthropic path override</string>
+    <string name="editor_path_override_hint">DeepSeek puts it under /anthropic/v1/messages. Leave empty for the default.</string>
+    <string name="editor_timeout">Timeout, seconds</string>
+    <string name="editor_timeout_hint">Empty means use the global value</string>
+    <string name="editor_auth_style">Auth header style</string>
+    <string name="editor_auth_style_summary">Auto tries x-api-key first, then Bearer. Some gateways gate only the Bearer path.</string>
+    <string name="editor_discard_title">Discard changes?</string>
+    <string name="editor_discard_summary">What you typed will be lost.</string>
+    <string name="editor_discard_confirm">Discard</string>
+    <string-array name="balance_kinds">
+        <item>Do not query</item>
+        <item>new-api / one-api</item>
+        <item>DeepSeek official</item>
+        <item>OpenRouter</item>
+        <item>SiliconFlow</item>
+        <item>Moonshot</item>
+        <item>Custom JSON</item>
+    </string-array>
+    <string-array name="auth_styles">
+        <item>Auto</item>
+        <item>Authorization: Bearer</item>
+        <item>x-api-key</item>
+    </string-array>    <!-- Groups -->
+    <string name="groups_add">New group</string>
+    <string name="groups_rename">Rename</string>
+    <string name="groups_delete">Delete</string>
+    <string name="groups_count">%1$d providers</string>
+    <string name="groups_empty_title">No groups yet</string>
+    <string name="groups_empty_desc">Groups are the filter chips on the manage page. Create a couple once you have more than a handful of providers.</string>
+    <string name="groups_delete_note">Deleting a group does not delete its providers — they fall back to All.</string>
+
+    <!-- Import -->
+    <string name="import_title">Paste to import</string>
+    <string name="import_section_paste">Paste</string>
+    <string name="import_paste_label">Text block</string>
+    <string name="import_paste_hint">Name, key, base URL, protocols, model list, balance settings. One provider per block, blocks separated by a line of three dashes.</string>
+    <string name="import_from_clipboard">Fill from clipboard</string>
+    <string name="import_parse">Parse</string>
+    <string name="import_no_preview">Nothing parsed yet. Paste something and press Parse.</string>
+    <string name="import_section_preview">Preview</string>
+    <string name="import_selected">Will import</string>
+    <string name="import_skipped">Skipped</string>
+    <string name="import_counts">%1$d keys · %2$d models · %3$d accounts</string>
+    <string name="import_confirm">Import %1$d providers</string>
+
+    <!-- Probe run -->
+    <string name="probe_run_failed">Failed</string>
+    <string name="probe_run_skipped">Not probed this round</string>
+    <string name="probe_run_succeeded">Succeeded</string>
+    <string name="probe_run_retry">Retry the failed and unprobed items</string>
+
+    <!-- Balance breakdown -->
+    <string name="balance_failed_section">Query failed</string>
+    <string name="balance_failed_hint">Could not read the balance — this is not the same as a balance of zero</string>    <string name="sample_import_issue_model_name">"DeepSeek V4 Pro" looks like a display name rather than a model id — check it before importing</string>
+    <string name="sample_probe_detail_client">401 unauthorized client detected — a different User-Agent gets through</string>
+    <string name="sample_probe_detail_ratelimited">Stopped after the host rate-limited us this round</string>
+    <string name="sample_probe_detail_budget">Per-host request budget for this round was used up</string></resources>

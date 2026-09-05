@@ -157,17 +157,30 @@ M0.5（协议踩点）已完成，2026-09-04。`ProtocolSpike.kt` 打了三家�
 M5 的 `classify()` 单测直接读它）。红线 33–35 就是这一轮补的。
 唯一没拿到的是**额度耗尽的真实响应**（三个账号都还有余额），记在 §18。
 
-M0.8（界面骨架）**已完成第二轮**：底栏是仪表盘 · 管理 · 设置；仪表盘六块卡；管理页
-**只列供应商** + 用户自定义分组的横滑筛选条；供应商详情页（头部卡 + 密钥 / 模型 /
-平台账号三段）；设置页四块导航 + **七个二级页做出真实内容**（外观 / 安全 / 探测 /
-客户端预设 / 数据 / 同步 / 更新）。`ui/miuix` 补了 `AppTabRow` / `AppChip` /
-`AppFilterChip` / `AppSearchField` / `AppFab` / `AppBottomSheet` / `AppLinearProgress` /
-`AppSwitchRow` / `AppDropdownRow`，`ui/common` 补了 `StatusDot` / `SegmentedBar` /
-`StatTile` / `HealthVisuals`，样例数据在 `screens/sample/`（M3 删掉）。
-模拟器上中英双语都验过，strings 两份键名用脚本对齐过（各 226 条 + 5 个 string-array）。
+M0.8（界面骨架）**已完成**。底栏是仪表盘 · 管理 · 设置，全部 18 个路由都有真实页面，
+没有占位壳了：
 
-**还剩**：供应商编辑 / 导入 / 分组管理 / 探测明细 / 余额明细五个二级页仍是空壳；
-`SecretText` / `RelativeTime` / `AppRefreshBox` 没做；深浅色对比截图、宽屏双栏没做。
+- **仪表盘**六块卡（余额 / 内容计数 / 健康分布 / 需要处理 / 上次探测 / 备份）+ 两个二级页
+  （探测明细、余额明细）。
+- **管理**只列供应商 + 用户分组的横滑筛选条；二级页有供应商详情、供应商编辑、
+  分组管理、粘贴导入。编辑页的**端点实时预览**用的是真的 `normalizeBaseUrl`。
+- **设置**四块导航 + 七个二级页（外观 / 安全 / 探测 / 客户端预设 / 数据 / 同步 / 更新）。
+
+`ui/miuix` 有 `AppTabRow` / `AppChip` / `AppFilterChip` / `AppSearchField` / `AppTextField` /
+`AppFab` / `AppBottomSheet` / `AppLinearProgress` / `AppSwitchRow` / `AppDropdownRow` /
+`AppRefreshBox`；`ui/common` 有 `StatusDot` / `SegmentedBar` / `StatTile` / `HealthVisuals` /
+`SecretText` / `RelativeTime` / `ColorSwatchRow` / `EmptyState`。
+样例数据在 `screens/sample/`（M3 删掉）。
+
+**顺手提前做完的两件 M3 / M5 的事**（都是纯 Kotlin + 单测，不是脚手架）：
+`endpoint/EndpointNormalizer.kt`（§5.2 的 URL 规范化，§14.3 测试 1 全绿，10 个用例）与
+`ui/common/RelativeTime.kt` 的分档函数（6 个用例）。两者都不读当前时间，`now` 是参数
+（红线 20），所以测试不是时间敏感的。
+
+验收：模拟器上 18 个页面都能进能回；深浅色各一轮、中英文各一轮；`OverlayDialog` 与
+`OverlayBottomSheet` 在二级页里都能弹；单测 22 个全绿（1 个 spike 按设计跳过）；
+`lint` 0 issue；strings 两份键名脚本对齐（各 314 项）。
+**还没做**：宽屏双栏（在 M10）、`SecretText` 接真明文与剪贴板（要 DEK，在 M3）。
 
 `AppTabRow` **没有用 MIUIX 的 `TabRow`**：它给所有分段算同一个固定宽度再加内边距，
 四个英文标签在 360dp 宽的屏上必然被截断，而 `minWidth` / `maxWidth` 都改不动

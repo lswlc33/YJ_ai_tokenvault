@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
@@ -27,6 +28,7 @@ import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
+import top.yukonga.miuix.kmp.basic.PullToRefresh
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.TabRow
@@ -442,6 +444,50 @@ fun AppIconLabel(
     }
 }
 
+/** 光图标，没有按钮语义。画在色块上的对勾这类装饰用它。 */
+@Composable
+fun AppIconTint(
+    icon: AppIcon,
+    modifier: Modifier = Modifier,
+    size: Dp = 20.dp,
+    tint: Color = Color.White,
+) {
+    Icon(
+        imageVector = icon.imageVector(),
+        contentDescription = null,
+        modifier = modifier.size(size),
+        tint = tint,
+    )
+}
+
+/**
+ * 下拉刷新。
+ *
+ * 只给**只读页**用。编辑页不放它：下拉在那里语义含糊（刷新列表？重新探测？），
+ * 而探测要花钱，必须由一个明确的按钮触发（§13.4）。
+ *
+ * [refreshTexts] 四段文案由调用方从资源里给，顺序是"下拉刷新 / 释放刷新 /
+ * 正在刷新 / 刷新完成"——MIUIX 按这个顺序取。
+ */
+@Composable
+fun AppRefreshBox(
+    refreshing: Boolean,
+    onRefresh: () -> Unit,
+    refreshTexts: List<String>,
+    modifier: Modifier = Modifier,
+    scrollState: AppTopBarScrollState? = null,
+    content: @Composable () -> Unit,
+) {
+    PullToRefresh(
+        isRefreshing = refreshing,
+        onRefresh = onRefresh,
+        modifier = modifier,
+        topAppBarScrollBehavior = scrollState?.behavior,
+        refreshTexts = refreshTexts,
+        content = content,
+    )
+}
+
 /**
  * 输入框状态。包成自己的类型，页面就不必 import Compose 的 `TextFieldState`——
  * 它是 MIUIX `TextField` 的入参形态，换实现时不该牵连页面。
@@ -479,4 +525,37 @@ fun AppSearchField(
             )
         },
     )
+}
+
+/**
+ * 普通输入框。label 常驻（不当 placeholder），这样填完之后还看得见这一格是什么。
+ *
+ * [errorText] 非空时在下面补一行错误说明——校验结果必须能被看到，不能只靠边框变色。
+ */
+@Composable
+fun AppTextField(
+    state: AppTextFieldState,
+    label: String,
+    modifier: Modifier = Modifier,
+    singleLine: Boolean = true,
+    errorText: String? = null,
+    supportingText: String? = null,
+) {
+    Column(modifier = modifier) {
+        TextField(
+            state = state.state,
+            modifier = Modifier.fillMaxWidth(),
+            label = label,
+            lineLimits = if (singleLine) TextFieldLineLimits.SingleLine else TextFieldLineLimits.Default,
+        )
+        val note = errorText ?: supportingText
+        if (note != null) {
+            AppText(
+                text = note,
+                style = AppTextStyle.Footnote,
+                color = if (errorText != null) MiuixTheme.colorScheme.error else appSecondaryTextColor,
+                modifier = Modifier.padding(start = 4.dp, top = 4.dp),
+            )
+        }
+    }
 }

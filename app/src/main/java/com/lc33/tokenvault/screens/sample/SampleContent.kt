@@ -3,6 +3,8 @@
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import com.lc33.tokenvault.R
+import com.lc33.tokenvault.endpoint.Protocol
+import com.lc33.tokenvault.screens.manage.ParsedPreview
 import com.lc33.tokenvault.screens.model.AttentionItem
 import com.lc33.tokenvault.screens.model.BackupStatus
 import com.lc33.tokenvault.screens.model.BalanceSummary
@@ -12,6 +14,7 @@ import com.lc33.tokenvault.screens.model.HealthBreakdown
 import com.lc33.tokenvault.screens.model.ManageUiState
 import com.lc33.tokenvault.screens.model.ProbeRunSummary
 import com.lc33.tokenvault.screens.model.ProviderDetailUiState
+import com.lc33.tokenvault.screens.model.ProviderDraft
 import com.lc33.tokenvault.screens.model.UiGroup
 import com.lc33.tokenvault.screens.model.UiAccountRow
 import com.lc33.tokenvault.screens.model.UiHealth
@@ -20,6 +23,7 @@ import com.lc33.tokenvault.screens.model.UiModelRow
 import com.lc33.tokenvault.screens.model.UiModelSource
 import com.lc33.tokenvault.screens.model.UiMoney
 import com.lc33.tokenvault.screens.model.UiProviderRow
+import com.lc33.tokenvault.screens.probe.ProbeItemRow
 import com.lc33.tokenvault.screens.settings.ProfileRow
 
 /**
@@ -104,8 +108,7 @@ object SampleContent {
     }
 
     /**
-     * 内置客户端预设（§8.2 那张表）。
-     *
+     * 内置客户端预设（§8.2 那张表）。     *
      * `claude_code` 是唯一带「已实测」的那条：M0.5 在 Agent Router 上验证过它能过闸，
      * 而且只需要换 UA。其余的置信度都只是社区观察。
      */
@@ -145,6 +148,118 @@ object SampleContent {
             userAgent = "CherryStudio/1.4.0 (Windows NT 10.0; x64)",
             builtin = true,
             verified = false,
+        ),
+    )
+
+    /** 编辑页的草稿。`id` 为 null 表示新建。 */
+    @Composable
+    fun draft(providerId: Long?): ProviderDraft {
+        val provider = providers().firstOrNull { it.id == providerId } ?: return ProviderDraft()
+        return ProviderDraft(
+            id = provider.id,
+            name = provider.name,
+            note = provider.note.orEmpty(),
+            website = "https://${provider.host}",
+            baseUrl = "https://${provider.host}/v1",
+            groupIndex = provider.groupId?.toInt() ?: 0,
+            colorIndex = provider.colorIndex,
+            pinned = provider.pinned,
+            protocols = provider.protocols.mapNotNull { label ->
+                Protocol.entries.firstOrNull { it.name.equals(label, ignoreCase = true) }
+            }.toSet().ifEmpty { setOf(Protocol.CHAT) },
+            balanceKindIndex = if (provider.host.contains("deepseek")) 2 else 1,
+            // 真实实现里这一格是解密后的明文；M0.8 只给个形状，别当成真令牌
+            balanceToken = if (provider.host.contains("deepseek")) "" else "token…",
+            balanceUserId = if (provider.host.contains("deepseek")) "" else "199628",
+            pathOverrideAnthropic = if (provider.host.contains("deepseek")) "/anthropic/v1/messages" else "",
+        )
+    }
+
+    /** 导入预览。第三条刻意带一个问题，好看清"有问题但不阻止导入"长什么样。 */
+    @Composable
+    fun previews(): List<ParsedPreview> = listOf(
+        ParsedPreview(
+            name = "Agent Router",
+            host = "ps.air-outer.com",
+            keyCount = 1,
+            modelCount = 3,
+            accountCount = 1,
+            protocols = listOf("CHAT", "RESPONSES", "ANTHROPIC"),
+        ),
+        ParsedPreview(
+            name = "JustDoWork",
+            host = "api.justwoker.icu",
+            keyCount = 1,
+            modelCount = 2,
+            accountCount = 1,
+            protocols = listOf("ANTHROPIC"),
+        ),
+        ParsedPreview(
+            name = "DeepSeek",
+            host = "api.deepseek.com",
+            keyCount = 1,
+            modelCount = 2,
+            accountCount = 0,
+            protocols = listOf("CHAT", "RESPONSES"),
+            issues = listOf(stringResource(R.string.sample_import_issue_model_name)),
+        ),
+    )
+
+    /**
+     * 探测明细的三组。
+     *
+     * "本轮未探测"单独一组是有意的：它不是失败（红线 11），混进失败里会让用户以为
+     * 有三样东西坏了，而其实只坏了一样。
+     */
+    @Composable
+    fun probeFailed(): List<ProbeItemRow> = listOf(
+        ProbeItemRow(
+            target = "ps.air-outer.com · gpt-5.6-sol",
+            providerId = 1L,
+            health = UiHealth.Warn,
+            outcome = stringResource(R.string.health_warn),
+            detail = stringResource(R.string.sample_probe_detail_client),
+            latencyMs = 248,
+        ),
+    )
+
+    @Composable
+    fun probeSkipped(): List<ProbeItemRow> = listOf(
+        ProbeItemRow(
+            target = "api.justwoker.icu · claude-opus-5-thinking",
+            providerId = 2L,
+            health = UiHealth.Unknown,
+            outcome = stringResource(R.string.probe_run_skipped),
+            detail = stringResource(R.string.sample_probe_detail_ratelimited),
+            latencyMs = null,
+        ),
+        ProbeItemRow(
+            target = "api.deepseek.com · deepseek-v4-pro",
+            providerId = 3L,
+            health = UiHealth.Unknown,
+            outcome = stringResource(R.string.probe_run_skipped),
+            detail = stringResource(R.string.sample_probe_detail_budget),
+            latencyMs = null,
+        ),
+    )
+
+    @Composable
+    fun probeSucceeded(): List<ProbeItemRow> = listOf(
+        ProbeItemRow(
+            target = "api.justwoker.icu · claude-opus-5",
+            providerId = 2L,
+            health = UiHealth.Ok,
+            outcome = stringResource(R.string.health_ok),
+            detail = null,
+            latencyMs = 412,
+        ),
+        ProbeItemRow(
+            target = "api.deepseek.com · deepseek-v4-flash",
+            providerId = 3L,
+            health = UiHealth.Ok,
+            outcome = stringResource(R.string.health_ok),
+            detail = null,
+            latencyMs = 236,
         ),
     )
 

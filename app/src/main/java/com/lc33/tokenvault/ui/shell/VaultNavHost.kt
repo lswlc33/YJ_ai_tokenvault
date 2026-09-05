@@ -1,4 +1,4 @@
-package com.lc33.tokenvault.ui.shell
+﻿package com.lc33.tokenvault.ui.shell
 
 import android.content.Context
 import android.content.Intent
@@ -16,11 +16,15 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
 import com.lc33.tokenvault.R
-import com.lc33.tokenvault.screens.common.PlaceholderScreen
+import com.lc33.tokenvault.screens.dashboard.BalanceBreakdownScreen
 import com.lc33.tokenvault.screens.dashboard.DashboardScreen
+import com.lc33.tokenvault.screens.manage.GroupsScreen
+import com.lc33.tokenvault.screens.manage.ImportScreen
 import com.lc33.tokenvault.screens.manage.ManageScreen
 import com.lc33.tokenvault.screens.manage.ProviderDetailScreen
+import com.lc33.tokenvault.screens.manage.ProviderEditorScreen
 import com.lc33.tokenvault.screens.model.SettingsDraft
+import com.lc33.tokenvault.screens.probe.ProbeRunScreen
 import com.lc33.tokenvault.screens.sample.SampleContent
 import com.lc33.tokenvault.screens.settings.AboutScreen
 import com.lc33.tokenvault.screens.settings.AppearanceScreen
@@ -70,6 +74,7 @@ fun VaultNavHost(
                 onOpenManage = ::openManage,
                 onOpenProbeRun = { nav.navigate(ProbeRunRoute) },
                 onOpenSync = { nav.navigate(SyncRoute) },
+                onOpenBalanceBreakdown = { nav.navigate(BalanceBreakdownRoute) },
                 onStartProbe = {},
                 onCancelProbe = {},
                 onRefreshBalance = {},
@@ -180,11 +185,56 @@ fun VaultNavHost(
         }
 
         // 剩下这几个还是 M0.8 立起来的空壳，内容各归各的里程碑（见 §16）
-        composable<ProviderEditorRoute> { PlaceholderScreen(R.string.provider_editor_title, back) }
-        composable<ImportRoute> { PlaceholderScreen(R.string.dashboard_empty_import, back) }
-        composable<GroupsRoute> { PlaceholderScreen(R.string.groups_title, back) }
-        composable<ProbeRunRoute> { PlaceholderScreen(R.string.probe_run_title, back) }
-        composable<BalanceBreakdownRoute> { PlaceholderScreen(R.string.dashboard_balance_title, back) }
+        composable<ProviderEditorRoute> { entry ->
+            val route = entry.toRoute<ProviderEditorRoute>()
+            ProviderEditorScreen(
+                draft = SampleContent.draft(route.id),
+                groupNames = SampleContent.manage().groups.map { it.name },
+                profileNames = SampleContent.profiles().map { it.name },
+                onChange = {},
+                onBack = back,
+                onSave = back,
+            )
+        }
+        composable<ImportRoute> {
+            ImportScreen(
+                previews = SampleContent.previews(),
+                onBack = back,
+                onFillFromClipboard = {},
+                onParse = {},
+                onToggle = {},
+                onConfirm = back,
+            )
+        }
+        composable<GroupsRoute> {
+            GroupsScreen(
+                groups = SampleContent.manage().groups,
+                onBack = back,
+                onAdd = {},
+                onRename = {},
+                onDelete = {},
+            )
+        }
+        composable<ProbeRunRoute> {
+            ProbeRunScreen(
+                lastRun = SampleContent.dashboard().lastRun,
+                failed = SampleContent.probeFailed(),
+                skipped = SampleContent.probeSkipped(),
+                succeeded = SampleContent.probeSucceeded(),
+                onBack = back,
+                onRetryFailed = {},
+                onOpenProvider = { id -> nav.navigate(ProviderDetailRoute(id)) },
+            )
+        }
+        composable<BalanceBreakdownRoute> {
+            val providers = SampleContent.manage().providers
+            BalanceBreakdownScreen(
+                providers = providers.filter { it.id != 1L },
+                failedProviders = providers.filter { it.id == 1L },
+                onBack = back,
+                onOpenProvider = { id -> nav.navigate(ProviderDetailRoute(id)) },
+            )
+        }
     }
 }
 
