@@ -25,7 +25,11 @@ import com.lc33.tokenvault.ui.theme.LocalStatusPalette
 /**
  * 恢复密钥页（设置 → 安全 → 恢复密钥）。
  *
- * @param hasKey 当前有没有一份恢复密钥的包裹。没有时这一页是"补一把"，有时是"换一把"。
+ * @param hasKey 当前有没有一份恢复密钥的**包裹**。判据是 `BootRecord.hasRecoveryWrap`
+ *   （等价于 `LockPhase.Locked.hasRecoveryKey`），**不是** `recoveryKdf != null`：
+ *   kdf 参数只是派生用的盐与档位，能解开 DEK 的是那个包裹。理论上可以有参数而没有包裹
+ *   （某个版本写了一半），那时按 kdf 判就会显示"有恢复密钥"，用户点进去却用不了——
+ *   而这一页最不能出现的就是"以为有救、其实没有"。
  * @param generated 刚刚生成、正在展示的那一把。**只有这一刻能看到它**——见下。
  */
 @Immutable

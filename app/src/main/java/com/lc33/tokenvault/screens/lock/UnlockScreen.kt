@@ -193,8 +193,10 @@ private fun UnlockStatus(
  * 输入框状态用 [rememberSecretTextFieldState]（不可保存）：可保存的那个会把内容序列化进
  * Activity 的 saved instance state，转个屏就把能解开整个库的东西交给了系统进程（红线 1）。
  *
- * 空格与短横线不用管——规范化由 `crypto/RecoveryKey.normalize` 做（页面层不碰 `crypto/`，
- * 所以形状对不对由后端回一个 [PinError]）。换行是唯一的例外，见 [withoutLineBreaks]。
+ * 空格、换行、短横线都不用管：规范化由 `crypto/RecoveryKey.normalize` 一手做完
+ * （它跳掉所有 `isWhitespace()` 与 `-`）。界面这一侧**刻意不再自己过滤一遍**——
+ * 同一条规则放在两层里，迟早有一层落后于另一层，而这一页最不能出现的就是
+ * "我抄得没错但它说不对"。形状对不对由后端回一个 [PinError]（页面层不碰 `crypto/`）。
  */
 @Composable
 private fun RecoveryKeyInput(
@@ -208,7 +210,8 @@ private fun RecoveryKeyInput(
     DisposableEffect(Unit) {
         onDispose { field.clear() }
     }
-    val submit = { onSubmit(field.chars.withoutLineBreaks()) }
+    // 交出去的 CharArray 由调用方擦（见 LockCallbacks.onRecoveryUnlock）
+    val submit = { onSubmit(field.chars) }
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
@@ -232,26 +235,4 @@ private fun RecoveryKeyInput(
             modifier = Modifier.fillMaxWidth(),
         )
     }
-}
-
-/**
- * 去掉换行，顺手擦掉中间产物。
- *
- * `RecoveryKey.normalize` 处理空格、短横线与制表符，但不处理换行；而换行只可能来自**粘贴**
- * （密码管理器的备注、txt 文件几乎一定带一个结尾换行），也绝不可能是密钥的一部分。
- * 粘贴发生在界面这一侧，所以在界面挡掉——不挡的话，用户会在"忘记 PIN 之后唯一的出路"
- * 这一页上被告知"你抄对了的东西是错的"。
- */
-private fun CharArray.withoutLineBreaks(): CharArray {
-    if (none { it == '\n' || it == '\r' }) return this
-    val kept = CharArray(size)
-    var n = 0
-    for (c in this) {
-        if (c != '\n' && c != '\r') kept[n++] = c
-    }
-    val trimmed = kept.copyOf(n)
-    // 这两份都是明文，交出去的只有 trimmed
-    kept.fill(' ')
-    fill(' ')
-    return trimmed
 }
