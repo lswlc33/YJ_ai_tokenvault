@@ -10,11 +10,21 @@ package com.lc33.tokenvault.domain
  *   所以撞客户端闸时先换鉴权头（一次请求），再考虑换客户端预设（最多四次）。
  *
  * 成功之后把结果固化到 `providers.authStyle`，下次不再试第二种。
+ *
+ * @param wireName 入库标识。和这个包里其它枚举同一个理由：**不用 [name]**，
+ *   枚举改名不该改变已存数据的含义。
  */
-enum class AuthStyle {
-    AUTO,
-    BEARER,
-    X_API_KEY,
+enum class AuthStyle(val wireName: String) {
+    AUTO("auto"),
+    BEARER("bearer"),
+    X_API_KEY("x_api_key"),
+    ;
+
+    companion object {
+        /** 认不出来就当 [AUTO]：读方向单向容错（`data/mapper` 那条统一立场）。 */
+        fun fromWireName(value: String): AuthStyle =
+            entries.firstOrNull { it.wireName == value } ?: AUTO
+    }
 }
 
 /**

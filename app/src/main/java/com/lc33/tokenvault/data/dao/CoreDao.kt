@@ -27,6 +27,12 @@ interface GroupDao {
     @Query("SELECT * FROM groups ORDER BY sortOrder, id")
     fun observeAll(): Flow<List<GroupEntity>>
 
+    @Query("SELECT * FROM groups ORDER BY sortOrder, id")
+    suspend fun findAll(): List<GroupEntity>
+
+    @Query("SELECT * FROM groups WHERE id = :id")
+    suspend fun findById(id: Long): GroupEntity?
+
     @Insert
     suspend fun insert(group: GroupEntity): Long
 
@@ -99,6 +105,13 @@ interface ProviderDao {
     @Query("UPDATE providers SET groupId = :groupId, updatedAt = :now WHERE id IN (:ids)")
     suspend fun setGroup(ids: List<Long>, groupId: Long?, now: Long)
 
+    /**
+     * 单独写余额令牌的密文。新增供应商时要回填它——AAD 绑主键（红线 24），
+     * 而主键是插入时才分配的，所以和 `api_keys.secretEnc` 一样分两步。
+     */
+    @Query("UPDATE providers SET balanceTokenEnc = :token, updatedAt = :now WHERE id = :id")
+    suspend fun setBalanceToken(id: Long, token: ByteArray?, now: Long)
+
     @Query(
         """
         UPDATE providers SET
@@ -151,6 +164,29 @@ interface ApiKeyDao {
 
     @Query("DELETE FROM api_keys WHERE id = :id")
     suspend fun deleteRaw(id: Long)
+
+    /**
+     * 写密文。**新增密钥必须分两步**，这是第二步。
+     *
+     * 原因是红线 24：`secretEnc` 的 AAD 是 `api_keys:{id}:secretEnc`，而 `id` 是
+     * `AUTOINCREMENT` 分配的——加密时还不知道它。所以先插入（密文列先空着）拿到 id，
+     * 再用真 AAD 加密回填，两步包在同一个事务里，于是"密文为空"这个中间态不会被
+     * `Flow` 观察到，也不会在崩溃后留在库里。
+     *
+     * **依赖 AUTOINCREMENT 不复用 id**：换成普通 `INTEGER PRIMARY KEY` 之后，
+     * 删掉最后一行再插入会拿到同一个 id，于是一份旧密文可以被搬进新行且 AAD 照样匹配。
+     */
+    @Query("UPDATE api_keys SET secretEnc = :secretEnc, fingerprint = :fingerprint, updatedAt = :now WHERE id = :id")
+    suspend fun setSecret(id: Long, secretEnc: ByteArray, fingerprint: String, now: Long)
+
+    /**
+     * 只改元数据。
+     *
+     * 刻意不复用 `@Update`：那个整行替换，于是一个 `secretEnc` 忘填的领域对象能把密文
+     * 覆盖成空——编译通过、没有报错，表现是那张密钥从此解不开。这条语句连密文列都没提到。
+     */
+    @Query("UPDATE api_keys SET label = :label, sortOrder = :sortOrder, updatedAt = :now WHERE id = :id")
+    suspend fun setMeta(id: Long, label: String, sortOrder: Int, now: Long)
 
     @Query("UPDATE api_keys SET isDefault = 0 WHERE providerId = :providerId")
     suspend fun clearDefault(providerId: Long)

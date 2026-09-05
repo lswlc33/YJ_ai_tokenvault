@@ -5,6 +5,7 @@ import android.os.SystemClock
 import androidx.room.Room
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.lc33.tokenvault.crypto.RandomBytes
+import com.lc33.tokenvault.crypto.SecretBox
 import com.lc33.tokenvault.crypto.SecureRandomBytes
 import com.lc33.tokenvault.data.VaultDatabase
 import com.lc33.tokenvault.data.dao.ApiKeyDao
@@ -45,6 +46,17 @@ import kotlinx.coroutines.SupervisorJob
 @Retention(AnnotationRetention.BINARY)
 annotation class AppScope
 
+/**
+ * 墙上时间。
+ *
+ * 做成可注入的 lambda 而不是让仓库直接调 `System.currentTimeMillis()`：**当前时间也算
+ * 平台能力**（红线 20）。直接调的代价很具体——`createdAt` / `updatedAt` 的测试会变成
+ * 时间敏感的，只能断言"大概是现在"，于是"保存时忘了更新 updatedAt"这种 bug 测不出来。
+ */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class NowEpochMs
+
 @Module
 @InstallIn(SingletonComponent::class)
 object VaultModule {
@@ -57,6 +69,16 @@ object VaultModule {
     @Provides
     @Singleton
     fun provideRandom(): RandomBytes = SecureRandomBytes
+
+    @Provides
+    @Singleton
+    @NowEpochMs
+    fun provideNow(): () -> Long = System::currentTimeMillis
+
+    /** 字段级加解密。`SecretBox` 自己无状态，随机源注进去（测试里换成确定源）。 */
+    @Provides
+    @Singleton
+    fun provideSecretBox(random: RandomBytes): SecretBox = SecretBox(random)
 
     /**
      * boot 文件放在 `filesDir` 而不是 `SharedPreferences`：
