@@ -514,4 +514,25 @@
     <string name="biometric_prompt_enable_subtitle">验证一下是你，把这台设备与你的金库绑定</string>
     <string name="biometric_prompt_cancel">改用 PIN</string>
     <string name="clipboard_label_recovery_key">元记</string>
+
+    <!-- M3：供应商详情页的密钥管理。 -->
+    <string name="detail_keys_empty">这家还没有密钥。没有密钥就没法探测，也查不了余额。</string>
+    <string name="detail_add_key">添加密钥</string>
+    <string name="detail_key_label">标签</string>
+    <string name="detail_key_label_hint">用来区分同一家的几把密钥，可以留空。</string>
+    <string name="detail_key_secret">密钥</string>
+    <string name="detail_key_secret_hint">粘贴进来就好。它在进库之前就已经加密，这一屏也截不了图。</string>
+    <string name="detail_key_sheet_title">这把密钥</string>
+    <string name="detail_key_set_default">设为默认</string>
+    <string name="detail_key_delete_title">删掉这把密钥？</string>
+    <string name="detail_key_delete_body">删掉没法找回。如果它是默认那张，排在最前的启用密钥会自动顶上。</string>
+    <string name="detail_key_reveal_hint">复制会放进剪贴板并在一段时间后自动清除。离开这一层就擦掉明文。</string>
+    <string name="clipboard_label_api_key">元记密钥</string>
+    <string name="editor_group_none">未分组</string>
+    <string name="editor_profile_default">默认（不伪装）</string>
+    <string name="groups_add_title">新建分组</string>
+    <string name="groups_rename_title">重命名分组</string>
+    <string name="groups_name_label">分组名称</string>
+    <string name="groups_delete_title">删掉这个分组？</string>
+    <string name="groups_delete_body">里面的供应商不会被删——它们会落回「全部」。</string>
 </resources>

@@ -112,6 +112,7 @@ object SampleContent {
             keys = keys().filter { it.providerId == provider.id },
             models = models().filter { it.providerId == provider.id },
             accounts = accounts().filter { it.providerId == provider.id },
+            nowMs = System.currentTimeMillis(),
         )
     }
 
@@ -176,8 +177,6 @@ object SampleContent {
                 Protocol.entries.firstOrNull { it.name.equals(label, ignoreCase = true) }
             }.toSet().ifEmpty { setOf(Protocol.CHAT) },
             balanceKindIndex = if (provider.host.contains("deepseek")) 2 else 1,
-            // 真实实现里这一格是解密后的明文；M0.8 只给个形状，别当成真令牌
-            balanceToken = if (provider.host.contains("deepseek")) "" else "token…",
             balanceUserId = if (provider.host.contains("deepseek")) "" else "199628",
             pathOverrideAnthropic = if (provider.host.contains("deepseek")) "/anthropic/v1/messages" else "",
         )
@@ -333,7 +332,7 @@ object SampleContent {
             masked = "sk-LWxU…JrG0",
             health = UiHealth.Warn,
             latencyMs = null,
-            checkedAgo = stringResource(R.string.sample_ago_2hour),
+            checkedAt = sampleTwoHoursAgo(),
             isDefault = true,
         ),
         UiKeyRow(
@@ -343,7 +342,7 @@ object SampleContent {
             masked = "sk-k7Ks…Xp9G",
             health = UiHealth.Ok,
             latencyMs = 412,
-            checkedAgo = stringResource(R.string.sample_ago_2hour),
+            checkedAt = sampleTwoHoursAgo(),
             isDefault = true,
         ),
         UiKeyRow(
@@ -353,7 +352,7 @@ object SampleContent {
             masked = "sk-9fQ2…mA7T",
             health = UiHealth.Unknown,
             latencyMs = null,
-            checkedAgo = null,
+            checkedAt = null,
             isDefault = false,
         ),
         UiKeyRow(
@@ -363,10 +362,18 @@ object SampleContent {
             masked = "sk-74ac…3ae3",
             health = UiHealth.Ok,
             latencyMs = 236,
-            checkedAgo = stringResource(R.string.sample_ago_2hour),
+            checkedAt = sampleTwoHoursAgo(),
             isDefault = true,
         ),
     )
+
+    /**
+     * 样例的"两小时前"。
+     *
+     * 从时间戳算而不是写死一句"2 小时前"：`UiKeyRow` 现在给的是时间戳，文案由页面按当前
+     * 时间分档。写死会让样例数据与真数据走两条不同的渲染路径，于是那条路径就没人走过了。
+     */
+    private fun sampleTwoHoursAgo(): Long = System.currentTimeMillis() - 2 * 60 * 60 * 1000L
 
     @Composable
     private fun models(): List<UiModelRow> = listOf(

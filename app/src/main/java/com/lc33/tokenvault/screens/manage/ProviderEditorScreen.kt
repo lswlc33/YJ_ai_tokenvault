@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringArrayResource
@@ -34,10 +35,12 @@ import com.lc33.tokenvault.ui.miuix.AppFilterChip
 import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppIconButton
 import com.lc33.tokenvault.ui.miuix.AppScaffold
+import com.lc33.tokenvault.ui.miuix.AppSecretTextField
 import com.lc33.tokenvault.ui.miuix.AppSwitchRow
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppTextButton
 import com.lc33.tokenvault.ui.miuix.AppTextField
+import com.lc33.tokenvault.ui.miuix.AppTextFieldState
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.AppTopBar
 import com.lc33.tokenvault.ui.miuix.SectionTitle
@@ -45,6 +48,7 @@ import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
 import com.lc33.tokenvault.ui.miuix.appTopBarScroll
 import com.lc33.tokenvault.ui.miuix.rememberAppTextFieldState
 import com.lc33.tokenvault.ui.miuix.rememberAppTopBarScrollState
+import com.lc33.tokenvault.ui.miuix.rememberSecretTextFieldState
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
 import com.lc33.tokenvault.ui.theme.LocalStatusPalette
 
@@ -58,6 +62,15 @@ import com.lc33.tokenvault.ui.theme.LocalStatusPalette
  * 直接摊开，是让用户自己发现地址填错的唯一有效手段。M0.5 那次 DeepSeek 的
  * `/v1/messages` → 404 空 body 就是"猜错路径时上游一个字都不给"的例子，
  * 所以必须在录入阶段看见。
+ *
+ * **文本框的内容在保存时才交出去**（[onSave] 带着一个补全过的 [ProviderDraft]）。
+ * 每敲一个字都 `onChange` 一次会让整棵树跟着重组，而这一页有二十多个控件；
+ * 反过来，让 ViewModel 自己去读文本框是做不到的——那些状态属于这一层。
+ *
+ * **余额访问令牌不进 draft**：它是明文秘密，只允许活在能擦掉的 `CharArray` 里（红线 1），
+ * 而 [ProviderDraft] 是 Compose 长期持有的状态。所以它作为 [onSave] 的第二个参数单独交出，
+ * 并且用 `rememberSecretTextFieldState`（不进 saved instance state）+ 密码键盘。
+ * `null` 表示"这一格没动过"，仓库据此保留库里那份密文——否则每次改备注都会把令牌清掉。
  */
 @Composable
 fun ProviderEditorScreen(
@@ -66,7 +79,7 @@ fun ProviderEditorScreen(
     profileNames: List<String>,
     onChange: (ProviderDraft) -> Unit,
     onBack: () -> Unit,
-    onSave: () -> Unit,
+    onSave: (ProviderDraft, CharArray?) -> Unit,
 ) {
     val scrollState = rememberAppTopBarScrollState()
     val tokens = LocalAppTokens.current
@@ -76,6 +89,36 @@ fun ProviderEditorScreen(
     val note = rememberAppTextFieldState(draft.note)
     val website = rememberAppTextFieldState(draft.website)
     val baseUrl = rememberAppTextFieldState(draft.baseUrl)
+    val balanceUserId = rememberAppTextFieldState(draft.balanceUserId)
+
+    // 令牌那一格刻意用不可保存的状态：可保存的会被序列化进 Activity 的 saved instance
+    // state（交给 system_server 放在 Bundle 里），转屏就发生一次，而那是明文秘密
+    val balanceToken = rememberSecretTextFieldState()
+
+    /**
+     * 提交时把这一层持有的文本补回 draft；令牌单独走，不进 draft。
+     *
+     * **`draft` 必须经 [rememberUpdatedState] 读**：保存按钮在 `AppTopBar` 的 `actions`
+     * 槽里，那个槽不保证跟着每次重组重建，于是 `::submit` 可能仍然是**上一次组合**里
+     * 那个闭包、带着旧的 draft。真机上撞到过一次：下拉里选了分组、界面也显示成了新值，
+     * 保存下去的却是 `groupIndex = 0`，于是"改分组"永远不生效而且没有任何报错。
+     */
+    val currentDraft by rememberUpdatedState(draft)
+
+    fun submit() {
+        onSave(
+            currentDraft.copy(
+                name = name.text.trim(),
+                note = note.text.trim(),
+                website = website.text.trim(),
+                baseUrl = baseUrl.text.trim(),
+                balanceUserId = balanceUserId.text.trim(),
+            ),
+            // 空 = 没动过（保留库里那份），非空 = 用户填了新的。"清掉令牌"要显式的删除动作，
+            // 不能靠"把输入框清空再保存"——那和"没动过"在界面上长得一模一样
+            balanceToken.chars.takeIf { it.isNotEmpty() },
+        )
+    }
 
     // dirty 只看地址与名称这两处足够代表"用户动过东西"了；真正的 dirty 判定
     // 在 M3 接真数据时由 ViewModel 比对整个 draft。
@@ -98,7 +141,7 @@ fun ProviderEditorScreen(
                     AppIconButton(
                         icon = AppIcon.Ok,
                         contentDescription = stringResource(R.string.editor_save),
-                        onClick = onSave,
+                        onClick = ::submit,
                     )
                 },
             )
@@ -182,7 +225,7 @@ fun ProviderEditorScreen(
                     onSelect = { onChange(draft.copy(balanceKindIndex = it)) },
                 )
             }
-            item { BalanceFields(draft) }
+            item { BalanceFields(draft, balanceToken, balanceUserId) }
 
             item { SectionTitle(text = stringResource(R.string.editor_section_client)) }
             item {
@@ -330,12 +373,17 @@ private fun ProtocolChips(draft: ProviderDraft, onChange: (ProviderDraft) -> Uni
  * `newapi` 要的是**独立的访问令牌 + 用户 ID**（在中转站个人安全设置里获取），
  * 与 API 密钥无关；其余适配器复用该供应商的默认 Key。这个区别不写在界面上，
  * 用户一定会把 API Key 填进访问令牌那一格。
+ *
+ * 两个状态由上一层持有：令牌要在保存时交给仓库，而这一段是个 `item {}`，
+ * 划出屏幕就会被回收——状态留在这里的表现是"滚下去再滚回来，刚填的令牌不见了"。
  */
 @Composable
-private fun BalanceFields(draft: ProviderDraft) {
+private fun BalanceFields(
+    draft: ProviderDraft,
+    token: AppTextFieldState,
+    userId: AppTextFieldState,
+) {
     val tokens = LocalAppTokens.current
-    val token = rememberAppTextFieldState(draft.balanceToken)
-    val userId = rememberAppTextFieldState(draft.balanceUserId)
 
     Column(
         modifier = Modifier.padding(horizontal = tokens.screenPadding, vertical = tokens.itemSpacing),
@@ -344,7 +392,7 @@ private fun BalanceFields(draft: ProviderDraft) {
         when (draft.balanceKindIndex) {
             // newapi
             1 -> {
-                AppTextField(
+                AppSecretTextField(
                     state = token,
                     label = stringResource(R.string.editor_balance_token),
                     supportingText = stringResource(R.string.editor_balance_token_hint),

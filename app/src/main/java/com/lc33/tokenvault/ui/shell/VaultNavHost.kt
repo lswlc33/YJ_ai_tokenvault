@@ -46,18 +46,18 @@ import com.lc33.tokenvault.screens.settings.UpdateScreen
 /**
  * 导航图。
  *
- * M0.8 阶段数据来自 [SampleContent]，而"当前分段"这类**纯 UI 状态**先由 Shell 记着；
- * M3 接真数据时这两样都换成 ViewModel + `SavedStateHandle`，页面签名不用动
- * （页面只接 UiState 与回调，本来就不知道数据从哪来）。
+ * **M3 起管理那一支吃真数据**：管理页、供应商详情、供应商编辑、分组管理都接 ViewModel +
+ * 仓库；分组筛选那个"当前选中"是纯 UI 状态，留在 `ManageViewModel` 里。
+ *
+ * 剩下的仍然来自 [SampleContent]：仪表盘六块卡、探测明细、余额明细、粘贴导入、
+ * 客户端预设列表。它们各自等自己的里程碑（§16），而不是"接了一半假装接完"。
  */
 @Composable
 fun VaultNavHost(
     nav: NavHostController,
     modifier: Modifier = Modifier,
 ) {
-    // 分组筛选跨导航保留：进详情再返回，应该还停在刚才那个分组。
-    var selectedGroupId by remember { mutableStateOf<Long?>(null) }
-    // M0.8 的设置项由这里兜着：切页保留、杀进程丢弃。M2 换成 SettingsRepository。
+    // M0.8 的设置项由这里兜着：切页保留、杀进程丢弃。等 SettingsRepository（M3 后半）。
     var settings by remember { mutableStateOf(SettingsDraft()) }
     val context = LocalContext.current
 
@@ -89,9 +89,14 @@ fun VaultNavHost(
         }
 
         composable<ManageRoute> {
+            val vm: ManageViewModel = hiltViewModel()
+            val manage by vm.state.collectAsStateWithLifecycle()
+            // 「全部」那一枚 chip 的文案在资源里，而 ViewModel 读不到资源（红线 19）
+            val allLabel = stringResource(R.string.group_all)
+            LaunchedEffect(allLabel) { vm.setAllGroupLabel(allLabel) }
             ManageScreen(
-                state = SampleContent.manage().copy(selectedGroupId = selectedGroupId),
-                onSelectGroup = { id -> selectedGroupId = id },
+                state = manage,
+                onSelectGroup = vm::onSelectGroup,
                 onOpenProvider = { id -> nav.navigate(ProviderDetailRoute(id)) },
                 onOpenGroups = { nav.navigate(GroupsRoute) },
                 onNewProvider = { nav.navigate(ProviderEditorRoute()) },
@@ -118,11 +123,27 @@ fun VaultNavHost(
 
         composable<ProviderDetailRoute> { entry ->
             val route = entry.toRoute<ProviderDetailRoute>()
-            ProviderDetailScreen(
-                state = SampleContent.detail(route.id),
-                onBack = back,
-                onEdit = { nav.navigate(ProviderEditorRoute(route.id)) },
-            )
+            val vm: ProviderDetailViewModel = hiltViewModel()
+            val detail by vm.state.collectAsStateWithLifecycle()
+            val revealed by vm.revealed.collectAsStateWithLifecycle()
+            val clipboardLabel = stringResource(R.string.clipboard_label_api_key)
+            // 这一家可能刚被删掉（详情页还在栈上）。detail 为 null 时什么都不画：
+            // 画一个空壳会让用户以为数据丢了，而真相是这一行已经不存在
+            detail?.let { state ->
+                ProviderDetailScreen(
+                    state = state,
+                    revealedKeyId = revealed?.keyId,
+                    revealedText = revealed?.text,
+                    onBack = back,
+                    onEdit = { nav.navigate(ProviderEditorRoute(route.id)) },
+                    onAddKey = vm::onAddKey,
+                    onRevealKey = vm::onRevealKey,
+                    onCopyRevealed = { vm.onCopyRevealed(clipboardLabel) },
+                    onCloseReveal = vm::onCloseKeySheet,
+                    onSetDefaultKey = vm::onSetDefaultKey,
+                    onDeleteKey = vm::onDeleteKey,
+                )
+            }
         }
 
         composable<AppearanceRoute> {
@@ -243,16 +264,25 @@ fun VaultNavHost(
         }
 
         // 剩下这几个还是 M0.8 立起来的空壳，内容各归各的里程碑（见 §16）
-        composable<ProviderEditorRoute> { entry ->
-            val route = entry.toRoute<ProviderEditorRoute>()
-            ProviderEditorScreen(
-                draft = SampleContent.draft(route.id),
-                groupNames = SampleContent.manage().groups.map { it.name },
-                profileNames = SampleContent.profiles().map { it.name },
-                onChange = {},
-                onBack = back,
-                onSave = back,
-            )
+        composable<ProviderEditorRoute> {
+            val vm: ProviderEditorViewModel = hiltViewModel()
+            val draft by vm.draft.collectAsStateWithLifecycle()
+            val groups by vm.groups.collectAsStateWithLifecycle()
+            val loaded by vm.loaded.collectAsStateWithLifecycle()
+            LaunchedEffect(vm) { vm.saved.collect { back() } }
+            // 下标 0 固定是「未分组」，与 ProviderDraftMapping 里那张表对齐
+            val ungrouped = stringResource(R.string.editor_group_none)
+            if (loaded) {
+                ProviderEditorScreen(
+                    draft = draft,
+                    groupNames = listOf(ungrouped) + groups.map { it.name },
+                    // 客户端预设还没有仓库（内置预设的 seed 在 M5），这一格暂时只有一项
+                    profileNames = listOf(stringResource(R.string.editor_profile_default)),
+                    onChange = vm::onChange,
+                    onBack = back,
+                    onSave = vm::onSave,
+                )
+            }
         }
         composable<ImportRoute> {
             ImportScreen(
@@ -265,12 +295,15 @@ fun VaultNavHost(
             )
         }
         composable<GroupsRoute> {
+            val vm: ManageViewModel = hiltViewModel()
+            val manage by vm.state.collectAsStateWithLifecycle()
             GroupsScreen(
-                groups = SampleContent.manage().groups,
+                // 「全部」那一枚由页面自己过滤掉（它不入库，也就没有重命名这种操作）
+                groups = manage.groups,
                 onBack = back,
-                onAdd = {},
-                onRename = {},
-                onDelete = {},
+                onAdd = vm::onAddGroup,
+                onRename = vm::onRenameGroup,
+                onDelete = vm::onDeleteGroup,
             )
         }
         composable<ProbeRunRoute> {

@@ -101,4 +101,11 @@ data class ProviderDetailUiState(
     val keys: List<UiKeyRow>,
     val models: List<UiModelRow>,
     val accounts: List<UiAccountRow>,
+    /**
+     * 渲染这一屏时的"现在"，给相对时间用。
+     *
+     * 由 ViewModel 一次取好而不是页面各自调 `System.currentTimeMillis()`：同一屏里
+     * 两行的"3 小时前"必须以同一个基准算，否则滚动时它们会各自漂移。
+     */
+    val nowMs: Long = 0,
 )

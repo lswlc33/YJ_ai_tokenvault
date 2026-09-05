@@ -27,7 +27,12 @@ data class ProviderDraft(
 
     /** 下标对应 `R.array.balance_kinds`：0 = 不查，1 = newapi，其余复用默认 Key。 */
     val balanceKindIndex: Int = 0,
-    val balanceToken: String = "",
+
+    /**
+     * 用户 ID。**访问令牌不在这里**——它是明文秘密，只允许活在能擦掉的 `CharArray` 里
+     * （红线 1），而这个类是 Compose 长期持有、还会进快照系统的状态。
+     * 编辑页把它作为 `onSave` 的第二个参数单独交出去。
+     */
     val balanceUserId: String = "",
 
     val profileIndex: Int = 0,

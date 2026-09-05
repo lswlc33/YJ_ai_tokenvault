@@ -27,6 +27,8 @@ import com.lc33.tokenvault.screens.model.UiProviderRow
 import com.lc33.tokenvault.ui.common.StatusDot
 import com.lc33.tokenvault.ui.common.colorOf
 import com.lc33.tokenvault.ui.common.labelOf
+import com.lc33.tokenvault.ui.common.relativeBucketOf
+import com.lc33.tokenvault.ui.common.relativeTimeLabel
 import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppChip
 import com.lc33.tokenvault.ui.miuix.AppText
@@ -148,7 +150,7 @@ internal fun ProviderRow(row: UiProviderRow, onClick: (Long) -> Unit) {
 }
 
 @Composable
-internal fun KeyRow(row: UiKeyRow, onClick: () -> Unit) {
+internal fun KeyRow(row: UiKeyRow, nowMs: Long, onClick: () -> Unit) {
     val tokens = LocalAppTokens.current
     AppCard(modifier = rowModifier(), onClick = onClick) {
         Row(
@@ -187,9 +189,10 @@ internal fun KeyRow(row: UiKeyRow, onClick: () -> Unit) {
                         color = appSecondaryTextColor,
                     )
                 }
-                if (row.checkedAgo != null) {
+                if (row.checkedAt != null) {
+                    // 分档是纯函数、文案在资源里，所以"算"在这里而不是在 ViewModel（它拿不到资源）
                     AppText(
-                        text = row.checkedAgo,
+                        text = relativeTimeLabel(relativeBucketOf(nowMs, row.checkedAt)),
                         style = AppTextStyle.Footnote,
                         color = appSecondaryTextColor,
                     )

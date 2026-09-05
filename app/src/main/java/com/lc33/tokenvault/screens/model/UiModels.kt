@@ -55,11 +55,21 @@ data class UiKeyRow(
     val id: Long,
     val label: String,
     val providerId: Long,
-    /** 入库时算好的静态遮蔽串。这个类里**没有明文字段**，所以画不出明文（§6.1 推论 3）。 */
+    /**
+     * 遮蔽串。**解密之后现算**（§6.1 推论 3），所以它只出现在详情页；这个类里没有明文字段，
+     * 也就画不出明文。
+     */
     val masked: String,
     val health: UiHealth,
     val latencyMs: Long?,
-    val checkedAgo: String?,
+    /**
+     * 最近一次探测的时间戳，**不是格式化好的相对时间串**。
+     *
+     * 相对时间的文案在 `strings.xml` 里（"3 小时前"），取它要 `stringResource`，
+     * 而 ViewModel 拿不到资源。所以这里给时间戳，分档与文案由页面用
+     * `relativeBucketOf` + `relativeTimeLabel` 现做——那两个函数本来就是为此拆开的。
+     */
+    val checkedAt: Long?,
     val isDefault: Boolean,
 )
 

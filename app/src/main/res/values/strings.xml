@@ -518,4 +518,25 @@
     <string name="biometric_prompt_enable_subtitle">Confirm it is you to bind this device to your vault</string>
     <string name="biometric_prompt_cancel">Use PIN instead</string>
     <string name="clipboard_label_recovery_key">YuanJi</string>
+
+    <!-- M3: key management on the provider detail page. -->
+    <string name="detail_keys_empty">No key yet. A provider without a key cannot be probed and its balance cannot be read.</string>
+    <string name="detail_add_key">Add key</string>
+    <string name="detail_key_label">Label</string>
+    <string name="detail_key_label_hint">Tells apart several keys of the same provider. Can be left empty.</string>
+    <string name="detail_key_secret">Key</string>
+    <string name="detail_key_secret_hint">Paste it in. It is encrypted before it reaches the database, and this screen cannot be captured.</string>
+    <string name="detail_key_sheet_title">This key</string>
+    <string name="detail_key_set_default">Set as default</string>
+    <string name="detail_key_delete_title">Delete this key?</string>
+    <string name="detail_key_delete_body">There is no way to get it back. If it is the default one, the enabled key sorted first takes over automatically.</string>
+    <string name="detail_key_reveal_hint">Copy puts it on the clipboard and clears it after a while. Leaving this sheet wipes the plain text.</string>
+    <string name="clipboard_label_api_key">YuanJi key</string>
+    <string name="editor_group_none">Ungrouped</string>
+    <string name="editor_profile_default">Default (no disguise)</string>
+    <string name="groups_add_title">New group</string>
+    <string name="groups_rename_title">Rename group</string>
+    <string name="groups_name_label">Group name</string>
+    <string name="groups_delete_title">Delete this group?</string>
+    <string name="groups_delete_body">The providers in it are not deleted — they fall back to All.</string>
 </resources>
