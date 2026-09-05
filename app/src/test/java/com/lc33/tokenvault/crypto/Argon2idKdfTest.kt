@@ -129,6 +129,47 @@ class Argon2idKdfTest {
         assertTrue("抄写时几乎一定带分隔符，不规范化就会说'你抄错了'", RecoveryKey.isWellFormed(normalized))
     }
 
+    /**
+     * 换行必须被跳掉。
+     *
+     * 恢复密钥的正常保管方式是密码管理器的备注或一个 txt 文件，粘贴过来几乎一定带一个
+     * 结尾换行；多行输入框里用户也能直接按回车。带着 `\n` 就是 33 个字符，于是应用告诉他
+     * "恢复密钥是 32 个字符"——而他抄得没错。
+     */
+    @Test
+    fun `粘贴带来的换行被跳掉`() {
+        val hex = "a1b2c3d4e5f67890a1b2c3d4e5f67890"
+        for (pasted in listOf("$hex\n", "$hex\r\n", "\n$hex", "a1b2c3d4e5f67890\na1b2c3d4e5f67890")) {
+            val normalized = RecoveryKey.normalize(pasted.toCharArray())
+            assertTrue("粘贴形态 <${pasted.replace("\n", "\\n").replace("\r", "\\r")}> 该被接受",
+                RecoveryKey.isWellFormed(normalized))
+        }
+    }
+
+    @Test
+    fun `全角空格等 Unicode 空白也跳掉`() {
+        // 枚举几个字符早晚漏一个，所以用 isWhitespace
+        val withIdeographicSpace = "a1b2c3d4e5f67890\u3000a1b2c3d4e5f67890"
+        assertTrue(RecoveryKey.isWellFormed(RecoveryKey.normalize(withIdeographicSpace.toCharArray())))
+    }
+
+    /**
+     * `normalize` 必须**无条件**擦掉中间缓冲。
+     *
+     * `copyOf(n)` 永远新分配一份，所以那个缓冲每次都是该丢掉的中间产物。写成"长度变了才擦"
+     * 会恰好漏掉最常见的那条路径：用户直接粘贴、输入里没有分隔符时长度没变，
+     * 于是完整的明文恢复密钥留在堆上不擦。
+     */
+    @Test
+    fun `没有分隔符时中间缓冲照样被擦掉`() {
+        val clean = "a1b2c3d4e5f67890a1b2c3d4e5f67890".toCharArray()
+        val normalized = RecoveryKey.normalize(clean)
+        // 返回值是拷贝，所以它本身必须是完好的——擦的是那份看不见的缓冲
+        assertEquals(RecoveryKey.LENGTH, normalized.size)
+        assertTrue(RecoveryKey.isWellFormed(normalized))
+        assertEquals("a1b2c3d4e5f67890a1b2c3d4e5f67890", normalized.concatToString())
+    }
+
     @Test
     fun `非 hex 的输入判为格式不对`() {
         assertFalse(RecoveryKey.isWellFormed(RecoveryKey.normalize("zzzz".toCharArray())))
