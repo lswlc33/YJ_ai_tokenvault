@@ -165,11 +165,23 @@ class ArchitectureRulesTest {
                 }
                 // 原始字符串
                 c == '"' && source.startsWith("\"\"\"", i) -> {
-                    val end = source.indexOf("\"\"\"", i + 3)
-                    val stop = if (end < 0) n else end
-                    val body = source.substring(i + 3, stop)
-                    if (cjk.containsMatchIn(body)) found += body.take(30)
-                    i = if (end < 0) n else end + 3
+                    // 结束符不能取"第一个 \"\"\""：Kotlin 允许原始字符串的内容以引号结尾，
+                    // 此时源码里会出现连着的四个引号（例如正则 "[^"]*" 写成原始字符串）。
+                    // 取第一个就会把结束符定在内容中间，之后整个扫描错位，把后面的注释
+                    // 当成字符串——曾经因此把 crypto/Redactor.kt 误报成"有中文字面量"。
+                    // 正确规则：连续引号里**最后三个**才是结束符。
+                    val hit = source.indexOf("\"\"\"", i + 3)
+                    if (hit < 0) {
+                        val body = source.substring(i + 3)
+                        if (cjk.containsMatchIn(body)) found += body.take(30)
+                        i = n
+                    } else {
+                        var runEnd = hit
+                        while (runEnd < n && source[runEnd] == '"') runEnd++
+                        val body = source.substring(i + 3, runEnd - 3)
+                        if (cjk.containsMatchIn(body)) found += body.take(30)
+                        i = runEnd
+                    }
                 }
                 // 普通字符串
                 c == '"' -> {
