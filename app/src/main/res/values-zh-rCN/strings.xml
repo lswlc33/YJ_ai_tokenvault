@@ -201,10 +201,6 @@
     <string name="probe_section_when">探测时机</string>
     <string name="probe_auto_when">自动探测</string>
     <string name="probe_section_cost">成本</string>
-    <string name="probe_enable_l3">逐个探测模型</string>
-    <string name="probe_enable_l3_summary">每个模型一次真实调用。默认关，自动探测永远不含它。</string>
-    <string name="probe_allow_upgraded_l2">允许验证密钥时消耗额度</string>
-    <string name="probe_allow_upgraded_l2_summary">如果某个中转站的模型列表接口不鉴权，验证密钥会退化成一次真实调用。输出限 16 token，但输入 token 数由中转站决定，可能上千——实测只发一个「ping」，对方回的是 7021。</string>
     <string name="probe_thresholds">余额低额阈值</string>
     <string name="probe_thresholds_summary">按币种配置。默认 USD 5、CNY 30。</string>
     <string name="probe_section_rate">限流</string>
@@ -381,4 +377,21 @@
     <string name="balance_failed_hint">没能读到余额——这与「余额是 0」不是一回事</string>    <string name="sample_import_issue_model_name">「DeepSeek V4 Pro」看起来是显示名而不是模型 id，导入前先确认一下</string>
     <string name="sample_probe_detail_client">401 unauthorized client detected —— 换个 User-Agent 就能通</string>
     <string name="sample_probe_detail_ratelimited">本轮该 host 撞了限流，后续可选请求已停发</string>
-    <string name="sample_probe_detail_budget">本轮该 host 的请求预算已用完</string></resources>
+    <string name="sample_probe_detail_budget">本轮该 host 的请求预算已用完</string>    <!-- Per-provider probe switches (invariant 36) -->
+    <string name="editor_section_probe">探测</string>
+    <string name="editor_probe_enabled">允许探测这一家</string>
+    <string name="editor_probe_enabled_summary">条款里明确不允许自动化检测的站，把它关掉</string>
+    <string name="editor_probe_disabled_note">这一家不会收到任何探测请求——手动探测、定时探测、「重试失败项」都不会。</string>
+    <string name="editor_probe_reachability">可达性检测</string>
+    <string name="editor_probe_reachability_summary">拉一次模型列表。不花钱。</string>
+    <string name="editor_probe_keys">密钥有效性</string>
+    <string name="editor_probe_keys_summary">模型列表接口鉴权的站不花钱。不鉴权的站要靠真实调用才有结论，那一次只能手动。</string>
+    <string name="editor_probe_balance">余额查询</string>
+    <string name="editor_probe_balance_summary">问的是管理接口。不花钱。</string>
+    <string name="editor_probe_models">模型探测 / 预热</string>
+    <string name="editor_probe_models_summary">每个模型一次真实调用，会花钱。只能手动触发，自动探测永远不含它。关掉之后这一家连手动按钮都不出现。</string>
+    <string name="probe_section_defaults">新建供应商时的默认值</string>
+    <string name="probe_defaults_notice">下面这几个开关只是「新建供应商时用哪个默认值」。每家供应商建好之后各自留一份，因为每个中转站都不一样——有的在条款里禁止自动化检测，有的三个请求就限流。改这里的默认值不会动你已经有的那些供应商。</string>
+    <string name="probe_defaults_goto_manage">逐家去看一遍</string>
+    <string name="probe_auto_when_summary">自动跑的那几轮一分钱都不花：只做可达性、密钥有效性和余额。凡是需要真实调用的，都留给你自己点。</string>
+</resources>

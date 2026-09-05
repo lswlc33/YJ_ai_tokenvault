@@ -201,10 +201,6 @@
     <string name="probe_section_when">When to probe</string>
     <string name="probe_auto_when">Automatic probing</string>
     <string name="probe_section_cost">Cost</string>
-    <string name="probe_enable_l3">Probe each model</string>
-    <string name="probe_enable_l3_summary">One real call per model. Off by default; automatic probing never includes it.</string>
-    <string name="probe_allow_upgraded_l2">Let key checks spend credit when needed</string>
-    <string name="probe_allow_upgraded_l2_summary">If a gateway does not authenticate its model list, checking a key falls back to one real call. Output is capped at 16 tokens, but the input token count is decided by the gateway and can run into the thousands — measured 7021 for a single "ping".</string>
     <string name="probe_thresholds">Low-balance thresholds</string>
     <string name="probe_thresholds_summary">Per currency. Defaults: USD 5, CNY 30.</string>
     <string name="probe_section_rate">Rate limiting</string>
@@ -381,4 +377,21 @@
     <string name="balance_failed_hint">Could not read the balance — this is not the same as a balance of zero</string>    <string name="sample_import_issue_model_name">"DeepSeek V4 Pro" looks like a display name rather than a model id — check it before importing</string>
     <string name="sample_probe_detail_client">401 unauthorized client detected — a different User-Agent gets through</string>
     <string name="sample_probe_detail_ratelimited">Stopped after the host rate-limited us this round</string>
-    <string name="sample_probe_detail_budget">Per-host request budget for this round was used up</string></resources>
+    <string name="sample_probe_detail_budget">Per-host request budget for this round was used up</string>    <!-- Per-provider probe switches (invariant 36) -->
+    <string name="editor_section_probe">Probing</string>
+    <string name="editor_probe_enabled">Allow probing this provider</string>
+    <string name="editor_probe_enabled_summary">Turn this off for a provider whose terms forbid automated checks</string>
+    <string name="editor_probe_disabled_note">This provider will not receive a single probe request — not from a manual probe, not from the scheduled one, not from "retry failed items".</string>
+    <string name="editor_probe_reachability">Reachability check</string>
+    <string name="editor_probe_reachability_summary">One GET of the model list. Costs nothing.</string>
+    <string name="editor_probe_keys">Key validity</string>
+    <string name="editor_probe_keys_summary">Costs nothing where the model list is authenticated. Where it is not, a verdict needs a real call — that one is manual only.</string>
+    <string name="editor_probe_balance">Balance query</string>
+    <string name="editor_probe_balance_summary">Asks the management API. Costs nothing.</string>
+    <string name="editor_probe_models">Model probe / warm-up</string>
+    <string name="editor_probe_models_summary">One real call per model, so it costs money. Manual only — automatic probing never includes it. Turning this off also hides the manual button for this provider.</string>
+    <string name="probe_section_defaults">Defaults for new providers</string>
+    <string name="probe_defaults_notice">The switches below are only the defaults used when you add a provider. Each provider keeps its own copy afterwards, because every gateway is different — some forbid automated checks in their terms, some rate-limit after three requests. Changing a default here does not touch providers you already have.</string>
+    <string name="probe_defaults_goto_manage">Review them provider by provider</string>
+    <string name="probe_auto_when_summary">Automatic runs never spend credit: reachability, key validity and balance only. Anything that needs a real call is left for you to tap.</string>
+</resources>

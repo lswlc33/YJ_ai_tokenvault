@@ -190,6 +190,9 @@ fun ProviderEditorScreen(
                 )
             }
 
+            item { SectionTitle(text = stringResource(R.string.editor_section_probe)) }
+            item { ProbeBlock(draft, onChange) }
+
             item { SectionTitle(text = stringResource(R.string.editor_section_advanced)) }
             item { AdvancedBlock(draft, onChange) }
 
@@ -356,6 +359,68 @@ private fun BalanceFields(draft: ProviderDraft) {
                 color = appSecondaryTextColor,
             )
         }
+    }
+}
+
+/**
+ * 探测开关，**每家单独一份**（红线 36）。
+ *
+ * 这一段刻意不写"从设置继承而来"：用户在这里看到的应该是"这一家现在是什么样"，
+ * 而不是"它从哪儿继承来的"——继承那件事只在设置那一页说一次。
+ *
+ * 总闸关掉时下面四项全部灰掉而不是隐藏：藏起来会让人以为设置丢了。
+ */
+@Composable
+private fun ProbeBlock(draft: ProviderDraft, onChange: (ProviderDraft) -> Unit) {
+    val tokens = LocalAppTokens.current
+    val palette = LocalStatusPalette.current
+    Column {
+        AppSwitchRow(
+            title = stringResource(R.string.editor_probe_enabled),
+            summary = stringResource(R.string.editor_probe_enabled_summary),
+            checked = draft.probeEnabled,
+            onCheckedChange = { onChange(draft.copy(probeEnabled = it)) },
+        )
+        if (!draft.probeEnabled) {
+            AppText(
+                text = stringResource(R.string.editor_probe_disabled_note),
+                style = AppTextStyle.Footnote,
+                color = palette.warn,
+                modifier = Modifier.padding(
+                    horizontal = tokens.screenPadding,
+                    vertical = tokens.itemSpacing,
+                ),
+            )
+        }
+        AppSwitchRow(
+            title = stringResource(R.string.editor_probe_reachability),
+            summary = stringResource(R.string.editor_probe_reachability_summary),
+            checked = draft.probeReachability,
+            onCheckedChange = { onChange(draft.copy(probeReachability = it)) },
+            enabled = draft.probeEnabled,
+        )
+        AppSwitchRow(
+            title = stringResource(R.string.editor_probe_keys),
+            summary = stringResource(R.string.editor_probe_keys_summary),
+            checked = draft.probeKeys,
+            onCheckedChange = { onChange(draft.copy(probeKeys = it)) },
+            enabled = draft.probeEnabled,
+        )
+        AppSwitchRow(
+            title = stringResource(R.string.editor_probe_balance),
+            summary = stringResource(R.string.editor_probe_balance_summary),
+            checked = draft.probeBalance,
+            onCheckedChange = { onChange(draft.copy(probeBalance = it)) },
+            enabled = draft.probeEnabled,
+        )
+        // 这一项要钱，所以副文案不是"要不要自动跑"而是"这一家允不允许被这样测"
+        AppSwitchRow(
+            title = stringResource(R.string.editor_probe_models),
+            summary = stringResource(R.string.editor_probe_models_summary),
+            checked = draft.probeModels,
+            onCheckedChange = { onChange(draft.copy(probeModels = it)) },
+            enabled = draft.probeEnabled,
+        )
     }
 }
 

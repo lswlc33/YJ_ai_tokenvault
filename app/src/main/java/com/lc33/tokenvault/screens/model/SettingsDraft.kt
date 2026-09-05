@@ -25,9 +25,17 @@ data class SettingsDraft(
 
     // 探测
     val autoProbeIndex: Int = 0,
-    val enableL3: Boolean = false,
-    /** §8.3：models 路由不鉴权的站，L2 会退化成一次真实调用，所以这一项会花钱。 */
-    val allowUpgradedL2: Boolean = true,
+    /**
+     * 这四项是**新建供应商时的默认值**，不是总开关（红线 36）。
+     *
+     * 权威在 `ProviderDraft` 的同名字段上：新建时从这里拷一份，之后各自独立。
+     * 改这里不会动已有的供应商——每家站的规则不一样，有的按 ToS 就不允许探测。
+     */
+    val defaultProbeReachability: Boolean = true,
+    val defaultProbeKeys: Boolean = true,
+    val defaultProbeBalance: Boolean = true,
+    /** L3 默认关：它要花钱，而且只能手动触发。 */
+    val defaultProbeModels: Boolean = false,
     val sniffClientProfile: Boolean = true,
     val verboseHttpLog: Boolean = false,
 

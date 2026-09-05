@@ -32,6 +32,20 @@ data class ProviderDraft(
 
     val profileIndex: Int = 0,
 
+    /**
+     * 探测开关，**每家单独存**（红线 36）。
+     *
+     * 新建时从设置里的默认值拷一份，之后各自独立——改设置不会动已有的供应商。
+     * 每家站的规则都不一样：有的按 ToS 不允许自动化探测，有的三个请求就限流，
+     * 有的每次调用都真扣钱，全局一个开关表达不了"这一家别碰"。
+     */
+    val probeEnabled: Boolean = true,
+    val probeReachability: Boolean = true,
+    val probeKeys: Boolean = true,
+    /** L3。**要钱，只能手动触发**；关掉之后连手动按钮都不出现。 */
+    val probeModels: Boolean = false,
+    val probeBalance: Boolean = true,
+
     // 高级
     val pathOverrideAnthropic: String = "",
     val authStyleIndex: Int = 0,

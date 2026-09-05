@@ -140,6 +140,7 @@ fun VaultNavHost(
                 draft = settings,
                 onChange = { settings = it },
                 onBack = back,
+                onOpenManage = ::openManage,
                 onEditThresholds = {},
                 onEditKeywords = {},
                 onEditProxy = {},
