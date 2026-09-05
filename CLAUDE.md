@@ -234,18 +234,45 @@ M1（安全底座）**已完成**，2026-09-06。引导 → 设 PIN → 抄恢�
 接在 boot 上是错的权威，将来还得再迁一次。选"立即"却仍然等 60 秒是"设置项撒谎"，
 所以它排在 M3 的第一批。
 
-M2（数据层）**部分完成**：10 张表 + 10 个 DAO + v1 schema JSON 已提交，
-`data/mapper` 的列编解码（CSV 与 JSON 列往返）17 个单测全绿。
-**仓库层还没有**——`domain/repo/` 接口与 `data/` 实现都不存在，10 个 DAO 目前零注入方。
+M2（数据层）**基本完成**：10 张表 + 10 个 DAO + v1 schema JSON、`data/mapper` 的列编解码
+（CSV 与 JSON 列往返）、实体↔领域映射器、`domain/repo/` 三个接口 + `data/repo/` 三个实现
+（分组 / 供应商 / 密钥）都已提交。
 
-下一步 M3（接真数据）：`domain/repo/` 接口 + `data/` 实现，然后把管理页从
-`screens/sample/` 换成真数据。**在这一步做完之前，这个 app 存不下任何一个真密钥。**
-里程碑表见 `计划.md` §16。
+M3（接真数据）**管理那一支已完成**，2026-09-06。管理页、供应商详情、供应商编辑、
+分组管理四页吃真数据；**这个 app 现在存得下真密钥了**。设备上走通的一条路：
+新建供应商 → 添加密钥 → 展开看明文 → `am force-stop` → 用 PIN 解锁 → 遮蔽串仍然算得出来
+（这一步证明 DEK 从 boot 重新派生后 AAD 仍然对得上）。
 
-单测 200 个全绿（1 个 spike 按设计跳过），17 个 suite；`lint` 0 error / 23 warning
-（12 个 UnusedResources 是 M0.8 留下的死文案，M3 会用上或删掉；剩下的是 6 个
+- **新增密钥必须分两步写。** `secretEnc` 的 AAD 是 `api_keys:{id}:secretEnc`（红线 24），
+  而 id 是 AUTOINCREMENT 分配的——加密时还不知道它。所以先插入（密文列先空着）拿到 id、
+  再用真 AAD 加密回填，两步包在一个事务里。`providers.balanceTokenEnc` 同理。
+  **这条路依赖 AUTOINCREMENT 不复用 id**：换成普通 `INTEGER PRIMARY KEY` 之后，
+  删掉最后一行再插入会拿到同一个 id，于是旧密文能被搬进新行且 AAD 照样匹配。
+- **指纹在插入之前算**（它不依赖 id），所以 `(providerId, fingerprint)` 唯一索引在插入
+  那一刻就能挡住重复录入；顺带的好处是锁定态调 `add` 会抛在算指纹那一步，库里一行不留。
+- **遮蔽串不入库**，是详情页解密后现算的（推论 3），按 `updatedAt` 缓存——只按 id 缓存的
+  表现是"换了密钥但遮蔽串还是旧的那一段"。详情页因此挂 `SecureScreen()`。
+- `ProviderRepository.save` 的令牌参数是**三档**：null 不动 / 空数组清掉 / 非空换新的。
+  两档不够——编辑页手上没有已存的密文，"输入框是空的"不能当成"要清掉令牌"。
+- **仓库单测用假 DAO**（`app/src/test/.../data/repo/FakeDaos.kt`）：没有 Robolectric，
+  Room 在 JVM 上起不来。所以 SQL 层面的东西仍然没有自动化覆盖——外键 CASCADE、
+  部分唯一索引 `idx_keys_default`、`(providerId, fingerprint)` 唯一约束。
+  假 DAO 的行表**不能用 `MutableStateFlow<List<Entity>>`**：实体的 `equals` 是刻意残缺的
+  （给 Room 用），而 `value` 的 setter 会用 `equals` 判"变了没"，于是
+  `copy(isDefault = true)` 这种只动了未参与比较字段的写入会被静默丢掉。
+
+**还吃 `screens/sample/` 的**：仪表盘六块卡、探测明细、余额明细、粘贴导入、
+客户端预设列表。详情页的模型与平台账号是空列表（仓库分别在 M5 / M6）。
+编辑页的"客户端预设"下拉只有一项且不落库——内置预设是数据不是代码（红线 22），
+它的 seed 在 M5。
+
+下一步：`SettingsRepository`（把七个设置页与"离开应用后锁定"落到 `app_settings`）、
+仪表盘计数接真数据、然后 M4 的粘贴导入。里程碑表见 `计划.md` §16。
+
+单测 229 个全绿（1 个 spike 按设计跳过），21 个 suite；`lint` 0 error / 23 warning
+（12 个 UnusedResources 是 M0.8 留下的死文案，后续会用上或删掉；剩下的是 6 个
 PluralsCandidate、2 个依赖有新版、2 个 Modifier 工厂命名、1 个拼写）；
-strings 两份各 408 条 string + 7 条 string-array，键名零差异。
+strings 两份各 427 条 string + 7 条 string-array，键名零差异。
 **仪器测试仍然是空的**（只有 `HiltTestRunner.kt`），所以 `计划.md` §14.3 里需要设备的三项
 ——Keystore 往返、boot 原子写杀进程、`FLAG_SECURE` + 剪贴板——目前只有手工验证，
 没有自动化覆盖。
