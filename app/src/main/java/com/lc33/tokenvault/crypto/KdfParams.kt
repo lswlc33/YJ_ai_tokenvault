@@ -26,7 +26,7 @@ data class KdfParams(
     @SerialName("m") val memoryKib: Int = DEFAULT_MEMORY_KIB,
     @SerialName("t") val iterations: Int = DEFAULT_ITERATIONS,
     @SerialName("p") val parallelism: Int = DEFAULT_PARALLELISM,
-    @SerialName("salt") val salt: ByteArray,
+    @SerialName("salt") @Serializable(with = ByteArrayAsBase64::class) val salt: ByteArray,
 ) {
     init {
         require(algorithm == ALGORITHM_ARGON2ID) { "only argon2id is supported, got $algorithm" }
