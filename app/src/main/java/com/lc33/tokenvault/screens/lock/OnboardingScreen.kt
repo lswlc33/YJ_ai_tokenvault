@@ -51,7 +51,10 @@ fun OnboardingScreen(
         Spacer(Modifier.height(tokens.sectionSpacing))
 
         when (state.step) {
-            OnboardingStep.Welcome -> WelcomeStep(onNext = callbacks.onOnboardingNext)
+            OnboardingStep.Welcome -> WelcomeStep(
+                onNext = callbacks.onOnboardingNext,
+                enabled = !state.busy,
+            )
             OnboardingStep.SetPin, OnboardingStep.ConfirmPin -> PinStep(state = state, callbacks = callbacks)
             OnboardingStep.Calibrating -> CalibratingStep()
             OnboardingStep.Biometric -> BiometricStep(state = state, callbacks = callbacks)
@@ -89,7 +92,7 @@ private fun StepProgress(step: OnboardingStep) {
  * 是因为它会改变用户的决定——知道这一点的人不会把复用过的密码存进来（§7.6）。
  */
 @Composable
-private fun WelcomeStep(onNext: () -> Unit) {
+private fun WelcomeStep(onNext: () -> Unit, enabled: Boolean) {
     val tokens = LocalAppTokens.current
     LockPageHeader(
         title = stringResource(R.string.onboarding_welcome_title),
@@ -109,6 +112,7 @@ private fun WelcomeStep(onNext: () -> Unit) {
         text = stringResource(R.string.onboarding_start),
         onClick = onNext,
         modifier = Modifier.fillMaxWidth(),
+        enabled = enabled,
     )
 }
 
@@ -209,12 +213,14 @@ private fun CalibratingStep() {
  * 不说清的话用户会以为开了它更安全，而实际上它换来的是方便。
  *
  * 不可用时逐档给出原因（七档一档不合并），并且只有"去录入"这一档给按钮
- * （见 [offersBiometricEnroll]）。
+ * （见 [offersBiometricEnroll]）。还没问出系统能力时（`biometric == null`）画"正在检查"，
+ * 不拿任何一档去冒充——冒充的那一句必然是假话。
  */
 @Composable
 private fun BiometricStep(state: OnboardingUiState, callbacks: LockCallbacks) {
     val tokens = LocalAppTokens.current
-    val unavailableRes = biometricUnavailableRes(state.biometric)
+    val availability = state.biometric
+    val unavailableRes = availability?.let { biometricUnavailableRes(it) }
     LockPageHeader(
         title = stringResource(R.string.onboarding_biometric_title),
         subtitle = stringResource(R.string.onboarding_biometric_subtitle),
@@ -222,12 +228,21 @@ private fun BiometricStep(state: OnboardingUiState, callbacks: LockCallbacks) {
     )
     Spacer(Modifier.height(tokens.sectionSpacing))
 
-    if (state.biometric.usable) {
+    if (availability == null) {
+        AppLinearProgress(progress = null, modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(tokens.itemSpacing))
+        AppText(
+            text = stringResource(R.string.onboarding_biometric_checking),
+            style = AppTextStyle.Secondary,
+            color = appSecondaryTextColor,
+        )
+    } else if (availability.usable) {
         AppSwitchRow(
             title = stringResource(R.string.onboarding_biometric_switch),
             summary = stringResource(R.string.onboarding_biometric_switch_summary),
             checked = state.biometricOptIn,
             onCheckedChange = callbacks.onBiometricOptIn,
+            enabled = !state.busy,
         )
     } else if (unavailableRes != null) {
         AppText(
@@ -236,11 +251,12 @@ private fun BiometricStep(state: OnboardingUiState, callbacks: LockCallbacks) {
             color = LocalStatusPalette.current.neutral,
             textAlign = TextAlign.Center,
         )
-        if (offersBiometricEnroll(state.biometric)) {
+        if (offersBiometricEnroll(availability)) {
             Spacer(Modifier.height(tokens.itemSpacing))
             AppTextButton(
                 text = stringResource(R.string.biometric_enroll_action),
                 onClick = callbacks.onOpenBiometricEnroll,
+                enabled = !state.busy,
             )
         }
     }
@@ -274,6 +290,7 @@ private fun RecoveryKeyStep(state: OnboardingUiState, callbacks: LockCallbacks) 
             saved = state.recoveryKeySaved,
             onSavedChange = callbacks.onRecoveryKeySavedChange,
             onCopy = callbacks.onCopyRecoveryKey,
+            enabled = !state.busy,
         )
         Spacer(Modifier.height(tokens.sectionSpacing))
         AppPrimaryButton(

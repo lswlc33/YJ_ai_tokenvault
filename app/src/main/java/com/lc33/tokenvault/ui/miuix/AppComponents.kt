@@ -1,5 +1,6 @@
 package com.lc33.tokenvault.ui.miuix
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -9,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.KeyboardActionHandler
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.clearText
@@ -20,6 +23,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -507,14 +512,41 @@ class AppTextFieldState internal constructor(internal val state: TextFieldState)
      */
     val chars: CharArray get() = state.text.let { cs -> CharArray(cs.length) { cs[it] } }
 
+    /**
+     * 清空，**连撤销历史一起清**。
+     *
+     * 少清撤销历史等于没清：`clearText()` 自己也会记一条可撤销的编辑，把刚刚那段明文
+     * 存进 `TextUndoManager`，于是"已经清掉了"的秘密还能被一次撤销拿回来。
+     *
+     * `undoState` 还是实验 API，所以这里逐个函数 opt-in 而不是全模块打开——
+     * 它哪天改签名，编译器该在这一个函数上报错，不该在整个模块里静默通过。
+     */
+    @OptIn(ExperimentalFoundationApi::class)
     fun clear() {
         state.clearText()
+        state.undoState.clearHistory()
     }
 }
 
 @Composable
 fun rememberAppTextFieldState(initial: String = ""): AppTextFieldState {
     val state = rememberTextFieldState(initial)
+    return remember(state) { AppTextFieldState(state) }
+}
+
+/**
+ * 装明文秘密的输入框状态。**刻意不可保存**。
+ *
+ * [rememberAppTextFieldState] 走的是 `rememberSaveable`，于是输入框里的内容会被
+ * `TextFieldState.Saver` 序列化进 Activity 的 saved instance state —— 也就是交给
+ * `system_server` 放在一个 Bundle 里，转屏或切后台就发生一次，而 [AppTextFieldState.clear]
+ * 完全够不到那份拷贝。恢复密钥是能解开整个库的东西（红线 1），不能这么走。
+ *
+ * 代价是转屏会丢掉已输入的内容。这个代价是对的：那一格本来就该重新输一次。
+ */
+@Composable
+fun rememberSecretTextFieldState(): AppTextFieldState {
+    val state = remember { TextFieldState() }
     return remember(state) { AppTextFieldState(state) }
 }
 
@@ -556,13 +588,65 @@ fun AppTextField(
     errorText: String? = null,
     supportingText: String? = null,
 ) {
-    Column(modifier = modifier) {
+    FieldWithNote(modifier = modifier, errorText = errorText, supportingText = supportingText) {
         TextField(
             state = state.state,
             modifier = Modifier.fillMaxWidth(),
             label = label,
             lineLimits = if (singleLine) TextFieldLineLimits.SingleLine else TextFieldLineLimits.Default,
         )
+    }
+}
+
+/**
+ * 装明文秘密的输入框（恢复密钥、备份口令、平台密码）。
+ *
+ * 与 [AppTextField] 的差别只有键盘配置，但那正是重点：默认的文本键盘会把输入内容喂给
+ * 输入法的联想与"个性化学习"，于是这段明文之后会以候选词的形式出现在**任何人**面前——
+ * 这正是 `PinPad` 宁可自己画一个数字盘也不用系统键盘的理由（§7.5），而恢复密钥比 PIN 更值钱。
+ * `KeyboardType.Password` 会让输入法关掉联想与记忆。
+ *
+ * [onDone] 非空时回车键变成「完成」并直接提交：这一格常常是一屏里唯一的输入，
+ * 让用户先收起键盘再去找按钮，等于让他盲着点。
+ */
+@Composable
+fun AppSecretTextField(
+    state: AppTextFieldState,
+    label: String,
+    modifier: Modifier = Modifier,
+    singleLine: Boolean = true,
+    errorText: String? = null,
+    supportingText: String? = null,
+    onDone: (() -> Unit)? = null,
+) {
+    FieldWithNote(modifier = modifier, errorText = errorText, supportingText = supportingText) {
+        TextField(
+            state = state.state,
+            modifier = Modifier.fillMaxWidth(),
+            label = label,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Password,
+                autoCorrectEnabled = false,
+                imeAction = if (onDone == null) ImeAction.Default else ImeAction.Done,
+            ),
+            onKeyboardAction = KeyboardActionHandler { performDefault ->
+                if (onDone == null) performDefault() else onDone()
+            },
+            lineLimits = if (singleLine) TextFieldLineLimits.SingleLine else TextFieldLineLimits.Default,
+        )
+    }
+}
+
+/** 输入框 + 下面那行说明。校验结果必须能被看到，不能只靠边框变色。 */
+@Composable
+private fun FieldWithNote(
+    modifier: Modifier,
+    errorText: String?,
+    supportingText: String?,
+    field: @Composable () -> Unit,
+) {
+    Column(modifier = modifier) {
+        field()
         val note = errorText ?: supportingText
         if (note != null) {
             AppText(

@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import com.lc33.tokenvault.R
 import com.lc33.tokenvault.screens.model.UiGroup
@@ -102,7 +103,11 @@ fun GroupsScreen(
                             modifier = Modifier.weight(1f),
                         )
                         AppText(
-                            text = stringResource(R.string.groups_count, group.providerCount),
+                            text = pluralStringResource(
+                                R.plurals.groups_count,
+                                group.providerCount,
+                                group.providerCount,
+                            ),
                             style = AppTextStyle.Footnote,
                             color = appSecondaryTextColor,
                         )

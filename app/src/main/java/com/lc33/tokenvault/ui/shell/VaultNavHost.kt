@@ -18,6 +18,11 @@ import androidx.navigation.toRoute
 import com.lc33.tokenvault.R
 import com.lc33.tokenvault.screens.dashboard.BalanceBreakdownScreen
 import com.lc33.tokenvault.screens.dashboard.DashboardScreen
+import com.lc33.tokenvault.screens.lock.ChangePinScreen
+import com.lc33.tokenvault.screens.lock.ChangePinStep
+import com.lc33.tokenvault.screens.lock.ChangePinUiState
+import com.lc33.tokenvault.screens.lock.RecoveryKeyScreen
+import com.lc33.tokenvault.screens.lock.RecoveryKeyUiState
 import com.lc33.tokenvault.screens.manage.GroupsScreen
 import com.lc33.tokenvault.screens.manage.ImportScreen
 import com.lc33.tokenvault.screens.manage.ManageScreen
@@ -52,6 +57,11 @@ fun VaultNavHost(
     var selectedGroupId by remember { mutableStateOf<Long?>(null) }
     // M0.8 的设置项由这里兜着：切页保留、杀进程丢弃。M1 / M2 换成 SettingsRepository。
     var settings by remember { mutableStateOf(SettingsDraft()) }
+    // 改 PIN 与恢复密钥两页的界面状态。这里只记"输了几位"和"走到第几步"——
+    // 明文 PIN 不进任何界面状态（红线 1）。真正的校验与重新包裹在 M1 的 VaultSession 里，
+    // 那时这两块 remember 与上面的 settings 一起换成 ViewModel。
+    var changePin by remember { mutableStateOf(ChangePinUiState()) }
+    var recoveryKey by remember { mutableStateOf(RecoveryKeyUiState()) }
     val context = LocalContext.current
 
     fun openManage() {
@@ -131,8 +141,58 @@ fun VaultNavHost(
                 draft = settings,
                 onChange = { settings = it },
                 onBack = back,
-                onChangePin = {},
-                onRecoveryKey = {},
+                onChangePin = { nav.navigate(ChangePinRoute) },
+                onRecoveryKey = { nav.navigate(RecoveryKeyRoute) },
+            )
+        }
+        composable<ChangePinRoute> {
+            ChangePinScreen(
+                state = changePin,
+                onDigit = {
+                    val next = changePin.pinLength + 1
+                    if (next < changePin.pinSlots) {
+                        changePin = changePin.copy(pinLength = next, error = null)
+                    } else {
+                        when (changePin.step) {
+                            ChangePinStep.Current ->
+                                changePin = changePin.copy(step = ChangePinStep.New, pinLength = 0)
+                            ChangePinStep.New ->
+                                changePin = changePin.copy(step = ChangePinStep.Confirm, pinLength = 0)
+                            // 校验旧 PIN、比对两次新 PIN、重新包裹 DEK 都在 M1 的 VaultSession 里，
+                            // 所以这里只是走完流程退出去——不弹"已修改"，那会是一句假话。
+                            ChangePinStep.Confirm -> {
+                                changePin = ChangePinUiState()
+                                back()
+                            }
+                        }
+                    }
+                },
+                onBackspace = {
+                    changePin = changePin.copy(pinLength = (changePin.pinLength - 1).coerceAtLeast(0))
+                },
+                onBack = {
+                    changePin = ChangePinUiState()
+                    back()
+                },
+            )
+        }
+        composable<RecoveryKeyRoute> {
+            RecoveryKeyScreen(
+                state = recoveryKey,
+                onRotate = {
+                    recoveryKey = recoveryKey.copy(
+                        hasKey = true,
+                        generated = SampleContent.recoveryKeyDisplay(),
+                        saved = false,
+                    )
+                },
+                onCopy = {},
+                onSavedChange = { recoveryKey = recoveryKey.copy(saved = it) },
+                onBack = {
+                    // 退出时丢掉展示串：它是明文，不该在返回之后还留在状态里
+                    recoveryKey = RecoveryKeyUiState(hasKey = recoveryKey.hasKey)
+                    back()
+                },
             )
         }
         composable<ProbeSettingsRoute> {

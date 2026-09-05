@@ -55,6 +55,14 @@ data object AppearanceRoute
 @Serializable
 data object SecurityRoute
 
+/** 改 PIN。只重新包裹数据密钥，不重新加密数据（红线 2）。 */
+@Serializable
+data object ChangePinRoute
+
+/** 恢复密钥：看状态、补一把或换一把。已有的那把看不到（它从不落盘）。 */
+@Serializable
+data object RecoveryKeyRoute
+
 @Serializable
 data object ProbeSettingsRoute
 

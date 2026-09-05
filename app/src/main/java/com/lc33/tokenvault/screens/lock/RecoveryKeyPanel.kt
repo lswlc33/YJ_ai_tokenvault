@@ -37,6 +37,7 @@ fun RecoveryKeyPanel(
     onSavedChange: (Boolean) -> Unit,
     onCopy: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     SecureScreen()
     val tokens = LocalAppTokens.current
@@ -68,12 +69,14 @@ fun RecoveryKeyPanel(
             text = stringResource(R.string.recovery_key_copy),
             onClick = onCopy,
             modifier = Modifier.fillMaxWidth(),
+            enabled = enabled,
         )
         AppCheckboxRow(
             text = stringResource(R.string.recovery_key_saved),
             checked = saved,
             onCheckedChange = onSavedChange,
             modifier = Modifier.fillMaxWidth(),
+            enabled = enabled,
         )
     }
 }

@@ -10,8 +10,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -91,8 +89,6 @@ fun AppSecondaryButton(
  *
  * [minSize] 默认 64dp 而不是 `minTouchTarget` 的 48dp：解锁是每天要做几次、经常单手做、
  * 而且输错要罚等待的操作（§7.2 的退避阶梯），键太小的代价不是"不好点"而是"被罚等 30 秒"。
- *
- * [contentDescription] 非空时替换掉朗读内容——退格键画的是符号，读出来得是"退格"。
  */
 @Composable
 fun AppKeyButton(
@@ -101,23 +97,8 @@ fun AppKeyButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     minSize: Dp = 64.dp,
-    contentDescription: String? = null,
 ) {
-    Surface(
-        onClick = onClick,
-        modifier = modifier
-            .defaultMinSize(minWidth = minSize, minHeight = minSize)
-            .then(
-                if (contentDescription == null) {
-                    Modifier
-                } else {
-                    Modifier.clearAndSetSemantics { this.contentDescription = contentDescription }
-                },
-            ),
-        enabled = enabled,
-        shape = RoundedCornerShape(percent = 50),
-        color = MiuixTheme.colorScheme.surfaceContainerHigh,
-    ) {
+    KeyShell(onClick = onClick, modifier = modifier, enabled = enabled, minSize = minSize) {
         Text(
             text = label,
             modifier = Modifier
@@ -138,6 +119,10 @@ fun AppKeyButton(
 /**
  * 键盘上的图标键。与 [AppKeyButton] 同形，只是画图标——退格键没有合适的字符
  * （`⌫` 在部分设备的字体里是空豆腐块）。
+ *
+ * [contentDescription] 给 `Icon`，不用 `clearAndSetSemantics` 去盖整个键：那个修饰符
+ * 挂在 `Surface` 外面时会把 `Surface` 内部 `clickable` 贡献的点击动作一起清掉，
+ * 于是读屏用户听得见标签、却点不动这个键。
  */
 @Composable
 fun AppKeyIconButton(
@@ -148,13 +133,7 @@ fun AppKeyIconButton(
     enabled: Boolean = true,
     minSize: Dp = 64.dp,
 ) {
-    Surface(
-        onClick = onClick,
-        modifier = modifier.defaultMinSize(minWidth = minSize, minHeight = minSize),
-        enabled = enabled,
-        shape = RoundedCornerShape(percent = 50),
-        color = MiuixTheme.colorScheme.surfaceContainerHigh,
-    ) {
+    KeyShell(onClick = onClick, modifier = modifier, enabled = enabled, minSize = minSize) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -172,6 +151,25 @@ fun AppKeyIconButton(
             )
         }
     }
+}
+
+/** 两种键唯一的区别是里面画什么，圆形、配色、最小尺寸、禁用态都该只有一份。 */
+@Composable
+private fun KeyShell(
+    onClick: () -> Unit,
+    modifier: Modifier,
+    enabled: Boolean,
+    minSize: Dp,
+    content: @Composable () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier.defaultMinSize(minWidth = minSize, minHeight = minSize),
+        enabled = enabled,
+        shape = RoundedCornerShape(percent = 50),
+        color = MiuixTheme.colorScheme.surfaceContainerHigh,
+        content = content,
+    )
 }
 
 /**

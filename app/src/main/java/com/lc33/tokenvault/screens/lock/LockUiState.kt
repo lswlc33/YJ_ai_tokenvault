@@ -68,9 +68,11 @@ val PinError.isRecoveryError: Boolean
  * @param recoveryKeyDisplay 分组后的展示串，**只在走到 [OnboardingStep.RecoveryKey] 那一刻**
  *   由 `RecoveryKey.formatForDisplay` 生成。它是一个擦不掉的 `String`，所以那一页必须挂
  *   `SecureScreen()`，离开就丢引用。
- * @param biometric 引导阶段这里放的必须是**系统 `canAuthenticate` 的结果**。
- *   `NOT_ENABLED_BY_USER` 在引导里没有意义——本应用的那个开关就是这一步本身
- *   （[biometricOptIn]），传它会画出"你在本应用里关掉了生物识别"这种自相矛盾的话。
+ * @param biometric 系统 `canAuthenticate` 的结果，**null 表示还没问出来**。
+ *   做成可空是因为"还不知道"是一个真实存在的状态（第一帧、异步探测中、`.copy()` 漏了这个字段），
+ *   而它没有任何一档可以用来冒充：`NOT_ENABLED_BY_USER` 在引导里尤其不行——本应用的那个
+ *   开关就是这一步本身（[biometricOptIn]），传它会画出"你在本应用里关掉了生物识别"这种
+ *   自相矛盾的话。null 时这一步画的是"正在检查"。
  */
 @Immutable
 data class OnboardingUiState(
@@ -78,7 +80,7 @@ data class OnboardingUiState(
     val pinLength: Int = 0,
     val pinSlots: Int = 6,
     val error: PinError? = null,
-    val biometric: BiometricAvailability = BiometricAvailability.NOT_ENABLED_BY_USER,
+    val biometric: BiometricAvailability? = null,
     val biometricOptIn: Boolean = false,
     val recoveryKeyDisplay: String? = null,
     val recoveryKeySaved: Boolean = false,

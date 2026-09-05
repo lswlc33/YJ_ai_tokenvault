@@ -33,7 +33,9 @@
     <string name="count_models">模型</string>
     <string name="count_accounts">平台账号</string>
     <string name="dashboard_health_title">密钥健康</string>
-    <string name="dashboard_health_all_ok">%1$d 张全部可用</string>
+    <plurals name="dashboard_health_all_ok">
+        <item quantity="other">%1$d 张全部可用</item>
+    </plurals>
     <string name="dashboard_attention_title">需要处理</string>
     <string name="dashboard_attention_none">暂无需要处理的项</string>
     <string name="dashboard_attention_fix_client">换客户端预设</string>
@@ -347,7 +349,9 @@
     <string name="groups_add">新建分组</string>
     <string name="groups_rename">重命名</string>
     <string name="groups_delete">删除</string>
-    <string name="groups_count">%1$d 个供应商</string>
+    <plurals name="groups_count">
+        <item quantity="other">%1$d 个供应商</item>
+    </plurals>
     <string name="groups_empty_title">还没有分组</string>
     <string name="groups_empty_desc">分组就是管理页上那排筛选 chip。供应商多到一屏放不下时再建几个。</string>
     <string name="groups_delete_note">删除分组不会删掉里面的供应商——它们会落回「全部」。</string>
@@ -364,7 +368,9 @@
     <string name="import_selected">将导入</string>
     <string name="import_skipped">跳过</string>
     <string name="import_counts">%1$d 张密钥 · %2$d 个模型 · %3$d 个账号</string>
-    <string name="import_confirm">导入 %1$d 家</string>
+    <plurals name="import_confirm">
+        <item quantity="other">导入 %1$d 家</item>
+    </plurals>
 
     <!-- Probe run -->
     <string name="probe_run_failed">失败</string>
@@ -432,7 +438,9 @@
     <string name="unlock_subtitle">输入 PIN 解锁</string>
     <string name="unlock_busy">正在派生密钥…</string>
     <string name="unlock_backoff">输错次数太多，请等 %1$s。</string>
-    <string name="unlock_free_left">还能再错 %1$d 次，之后就要等待了</string>
+    <plurals name="unlock_free_left">
+        <item quantity="other">还能再错 %1$d 次，之后就要等待了</item>
+    </plurals>
     <string name="unlock_next_waits">再错一次就要开始等待了</string>
     <string name="unlock_biometric">用生物识别解锁</string>
     <string name="unlock_use_recovery">改用恢复密钥解锁</string>
@@ -450,6 +458,29 @@
     <string name="recovery_key_where">抄到这台手机之外的地方——纸上，或者密码管理器里。谁拿到它就能打开这个库。</string>
     <string name="recovery_key_copy">复制</string>
     <string name="recovery_key_saved">我已经抄到别处保存好了</string>
+
+    <!-- 改 PIN（设置 · 安全） -->
+    <string name="change_pin_title">修改 PIN</string>
+    <string name="change_pin_current_title">先输当前的 PIN</string>
+    <string name="change_pin_current_subtitle">要这一步，是为了让捡到你已解锁手机的人没法悄悄把 PIN 换掉。</string>
+    <string name="change_pin_new_title">设一个新 PIN</string>
+    <string name="change_pin_new_subtitle">还是 6 位。</string>
+    <string name="change_pin_confirm_title">再输一次新 PIN</string>
+    <string name="change_pin_confirm_subtitle">这里手滑，下一次解锁就会把自己关在门外。</string>
+    <string name="change_pin_note">改 PIN 只是把数据密钥重新包一次，别的什么都不动。你存的密钥一个都不会重新加密，所以存了三条还是三百条，改起来一样快。</string>
+
+    <!-- 恢复密钥（设置 · 安全） -->
+    <string name="recovery_key_settings_title">恢复密钥</string>
+    <string name="recovery_key_present">这个库有恢复密钥。</string>
+    <string name="recovery_key_absent">这个库还没有恢复密钥。</string>
+    <string name="recovery_key_cannot_show">已有的那把看不到了。存下来的只是"被它包裹过的数据密钥"，恢复密钥本身从不落盘。找不到自己那把的话，重新生成一把。</string>
+    <string name="recovery_key_missing_warning">没有它，忘记 PIN 就等于丢掉这里存的每一把密钥。备份也救不了：备份口令默认就是那个 PIN。</string>
+    <string name="recovery_key_create">生成恢复密钥</string>
+    <string name="recovery_key_rotate">重新生成一把</string>
+    <string name="recovery_key_rotate_confirm_title">要换掉恢复密钥吗？</string>
+    <string name="recovery_key_rotate_confirm_body">新的一生成，旧的当场失效。如果你抄过旧的、而且还找得到，就不必做这一步。</string>
+    <string name="recovery_key_rotate_confirm">换掉</string>
+    <string name="recovery_key_finish">完成</string>
 
     <!-- 引导 -->
     <string name="onboarding_step_of">第 %1$d 步，共 %2$d 步</string>
@@ -471,6 +502,7 @@
     <string name="onboarding_calibrating_note">这一步只做一次，中途不能取消。它没有百分比可显示：密钥派生本身没有可以报告的中间进度。</string>
     <string name="onboarding_biometric_title">生物识别解锁</string>
     <string name="onboarding_biometric_subtitle">可选。以后在设置的安全里随时能开关。</string>
+    <string name="onboarding_biometric_checking">正在检查这台设备支持什么…</string>
     <string name="onboarding_biometric_switch">用生物识别解锁</string>
     <string name="onboarding_biometric_switch_summary">它是解开同一把数据密钥的另一条路，不是第二道锁。密钥放在硬件里、每次都要求验证；新增或删除指纹会让它失效，解锁自动退回用 PIN。</string>
 </resources>

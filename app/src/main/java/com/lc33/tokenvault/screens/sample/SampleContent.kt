@@ -42,6 +42,14 @@ import com.lc33.tokenvault.screens.settings.ProfileRow
  */
 object SampleContent {
 
+    /**
+     * 恢复密钥的样例展示串（32 hex，每 4 位一组）。
+     *
+     * 真身是 `RecoveryKey.generate()` + `formatForDisplay()`，在 M1 的 `VaultSession` 里。
+     * 这里给一个固定值只是为了让那一页能看：它不是任何一个真实库的恢复密钥。
+     */
+    fun recoveryKeyDisplay(): String = "a3f9 21be 0c47 d5e8 9a1f 3b62 7c40 ed15"
+
     @Composable
     fun dashboard(): DashboardUiState = DashboardUiState(
         balance = BalanceSummary(

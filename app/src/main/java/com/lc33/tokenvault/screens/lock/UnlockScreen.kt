@@ -14,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -22,12 +23,12 @@ import com.lc33.tokenvault.domain.LockPhase
 import com.lc33.tokenvault.domain.UnlockBackoff
 import com.lc33.tokenvault.ui.miuix.AppLinearProgress
 import com.lc33.tokenvault.ui.miuix.AppPrimaryButton
+import com.lc33.tokenvault.ui.miuix.AppSecretTextField
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppTextButton
-import com.lc33.tokenvault.ui.miuix.AppTextField
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
-import com.lc33.tokenvault.ui.miuix.rememberAppTextFieldState
+import com.lc33.tokenvault.ui.miuix.rememberSecretTextFieldState
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
 import com.lc33.tokenvault.ui.theme.LocalStatusPalette
 import kotlinx.coroutines.delay
@@ -81,8 +82,10 @@ fun UnlockScreen(
             error = error,
             backoff = locked.backoff,
             remainingSeconds = remaining,
-            // 退避罚的是 PIN 试错；恢复密钥是 128 位熵，穷举不现实，所以那条提示与它无关
-            showAttempts = !state.recoveryMode,
+            // 退避罚的是 PIN 试错。恢复密钥是 128 位熵、穷举不现实，所以那条路不受退避限制——
+            // 于是倒计时与"还能错几次"在恢复模式下都不该出现：一边让人等，一边输入框是活的，
+            // 结果是被锁在门外的人干等着一件其实没挡住他的事。
+            pinMode = !state.recoveryMode,
         )
         Spacer(Modifier.height(tokens.itemSpacing))
 
@@ -138,7 +141,7 @@ private fun UnlockStatus(
     error: PinError?,
     backoff: UnlockBackoff,
     remainingSeconds: Int,
-    showAttempts: Boolean,
+    pinMode: Boolean,
 ) {
     val palette = LocalStatusPalette.current
     val freeLeft = UnlockBackoff.FREE_ATTEMPTS - backoff.failedAttempts
@@ -157,7 +160,7 @@ private fun UnlockStatus(
             )
         }
         when {
-            remainingSeconds > 0 -> AppText(
+            remainingSeconds > 0 && pinMode -> AppText(
                 text = stringResource(R.string.unlock_backoff, formatCountdown(remainingSeconds)),
                 style = AppTextStyle.Body,
                 color = palette.warn,
@@ -171,10 +174,10 @@ private fun UnlockStatus(
                 textAlign = TextAlign.Center,
             )
         }
-        if (showAttempts && remainingSeconds == 0 && backoff.failedAttempts > 0) {
+        if (pinMode && remainingSeconds == 0 && backoff.failedAttempts > 0) {
             AppText(
                 text = if (freeLeft > 0) {
-                    stringResource(R.string.unlock_free_left, freeLeft)
+                    pluralStringResource(R.plurals.unlock_free_left, freeLeft, freeLeft)
                 } else {
                     stringResource(R.string.unlock_next_waits)
                 },
@@ -193,8 +196,11 @@ private fun UnlockStatus(
  * 不让人粘贴等于逼着他们手敲 32 个字符，而这是一条"忘记 PIN 之后的最后出路"，
  * 在这里制造摩擦的代价最高。
  *
- * 空格与短横线不用管——用户一定会照着分组抄，规范化由 `crypto/RecoveryKey.normalize` 做
- * （页面层不碰 `crypto/`，所以形状是否正确由后端回一个 [PinError] 告诉界面）。
+ * 输入框状态用 [rememberSecretTextFieldState]（不可保存）：可保存的那个会把内容序列化进
+ * Activity 的 saved instance state，转个屏就把能解开整个库的东西交给了系统进程（红线 1）。
+ *
+ * 空格与短横线不用管——规范化由 `crypto/RecoveryKey.normalize` 做（页面层不碰 `crypto/`，
+ * 所以形状对不对由后端回一个 [PinError]）。换行是唯一的例外，见 [withoutLineBreaks]。
  */
 @Composable
 private fun RecoveryKeyInput(
@@ -203,24 +209,26 @@ private fun RecoveryKeyInput(
     onCancel: () -> Unit,
 ) {
     val tokens = LocalAppTokens.current
-    val field = rememberAppTextFieldState()
+    val field = rememberSecretTextFieldState()
     // 离开这一页立刻清空：明文恢复密钥不该在返回之后还留在输入框里（§7.5 的"离开页面立即回遮"同理）
     DisposableEffect(Unit) {
         onDispose { field.clear() }
     }
+    val submit = { onSubmit(field.chars.withoutLineBreaks()) }
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
     ) {
-        AppTextField(
+        AppSecretTextField(
             state = field,
             label = stringResource(R.string.unlock_recovery_label),
             singleLine = false,
             supportingText = stringResource(R.string.unlock_recovery_hint),
+            onDone = submit,
         )
         AppPrimaryButton(
             text = stringResource(R.string.unlock_recovery_submit),
-            onClick = { onSubmit(field.chars) },
+            onClick = submit,
             modifier = Modifier.fillMaxWidth(),
             enabled = enabled,
         )
@@ -230,6 +238,28 @@ private fun RecoveryKeyInput(
             modifier = Modifier.fillMaxWidth(),
         )
     }
+}
+
+/**
+ * 去掉换行，顺手擦掉中间产物。
+ *
+ * `RecoveryKey.normalize` 处理空格、短横线与制表符，但不处理换行；而换行只可能来自**粘贴**
+ * （密码管理器的备注、txt 文件几乎一定带一个结尾换行），也绝不可能是密钥的一部分。
+ * 粘贴发生在界面这一侧，所以在界面挡掉——不挡的话，用户会在"忘记 PIN 之后唯一的出路"
+ * 这一页上被告知"你抄对了的东西是错的"。
+ */
+private fun CharArray.withoutLineBreaks(): CharArray {
+    if (none { it == '\n' || it == '\r' }) return this
+    val kept = CharArray(size)
+    var n = 0
+    for (c in this) {
+        if (c != '\n' && c != '\r') kept[n++] = c
+    }
+    val trimmed = kept.copyOf(n)
+    // 这两份都是明文，交出去的只有 trimmed
+    kept.fill(' ')
+    fill(' ')
+    return trimmed
 }
 
 /**

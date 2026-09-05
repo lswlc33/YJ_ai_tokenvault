@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.lc33.tokenvault.R
@@ -149,7 +150,7 @@ internal fun HealthCard(health: HealthBreakdown) {
             // 全绿时不必列四行图例，一句话更清楚
             StatusDot(
                 color = colorOf(UiHealth.Ok),
-                label = stringResource(R.string.dashboard_health_all_ok, health.total),
+                label = pluralStringResource(R.plurals.dashboard_health_all_ok, health.total, health.total),
             )
             return@AppCard
         }
