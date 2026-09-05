@@ -6,6 +6,7 @@ import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Backup
 import top.yukonga.miuix.kmp.icon.extended.ChevronForward
+import top.yukonga.miuix.kmp.icon.extended.Clear
 import top.yukonga.miuix.kmp.icon.extended.Contacts
 import top.yukonga.miuix.kmp.icon.extended.Copy
 import top.yukonga.miuix.kmp.icon.extended.Delete
@@ -74,6 +75,12 @@ enum class AppIcon {
     OpenLink,
     Tune,
 
+    /** 数字键盘的退格键。用"清除"的图形，MIUIX 没有退格图形。 */
+    Backspace,
+
+    /** 锁屏页的图标。与 [Key] 现在是同一个图形，但语义不同：那个是"一张密钥"，这个是"已锁定"。 */
+    Locked,
+
     // 状态与设置块
     Ok,
     Warning,
@@ -109,6 +116,8 @@ internal fun AppIcon.imageVector(): ImageVector = when (this) {
     AppIcon.Conceal -> MiuixIcons.Hide
     AppIcon.OpenLink -> MiuixIcons.Link
     AppIcon.Tune -> MiuixIcons.Tune
+    AppIcon.Backspace -> MiuixIcons.Clear
+    AppIcon.Locked -> MiuixIcons.Lock
 
     AppIcon.Ok -> MiuixIcons.Ok
     AppIcon.Warning -> MiuixIcons.Report

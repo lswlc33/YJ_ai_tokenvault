@@ -394,4 +394,83 @@
     <string name="probe_defaults_notice">下面这几个开关只是「新建供应商时用哪个默认值」。每家供应商建好之后各自留一份，因为每个中转站都不一样——有的在条款里禁止自动化检测，有的三个请求就限流。改这里的默认值不会动你已经有的那些供应商。</string>
     <string name="probe_defaults_goto_manage">逐家去看一遍</string>
     <string name="probe_auto_when_summary">自动跑的那几轮一分钱都不花：只做可达性、密钥有效性和余额。凡是需要真实调用的，都留给你自己点。</string>
+
+    <!-- ==================== M1 锁闸：引导、解锁、恢复密钥 ==================== -->
+    <string name="dialog_cancel">取消</string>
+
+    <!-- PIN 输入 -->
+    <string name="pin_dots_cd">已输入 %1$d 位，共 %2$d 位</string>
+    <string name="pin_backspace_cd">退格</string>
+    <string name="pin_error_wrong">PIN 不对</string>
+    <string name="pin_error_mismatch">两次输入不一样</string>
+    <string name="pin_error_too_simple">太容易猜到。别用 123456 这样的顺号，也别用 111111 这样的全同。</string>
+    <string name="pin_error_recovery_malformed">恢复密钥是 32 个字符，只含数字与 a 到 f</string>
+    <string name="pin_error_recovery_wrong">这把恢复密钥打不开这个库</string>
+
+    <!-- 生物识别可用性。七档一档不合并：其中三档是用户自己能解决的。 -->
+    <string name="biometric_state_no_hardware">这台设备没有生物识别硬件</string>
+    <string name="biometric_state_hardware_unavailable">生物识别硬件正忙，过一会儿再试</string>
+    <string name="biometric_state_none_enrolled">这台设备还没录入指纹或人脸</string>
+    <string name="biometric_state_security_update">系统需要先做一次安全更新才能用生物识别</string>
+    <string name="biometric_state_unsupported">这个 Android 版本不支持强生物识别</string>
+    <string name="biometric_state_not_enabled">你在本应用里关掉了生物识别解锁</string>
+    <string name="biometric_enroll_action">去系统设置里录入</string>
+
+    <!-- boot 存储读不出来 -->
+    <string name="boot_corrupt_title">读不出金库的配置文件</string>
+    <string name="boot_corrupt_body">这个文件里存着解开数据密钥所需的参数。没有它，数据库里那些加密过的密钥就打不开。</string>
+    <string name="boot_corrupt_untouched">现在什么都还没被改动。应用不会自己重建这个文件——重建之后，你存的每一把密钥都会变成谁也解不开的密文。</string>
+    <string name="boot_corrupt_restore">从备份恢复</string>
+    <string name="boot_corrupt_wipe">清空重来</string>
+    <string name="boot_corrupt_diagnostic">诊断信息，报问题时贴上它：</string>
+    <string name="boot_corrupt_wipe_confirm_title">确定清空？</string>
+    <string name="boot_corrupt_wipe_confirm_body">这会删掉本机上全部供应商、密钥、模型、平台账号与设置。删完没法撤销，之后再做备份也找不回来。</string>
+    <string name="boot_corrupt_wipe_confirm">清空</string>
+
+    <!-- 解锁 -->
+    <string name="unlock_title">已锁定</string>
+    <string name="unlock_subtitle">输入 PIN 解锁</string>
+    <string name="unlock_busy">正在派生密钥…</string>
+    <string name="unlock_backoff">输错次数太多，请等 %1$s。</string>
+    <string name="unlock_free_left">还能再错 %1$d 次，之后就要等待了</string>
+    <string name="unlock_next_waits">再错一次就要开始等待了</string>
+    <string name="unlock_biometric">用生物识别解锁</string>
+    <string name="unlock_use_recovery">改用恢复密钥解锁</string>
+    <string name="unlock_recovery_title">恢复密钥</string>
+    <string name="unlock_recovery_subtitle">初次设置时让你抄下来的那 32 个字符。它解开的是同一把数据密钥，和 PIN 一样。</string>
+    <string name="unlock_recovery_label">恢复密钥</string>
+    <string name="unlock_recovery_hint">带空格、短横线都没关系，大小写也不区分</string>
+    <string name="unlock_recovery_submit">解锁</string>
+    <string name="unlock_recovery_back">回到 PIN</string>
+
+    <!-- 恢复密钥展示页，引导与设置共用 -->
+    <string name="recovery_key_title">你的恢复密钥</string>
+    <string name="recovery_key_subtitle">继续之前先抄下来。这一页截不了图。</string>
+    <string name="recovery_key_why">忘记 PIN 时，只有它能把你的数据找回来。没有重置这条路，也没有人能替你恢复。</string>
+    <string name="recovery_key_where">抄到这台手机之外的地方——纸上，或者密码管理器里。谁拿到它就能打开这个库。</string>
+    <string name="recovery_key_copy">复制</string>
+    <string name="recovery_key_saved">我已经抄到别处保存好了</string>
+
+    <!-- 引导 -->
+    <string name="onboarding_step_of">第 %1$d 步，共 %2$d 步</string>
+    <string name="onboarding_next">继续</string>
+    <string name="onboarding_start">开始设置</string>
+    <string name="onboarding_finish">完成</string>
+    <string name="onboarding_welcome_title">设 PIN 之前，先说清三件事</string>
+    <string name="onboarding_welcome_subtitle">这三件事每一件都会影响你该往这里存什么。</string>
+    <string name="onboarding_welcome_what">API 密钥、平台账号密码、访问令牌是按字段用 AES-256-GCM 加密存的。供应商名称、端点、模型 id、余额是明文。</string>
+    <string name="onboarding_welcome_limit">6 位 PIN 挡不住把这些文件拷走、拿去离线穷举的人。所以别把你在别处复用过的密码存进来——设置里可以改成任意长度的口令。</string>
+    <string name="onboarding_welcome_recovery">最后一步会给你一把恢复密钥。忘记 PIN 时只有它能救，所以先准备好抄它的地方。</string>
+    <string name="onboarding_pin_title">设一个 6 位 PIN</string>
+    <string name="onboarding_pin_subtitle">PIN 只用来包裹真正的数据密钥。所以以后改 PIN 只是把那一小段重新包一次，不会重新加密你的数据。</string>
+    <string name="onboarding_pin_confirm_title">再输一次</string>
+    <string name="onboarding_pin_confirm_subtitle">这里手滑，第一次解锁就会把自己关在门外。</string>
+    <string name="onboarding_pin_restart">重设一个不一样的 PIN</string>
+    <string name="onboarding_calibrating_title">正在校准</string>
+    <string name="onboarding_calibrating_subtitle">在测这台设备跑一次密钥派生要多久，好让解锁又快又不至于把参数调弱。</string>
+    <string name="onboarding_calibrating_note">这一步只做一次，中途不能取消。它没有百分比可显示：密钥派生本身没有可以报告的中间进度。</string>
+    <string name="onboarding_biometric_title">生物识别解锁</string>
+    <string name="onboarding_biometric_subtitle">可选。以后在设置的安全里随时能开关。</string>
+    <string name="onboarding_biometric_switch">用生物识别解锁</string>
+    <string name="onboarding_biometric_switch_summary">它是解开同一把数据密钥的另一条路，不是第二道锁。密钥放在硬件里、每次都要求验证；新增或删除指纹会让它失效，解锁自动退回用 PIN。</string>
 </resources>

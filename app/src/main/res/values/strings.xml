@@ -394,4 +394,83 @@
     <string name="probe_defaults_notice">The switches below are only the defaults used when you add a provider. Each provider keeps its own copy afterwards, because every gateway is different — some forbid automated checks in their terms, some rate-limit after three requests. Changing a default here does not touch providers you already have.</string>
     <string name="probe_defaults_goto_manage">Review them provider by provider</string>
     <string name="probe_auto_when_summary">Automatic runs never spend credit: reachability, key validity and balance only. Anything that needs a real call is left for you to tap.</string>
+
+    <!-- ==================== M1 lock gate: onboarding, unlock, recovery key ==================== -->
+    <string name="dialog_cancel">Cancel</string>
+
+    <!-- PIN entry -->
+    <string name="pin_dots_cd">%1$d of %2$d digits entered</string>
+    <string name="pin_backspace_cd">Backspace</string>
+    <string name="pin_error_wrong">That PIN is not right</string>
+    <string name="pin_error_mismatch">The two entries do not match</string>
+    <string name="pin_error_too_simple">Too easy to guess. Avoid runs like 123456 and repeats like 111111.</string>
+    <string name="pin_error_recovery_malformed">A recovery key is 32 characters, digits and a to f</string>
+    <string name="pin_error_recovery_wrong">That recovery key does not open this vault</string>
+
+    <!-- Biometric availability. Seven cases, none merged: three of them the user can fix. -->
+    <string name="biometric_state_no_hardware">This device has no biometric hardware</string>
+    <string name="biometric_state_hardware_unavailable">The biometric sensor is busy right now. Try again in a moment.</string>
+    <string name="biometric_state_none_enrolled">No fingerprint or face is enrolled on this device yet</string>
+    <string name="biometric_state_security_update">Android needs a security update before biometrics can be used</string>
+    <string name="biometric_state_unsupported">This Android version does not support strong biometrics</string>
+    <string name="biometric_state_not_enabled">Biometric unlock is switched off for this app</string>
+    <string name="biometric_enroll_action">Enroll in system settings</string>
+
+    <!-- Boot store unreadable -->
+    <string name="boot_corrupt_title">The vault settings file could not be read</string>
+    <string name="boot_corrupt_body">This file holds the parameters needed to unwrap your data key. Without it the encrypted keys in the database cannot be opened.</string>
+    <string name="boot_corrupt_untouched">Nothing has been changed yet. The app will not rebuild this file on its own — doing that would leave every stored key as ciphertext nobody can open.</string>
+    <string name="boot_corrupt_restore">Restore from a backup</string>
+    <string name="boot_corrupt_wipe">Erase everything and start over</string>
+    <string name="boot_corrupt_diagnostic">Diagnostic, useful in a bug report:</string>
+    <string name="boot_corrupt_wipe_confirm_title">Erase everything?</string>
+    <string name="boot_corrupt_wipe_confirm_body">This deletes every provider, key, model, platform account and setting on this device. It cannot be undone, and a backup made after this point will not bring them back.</string>
+    <string name="boot_corrupt_wipe_confirm">Erase</string>
+
+    <!-- Unlock -->
+    <string name="unlock_title">Locked</string>
+    <string name="unlock_subtitle">Enter your PIN to unlock</string>
+    <string name="unlock_busy">Deriving the key…</string>
+    <string name="unlock_backoff">Too many wrong attempts. Try again in %1$s.</string>
+    <string name="unlock_free_left">%1$d more wrong attempts before you have to wait</string>
+    <string name="unlock_next_waits">The next wrong attempt starts a waiting period</string>
+    <string name="unlock_biometric">Unlock with biometrics</string>
+    <string name="unlock_use_recovery">Use the recovery key instead</string>
+    <string name="unlock_recovery_title">Recovery key</string>
+    <string name="unlock_recovery_subtitle">The 32 characters you wrote down when you set this app up. This unwraps the same data key your PIN does.</string>
+    <string name="unlock_recovery_label">Recovery key</string>
+    <string name="unlock_recovery_hint">Spaces and dashes are fine, and case does not matter</string>
+    <string name="unlock_recovery_submit">Unlock</string>
+    <string name="unlock_recovery_back">Back to the PIN</string>
+
+    <!-- Recovery key display, shared by onboarding and settings -->
+    <string name="recovery_key_title">Your recovery key</string>
+    <string name="recovery_key_subtitle">Write it down before you continue. This screen cannot be screenshotted.</string>
+    <string name="recovery_key_why">If you forget your PIN, this is the only way back into your data. There is no reset, and no one can recover it for you.</string>
+    <string name="recovery_key_where">Keep it somewhere other than this phone — on paper, or in a password manager. Anyone holding it can open this vault.</string>
+    <string name="recovery_key_copy">Copy</string>
+    <string name="recovery_key_saved">I have saved it somewhere safe</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_step_of">Step %1$d of %2$d</string>
+    <string name="onboarding_next">Continue</string>
+    <string name="onboarding_start">Set up</string>
+    <string name="onboarding_finish">Done</string>
+    <string name="onboarding_welcome_title">Before you set a PIN</string>
+    <string name="onboarding_welcome_subtitle">Three things worth knowing, because each one changes what you should store here.</string>
+    <string name="onboarding_welcome_what">API keys, platform account passwords and access tokens are encrypted field by field with AES-256-GCM. Provider names, endpoints, model ids and balances are stored in the clear.</string>
+    <string name="onboarding_welcome_limit">A six digit PIN does not stop someone who copies these files off the device and attacks them offline. So do not store a password here that you reuse elsewhere — the settings offer a long passphrase instead.</string>
+    <string name="onboarding_welcome_recovery">The last step gives you a recovery key. It is the only way back in if you forget your PIN, so have somewhere to write it down.</string>
+    <string name="onboarding_pin_title">Choose a 6 digit PIN</string>
+    <string name="onboarding_pin_subtitle">The PIN only wraps the real data key, so changing it later re-wraps one small value and never re-encrypts your data.</string>
+    <string name="onboarding_pin_confirm_title">Enter it again</string>
+    <string name="onboarding_pin_confirm_subtitle">A typo here would lock you out on the very first unlock.</string>
+    <string name="onboarding_pin_restart">Start over with a different PIN</string>
+    <string name="onboarding_calibrating_title">Calibrating</string>
+    <string name="onboarding_calibrating_subtitle">Measuring how long one key derivation takes on this device, so unlocking stays quick without weakening the settings.</string>
+    <string name="onboarding_calibrating_note">This runs once, and cannot be cancelled. There is no progress to show: the derivation has no intermediate steps to report.</string>
+    <string name="onboarding_biometric_title">Biometric unlock</string>
+    <string name="onboarding_biometric_subtitle">Optional. You can turn it on or off later in Settings, Security.</string>
+    <string name="onboarding_biometric_switch">Unlock with biometrics</string>
+    <string name="onboarding_biometric_switch_summary">This is a second way to unwrap the same data key, not a second lock. The key sits in hardware and requires an authentication every time; adding or removing a fingerprint invalidates it and unlock falls back to the PIN.</string>
 </resources>

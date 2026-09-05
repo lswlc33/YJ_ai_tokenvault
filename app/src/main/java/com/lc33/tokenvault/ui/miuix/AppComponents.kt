@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.clearText
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
@@ -495,6 +496,20 @@ fun AppRefreshBox(
 @Stable
 class AppTextFieldState internal constructor(internal val state: TextFieldState) {
     val text: String get() = state.text.toString()
+
+    /**
+     * 不经过 `String` 的字符拷贝。
+     *
+     * 明文秘密（恢复密钥、长口令）只允许活在能擦掉的 `CharArray` 里（红线 1），
+     * 而 [text] 会产出一个进了字符串常量池、再也擦不掉的 `String`。
+     * 输入框内部当然仍持有这段文本——这是文本框不可避免的代价，所以用它的那一页
+     * 必须挂 `SecureScreen()`，并且离开时调 [clear]。
+     */
+    val chars: CharArray get() = state.text.let { cs -> CharArray(cs.length) { cs[it] } }
+
+    fun clear() {
+        state.clearText()
+    }
 }
 
 @Composable
