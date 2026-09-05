@@ -7,6 +7,7 @@ import com.lc33.tokenvault.crypto.RecoveryKey
 import com.lc33.tokenvault.crypto.zeroize
 import com.lc33.tokenvault.domain.LockPhase
 import com.lc33.tokenvault.domain.PinPolicy
+import com.lc33.tokenvault.platform.AutoLocker
 import com.lc33.tokenvault.platform.BiometricOutcome
 import com.lc33.tokenvault.platform.BiometricUnlocker
 import com.lc33.tokenvault.platform.BootStore
@@ -16,6 +17,7 @@ import com.lc33.tokenvault.platform.VaultSession
 import com.lc33.tokenvault.screens.lock.LockUiState
 import com.lc33.tokenvault.screens.lock.OnboardingStep
 import com.lc33.tokenvault.screens.lock.PinError
+import com.lc33.tokenvault.screens.lock.UnlockUiState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.io.IOException
 import javax.inject.Inject
@@ -45,6 +47,7 @@ class LockViewModel @Inject constructor(
     private val bootStore: BootStore,
     private val biometric: BiometricUnlocker,
     private val clipboard: SecureClipboard,
+    private val autoLocker: AutoLocker,
 ) : ViewModel() {
 
     private val _phase = MutableStateFlow<LockPhase>(LockPhase.Loading)
@@ -65,6 +68,33 @@ class LockViewModel @Inject constructor(
 
     init {
         refresh()
+        // 自动锁定发生在这一层之外（进程进后台、或者用户点"立即锁定"），所以必须订阅：
+        // 光靠 VaultSession 换了内部阶段，锁闸这棵树不会动。
+        viewModelScope.launch {
+            autoLocker.locked.collect { onLocked() }
+        }
+    }
+
+    /**
+     * 锁定了（自动或手动）。§7.4：**清空界面上所有明文状态**，`LockGate` 立刻换整棵树。
+     *
+     * 这里连引导中途的两个缓冲一起擦。引导没走完时不会有自动锁定（那时还没进过金库），
+     * 但"立即锁定"这条路进得来，而把 `firstPin` 留在内存里没有任何好处。
+     */
+    private fun onLocked() {
+        pinBuffer.zeroize()
+        pinLength = 0
+        firstPin?.zeroize()
+        firstPin = null
+        recoveryKeyPlain?.zeroize()
+        recoveryKeyPlain = null
+        _uiState.value = LockUiState(unlock = UnlockUiState(pinSlots = PinPolicy.DEFAULT_SLOTS))
+        _phase.value = session.currentPhase()
+    }
+
+    /** 设置里的"立即锁定"。 */
+    fun onLockNow() {
+        autoLocker.lockNow()
     }
 
     fun refresh() {
@@ -457,7 +487,6 @@ class LockViewModel @Inject constructor(
         pinBuffer.zeroize()
         firstPin?.zeroize()
         recoveryKeyPlain?.zeroize()
-        super.onCleared()
     }
 
     private companion object {

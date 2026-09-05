@@ -9,6 +9,7 @@ import com.lc33.tokenvault.ui.miuix.AppArrowRow
 import com.lc33.tokenvault.ui.miuix.AppDropdownRow
 import com.lc33.tokenvault.ui.miuix.AppSwitchRow
 import com.lc33.tokenvault.ui.miuix.SectionTitle
+import com.lc33.tokenvault.ui.theme.AppColorSchemeMode
 
 /**
  * 外观（计划.md §13.4）。
@@ -16,11 +17,17 @@ import com.lc33.tokenvault.ui.miuix.SectionTitle
  * 语言那一行故意是 `AppArrowRow` 而不是应用内的下拉：Android 13+ 有系统级的
  * 「应用语言」页，自己再做一份就有两个权威（红线 31 的精神），所以这里只负责
  * 把用户送去系统设置。
+ *
+ * 配色那一行**不吃 [SettingsDraft]**：它的权威存储是 `boot.themeMode`（红线 31），
+ * 由 `AppearanceViewModel` 读写。下拉是按下标选的，所以枚举声明顺序必须与
+ * `R.array.color_scheme_modes` 一致——`ArchitectureRulesTest` 会比这两个数量。
  */
 @Composable
 fun AppearanceScreen(
     draft: SettingsDraft,
+    colorScheme: AppColorSchemeMode,
     onChange: (SettingsDraft) -> Unit,
+    onColorSchemeChange: (AppColorSchemeMode) -> Unit,
     onBack: () -> Unit,
     onOpenSystemLocaleSettings: () -> Unit,
 ) {
@@ -30,8 +37,8 @@ fun AppearanceScreen(
             AppDropdownRow(
                 title = stringResource(R.string.appearance_color_scheme),
                 items = stringArrayResource(R.array.color_scheme_modes).toList(),
-                selectedIndex = draft.colorSchemeIndex,
-                onSelect = { onChange(draft.copy(colorSchemeIndex = it)) },
+                selectedIndex = colorScheme.ordinal,
+                onSelect = { onColorSchemeChange(AppColorSchemeMode.entries[it]) },
             )
         }
         item {

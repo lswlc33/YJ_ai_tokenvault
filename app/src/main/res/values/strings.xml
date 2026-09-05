@@ -179,6 +179,8 @@
     <string name="security_biometric">Unlock with biometrics</string>
     <string name="security_biometric_summary">Another path to the same data key, not a second lock. Re-enrolling a fingerprint invalidates it.</string>
     <string name="security_section_lock">Auto-lock</string>
+    <string name="security_lock_now">Lock now</string>
+    <string name="security_lock_now_summary">Clears the data key from memory and returns to the lock screen. Nothing is deleted.</string>
     <string name="security_auto_lock">Lock after leaving the app</string>
     <string name="security_idle_lock">Lock when idle in the foreground</string>
     <string name="security_idle_lock_summary">Paused while a probe or a backup is running, otherwise the job would interrupt itself</string>

@@ -1,6 +1,7 @@
 package com.lc33.tokenvault.di
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.room.Room
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.lc33.tokenvault.crypto.RandomBytes
@@ -17,11 +18,14 @@ import com.lc33.tokenvault.data.dao.ProbeRunDao
 import com.lc33.tokenvault.data.dao.ProviderAccountDao
 import com.lc33.tokenvault.data.dao.ProviderDao
 import com.lc33.tokenvault.domain.BiometricAvailability
+import com.lc33.tokenvault.platform.AndroidSecureClipboard
+import com.lc33.tokenvault.platform.AutoLocker
 import com.lc33.tokenvault.platform.BiometricCapability
 import com.lc33.tokenvault.platform.BiometricKeyStore
 import com.lc33.tokenvault.platform.BiometricUnlocker
 import com.lc33.tokenvault.platform.BootStore
 import com.lc33.tokenvault.platform.FileBootStore
+import com.lc33.tokenvault.platform.KeystoreBiometricUnlocker
 import com.lc33.tokenvault.platform.SecureClipboard
 import com.lc33.tokenvault.platform.VaultSession
 import dagger.Module
@@ -93,14 +97,29 @@ object VaultModule {
         keyStore: BiometricKeyStore,
         bootStore: BootStore,
         session: VaultSession,
-    ): BiometricUnlocker = BiometricUnlocker(keyStore, bootStore, session)
+    ): BiometricUnlocker = KeystoreBiometricUnlocker(keyStore, bootStore, session)
+
+    /**
+     * 自动锁定（§7.4）。用 `elapsedRealtime` 而不是墙上时间：改系统时间不该影响
+     * "离开了多久"。观察者在 `TokenVaultApp` 里挂到 `ProcessLifecycleOwner` 上。
+     */
+    @Provides
+    @Singleton
+    fun provideAutoLocker(
+        session: VaultSession,
+        @AppScope scope: CoroutineScope,
+    ): AutoLocker = AutoLocker(
+        session = session,
+        scope = scope,
+        elapsedRealtimeMs = SystemClock::elapsedRealtime,
+    )
 
     @Provides
     @Singleton
     fun provideClipboard(
         @ApplicationContext context: Context,
         @AppScope scope: CoroutineScope,
-    ): SecureClipboard = SecureClipboard(context, scope)
+    ): SecureClipboard = AndroidSecureClipboard(context, scope)
 
     /**
      * 数据库。**应用级单例、启动即建**（§6.1 推论 1）：锁定只清 DEK、不关库，

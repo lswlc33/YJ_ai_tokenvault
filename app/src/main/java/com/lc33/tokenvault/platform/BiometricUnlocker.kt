@@ -30,6 +30,39 @@ sealed interface BiometricOutcome {
 /**
  * 生物识别的启用与解锁（§7.3）。
  *
+ * 接口存在的理由和 [BootStore] 一样：**能在 JVM 单测里换实现**。真实实现要 Android Keystore
+ * （`KeyStore.getInstance("AndroidKeyStore")` 在 JVM 上直接抛），所以连"构造出来但不调用"
+ * 都做不到——而锁闸那一层要测的状态流转跟生物识别没关系。
+ */
+interface BiometricUnlocker {
+
+    /**
+     * 启用：用当前会话里的 DEK 加密一次，把 `{iv, ct}` 存进 boot。
+     *
+     * 必须**已解锁**才能调用——这也顺带保证了用户刚刚证明过自己知道 PIN（§7.3 的启用流程）。
+     */
+    suspend fun enable(
+        activity: FragmentActivity,
+        title: String,
+        subtitle: String,
+        negativeText: String,
+    ): BiometricOutcome
+
+    /** 关闭：删 Keystore 别名 + 清包裹 + 关开关。三件事必须一起做（红线 5）。 */
+    fun disable()
+
+    /** 解锁：读 `{iv, ct}`，验证之后 `doFinal` 得到 DEK，交给 [VaultSession]。 */
+    suspend fun unlock(
+        activity: FragmentActivity,
+        title: String,
+        subtitle: String,
+        negativeText: String,
+    ): BiometricOutcome
+}
+
+/**
+ * Keystore 实现。
+ *
  * 两条流程刻意分开写，因为它们的 Cipher 方向相反、且**IV 的处理不对称**：
  * 启用时 IV 由 Keystore 生成、必须取出来存；解锁时 IV 从存储里读出来喂进去。
  * 写成一个泛化函数的话，这个不对称就会被参数藏起来，而它正是这一块最容易错的地方。
@@ -38,18 +71,13 @@ sealed interface BiometricOutcome {
  * 带上之后 Keystore 密钥的绑定强度会退化到锁屏密码，而锁屏密码往往比本应用的 PIN 更弱、
  * 且我们无法控制它的策略。代价是没录生物识别的设备上这个入口直接不显示，这是对的。
  */
-class BiometricUnlocker(
+class KeystoreBiometricUnlocker(
     private val keyStore: BiometricKeyStore,
     private val bootStore: BootStore,
     private val session: VaultSession,
-) {
+) : BiometricUnlocker {
 
-    /**
-     * 启用：用当前会话里的 DEK 加密一次，把 `{iv, ct}` 存进 boot。
-     *
-     * 必须**已解锁**才能调用——这也顺带保证了用户刚刚证明过自己知道 PIN（§7.3 的启用流程）。
-     */
-    suspend fun enable(
+    override suspend fun enable(
         activity: FragmentActivity,
         title: String,
         subtitle: String,
@@ -85,13 +113,13 @@ class BiometricUnlocker(
     }
 
     /** 关闭：删 Keystore 别名 + 清包裹 + 关开关。三件事必须一起做（红线 5）。 */
-    fun disable() {
+    override fun disable() {
         keyStore.deleteKey()
         bootStore.update { it.copy(biometricEnabled = false, dekWrappedByBiometric = null) }
     }
 
     /** 解锁：读 `{iv, ct}`，验证之后 `doFinal` 得到 DEK，交给 [VaultSession]。 */
-    suspend fun unlock(
+    override suspend fun unlock(
         activity: FragmentActivity,
         title: String,
         subtitle: String,

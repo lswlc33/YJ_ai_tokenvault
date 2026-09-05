@@ -178,6 +178,8 @@
     <string name="security_biometric">用生物识别解锁</string>
     <string name="security_biometric_summary">它是通向同一个数据密钥的另一条路，不是第二道锁。重新录指纹会让它自动失效。</string>
     <string name="security_section_lock">自动锁定</string>
+    <string name="security_lock_now">立即锁定</string>
+    <string name="security_lock_now_summary">把数据密钥从内存里清掉并回到锁屏。不会删除任何东西。</string>
     <string name="security_auto_lock">离开应用后锁定</string>
     <string name="security_idle_lock">前台空闲时锁定</string>
     <string name="security_idle_lock_summary">探测或备份进行中会暂停计时，否则任务会把自己打断</string>

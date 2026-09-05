@@ -5,12 +5,17 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.fragment.app.FragmentActivity
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -19,10 +24,7 @@ import com.lc33.tokenvault.R
 import com.lc33.tokenvault.screens.dashboard.BalanceBreakdownScreen
 import com.lc33.tokenvault.screens.dashboard.DashboardScreen
 import com.lc33.tokenvault.screens.lock.ChangePinScreen
-import com.lc33.tokenvault.screens.lock.ChangePinStep
-import com.lc33.tokenvault.screens.lock.ChangePinUiState
 import com.lc33.tokenvault.screens.lock.RecoveryKeyScreen
-import com.lc33.tokenvault.screens.lock.RecoveryKeyUiState
 import com.lc33.tokenvault.screens.manage.GroupsScreen
 import com.lc33.tokenvault.screens.manage.ImportScreen
 import com.lc33.tokenvault.screens.manage.ManageScreen
@@ -55,13 +57,8 @@ fun VaultNavHost(
 ) {
     // 分组筛选跨导航保留：进详情再返回，应该还停在刚才那个分组。
     var selectedGroupId by remember { mutableStateOf<Long?>(null) }
-    // M0.8 的设置项由这里兜着：切页保留、杀进程丢弃。M1 / M2 换成 SettingsRepository。
+    // M0.8 的设置项由这里兜着：切页保留、杀进程丢弃。M2 换成 SettingsRepository。
     var settings by remember { mutableStateOf(SettingsDraft()) }
-    // 改 PIN 与恢复密钥两页的界面状态。这里只记"输了几位"和"走到第几步"——
-    // 明文 PIN 不进任何界面状态（红线 1）。真正的校验与重新包裹在 M1 的 VaultSession 里，
-    // 那时这两块 remember 与上面的 settings 一起换成 ViewModel。
-    var changePin by remember { mutableStateOf(ChangePinUiState()) }
-    var recoveryKey by remember { mutableStateOf(RecoveryKeyUiState()) }
     val context = LocalContext.current
 
     fun openManage() {
@@ -129,68 +126,68 @@ fun VaultNavHost(
         }
 
         composable<AppearanceRoute> {
+            val vm: AppearanceViewModel = hiltViewModel()
+            val colorScheme by vm.colorScheme.collectAsStateWithLifecycle()
             AppearanceScreen(
                 draft = settings,
+                colorScheme = colorScheme,
                 onChange = { settings = it },
+                onColorSchemeChange = vm::onColorSchemeChange,
                 onBack = back,
                 onOpenSystemLocaleSettings = { openAppLocaleSettings(context) },
             )
         }
         composable<SecurityRoute> {
+            val vm: SecurityViewModel = hiltViewModel()
+            val biometric by vm.biometric.collectAsStateWithLifecycle()
+            // 系统弹框的文案由系统画，所以要在这里取好传下去（ViewModel 读不到资源）。
+            val enableTitle = stringResource(R.string.biometric_prompt_enable_title)
+            val enableSubtitle = stringResource(R.string.biometric_prompt_enable_subtitle)
+            val promptCancel = stringResource(R.string.biometric_prompt_cancel)
+            val activity = context as? FragmentActivity
             SecurityScreen(
                 draft = settings,
+                biometric = biometric,
                 onChange = { settings = it },
+                onBiometricChange = { wanted ->
+                    activity?.let {
+                        vm.onBiometricChange(wanted, it, enableTitle, enableSubtitle, promptCancel)
+                    }
+                },
                 onBack = back,
                 onChangePin = { nav.navigate(ChangePinRoute) },
                 onRecoveryKey = { nav.navigate(RecoveryKeyRoute) },
+                onLockNow = vm::onLockNow,
             )
         }
         composable<ChangePinRoute> {
+            val vm: SecurityViewModel = hiltViewModel()
+            val state by vm.changePin.collectAsStateWithLifecycle()
+            // 改完就退出去。用一次性事件而不是状态里的标志：标志会在重组时重放，
+            // 于是这一页会在下一次进来时立刻自己弹回去。
+            LaunchedEffect(vm) { vm.pinChanged.collect { back() } }
             ChangePinScreen(
-                state = changePin,
-                onDigit = {
-                    val next = changePin.pinLength + 1
-                    if (next < changePin.pinSlots) {
-                        changePin = changePin.copy(pinLength = next, error = null)
-                    } else {
-                        when (changePin.step) {
-                            ChangePinStep.Current ->
-                                changePin = changePin.copy(step = ChangePinStep.New, pinLength = 0)
-                            ChangePinStep.New ->
-                                changePin = changePin.copy(step = ChangePinStep.Confirm, pinLength = 0)
-                            // 校验旧 PIN、比对两次新 PIN、重新包裹 DEK 都在 M1 的 VaultSession 里，
-                            // 所以这里只是走完流程退出去——不弹"已修改"，那会是一句假话。
-                            ChangePinStep.Confirm -> {
-                                changePin = ChangePinUiState()
-                                back()
-                            }
-                        }
-                    }
-                },
-                onBackspace = {
-                    changePin = changePin.copy(pinLength = (changePin.pinLength - 1).coerceAtLeast(0))
-                },
+                state = state,
+                onDigit = vm::onPinDigit,
+                onBackspace = vm::onPinBackspace,
                 onBack = {
-                    changePin = ChangePinUiState()
+                    vm.onChangePinExit()
                     back()
                 },
             )
         }
         composable<RecoveryKeyRoute> {
+            val vm: SecurityViewModel = hiltViewModel()
+            val state by vm.recoveryKey.collectAsStateWithLifecycle()
+            val clipboardLabel = stringResource(R.string.clipboard_label_recovery_key)
             RecoveryKeyScreen(
-                state = recoveryKey,
-                onRotate = {
-                    recoveryKey = recoveryKey.copy(
-                        hasKey = true,
-                        generated = SampleContent.recoveryKeyDisplay(),
-                        saved = false,
-                    )
-                },
-                onCopy = {},
-                onSavedChange = { recoveryKey = recoveryKey.copy(saved = it) },
+                state = state,
+                onRotate = vm::onRotateRecoveryKey,
+                onCopy = { vm.onCopyRecoveryKey(clipboardLabel) },
+                onSavedChange = vm::onRecoveryKeySavedChange,
                 onBack = {
-                    // 退出时丢掉展示串：它是明文，不该在返回之后还留在状态里
-                    recoveryKey = RecoveryKeyUiState(hasKey = recoveryKey.hasKey)
+                    // 退出时擦掉明文并丢掉展示串：它是明文，不该在返回之后还留在状态里
+                    vm.onRecoveryKeyExit()
                     back()
                 },
             )

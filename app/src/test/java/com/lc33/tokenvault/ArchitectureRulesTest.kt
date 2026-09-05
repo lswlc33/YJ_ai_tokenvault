@@ -1,5 +1,6 @@
 package com.lc33.tokenvault
 
+import com.lc33.tokenvault.ui.theme.AppColorSchemeMode
 import java.io.File
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -145,6 +146,37 @@ class ArchitectureRulesTest {
                 "确实是解析用的模式而不是 UI 文案时，在那一行加 $I18N_EXEMPT 注释并写明理由：",
             violations,
         )
+    }
+
+    @Test
+    fun `配色下拉的选项数与枚举一致`() {
+        // 下拉是按**下标**选的（AppDropdownRow 的 API 就是 selectedIndex），所以
+        // R.array.color_scheme_modes 的条目数与 AppColorSchemeMode 的常量数必须相等。
+        // 不等的表现不是崩溃而是错位：加了一个枚举值忘了加文案，用户选"深色"得到壁纸取色；
+        // 反过来 entries[index] 会越界。两种都编译得过。
+        val enumCount = AppColorSchemeMode.entries.size
+
+        val resRoot = sequenceOf(File("src/main/res"), File("app/src/main/res"))
+            .firstOrNull { it.isDirectory } ?: error("找不到 res 目录")
+        val stringFiles = resRoot.listFiles()!!
+            .filter { it.isDirectory && it.name.startsWith("values") }
+            .map { it.resolve("strings.xml") }
+            .filter { it.isFile }
+        assertTrue("至少要比到一份 strings.xml", stringFiles.isNotEmpty())
+
+        val violations = stringFiles.mapNotNull { xml ->
+            val array = xml.readText()
+                .substringAfter("""<string-array name="color_scheme_modes">""", "")
+                .substringBefore("</string-array>")
+            val count = Regex("<item>").findAll(array).count()
+            val where = "${xml.parentFile!!.name}/strings.xml"
+            when {
+                array.isEmpty() -> "$where 里没有 color_scheme_modes"
+                count != enumCount -> "$where 有 $count 项，AppColorSchemeMode 有 $enumCount 个"
+                else -> null
+            }
+        }
+        fail("配色下拉按下标取值，两边数量必须一致（红线 17 的同一条道理）：", violations)
     }
 
     /**

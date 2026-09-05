@@ -10,6 +10,9 @@ import androidx.compose.ui.unit.dp
  * 配色模式。刻意不直接用 MIUIX 的 `ColorSchemeMode`：
  * 设置项要持久化、要进备份白名单，不能让一个实验期 UI 库的枚举渗到数据层。
  * MIUIX 的映射只在 `ui/miuix/AppTheme.kt` 里做一次。
+ *
+ * **枚举的声明顺序就是 `R.array.color_scheme_modes` 的顺序**：设置页的下拉是按下标选的，
+ * 两边错位的表现是"选了深色得到壁纸取色"。`ArchitectureRulesTest` 会比这两个数量。
  */
 enum class AppColorSchemeMode {
     System,
@@ -18,6 +21,19 @@ enum class AppColorSchemeMode {
     MonetSystem,
     MonetLight,
     MonetDark,
+    ;
+
+    companion object {
+        /**
+         * 从 `boot.themeMode` 的存储值还原。
+         *
+         * 认不出来时回落 [System]，而且**不改写存储**——照红线 3 的同一条道理：
+         * "发现与编译期常量不一致就改写存储值"是永久丢配置的定时炸弹。这里改写的代价比
+         * KDF 参数小得多（只是一个配色），但同一个降级到旧版本的用户会因此被静默改掉设置。
+         */
+        fun fromStorage(value: String): AppColorSchemeMode =
+            entries.firstOrNull { it.name == value } ?: System
+    }
 }
 
 /**

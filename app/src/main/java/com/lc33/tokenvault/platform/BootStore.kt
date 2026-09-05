@@ -3,6 +3,10 @@ package com.lc33.tokenvault.platform
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.Json
 
 /**
@@ -33,6 +37,18 @@ interface BootStore {
 
     /** 清空重来（`BootCorrupt` 页那个二次确认之后的出口）。 */
     fun clear()
+
+    /**
+     * 落盘次数。每次成功的 [write] 与 [clear] 之后 +1。
+     *
+     * 存在的理由是红线 10 的精神：观察者从数据源本身知道"该重读了"，而不是靠每个写入方
+     * 顺手通知一声。漏通知的那一处永远是最后加进来的写入点，而它的表现是
+     * "在设置里改了，界面没动"——这种 bug 编译得过、测试也未必抓得到。
+     *
+     * 只带一个计数而不带记录本身：boot 里绝大多数改动（累加失败计数、包裹换一份）
+     * 对观察者毫无意义，把整条记录推出去只会让每个观察者都得自己判断"这次跟我有关吗"。
+     */
+    val revision: StateFlow<Long>
 }
 
 /**
@@ -53,6 +69,9 @@ class FileBootStore(
     private val file: File,
     private val deviceIdFactory: () -> String = { java.util.UUID.randomUUID().toString() },
 ) : BootStore {
+
+    private val _revision = MutableStateFlow(0L)
+    override val revision: StateFlow<Long> = _revision.asStateFlow()
 
     private val json = Json {
         // 存储格式要能被将来的版本读懂，所以显式写死这几项而不是靠默认值
@@ -110,6 +129,9 @@ class FileBootStore(
                 throw IOException("failed to replace boot file atomically: ${file.absolutePath}")
             }
         }
+        // 只有真的换上去了才 +1。放在 rename 之后而不是之前：观察者拿到新 revision 就会
+        // 立刻重读文件，而在 rename 成功之前重读拿到的还是旧内容。
+        _revision.update { it + 1 }
     }
 
     override fun update(transform: (BootRecord) -> BootRecord): BootRecord {
@@ -131,6 +153,7 @@ class FileBootStore(
     override fun clear() {
         File(file.parentFile, file.name + TEMP_SUFFIX).delete()
         file.delete()
+        _revision.update { it + 1 }
     }
 
     companion object {

@@ -13,7 +13,6 @@ import com.lc33.tokenvault.R
 import com.lc33.tokenvault.platform.BiometricCapability
 import com.lc33.tokenvault.screens.lock.LockCallbacks
 import com.lc33.tokenvault.ui.miuix.AppTheme
-import com.lc33.tokenvault.ui.theme.AppColorSchemeMode
 
 /**
  * 整棵树的根。
@@ -21,14 +20,17 @@ import com.lc33.tokenvault.ui.theme.AppColorSchemeMode
  * 锁闸在这里插入：[LockGate] 按 `LockPhase` 决定画哪一棵树，只有 `Unlocked` 才进
  * [VaultShell]（§13.1）。`LockPhase` 来自 [LockViewModel]，它背后是 `VaultSession`。
  *
- * 配色模式在 M2 接上 `SettingsRepository` 之前先跟随系统。**这一项的权威存储是 boot**
- * 而不是 `app_settings`（红线 31）——锁屏页也要用它，而那时数据库里的设置还读不到。
+ * 配色模式来自 [AppearanceViewModel]。**这一项的权威存储是 boot** 而不是 `app_settings`
+ * （红线 31）——锁屏页也要用它，而那时数据库里的设置还读不到。
  */
 @Composable
 fun AppRoot() {
     val vm: LockViewModel = hiltViewModel()
     val phase by vm.phase.collectAsStateWithLifecycle()
     val uiState by vm.uiState.collectAsStateWithLifecycle()
+
+    val appearance: AppearanceViewModel = hiltViewModel()
+    val colorScheme by appearance.colorScheme.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
     val activity = context as? FragmentActivity
@@ -75,7 +77,7 @@ fun AppRoot() {
         )
     }
 
-    AppTheme(mode = AppColorSchemeMode.System) {
+    AppTheme(mode = colorScheme) {
         LockGate(phase = phase, state = uiState, callbacks = callbacks) {
             VaultShell()
         }
