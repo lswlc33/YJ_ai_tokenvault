@@ -52,6 +52,11 @@ class ArchitectureRulesTest {
         )
     }
 
+    private companion object {
+        /** 见 [hasExemptionMarker]。拼出来而不是写成一整个字面量，否则这份文件自己会命中自己。 */
+        const val I18N_EXEMPT = "i18n" + "-exempt"
+    }
+
     @Test
     fun `纯 Kotlin 层不依赖平台`() {
         val banned = listOf(
@@ -136,9 +141,29 @@ class ArchitectureRulesTest {
         }
         fail(
             "用户可见文本一律进 values/strings.xml 与 values-zh-rCN/strings.xml，" +
-                "代码里不留中文字面量（计划.md 红线 19）：",
+                "代码里不留中文字面量（计划.md 红线 19）。" +
+                "确实是解析用的模式而不是 UI 文案时，在那一行加 $I18N_EXEMPT 注释并写明理由：",
             violations,
         )
+    }
+
+    /**
+     * 逐行豁免标记。
+     *
+     * 为什么需要它：本项目有一类中文**必须**留在代码里——它们是拿来**匹配用户粘贴进来的
+     * 中文**的解析模式，不是给用户看的文案。例如 §11.1 协议别名里的全角括号与"原生"、
+     * §8.4 第 4 行的额度关键词（`该令牌额度已用尽`）、§8.2 客户端校验关键词里的"客户端"。
+     *
+     * 把它们搬进 strings.xml 是**错的**：那样它们会跟着界面语言变，于是"手机设成英文的
+     * 用户粘贴一段中文数据"就解析不出来了——而这恰恰是最常见的用法。
+     *
+     * 标记刻意做成**逐行**而不是逐文件：逐文件等于给整个文件开后门，而 review 时
+     * 没人会逐行去确认那个后门有没有被滥用。
+     */
+    private fun hasExemptionMarker(source: String, index: Int): Boolean {
+        val lineStart = source.lastIndexOf('\n', index).let { if (it < 0) 0 else it + 1 }
+        val lineEnd = source.indexOf('\n', index).let { if (it < 0) source.length else it }
+        return source.substring(lineStart, lineEnd).contains(I18N_EXEMPT)
     }
 
     /**
@@ -173,18 +198,23 @@ class ArchitectureRulesTest {
                     val hit = source.indexOf("\"\"\"", i + 3)
                     if (hit < 0) {
                         val body = source.substring(i + 3)
-                        if (cjk.containsMatchIn(body)) found += body.take(30)
+                        if (cjk.containsMatchIn(body) && !hasExemptionMarker(source, i)) {
+                            found += body.take(30)
+                        }
                         i = n
                     } else {
                         var runEnd = hit
                         while (runEnd < n && source[runEnd] == '"') runEnd++
                         val body = source.substring(i + 3, runEnd - 3)
-                        if (cjk.containsMatchIn(body)) found += body.take(30)
+                        if (cjk.containsMatchIn(body) && !hasExemptionMarker(source, i)) {
+                            found += body.take(30)
+                        }
                         i = runEnd
                     }
                 }
                 // 普通字符串
                 c == '"' -> {
+                    val start = i
                     val sb = StringBuilder()
                     i++
                     while (i < n && source[i] != '"') {
@@ -198,7 +228,9 @@ class ArchitectureRulesTest {
                     }
                     i++
                     val body = sb.toString()
-                    if (cjk.containsMatchIn(body)) found += body.take(30)
+                    if (cjk.containsMatchIn(body) && !hasExemptionMarker(source, start)) {
+                        found += body.take(30)
+                    }
                 }
                 // 字符字面量
                 c == '\'' -> {

@@ -1,6 +1,6 @@
 package com.lc33.tokenvault.screens.model
 
-import com.lc33.tokenvault.endpoint.Protocol
+import com.lc33.tokenvault.domain.Protocol
 
 /**
  * 供应商编辑页的草稿。

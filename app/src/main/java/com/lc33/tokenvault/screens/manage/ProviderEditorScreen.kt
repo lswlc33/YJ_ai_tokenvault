@@ -20,9 +20,9 @@ import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.lc33.tokenvault.R
+import com.lc33.tokenvault.domain.Protocol
 import com.lc33.tokenvault.endpoint.EndpointError
 import com.lc33.tokenvault.endpoint.NormalizeResult
-import com.lc33.tokenvault.endpoint.Protocol
 import com.lc33.tokenvault.endpoint.normalizeBaseUrl
 import com.lc33.tokenvault.screens.model.ProviderDraft
 import com.lc33.tokenvault.ui.common.ColorSwatchRow

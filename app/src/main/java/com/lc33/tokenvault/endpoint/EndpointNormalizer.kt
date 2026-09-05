@@ -1,15 +1,6 @@
 package com.lc33.tokenvault.endpoint
 
-/**
- * 协议。属于**模型**，不属于供应商（红线 18）。
- *
- * 默认路径里的 `{ver}` 由 [normalizeBaseUrl] 从用户填的地址里剥出来的版本段替换。
- */
-enum class Protocol(val defaultPath: String) {
-    CHAT("/{ver}/chat/completions"),
-    RESPONSES("/{ver}/responses"),
-    ANTHROPIC("/{ver}/messages"),
-}
+import com.lc33.tokenvault.domain.Protocol
 
 /** 规范化后的端点集合。UI 的"实时预览"直接画它。 */
 data class ApiEndpointSet(
@@ -88,7 +79,7 @@ fun normalizeBaseUrl(
     val ver = versionSegment ?: DEFAULT_VER
 
     val byProtocol = Protocol.entries.associateWith { protocol ->
-        val suffix = pathOverrides[protocol] ?: protocol.defaultPath.replace("{ver}", ver)
+        val suffix = pathOverrides[protocol] ?: protocol.defaultPathTemplate.replace("{ver}", ver)
         apiRoot + suffix
     }
 

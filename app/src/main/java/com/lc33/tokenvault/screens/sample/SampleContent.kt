@@ -3,7 +3,7 @@
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import com.lc33.tokenvault.R
-import com.lc33.tokenvault.endpoint.Protocol
+import com.lc33.tokenvault.domain.Protocol
 import com.lc33.tokenvault.screens.manage.ParsedPreview
 import com.lc33.tokenvault.screens.model.AttentionItem
 import com.lc33.tokenvault.screens.model.BackupStatus

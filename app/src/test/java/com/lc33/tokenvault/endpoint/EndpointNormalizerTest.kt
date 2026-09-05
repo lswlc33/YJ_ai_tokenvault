@@ -1,5 +1,6 @@
 package com.lc33.tokenvault.endpoint
 
+import com.lc33.tokenvault.domain.Protocol
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
