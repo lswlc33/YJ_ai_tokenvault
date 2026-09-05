@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -106,6 +107,9 @@ fun ProviderEditorScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
+                // 软键盘不会自己让位：enableEdgeToEdge() 之后 manifest 的 adjustResize 失效，
+                // MIUIX Scaffold 的默认 insets 也不含 ime，不加这一条最下面那几格填不了
+                .imePadding()
                 .appTopBarScroll(scrollState),
             contentPadding = padding,
         ) {

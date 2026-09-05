@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -87,6 +88,8 @@ fun ImportScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
+                // 粘贴那一格是多行输入，键盘弹起来会盖住「解析」按钮（同 ProviderEditorScreen）
+                .imePadding()
                 .appTopBarScroll(scrollState),
             contentPadding = padding,
         ) {

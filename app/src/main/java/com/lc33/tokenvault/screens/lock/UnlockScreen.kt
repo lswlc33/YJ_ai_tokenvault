@@ -7,11 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
@@ -31,7 +26,6 @@ import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
 import com.lc33.tokenvault.ui.miuix.rememberSecretTextFieldState
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
 import com.lc33.tokenvault.ui.theme.LocalStatusPalette
-import kotlinx.coroutines.delay
 
 /**
  * 解锁页（§7.2、§7.4）。
@@ -260,24 +254,4 @@ private fun CharArray.withoutLineBreaks(): CharArray {
     kept.fill(' ')
     fill(' ')
     return trimmed
-}
-
-/**
- * 每秒重算一次的退避剩余秒数。
- *
- * 时间从这里读（`System.currentTimeMillis()`）而不是从 domain 读：红线 20 只允许平台层
- * 碰当前时间，`UnlockBackoff` 因此把 `now` 做成参数。到 0 之后循环自然结束，不再唤醒。
- */
-@Composable
-private fun rememberRemainingSeconds(backoff: UnlockBackoff): Int {
-    var remaining by remember(backoff) {
-        mutableIntStateOf(backoff.remainingSeconds(System.currentTimeMillis()))
-    }
-    LaunchedEffect(backoff) {
-        while (remaining > 0) {
-            delay(1_000)
-            remaining = backoff.remainingSeconds(System.currentTimeMillis())
-        }
-    }
-    return remaining
 }
