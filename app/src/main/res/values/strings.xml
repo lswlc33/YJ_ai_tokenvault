@@ -509,4 +509,11 @@
     <string name="onboarding_biometric_checking">Checking what this device supports…</string>
     <string name="onboarding_biometric_switch">Unlock with biometrics</string>
     <string name="onboarding_biometric_switch_summary">This is a second way to unwrap the same data key, not a second lock. The key sits in hardware and requires an authentication every time; adding or removing a fingerprint invalidates it and unlock falls back to the PIN.</string>
+    <!-- System biometric prompt. Shown by the OS, not by us, so the wording has to stand alone. -->
+    <string name="biometric_prompt_unlock_title">Unlock YuanJi</string>
+    <string name="biometric_prompt_unlock_subtitle">Confirm it is you to unwrap the data key</string>
+    <string name="biometric_prompt_enable_title">Enable biometric unlock</string>
+    <string name="biometric_prompt_enable_subtitle">Confirm it is you to bind this device to your vault</string>
+    <string name="biometric_prompt_cancel">Use PIN instead</string>
+    <string name="clipboard_label_recovery_key">YuanJi</string>
 </resources>

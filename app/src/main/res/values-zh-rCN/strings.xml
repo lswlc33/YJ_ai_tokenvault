@@ -505,4 +505,11 @@
     <string name="onboarding_biometric_checking">正在检查这台设备支持什么…</string>
     <string name="onboarding_biometric_switch">用生物识别解锁</string>
     <string name="onboarding_biometric_switch_summary">它是解开同一把数据密钥的另一条路，不是第二道锁。密钥放在硬件里、每次都要求验证；新增或删除指纹会让它失效，解锁自动退回用 PIN。</string>
+    <!-- 系统生物识别弹窗。它由系统画、不由我们画，所以文案必须能独立成句。 -->
+    <string name="biometric_prompt_unlock_title">解锁元记</string>
+    <string name="biometric_prompt_unlock_subtitle">验证一下是你，才能解开数据密钥</string>
+    <string name="biometric_prompt_enable_title">启用生物识别解锁</string>
+    <string name="biometric_prompt_enable_subtitle">验证一下是你，把这台设备与你的金库绑定</string>
+    <string name="biometric_prompt_cancel">改用 PIN</string>
+    <string name="clipboard_label_recovery_key">元记</string>
 </resources>
