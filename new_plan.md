@@ -130,7 +130,7 @@ v2 显式迁移，红线 9）。
 | 优先级 | 项 | 说明 | 粗估 |
 | --- | --- | --- | --- |
 | **P1** | ADB 端到端（M5/M6/M7） | M5 探测、M6 嗅探、M7 余额——插设备花真实额度。M4 粘贴导入已在设备上跑通（含 FLAG_SECURE 验证） | 需要设备 + 真实额度 |
-| **P1** | 仪器测试 | Room 迁移 / 级联删除 / `BootStore` 原子写已补（`VaultDatabaseTest` 6 用例 + `FileBootStoreTest` JVM 可测）；仅剩 `FLAG_SECURE` 的 connectedTest（需设备） | 1 人日 |
+| **P1** | 仪器测试 | Room 迁移 / 级联删除 / `BootStore` 原子写已补（`VaultDatabaseTest` 6 用例 + `FileBootStoreTest` JVM 可测）；`FLAG_SECURE` 的 connectedTest 已补（`SecureFlagTest` 2 用例，真机跑通） | ✅ 完成 |
 | **P2** | 生物识别设备验证 | 换一台有指纹的机器（当前设备无硬件） | 有设备时 |
 | **P2** | 额度耗尽真实响应 | DeepSeek CNY 0.89 耗尽后补一次 `ProtocolSpike` 进 fixture | 余额自然耗尽时 |
 | **P2** | M8 WorkManager 拉取 | 可砍，不影响核心四件事 | 2 人日 |
@@ -252,7 +252,7 @@ v2 显式迁移，红线 9）。
 
 | 项 | 步骤 | 何时做 |
 | --- | --- | --- |
-| **仪器测试** | `androidTest/` 现有 `VaultDatabaseTest`（6 用例：部分唯一索引 `idx_keys_default`、外键 CASCADE/SET_NULL）。**已修掉外键未开启的 bug**（`PRAGMA foreign_keys` 默认 OFF，CASCADE/SET_NULL 全是摆设）。还差：`FLAG_SECURE` connectedTest、Room 迁移测试（升 v2 时补） | 设备上 connectedTest 已跑通 |
+| **仪器测试** | `androidTest/` 现有 `VaultDatabaseTest`（6 用例：部分唯一索引 `idx_keys_default`、外键 CASCADE/SET_NULL）+ `SecureFlagTest`（2 用例：FLAG_SECURE 挂载置位/卸载清除/引用计数）。**已修掉外键未开启的 bug**（`PRAGMA foreign_keys` 默认 OFF，CASCADE/SET_NULL 全是摆设）。还差：Room 迁移测试（升 v2 时补） | 设备上 connectedTest 已跑通 |
 | **生物识别设备验证** | 换一台有指纹的机器，走：开启 → 解锁 → 改指纹后自动失效回退 PIN → 关闭后多次 PIN 解锁不悄悄打开 | 有设备时 |
 | **ADB 端到端** | 插设备后跑 `AGENTS.md` 里的流程：粘贴 `示例数据.md` → 全量探测 → 余额 → 快速复制 | 需要设备 + 真实额度 |
 | **额度耗尽真实响应** | DeepSeek 那 CNY 0.89 用完后补一次 `ProtocolSpike`，把响应加进 `fixtures/probe-matrix.json` | 余额自然耗尽时 |
