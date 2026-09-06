@@ -2,6 +2,7 @@ package com.lc33.tokenvault.ui.shell
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.platform.BootState
 import com.lc33.tokenvault.platform.BootStore
 import com.lc33.tokenvault.ui.theme.AppColorSchemeMode
@@ -11,6 +12,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 /**
  * 配色模式（红线 31、§6.1 推论 5）。
@@ -27,11 +29,20 @@ import kotlinx.coroutines.flow.stateIn
 @HiltViewModel
 class AppearanceViewModel @Inject constructor(
     private val bootStore: BootStore,
+    private val settings: SettingsRepository,
 ) : ViewModel() {
 
     val colorScheme: StateFlow<AppColorSchemeMode> = bootStore.revision
         .map { readColorScheme() }
         .stateIn(viewModelScope, SharingStarted.Eagerly, readColorScheme())
+
+    /** 底栏模糊。权威 `app_settings.blurNavBar`（红线 31），默认开。 */
+    val blurNavBar: StateFlow<Boolean> = settings.observeBlurNavBar()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun onBlurNavBarChange(enabled: Boolean) {
+        viewModelScope.launch { settings.setBlurNavBar(enabled) }
+    }
 
     private fun readColorScheme(): AppColorSchemeMode {
         // 读不出 boot（全新安装 Missing、或者已经坏了 Corrupt）时跟随系统。

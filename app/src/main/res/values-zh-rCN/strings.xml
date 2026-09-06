@@ -159,8 +159,6 @@
     <!-- Appearance -->
     <string name="appearance_section_theme">主题</string>
     <string name="appearance_color_scheme">配色模式</string>
-    <string name="appearance_squircle">连续圆角</string>
-    <string name="appearance_squircle_summary">MIUIX 那种曲率连续的圆角，而不是普通圆角</string>
     <string name="appearance_blur">底栏模糊</string>
     <string name="appearance_blur_summary">好看，但要花一点 GPU。老机器上可以关掉。</string>
     <string name="appearance_section_language">语言</string>
@@ -191,8 +189,6 @@
     <string name="security_idle_lock_summary">探测或备份进行中会暂停计时，否则任务会把自己打断</string>
     <string name="security_lock_on_screen_off">屏幕关闭即锁定</string>
     <string name="security_section_leak">泄漏面</string>
-    <string name="security_secure_flag">展示明文时防截屏</string>
-    <string name="security_secure_flag_summary">关掉之后，截屏与录屏会把密钥和密码一起拍进去</string>
     <string name="security_clipboard_clear">复制后自动清除剪贴板</string>
     <string name="security_clipboard_clear_summary">密钥、账号、密码走同一条路径，没有例外</string>
     <string-array name="auto_lock_options">

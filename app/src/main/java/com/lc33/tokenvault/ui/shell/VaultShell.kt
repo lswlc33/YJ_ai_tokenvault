@@ -7,6 +7,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavHostController
@@ -19,6 +21,8 @@ import com.lc33.tokenvault.ui.miuix.AppNavBarItem
 import com.lc33.tokenvault.ui.miuix.AppScaffold
 import com.lc33.tokenvault.ui.miuix.AppSnackbarHost
 import com.lc33.tokenvault.ui.miuix.LocalAppSnackbar
+import com.lc33.tokenvault.ui.miuix.appLayerBackdrop
+import com.lc33.tokenvault.ui.miuix.rememberAppLayerBackdrop
 import com.lc33.tokenvault.ui.miuix.rememberAppSnackbarState
 
 /**
@@ -35,6 +39,15 @@ fun VaultShell() {
     val entry by nav.currentBackStackEntryAsState()
     val snackbar = rememberAppSnackbarState()
 
+    // 底栏模糊开关。权威 `app_settings.blurNavBar`，由 AppearanceViewModel 派生——
+    // 这里另取一个实例没关系，它派生自单例仓库（同 AppRoot 里配色模式的取法）。
+    val appearance: AppearanceViewModel = hiltViewModel()
+    val blurNavBar by appearance.blurNavBar.collectAsStateWithLifecycle()
+
+    // 底栏模糊：backdrop 捕获内容区，NavigationBar 挂 textureBlur。开关关掉时
+    // textureBlur(enabled=false) 直接跳过模糊、内容照常画，所以 backdrop 始终创建无妨。
+    val backdrop = rememberAppLayerBackdrop()
+
     val items = listOf(
         AppNavBarItem(label = stringResource(R.string.nav_dashboard), icon = AppIcon.Dashboard),
         AppNavBarItem(label = stringResource(R.string.nav_manage), icon = AppIcon.Manage),
@@ -49,6 +62,8 @@ fun VaultShell() {
                     items = items,
                     selectedIndex = selectedIndex,
                     onSelect = { index -> nav.navigateTopLevel(index) },
+                    blur = blurNavBar,
+                    blurBackdrop = backdrop,
                 )
             }
         },
@@ -59,7 +74,9 @@ fun VaultShell() {
             // 顶部与状态栏由页面自己的 Scaffold + TopAppBar 处理（计划.md §15.16）。
             VaultNavHost(
                 nav = nav,
-                modifier = Modifier.padding(bottom = padding.calculateBottomPadding()),
+                modifier = Modifier
+                    .padding(bottom = padding.calculateBottomPadding())
+                    .appLayerBackdrop(backdrop),
             )
         }
     }

@@ -34,7 +34,6 @@ import com.lc33.tokenvault.screens.manage.ManageScreen
 import com.lc33.tokenvault.screens.manage.ProviderDetailScreen
 import com.lc33.tokenvault.screens.manage.ProviderEditorScreen
 import com.lc33.tokenvault.screens.model.BackupStatus
-import com.lc33.tokenvault.screens.model.SettingsDraft
 import com.lc33.tokenvault.screens.probe.ProbeRunScreen
 import com.lc33.tokenvault.screens.settings.AboutScreen
 import com.lc33.tokenvault.screens.settings.AppearanceScreen
@@ -70,8 +69,6 @@ fun VaultNavHost(
     nav: NavHostController,
     modifier: Modifier = Modifier,
 ) {
-    // M0.8 的设置项由这里兜着：切页保留、杀进程丢弃。等 SettingsRepository（M3 后半）。
-    var settings by remember { mutableStateOf(SettingsDraft()) }
     val context = LocalContext.current
 
     fun openManage() {
@@ -175,11 +172,12 @@ fun VaultNavHost(
         composable<AppearanceRoute> {
             val vm: AppearanceViewModel = hiltViewModel()
             val colorScheme by vm.colorScheme.collectAsStateWithLifecycle()
+            val blurNavBar by vm.blurNavBar.collectAsStateWithLifecycle()
             AppearanceScreen(
-                draft = settings,
                 colorScheme = colorScheme,
-                onChange = { settings = it },
+                blurNavBar = blurNavBar,
                 onColorSchemeChange = vm::onColorSchemeChange,
+                onBlurNavBarChange = vm::onBlurNavBarChange,
                 onBack = back,
                 onOpenSystemLocaleSettings = { openAppLocaleSettings(context) },
             )
@@ -197,13 +195,11 @@ fun VaultNavHost(
             val promptCancel = stringResource(R.string.biometric_prompt_cancel)
             val activity = context as? FragmentActivity
             SecurityScreen(
-                draft = settings,
                 biometric = biometric,
                 autoLockIndex = autoLockIndex,
                 idleLock = idleLock,
                 lockOnScreenOff = lockOnScreenOff,
                 clipboardClearIndex = clipboardClearIndex,
-                onChange = { settings = it },
                 onBiometricChange = { wanted ->
                     activity?.let {
                         vm.onBiometricChange(wanted, it, enableTitle, enableSubtitle, promptCancel)

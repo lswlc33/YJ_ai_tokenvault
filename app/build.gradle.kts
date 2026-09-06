@@ -137,7 +137,6 @@ dependencies {
     implementation(libs.miuix.ui)
     implementation(libs.miuix.preference)
     implementation(libs.miuix.icons)
-    implementation(libs.miuix.squircle)
     implementation(libs.miuix.blur)
 
     // Compose（不引入 material3）

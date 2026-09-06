@@ -322,8 +322,9 @@ M3（接真数据）**管理那一支已完成**，2026-09-06。管理页、供�
 
 | 字段 | 声称语义 | 实际状态 |
 | --- | --- | --- |
-| `squircle` / `blurNavBar` | 外观（圆角 / 底栏模糊） | 无消费方（MIUIX 主题没接这两个开关） |
-| `secureFlag` | 展示密钥时挂 FLAG_SECURE | `RevealKeySheet` 不读；`SecureFlag.kt` 注释明说解锁/引导/恢复密钥页「始终挂、与开关无关」 |
+| ~~`squircle`~~ | ~~连续圆角~~ | ✅ **已移除（2026-09-06）**：`miuix-squircle` 依赖虽在、但 `AppCard` 从未用它，开关拨动无效果是撑谎；用户拍板「只做模糊、不做圆角」，开关与死依赖（`miuix-squircle`）一并移除 |
+| `blurNavBar` | 底栏模糊 | ✅ **已接真（2026-09-06）**：`app_settings.blurNavBar`（默认开），`VaultShell` 用 `rememberLayerBackdrop` + `layerBackdrop` 捕获内容区、`AppNavBar` 挂 `textureBlur(enabled=开关)`；blur API 封装在 `ui/miuix/` 的 `AppLayerBackdrop`/`appLayerBackdrop`，Shell 层不碰 MIUIX |
+| ~~`secureFlag`~~ | ~~展示密钥时挂 FLAG_SECURE~~ | ✅ **已移除（2026-09-06）**：文案承诺可关、代码却把整个详情页始终挂 `SecureScreen()`（比承诺更严格）；用户拍板「防截屏始终开」，开关移除，`ProviderDetailScreen` 的 `SecureScreen()` 保持不变 |
 | ~~`clipboardClearIndex`~~ | ~~剪贴板自动清除~~ | ✅ **已接真（2026-09-06）**：`app_settings.clipboardClearSeconds`（存秒数，`ClipboardClearPolicy`），`AndroidSecureClipboard` 订阅缓存、`copy` 时跟随设置，默认 60 秒 |
 | `defaultProbeReachability/Keys/Balance/Models` | 新建供应商时的默认值 | ✅ **已接真（2026-09-06）**：`app_settings.defaultProbe`（JSON 对象存四个布尔，键名即字段名），`ProviderEditorViewModel` 新建分支读 `observeDefaultProbeSettings().first()` 覆盖草稿初值，`ProbeSettingsViewModel` 派生四开关；读方向缺字段用默认补、坏数据落回全默认 |
 | ~~`sniffClientProfile`~~ | ~~客户端嗅探开关~~ | ✅ **已接真（2026-09-06）**：`app_settings.sniffClientProfile`，`ProbeEngine.trySniff` 前判断，默认开（读方向坏值容错到开，与空闲锁定相反） |
@@ -349,9 +350,11 @@ M3（接真数据）**管理那一支已完成**，2026-09-06。管理页、供�
 且不在剩余计划内的功能」的几项（`verboseHttpLog`/`autoProbeIndex`/`autoBackup`/
 `autoCheckUpdate`），它们拨动没效果是撑谎，已一并移除（2026-09-06）。
 
-**清单收敛后，真正剩下的假开关只有两组，都需用户拍板**：
-1. `squircle` / `blurNavBar`（外观，MIUIX 主题能力未接）——外观决策。
-2. `secureFlag`（防截屏能否关，文案承诺可关但代码始终挂）——安全决策。
+**清单最终收敛（2026-09-06）**：`SettingsDraft` 这个 M0.8 的内存兜底壳已经清空并删除——
+它最初的 13 个假开关全部处理完毕，要么接真迁到各自权威存储（`app_settings` 或 `boot`），
+要么承认不做而移除。最后三项由用户拍板：`blurNavBar` 接真（底栏模糊，`miuix-blur`），
+`squircle` 移除（连续圆角不做）、`secureFlag` 移除（防截屏始终开）。至此**没有任何
+"有 UI 无消费方"的假开关残留**。
 
 - **存的是秒数，不是下拉的下标**（`app_settings.autoLockSeconds`）。存下标的代价是
   「以后在中间插一档」会让所有已存的设置悄悄改变含义，而没有任何迁移能发现它。

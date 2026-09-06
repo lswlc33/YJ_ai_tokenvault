@@ -160,8 +160,6 @@
     <!-- Appearance -->
     <string name="appearance_section_theme">Theme</string>
     <string name="appearance_color_scheme">Color scheme</string>
-    <string name="appearance_squircle">Squircle corners</string>
-    <string name="appearance_squircle_summary">MIUIX-style continuous curvature instead of plain rounded corners</string>
     <string name="appearance_blur">Blur the navigation bar</string>
     <string name="appearance_blur_summary">Looks better, costs a little GPU time. Turn it off on older phones.</string>
     <string name="appearance_section_language">Language</string>
@@ -192,8 +190,6 @@
     <string name="security_idle_lock_summary">Paused while a probe or a backup is running, otherwise the job would interrupt itself</string>
     <string name="security_lock_on_screen_off">Lock when the screen turns off</string>
     <string name="security_section_leak">Leak surface</string>
-    <string name="security_secure_flag">Block screenshots of plaintext</string>
-    <string name="security_secure_flag_summary">Turning this off lets screenshots and screen recording capture keys and passwords</string>
     <string name="security_clipboard_clear">Clear the clipboard after copying</string>
     <string name="security_clipboard_clear_summary">Applies to keys, accounts and passwords alike</string>
     <string-array name="auto_lock_options">

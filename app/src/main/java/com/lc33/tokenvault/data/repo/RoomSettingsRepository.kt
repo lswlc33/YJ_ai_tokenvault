@@ -123,6 +123,14 @@ class RoomSettingsRepository @Inject constructor(
         dao.put(AppSettingEntity(key = KEY_DEFAULT_PROBE, value = encodeDefaultProbe(settings)))
     }
 
+    override fun observeBlurNavBar(): Flow<Boolean> = dao.observeAll()
+        .map { rows -> rows.firstOrNull { it.key == KEY_BLUR_NAV_BAR }?.value.toBooleanDefaultTrue() }
+        .distinctUntilChanged()
+
+    override suspend fun setBlurNavBar(enabled: Boolean) {
+        dao.put(AppSettingEntity(key = KEY_BLUR_NAV_BAR, value = enabled.toString()))
+    }
+
     private companion object {
         /**
          * 键名照 §7.4 里的写法。
@@ -149,6 +157,8 @@ class RoomSettingsRepository @Inject constructor(
         const val KEY_UPDATE_CHANNEL = "updateChannel"
 
         const val KEY_DEFAULT_PROBE = "defaultProbe"
+
+        const val KEY_BLUR_NAV_BAR = "blurNavBar"
 
         /**
          * 阈值 → JSON 对象（键 = 币种代码，值 = 金额）。

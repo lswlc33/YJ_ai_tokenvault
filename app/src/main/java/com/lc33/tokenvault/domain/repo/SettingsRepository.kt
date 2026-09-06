@@ -127,4 +127,14 @@ interface SettingsRepository {
     fun observeDefaultProbeSettings(): Flow<DefaultProbeSettings>
 
     suspend fun setDefaultProbeSettings(settings: DefaultProbeSettings)
+
+    /**
+     * 底栏模糊（§13.4 外观页）。开 = 底栏对下方内容做背景模糊（`miuix-blur`，要 GPU）；
+     * 关 = 底栏用实色背景。
+     *
+     * **没写过时发 true**（默认开，与既有的视觉一致）。
+     */
+    fun observeBlurNavBar(): Flow<Boolean>
+
+    suspend fun setBlurNavBar(enabled: Boolean)
 }

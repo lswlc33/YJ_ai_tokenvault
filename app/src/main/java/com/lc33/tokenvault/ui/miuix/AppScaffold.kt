@@ -7,6 +7,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.NavigationBar
@@ -17,6 +18,10 @@ import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.basic.rememberTopAppBarState
+import top.yukonga.miuix.kmp.blur.LayerBackdrop
+import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
+import top.yukonga.miuix.kmp.blur.textureBlur
 
 /**
  * MIUIX `Scaffold` 的包装。
@@ -87,14 +92,48 @@ data class AppNavBarItem(
     val icon: AppIcon,
 )
 
+/**
+ * 底栏背景模糊的 backdrop 句柄。
+ *
+ * 把 MIUIX 的 [LayerBackdrop] 包一层，让 `ui/shell/` 层不用 import MIUIX（AGENTS.md：
+ * 只有 `ui/miuix/` 能碰 MIUIX）。用法：`rememberAppLayerBackdrop()` 建一份，把
+ * [Modifier.appLayerBackdrop] 挂在要作为「模糊背景」的内容容器上，再把同一个句柄
+ * 传给 [AppNavBar] 的 `blurBackdrop`。
+ */
+@Stable
+class AppLayerBackdrop internal constructor(internal val backdrop: LayerBackdrop)
+
+@Composable
+fun rememberAppLayerBackdrop(): AppLayerBackdrop {
+    val backdrop = rememberLayerBackdrop()
+    return remember(backdrop) { AppLayerBackdrop(backdrop) }
+}
+
+/** 捕获此容器的内容到 [AppLayerBackdrop]，供底栏 [AppNavBar] 做背景模糊。 */
+fun Modifier.appLayerBackdrop(backdrop: AppLayerBackdrop): Modifier =
+    this.layerBackdrop(backdrop.backdrop)
+
 @Composable
 fun AppNavBar(
     items: List<AppNavBarItem>,
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    blur: Boolean = false,
+    blurBackdrop: AppLayerBackdrop? = null,
 ) {
-    NavigationBar(modifier = modifier) {
+    val blurred = modifier.then(
+        if (blur && blurBackdrop != null) {
+            Modifier.textureBlur(
+                backdrop = blurBackdrop.backdrop,
+                shape = RectangleShape,
+                enabled = true,
+            )
+        } else {
+            Modifier
+        },
+    )
+    NavigationBar(modifier = blurred) {
         items.forEachIndexed { index, item ->
             NavBarItem(
                 selected = index == selectedIndex,

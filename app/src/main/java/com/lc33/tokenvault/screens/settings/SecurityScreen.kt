@@ -6,7 +6,6 @@ import androidx.compose.ui.res.stringResource
 import com.lc33.tokenvault.R
 import com.lc33.tokenvault.domain.BiometricAvailability
 import com.lc33.tokenvault.screens.lock.biometricUnavailableRes
-import com.lc33.tokenvault.screens.model.SettingsDraft
 import com.lc33.tokenvault.ui.miuix.AppArrowRow
 import com.lc33.tokenvault.ui.miuix.AppDropdownRow
 import com.lc33.tokenvault.ui.miuix.AppSwitchRow
@@ -27,26 +26,27 @@ data class BiometricRowState(
 /**
  * 安全（计划.md §13.4、§7.3–7.5）。
  *
- * 三条措辞是刻意的，不要"优化"成更好听的说法：
+ * 两条措辞是刻意的，不要"优化"成更好听的说法：
  * - 生物识别那一行的副文案要说清它**只是解 DEK 的另一条路**，不是第二道锁。
- * - 「展示密钥时防截屏」默认开且允许关，但关掉的后果要写在副文案里。
  * - 恢复密钥那一行是"忘记 PIN"唯一的出路（§7.1），所以它不藏在折叠区里。
  *
- * **生物识别那一行、自动锁定那一行、前台空闲与屏幕关闭两行都不吃 [SettingsDraft]**：
- * 前两者的权威存储分别是 `boot.biometricEnabled`（红线 5）与 `app_settings.autoLockSeconds`
- * （红线 31），后两者是 `app_settings.idleLockSeconds` / `app_settings.lockOnScreenOff`，
- * 四者都由 `SecurityViewModel` 从各自的权威存储派生。剩下几项还在 [SettingsDraft] 上，
- * 那是它们各自的消费方写完之后的活，现在是**切页保留、杀进程丢弃**。
+ * **防截屏不在这里给开关**：展示密钥 / 恢复密钥 / 解锁 / 引导这些页**始终**挂
+ * `FLAG_SECURE`（`SecureScreen()`），这是密钥库的定位，不给「关掉后可截屏」的入口
+ * （曾有的 `secureFlag` 开关文案承诺可关、代码却始终挂，属撑谎，已移除，见 CLAUDE.md）。
+ *
+ * **生物识别那一行、自动锁定那一行、前台空闲与屏幕关闭两行、剪贴板清除都有各自的权威
+ * 存储**：`boot.biometricEnabled`（红线 5）、`app_settings.autoLockSeconds`、
+ * `app_settings.idleLockSeconds` / `app_settings.lockOnScreenOff`、
+ * `app_settings.clipboardClearSeconds`（红线 31），都由 `SecurityViewModel` 从各自的权威
+ * 存储派生。
  */
 @Composable
 fun SecurityScreen(
-    draft: SettingsDraft,
     biometric: BiometricRowState,
     autoLockIndex: Int,
     idleLock: Boolean,
     lockOnScreenOff: Boolean,
     clipboardClearIndex: Int,
-    onChange: (SettingsDraft) -> Unit,
     onBiometricChange: (Boolean) -> Unit,
     onAutoLockIndexChange: (Int) -> Unit,
     onIdleLockChange: (Boolean) -> Unit,
@@ -119,14 +119,6 @@ fun SecurityScreen(
         }
 
         item { SectionTitle(text = stringResource(R.string.security_section_leak)) }
-        item {
-            AppSwitchRow(
-                title = stringResource(R.string.security_secure_flag),
-                summary = stringResource(R.string.security_secure_flag_summary),
-                checked = draft.secureFlag,
-                onCheckedChange = { onChange(draft.copy(secureFlag = it)) },
-            )
-        }
         item {
             AppDropdownRow(
                 title = stringResource(R.string.security_clipboard_clear),

@@ -369,4 +369,33 @@ class SettingsRepositoryTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    // ---------------------------------------------------------------- 底栏模糊
+
+    @Test
+    fun `底栏模糊没写过时默认开`() = runTest {
+        repo.observeBlurNavBar().test {
+            assertEquals(true, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `底栏模糊关了能读回来`() = runTest {
+        repo.setBlurNavBar(false)
+        repo.observeBlurNavBar().test {
+            assertEquals(false, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `底栏模糊坏值落回开，不落回关`() = runTest {
+        // 与嗅探同向：默认开，坏数据不该让底栏突然变成实色（视觉回退）。
+        dao.put(com.lc33.tokenvault.data.entity.AppSettingEntity(key = "blurNavBar", value = "garbage"))
+        repo.observeBlurNavBar().test {
+            assertEquals(true, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 }
