@@ -533,9 +533,13 @@ companion 里的纯函数（`host:port` → `Proxy`），支持 IPv6 方括号 `
   走索引，结果写回 `models.catalogKey`；`CatalogNormalize` 归一化。`ModelCatalogDao` 有
   `findByKey` / `findByModelId` / `findByNormId` / `upsertAll` / `clear`。测试 9 个用例。
 - **没做**：WorkManager 拉取 `api.json`（4.46 MB）那一半——`TokenVaultApp` 注释明确
-  "现在还没有 Worker"，`DataScreen` 的"同步元数据"入口是空实现（`onSyncCatalog = {}`）。
-  这是 §4.4 的第 1–3 步（分块解析、每 200 行一个事务、TTL 7 天 + 仅 UNMETERED 自动更新）。
-  `model_catalog` 表已建、DAO 已建，差的是拉取与入库那一步。**可砍**：不影响核心四件事。
+  "现在还没有 Worker"。这是 §4.4 的第 1–3 步（分块解析、每 200 行一个事务、TTL 7 天 + 仅
+  UNMETERED 自动更新）。`model_catalog` 表已建、DAO 已建，差的是拉取与入库那一步。
+  **可砍**：不影响核心四件事。**`DataScreen` 的"同步元数据"入口已移除（2026-09-06）**——
+  它是一个带箭头的空实现行（`onSyncCatalog = {}`），点了没反应是撑谎；而且 `catalog/` 纯逻辑
+  与 `model_catalog` 表目前没有任何 UI 产生路径或消费方（红线 16），留着空入口比移除更糟。
+  `catalog/` 纯逻辑层、`model_catalog` 表/DAO **保留**，将来恢复 M8 时只需把入口加回并接
+  WorkManager 拉取。
 
 ### M9：备份与同步（2026-09-06，编解码 + 引擎 + SAF 接线）
 
