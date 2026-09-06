@@ -351,8 +351,11 @@ M3（接真数据）**管理那一支已完成**，2026-09-06。管理页、供�
   遮蔽串缓存（§9.2 同款拆法）。账号遮蔽串走独立 `accountMasks` StateFlow + 重算协程。
 - `UiMapping.kt` 加 `AiModel.toRow()`（`probeState → UiHealth`：NOT_FOUND→Error、NO_ACCESS /
   ERROR→Warn）与 `ProviderAccount.toRow(maskedUsername)`。
-- 模型行 / 账号行的 `onClick` 仍是空实现——那是 M5 模型管理（L3 试一下/预热，要钱）与 M6
-  账号管理（展开看密码、编辑、删除）的范围，本补丁只解决"数据可见"，不碰增删改。
+- 模型行 / 账号行**纯只读展示**（2026-09-06 补）：`ModelRow` / `AccountRow` 的 `onClick` 从必选
+  改为可选 `(() -> Unit)? = null`，调用点去掉空实现 `onClick = {}`；账号空态的「添加账号」按钮
+  也一并删除（`onClick = {}`，无实现链路）。理由：M5 模型管理（L3 试一下/预热，要钱）与 M6
+  账号管理（展开看密码、编辑、删除）都还没做，画一个"点了有按压反馈却什么都没发生"的可点行 /
+  按钮是撑谎——宁可纯展示，等增删改落地再接。本补丁只解决"数据可见"，不碰增删改。
 
 ### M4：文本导入（2026-09-06）
 
