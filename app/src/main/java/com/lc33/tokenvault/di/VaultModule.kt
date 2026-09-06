@@ -294,6 +294,7 @@ object VaultModule {
         audit: com.lc33.tokenvault.domain.repo.AuditLogRepository,
         settings: com.lc33.tokenvault.domain.repo.SettingsRepository,
         autoLocker: AutoLocker,
+        redactor: com.lc33.tokenvault.crypto.Redactor,
         @NowEpochMs now: () -> Long,
         @AppPlaceholders placeholders: Map<String, String>,
     ): ProbeEngine = ProbeEngine(
@@ -307,6 +308,7 @@ object VaultModule {
         audit = audit,
         settings = settings,
         autoLocker = autoLocker,
+        redactor = redactor,
         now = now,
         placeholders = placeholders,
     )

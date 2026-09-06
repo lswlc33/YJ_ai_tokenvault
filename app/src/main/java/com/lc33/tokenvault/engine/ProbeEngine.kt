@@ -1,5 +1,6 @@
 package com.lc33.tokenvault.engine
 
+import com.lc33.tokenvault.crypto.Redactor
 import com.lc33.tokenvault.crypto.VaultLockedException
 import com.lc33.tokenvault.crypto.zeroize
 import com.lc33.tokenvault.data.dao.ApiKeyDao
@@ -82,6 +83,7 @@ class ProbeEngine @Inject constructor(
     private val audit: AuditLogRepository,
     private val settings: SettingsRepository,
     private val autoLocker: AutoLocker,
+    private val redactor: Redactor,
     @NowEpochMs private val now: () -> Long,
     @AppPlaceholders private val placeholders: Map<String, String>,
 ) {
@@ -283,9 +285,17 @@ class ProbeEngine @Inject constructor(
                     ProbeOutcome.SKIPPED, ProbeOutcome.CANCELLED -> Unit
                     else -> fail++
                 }
-                persist(final, now())
-                _results.tryEmit(final)
-                _lastRound.value = _lastRound.value + final
+                // 红线 32：detail 是上游 message 前 200 字符，上游会回显 key 前缀 / 后缀 4 位 /
+                // base64 访问令牌，落库与推流前必须脱敏。在这里统一脱敏一次，`persist`、
+                // `_results`、`_lastRound` 三处拿到的都是脱敏后的同一份。
+                val scrubbed = if (final.detail != null) {
+                    final.copy(detail = redactor.scrub(final.detail))
+                } else {
+                    final
+                }
+                persist(scrubbed, now())
+                _results.tryEmit(scrubbed)
+                _lastRound.value = _lastRound.value + scrubbed
                 _progress.value = ProbeProgress(
                     runId = runId,
                     running = true,
