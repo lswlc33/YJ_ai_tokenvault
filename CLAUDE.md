@@ -331,13 +331,14 @@ M3（接真数据）**管理那一支已完成**，2026-09-06。管理页、供�
 | `autoProbeIndex` | 自动探测 | 待确认（自动路径零成本原则下可能本就无意义） |
 | `autoBackup` / `autoBackupWifiOnly` | 自动备份 | 无 `PeriodicWorkRequest` Worker（M9 周期备份可砍） |
 | `autoCheckUpdate` | 自动检查更新 | 无后台调度（更新页「立即检查」已接，自动检查是独立可选增强） |
+| ~~`updateChannelIndex`~~ | ~~更新渠道~~ | ✅ **已接真（2026-09-06）**：`app_settings.updateChannel`（存下标 0=正式/1=nightly），`UpdateViewModel` 派生、`checkNow()` 读权威存储，默认正式版 |
 
 这些不是「漏了的空实现」那种简单撑谎——每个都要先定「接真（消费方 + 权威存储）还是
 移除（承认不做）」，且多数涉及产品/安全决策（FLAG_SECURE 到底能不能关、新建默认值放哪）。
 所以**没有在 2026-09-06 那批「消除撑谎」里一并做**，留作一个独立的、需要逐项拍板的
-技术债清理项，而不是机械删几个开关。唯一的例外是 `sniffClientProfile`：它消费方
-（`trySniff`）已经写好、只差开关接线，且默认开与既有行为一致、不涉及产品决策，所以
-已单独接真（2026-09-06）。
+技术债清理项，而不是机械删几个开关。例外是「消费方已经写好、只差开关接线」的几项，
+它们不涉及产品决策、默认值与既有行为一致，已单独接真（2026-09-06）：
+`sniffClientProfile`、`clipboardClearIndex`、`updateChannelIndex`。
 
 - **存的是秒数，不是下拉的下标**（`app_settings.autoLockSeconds`）。存下标的代价是
   「以后在中间插一档」会让所有已存的设置悄悄改变含义，而没有任何迁移能发现它。

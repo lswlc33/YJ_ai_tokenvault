@@ -48,6 +48,5 @@ data class SettingsDraft(
     val autoBackupWifiOnly: Boolean = true,
 
     // 更新
-    val updateChannelIndex: Int = 0,
     val autoCheckUpdate: Boolean = false,
 )

@@ -104,4 +104,15 @@ interface SettingsRepository {
     fun observeClipboardClearSeconds(): Flow<Int>
 
     suspend fun setClipboardClearSeconds(seconds: Int)
+
+    /**
+     * 更新渠道（§13.4 更新页）。下标与 `update_channels` 数组对齐：0=正式版、1=nightly。
+     *
+     * 渠道只有固定两档、不随版本演进，所以这里存下标而非另造枚举（与
+     * [com.lc33.tokenvault.update.ReleaseMatcher.match] 的 `channel` 参数直接对应）。
+     * **没写过时发 0**（正式版，安全那一侧——nightly 是 pre-release）。
+     */
+    fun observeUpdateChannel(): Flow<Int>
+
+    suspend fun setUpdateChannel(channel: Int)
 }

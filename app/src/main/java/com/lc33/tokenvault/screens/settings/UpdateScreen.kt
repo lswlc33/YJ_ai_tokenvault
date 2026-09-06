@@ -41,14 +41,16 @@ fun UpdateScreen(
     onChange: (SettingsDraft) -> Unit,
     onBack: () -> Unit,
     updateState: UpdateViewModel.UiState,
-    onCheckNow: (Int) -> Unit,
+    updateChannel: Int,
+    onUpdateChannelChange: (Int) -> Unit,
+    onCheckNow: () -> Unit,
     onOpenDownload: (String) -> Unit,
 ) {
     SettingsSubPage(titleRes = R.string.update_title, onBack = onBack) {
         item {
             VersionCard(
                 updateState = updateState,
-                onCheckNow = { onCheckNow(draft.updateChannelIndex) },
+                onCheckNow = onCheckNow,
                 onOpenDownload = onOpenDownload,
             )
         }
@@ -59,8 +61,8 @@ fun UpdateScreen(
                 title = stringResource(R.string.update_channel),
                 summary = stringResource(R.string.update_channel_summary),
                 items = stringArrayResource(R.array.update_channels).toList(),
-                selectedIndex = draft.updateChannelIndex,
-                onSelect = { onChange(draft.copy(updateChannelIndex = it)) },
+                selectedIndex = updateChannel,
+                onSelect = onUpdateChannelChange,
             )
         }
         item {

@@ -284,4 +284,34 @@ class SettingsRepositoryTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    // ---------------------------------------------------------------- 更新渠道
+
+    @Test
+    fun `更新渠道没写过时默认正式版`() = runTest {
+        repo.observeUpdateChannel().test {
+            assertEquals(0, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `更新渠道选了 nightly 能读回来`() = runTest {
+        repo.setUpdateChannel(1)
+        repo.observeUpdateChannel().test {
+            assertEquals(1, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `更新渠道坏值落回正式版`() = runTest {
+        // 越界的下标（比如将来加了渠道又删掉）与坏字符串都落回 0=正式版——pre-release
+        // 不是默认那一侧。
+        dao.put(com.lc33.tokenvault.data.entity.AppSettingEntity(key = "updateChannel", value = "99"))
+        repo.observeUpdateChannel().test {
+            assertEquals(0, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 }

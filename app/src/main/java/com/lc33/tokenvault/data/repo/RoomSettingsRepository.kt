@@ -105,6 +105,14 @@ class RoomSettingsRepository @Inject constructor(
         dao.put(AppSettingEntity(key = KEY_CLIPBOARD_CLEAR, value = ClipboardClearPolicy.encode(seconds)))
     }
 
+    override fun observeUpdateChannel(): Flow<Int> = dao.observeAll()
+        .map { rows -> rows.firstOrNull { it.key == KEY_UPDATE_CHANNEL }?.value?.trim()?.toIntOrNull()?.takeIf { it in 0..1 } ?: 0 }
+        .distinctUntilChanged()
+
+    override suspend fun setUpdateChannel(channel: Int) {
+        dao.put(AppSettingEntity(key = KEY_UPDATE_CHANNEL, value = channel.toString()))
+    }
+
     private companion object {
         /**
          * 键名照 §7.4 里的写法。
@@ -127,6 +135,8 @@ class RoomSettingsRepository @Inject constructor(
         const val KEY_SNIFF_CLIENT_PROFILE = "sniffClientProfile"
 
         const val KEY_CLIPBOARD_CLEAR = "clipboardClearSeconds"
+
+        const val KEY_UPDATE_CHANNEL = "updateChannel"
 
         /**
          * 阈值 → JSON 对象（键 = 币种代码，值 = 金额）。
