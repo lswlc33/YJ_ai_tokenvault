@@ -117,9 +117,11 @@ jobs:
         run: |
           set -eu
           apk=$(find app/build/outputs/apk/nightly -name '*.apk' | head -n 1)
-          # nightly 是滚动更新的预发布，直接删旧建新，绕开已发布 asset 的
-          # 「immutable」删除限制（delete-asset/--clobber 对非草稿 release 会报 422）。
+          # nightly 是滚动更新的预发布，直接删旧建新。
+          # 注意：--target 只能指向分支名（master），不能指向裸 commit SHA——后者会让
+          # gh 尝试用该 SHA 隐式创建 tag，被仓库「ref 创建限制」拦截（报 422
+          # "Cannot create ref due to creations being restricted"）。
           gh release delete nightly --yes > /dev/null 2>&1 || true
           gh release create nightly "$apk" \
-            --prerelease --target "$GITHUB_SHA" --title nightly \
+            --prerelease --target master --title nightly \
             --notes "自动构建于 $GITHUB_SHA（$(date -u '+%Y-%m-%d %H:%M UTC')）"
