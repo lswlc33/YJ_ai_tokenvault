@@ -146,7 +146,9 @@ fun VaultNavHost(
             val vm: ProviderDetailViewModel = hiltViewModel()
             val detail by vm.state.collectAsStateWithLifecycle()
             val revealed by vm.revealed.collectAsStateWithLifecycle()
+            val revealedAccount by vm.revealedAccount.collectAsStateWithLifecycle()
             val clipboardLabel = stringResource(R.string.clipboard_label_api_key)
+            val accountClipboardLabel = stringResource(R.string.clipboard_label_account)
             // 这一家可能刚被删掉（详情页还在栈上）。detail 为 null 时什么都不画：
             // 画一个空壳会让用户以为数据丢了，而真相是这一行已经不存在
             detail?.let { state ->
@@ -154,6 +156,7 @@ fun VaultNavHost(
                     state = state,
                     revealedKeyId = revealed?.keyId,
                     revealedText = revealed?.text,
+                    revealedAccount = revealedAccount,
                     onBack = back,
                     onEdit = { nav.navigate(ProviderEditorRoute(route.id)) },
                     onAddKey = vm::onAddKey,
@@ -165,6 +168,9 @@ fun VaultNavHost(
                     onRefreshBalance = vm::refreshBalance,
                     onProbeProvider = vm::probeProvider,
                     onProbeKey = vm::probeKey,
+                    onRevealAccount = vm::onRevealAccount,
+                    onCopyRevealedAccount = { vm.onCopyRevealedAccount(accountClipboardLabel) },
+                    onCloseAccountReveal = vm::onCloseAccountSheet,
                 )
             }
         }

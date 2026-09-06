@@ -591,10 +591,16 @@
     <string name="detail_key_delete_title">删掉这把密钥？</string>
     <string name="detail_key_delete_body">删掉没法找回。如果它是默认那张，排在最前的启用密钥会自动顶上。</string>
     <string name="detail_key_reveal_hint">复制会放进剪贴板并在一段时间后自动清除。离开这一层就擦掉明文。</string>
+    <string name="detail_account_sheet_title">这条账号</string>
+    <string name="detail_account_username">账号</string>
+    <string name="detail_account_password">密码</string>
+    <string name="detail_account_none">（未记录）</string>
+    <string name="detail_account_reveal_hint">复制会把密码放进剪贴板并在一段时间后自动清除。离开这一层就擦掉明文。</string>
     <string name="detail_balance_refresh">查余额</string>
     <string name="detail_probe_provider">探测这一家</string>
     <string name="detail_probe_key">长按密钥可只探测这一张</string>
     <string name="clipboard_label_api_key">元记密钥</string>
+    <string name="clipboard_label_account">元记密码</string>
     <string name="editor_group_none">未分组</string>
     <string name="editor_profile_default">默认（不伪装）</string>
     <string name="groups_add_title">新建分组</string>

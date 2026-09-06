@@ -38,6 +38,7 @@ import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
 import com.lc33.tokenvault.ui.miuix.appTopBarScroll
 import com.lc33.tokenvault.ui.miuix.rememberAppTopBarScrollState
 import com.lc33.tokenvault.ui.miuix.rememberSecretTextFieldState
+import com.lc33.tokenvault.ui.shell.ProviderDetailViewModel
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
 import com.lc33.tokenvault.ui.theme.LocalStatusPalette
 
@@ -60,6 +61,7 @@ fun ProviderDetailScreen(
     state: ProviderDetailUiState,
     revealedKeyId: Long?,
     revealedText: String?,
+    revealedAccount: ProviderDetailViewModel.AccountRevealState?,
     onBack: () -> Unit,
     onEdit: () -> Unit,
     onAddKey: (String, CharArray) -> Unit,
@@ -71,6 +73,9 @@ fun ProviderDetailScreen(
     onRefreshBalance: () -> Unit,
     onProbeProvider: () -> Unit,
     onProbeKey: (Long) -> Unit,
+    onRevealAccount: (Long) -> Unit,
+    onCopyRevealedAccount: (String) -> Unit,
+    onCloseAccountReveal: () -> Unit,
 ) {
     SecureScreen()
     val scrollState = rememberAppTopBarScrollState()
@@ -163,7 +168,12 @@ fun ProviderDetailScreen(
             if (state.accounts.isEmpty()) {
                 item { AccountsEmptyHint() }
             } else {
-                items(state.accounts.size) { index -> AccountRow(state.accounts[index]) }
+                items(state.accounts.size) { index ->
+                    AccountRow(
+                        row = state.accounts[index],
+                        onClick = { onRevealAccount(state.accounts[index].id) },
+                    )
+                }
             }
 
             item { Spacer(modifier = Modifier.height(tokens.sectionSpacing)) }
@@ -192,6 +202,12 @@ fun ProviderDetailScreen(
             onCloseReveal()
         },
         onDismiss = onCloseReveal,
+    )
+
+    RevealAccountSheet(
+        account = revealedAccount,
+        onCopy = { label -> onCopyRevealedAccount(label) },
+        onDismiss = onCloseAccountReveal,
     )
 
     AppDialog(
@@ -331,6 +347,69 @@ private fun RevealKeySheet(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+    }
+}
+
+/**
+ * 展开一条平台账号（红线 21：账号密码与密钥同等对待，展开看明文、关闭回遮）。
+ *
+ * [account] 非空就显示这一层。用户名与密码两段都可能为 null（只记了一半，§11.2），
+ * 为 null 的那段显示「（未记录）」而不是空串。明文是擦不掉的 `String`，所以整页
+ * 挂了 `SecureScreen()`，关掉这一层时 ViewModel 擦掉背后那份 `CharArray`。
+ */
+@Composable
+private fun RevealAccountSheet(
+    account: ProviderDetailViewModel.AccountRevealState?,
+    onCopy: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val tokens = LocalAppTokens.current
+    AppBottomSheet(
+        show = account != null,
+        onDismissRequest = onDismiss,
+        title = account?.label?.takeIf { it.isNotBlank() }
+            ?: stringResource(R.string.detail_account_sheet_title),
+    ) {
+        if (account == null) return@AppBottomSheet
+
+        // 用户名
+        AppText(
+            text = stringResource(R.string.detail_account_username),
+            style = AppTextStyle.Footnote,
+            color = appSecondaryTextColor,
+        )
+        AppText(
+            text = account.username ?: stringResource(R.string.detail_account_none),
+            style = AppTextStyle.Body,
+            fontFamily = tokens.monoFontFamily,
+        )
+
+        // 密码
+        AppText(
+            text = stringResource(R.string.detail_account_password),
+            style = AppTextStyle.Footnote,
+            color = appSecondaryTextColor,
+            modifier = Modifier.padding(top = tokens.itemSpacing),
+        )
+        AppText(
+            text = account.password ?: stringResource(R.string.detail_account_none),
+            style = AppTextStyle.Body,
+            fontFamily = tokens.monoFontFamily,
+        )
+
+        AppText(
+            text = stringResource(R.string.detail_account_reveal_hint),
+            style = AppTextStyle.Footnote,
+            color = appSecondaryTextColor,
+            modifier = Modifier.padding(top = tokens.itemSpacing),
+        )
+        AppTextButton(
+            text = stringResource(R.string.secret_copy_cd),
+            onClick = { onCopy(account.label) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = tokens.itemSpacing),
+        )
     }
 }
 

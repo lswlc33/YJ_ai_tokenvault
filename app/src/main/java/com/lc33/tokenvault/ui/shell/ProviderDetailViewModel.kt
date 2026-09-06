@@ -86,6 +86,33 @@ class ProviderDetailViewModel @Inject constructor(
     /** 展开一把密钥时给界面的东西。 */
     data class RevealState(val keyId: Long, val text: String)
 
+    /**
+     * 当前展开的那条账号的明文（用户名 + 密码各一份 [CharArray]，红线 1）。与密钥的
+     * [revealedPlain] 分开存：账号展开的是两段明文，关掉都要擦。
+     */
+    private var revealedAccountPlain: AccountPlain? = null
+
+    private val _revealedAccount = MutableStateFlow<AccountRevealState?>(null)
+    val revealedAccount: StateFlow<AccountRevealState?> = _revealedAccount.asStateFlow()
+
+    /** 展开一条账号时给界面的东西。两段都可能为 null（只记了一半，§11.2）。 */
+    data class AccountRevealState(
+        val accountId: Long,
+        val label: String,
+        val username: String?,
+        val password: String?,
+    )
+
+    private data class AccountPlain(
+        val username: CharArray?,
+        val password: CharArray?,
+    ) {
+        fun zeroize() {
+            username?.zeroize()
+            password?.zeroize()
+        }
+    }
+
     // 内层：四路数据流（供应商 / 密钥 / 模型 / 账号）先合成一份，外层再接两份遮蔽串缓存。
     // 六个流超过 kotlinx.coroutines combine 的 5 流类型化上限，拆成两层（§9.2 同款拆法）。
     private data class DetailData(
@@ -234,6 +261,39 @@ class ProviderDetailViewModel @Inject constructor(
         _revealed.value = null
     }
 
+    /** 展开一条账号：用户名与密码各解一份（没有的那份给 null），拿到就展示，关掉就擦。 */
+    fun onRevealAccount(accountId: Long) {
+        viewModelScope.launch {
+            val plain = withContext(Dispatchers.Default) {
+                val username = runCatching { accounts.revealUsername(accountId) }.getOrNull()
+                val password = runCatching { accounts.revealPassword(accountId) }.getOrNull()
+                if (username == null && password == null) null
+                else AccountPlain(username, password)
+            } ?: return@launch
+            revealedAccountPlain?.zeroize()
+            revealedAccountPlain = plain
+            _revealedAccount.value = AccountRevealState(
+                accountId = accountId,
+                label = state.value?.accounts?.firstOrNull { it.id == accountId }?.label.orEmpty(),
+                username = plain.username?.let(::String),
+                password = plain.password?.let(::String),
+            )
+        }
+    }
+
+    /** 复制账号密码明文（复制的是密码那一份；没记密码就复制用户名）。 */
+    fun onCopyRevealedAccount(label: String) {
+        val plain = revealedAccountPlain ?: return
+        val secret = plain.password ?: plain.username ?: return
+        clipboard.copy(label, secret, SecureClipboard.DEFAULT_AUTO_CLEAR_SECONDS)
+    }
+
+    fun onCloseAccountSheet() {
+        revealedAccountPlain?.zeroize()
+        revealedAccountPlain = null
+        _revealedAccount.value = null
+    }
+
     /** 详情页「查余额」。结果经 observeProvider 那条订阅流回，不用手动刷新（红线 10）。 */
     fun refreshBalance() {
         viewModelScope.launch {
@@ -285,6 +345,7 @@ class ProviderDetailViewModel @Inject constructor(
 
     override fun onCleared() {
         revealedPlain?.zeroize()
+        revealedAccountPlain?.zeroize()
     }
 
     private companion object {

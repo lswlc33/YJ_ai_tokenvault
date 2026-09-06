@@ -396,6 +396,19 @@ M3（接真数据）**管理那一支已完成**，2026-09-06。管理页、供�
   账号管理（展开看密码、编辑、删除）都还没做，画一个"点了有按压反馈却什么都没发生"的可点行 /
   按钮是撑谎——宁可纯展示，等增删改落地再接。本补丁只解决"数据可见"，不碰增删改。
 
+**账号密码展开看明文已接真（2026-09-06 补）**：上面「纯只读展示」只解决了"数据可见"，但
+没解决红线 21 的「回遮」——密码连遮蔽串都不给、也没法展开看，账号密码永远取不出来，违背
+§2.3 承诺的「遮蔽显示、30 秒回遮」。补法：
+- `ProviderAccountRepository` 加 `revealPassword(id): CharArray?`（`RoomProviderAccountRepository`
+  实现，`cipher.open(passwordEnc, aadPassword(id))`，null = 没记密码）。
+- `ProviderDetailViewModel` 加 `revealedAccount` StateFlow（`AccountRevealState`，用户名 + 密码
+  两段都可能 null，§11.2「只记一半」合法）+ `onRevealAccount` / `onCopyRevealedAccount` /
+  `onCloseAccountSheet`；明文存 `AccountPlain(CharArray?, CharArray?)`，关掉与 `onCleared` 都擦。
+- `ProviderDetailScreen` 加 `RevealAccountSheet`（与 `RevealKeySheet` 同款底部弹层），账号行
+  `AccountRow` 接 `onClick` 展开；复制走密码那一份（没记密码退到用户名），贴纸标签
+  `clipboard_label_account`。
+- 编辑 / 删除仍没做（接口注释如实标注），这是「账号管理」完整功能，与「回遮」分开。
+
 ### M4：文本导入（2026-09-06）
 
 粘贴 → 预览 → 确认，整条路通了。解析器在 `importer/`（纯 Kotlin，测试 8 全绿），

@@ -88,6 +88,17 @@ class RoomProviderAccountRepository @Inject constructor(
         }
     }
 
+    override suspend fun revealPassword(id: Long): CharArray? {
+        val row = requireNotNull(dao.findById(id)) { "provider account $id not found" }
+        val enc = row.passwordEnc ?: return null
+        val plain = cipher.open(enc, aadPassword(id))
+        return try {
+            plain.utf8Chars()
+        } finally {
+            plain.zeroize()
+        }
+    }
+
     private fun aadUsername(id: Long) = FieldAad.of(TABLE, id, COLUMN_USERNAME)
     private fun aadPassword(id: Long) = FieldAad.of(TABLE, id, COLUMN_PASSWORD)
 

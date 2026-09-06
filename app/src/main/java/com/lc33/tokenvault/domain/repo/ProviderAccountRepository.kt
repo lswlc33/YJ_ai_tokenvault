@@ -9,10 +9,10 @@ import kotlinx.coroutines.flow.Flow
  * 明文只在 [add] 的参数上出现，且是 [CharArray]（红线 1）：用户名与密码与密钥同等对待，
  * 同一套加密、遮蔽、脱敏策略（红线 21）。
  *
- * 这一版只有 [add]、[observeByProvider] 与 [revealUsername]——它是在 M4 文本导入落地时才
- * 建立的，因为导入需要写账号。**编辑 / 删除 / 回遮密码（`revealPassword`）还没做**：账号
- * 目前是纯只读展示（CLAUDE.md「详情页模型与平台账号接真数据」小节），展开看密码、编辑、
- * 删除都未落地，将来补的时候再按红线 21 与密钥同等对待（30 秒回遮、剪贴板清除同一条路径）。
+ * 这一版有 [add]、[observeByProvider]、[revealUsername] 与 [revealPassword]——它在 M4 文本
+ * 导入落地时建立（导入需要写账号），回遮（展开看明文）在 2026-09-06 补齐以对齐红线 21。
+ * **编辑 / 删除还没做**：账号目前能看（遮蔽串 + 展开明文）、能复制，但改不了、删不掉，
+ * 将来补的时候再按红线 21 与密钥同等对待（30 秒回遮、剪贴板清除同一条路径）。
  */
 interface ProviderAccountRepository {
 
@@ -39,4 +39,10 @@ interface ProviderAccountRepository {
      * null 表示这条账号没记用户名（只记了密码）。
      */
     suspend fun revealUsername(id: Long): CharArray?
+
+    /**
+     * 解出这条账号的**密码明文**（展开看明文时现算，红线 21 的「回遮」）。返回的
+     * [CharArray] 归调用方擦。null 表示这条账号没记密码（只记了用户名）。
+     */
+    suspend fun revealPassword(id: Long): CharArray?
 }

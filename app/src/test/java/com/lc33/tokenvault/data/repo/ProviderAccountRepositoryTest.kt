@@ -145,4 +145,31 @@ class ProviderAccountRepositoryTest {
         )
         assertNull(repo.revealUsername(id))
     }
+
+    @Test
+    fun `revealPassword 解回明文`() = runTest {
+        val id = repo.add(
+            providerId = 1,
+            label = "x",
+            username = "company@example.com".toCharArray(),
+            password = "Secret123".toCharArray(),
+            loginUrl = null,
+        )
+        val plain = repo.revealPassword(id)
+        assertNotNull(plain)
+        assertEquals("Secret123", String(plain!!))
+        plain.zeroize()
+    }
+
+    @Test
+    fun `没记密码时 revealPassword 返回 null`() = runTest {
+        val id = repo.add(
+            providerId = 1,
+            label = "只记用户名",
+            username = "u@example.com".toCharArray(),
+            password = null,
+            loginUrl = null,
+        )
+        assertNull(repo.revealPassword(id))
+    }
 }
