@@ -57,7 +57,6 @@ private fun CardTitle(text: String) {
 internal fun BalanceCard(
     balance: BalanceSummary,
     nowMs: Long,
-    canRefresh: Boolean,
     onRefresh: () -> Unit,
     onOpenBreakdown: () -> Unit,
 ) {
@@ -83,14 +82,11 @@ internal fun BalanceCard(
                     )
                 }
             }
-            // 余额适配器在 M7。按钮画出来但点了什么都不发生，和假数字是同一类问题
-            if (canRefresh) {
-                AppIconButton(
-                    icon = AppIcon.Refresh,
-                    contentDescription = stringResource(R.string.refresh_cd),
-                    onClick = onRefresh,
-                )
-            }
+            AppIconButton(
+                icon = AppIcon.Refresh,
+                contentDescription = stringResource(R.string.refresh_cd),
+                onClick = onRefresh,
+            )
         }
         if (balance.perCurrency.isEmpty()) {
             AppText(
@@ -307,11 +303,7 @@ internal fun ProbeCard(
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing)) {
-            // 探测引擎在 M5。没实现之前不画这两个按钮：一个点下去什么都不会发生的
-            // “开始探测”比没有这个按钮更伤信任
-            if (state.canProbe) {
-                AppTextButton(text = stringResource(R.string.dashboard_probe_start), onClick = onStart)
-            }
+            AppTextButton(text = stringResource(R.string.dashboard_probe_start), onClick = onStart)
             if (lastRun != null) {
                 AppTextButton(
                     text = stringResource(R.string.dashboard_probe_detail),

@@ -117,16 +117,6 @@ data class DashboardUiState(
      * 同一屏里的两个“3 小时前”必须以同一个基准算。
      */
     val nowMs: Long = 0,
-
-    /**
-     * 两个“这个动作现在真的能做”开关。
-     *
-     * 它们存在的理由是：**一个点下去什么都不会发生的按钮也是在撑谎**。探测引擎在 M5、
-     * 余额适配器在 M7，在那之前“开始探测”与“刷新余额”没有实现，于是干脆不画。
-     * 各自那个里程碑做完就把自己那一个翻成 true，两个都为 true 之后这两个字段一起删掉。
-     */
-    val canProbe: Boolean = false,
-    val canRefreshBalance: Boolean = false,
 ) {
     val isEmpty: Boolean get() = counts.providers == 0
 }

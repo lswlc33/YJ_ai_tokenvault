@@ -77,7 +77,6 @@ fun DashboardScreen(
                 BalanceCard(
                     balance = state.balance,
                     nowMs = state.nowMs,
-                    canRefresh = state.canRefreshBalance,
                     onRefresh = onRefreshBalance,
                     onOpenBreakdown = onOpenBalanceBreakdown,
                 )

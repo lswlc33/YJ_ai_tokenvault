@@ -133,9 +133,6 @@ class DashboardViewModel @Inject constructor(
         // 备份在 M9。空的 BackupStatus 会让那张卡画成 warn 色的"还没有备份"，这是真话
         backup = BackupStatus(),
         nowMs = System.currentTimeMillis(),
-        // 探测引擎（M5）已接入，余额引擎（M7）也已接入——两个动作都能真做了。
-        canProbe = true,
-        canRefreshBalance = true,
     )
 
     /** 引擎的进度（runId/running/done/total/currentHost）→ 仪表盘卡的进度。 */
