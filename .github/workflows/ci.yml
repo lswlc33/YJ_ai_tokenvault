@@ -77,20 +77,12 @@ jobs:
           # 的 37.0.0 对齐），不是 `android-37`——后者在 sdkmanager 里根本不存在。
           packages: 'platforms;android-37.0 build-tools;37.0.0'
 
+      # 缓存 Gradle 依赖与构建缓存，跨 run 复用，后续构建能快一大截。
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: JVM 单测
-        run: ./gradlew :app:testDebugUnitTest --console=plain
-
-      - name: Lint
-        run: ./gradlew :app:lint --console=plain
-
-      # 只编译不运行：仪器测试要设备，值得在 CI 里守的是"它还编得过"。
-      - name: 仪器测试编译
-        run: ./gradlew :app:assembleDebugAndroidTest --console=plain
-
-      # 发布页上那个 APK。跑 R8，所以它同时是"release 配置能不能构建"的回归。
-      - name: 构建 nightly
+      # 关键优化：把单测 / lint / 仪器测试编译 / nightly 构建合并成一次 gradlew 调用。
+      # 配置阶段只跑一遍、Gradle daemon 全程复用，比拆成 4 次独立调用省 2-3 分钟冷启动。
+      - name: 单测 + Lint + 构建 nightly（一次 gradlew）
         env:
           VAULT_RELEASE_KEYSTORE_BASE64: ${{ secrets.VAULT_RELEASE_KEYSTORE_BASE64 }}
           VAULT_RELEASE_STORE_PASSWORD: ${{ secrets.VAULT_RELEASE_STORE_PASSWORD }}
@@ -106,7 +98,8 @@ jobs:
             echo "未配置签名 secret，产出未签名包（无法安装，仅用于验证 R8 配置）"
             echo "signed=false" >> "$GITHUB_ENV"
           fi
-          ./gradlew :app:assembleNightly --console=plain
+          # 仪器测试只编译不运行（要设备，守住"还编得过"即可）。
+          ./gradlew :app:testDebugUnitTest :app:lint :app:assembleDebugAndroidTest :app:assembleNightly --console=plain
           rm -f release.keystore
 
       - uses: actions/upload-artifact@v4
