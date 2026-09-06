@@ -117,13 +117,9 @@ jobs:
         run: |
           set -eu
           apk=$(find app/build/outputs/apk/nightly -name '*.apk' | head -n 1)
-          if gh release view nightly > /dev/null 2>&1; then
-            gh release delete-asset nightly "$(basename "$apk")" --yes || true
-            gh release upload nightly "$apk" --clobber
-            gh release edit nightly --target "$GITHUB_SHA" \
-              --notes "自动构建于 $GITHUB_SHA（$(date -u '+%Y-%m-%d %H:%M UTC')）"
-          else
-            gh release create nightly "$apk" \
-              --prerelease --target "$GITHUB_SHA" --title nightly \
-              --notes "自动构建于 $GITHUB_SHA（$(date -u '+%Y-%m-%d %H:%M UTC')）"
-          fi
+          # nightly 是滚动更新的预发布，直接删旧建新，绕开已发布 asset 的
+          # 「immutable」删除限制（delete-asset/--clobber 对非草稿 release 会报 422）。
+          gh release delete nightly --yes > /dev/null 2>&1 || true
+          gh release create nightly "$apk" \
+            --prerelease --target "$GITHUB_SHA" --title nightly \
+            --notes "自动构建于 $GITHUB_SHA（$(date -u '+%Y-%m-%d %H:%M UTC')）"
