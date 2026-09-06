@@ -603,7 +603,9 @@ companion 里的纯函数（`host:port` → `Proxy`），支持 IPv6 方括号 `
   就不写，红线 28）。恢复三种模式（覆盖/合并/仅新增，默认合并），整过程单事务。
 - **SAF 接线**（`VaultNavHost.SyncRouteContent`）：`CreateDocument` / `OpenDocument`、
   口令用 `AppSecretTextField`、用完即擦、恢复模式选择、事件走 Snackbar。
-  M4 留下的 SAF 导出入口也一并填掉。
+  这里的 SAF 是**加密备份**（§12.1）的导入导出；M4 遗留的「`TextExporter` 反向导出」
+  （§11.3 文本导出）是**可砍项**（`TextExporter` 注释自述），纯函数 + 单测已就绪、
+  SAF 保存入口未接——两件事别混为一谈。
 - **appSettings 白名单**显式含 `themeMode` / `localeTag`（权威存储在 boot，boot 不进备份）。
 - 测试：`BackupCodecTest` 7 + `BackupPayloadTest` + `BackupEngineTest` 5，含往返断言。
 
