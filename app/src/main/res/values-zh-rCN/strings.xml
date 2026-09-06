@@ -156,7 +156,6 @@
     <string name="detail_section_models">模型</string>
     <string name="detail_section_accounts">平台账号</string>
     <string name="detail_accounts_empty">这家还没有平台账号。只存在本地，永远不会替你填写。</string>
-    <string name="detail_add_account">添加平台账号</string>
     <!-- Appearance -->
     <string name="appearance_section_theme">主题</string>
     <string name="appearance_color_scheme">配色模式</string>

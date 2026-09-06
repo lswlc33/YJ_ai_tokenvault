@@ -249,7 +249,7 @@ internal fun KeyRow(
 }
 
 @Composable
-internal fun ModelRow(row: UiModelRow, onClick: () -> Unit) {
+internal fun ModelRow(row: UiModelRow, onClick: (() -> Unit)? = null) {
     val tokens = LocalAppTokens.current
     AppCard(modifier = rowModifier(), onClick = onClick) {
         Row(
@@ -295,7 +295,7 @@ internal fun ModelRow(row: UiModelRow, onClick: () -> Unit) {
 }
 
 @Composable
-internal fun AccountRow(row: UiAccountRow, onClick: () -> Unit) {
+internal fun AccountRow(row: UiAccountRow, onClick: (() -> Unit)? = null) {
     val tokens = LocalAppTokens.current
     AppCard(modifier = rowModifier(), onClick = onClick) {
         Row(

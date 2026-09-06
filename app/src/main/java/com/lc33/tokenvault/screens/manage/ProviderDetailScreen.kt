@@ -157,13 +157,13 @@ fun ProviderDetailScreen(
             }
 
             item { SectionTitle(text = stringResource(R.string.detail_section_models)) }
-            items(state.models.size) { index -> ModelRow(state.models[index], onClick = {}) }
+            items(state.models.size) { index -> ModelRow(state.models[index]) }
 
             item { SectionTitle(text = stringResource(R.string.detail_section_accounts)) }
             if (state.accounts.isEmpty()) {
                 item { AccountsEmptyHint() }
             } else {
-                items(state.accounts.size) { index -> AccountRow(state.accounts[index], onClick = {}) }
+                items(state.accounts.size) { index -> AccountRow(state.accounts[index]) }
             }
 
             item { Spacer(modifier = Modifier.height(tokens.sectionSpacing)) }
@@ -409,11 +409,6 @@ private fun AccountsEmptyHint() {
             text = stringResource(R.string.detail_accounts_empty),
             style = AppTextStyle.Secondary,
             color = appSecondaryTextColor,
-        )
-        AppTextButton(
-            text = stringResource(R.string.detail_add_account),
-            onClick = {},
-            modifier = Modifier.padding(top = tokens.itemSpacing),
         )
     }
 }

@@ -157,7 +157,6 @@
     <string name="detail_section_models">Models</string>
     <string name="detail_section_accounts">Platform accounts</string>
     <string name="detail_accounts_empty">No platform account for this provider. Stored locally, never filled in for you.</string>
-    <string name="detail_add_account">Add platform account</string>
     <!-- Appearance -->
     <string name="appearance_section_theme">Theme</string>
     <string name="appearance_color_scheme">Color scheme</string>
