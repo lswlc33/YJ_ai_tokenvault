@@ -125,6 +125,8 @@ jobs:
           # 所以先显式 git push 更新 tag，再对已存在的 tag 建 release。
           git push origin "$GITHUB_SHA:refs/tags/nightly-build" --force
           gh release delete nightly-build --yes > /dev/null 2>&1 || true
+          # tag 已显式创建，这里不传 --target（--target 只接受分支/SHA，不接受 tag 名，
+          # 传了会报 "Release.target_commitish is invalid"）。
           gh release create nightly-build "$apk" \
-            --prerelease --target nightly-build --title "nightly-build" \
+            --prerelease --title "nightly-build" \
             --notes "自动构建于 $GITHUB_SHA（$(date -u '+%Y-%m-%d %H:%M UTC')）"
