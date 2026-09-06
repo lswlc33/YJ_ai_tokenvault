@@ -558,6 +558,14 @@ companion 里的纯函数（`host:port` → `Proxy`），支持 IPv6 方括号 `
 **还没做**：第二台设备真机恢复验证（分组与客户端预设必须对得上，红线 27）；WebDAV 半边
 （可砍，`onWebDav = {}` 空实现）。
 
+**WebDAV 入口已移除（2026-09-06）**：`onWebDav = {}` 是「服务器/凭据/目录配置」的带箭头
+可点击行、点了没反应（撑谎）。WebDAV 四动词 + 周期备份 Worker 是可砍项、无消费方，与数据页
+「同步元数据」同款处理——移除整个 WebDAV 区块（SectionTitle + 箭头行），删 `onWebDav` 参数
+与 3 个 string（`sync_section_webdav`/`sync_webdav`/`sync_webdav_summary`）。将来实现 WebDAV
+时再加回。**注意**：「自动备份」开关（`autoBackup`/`autoBackupWifiOnly`）是 `SettingsDraft`
+的有意占位（M0.8 临时壳，等 M9 周期备份 Worker 落地接权威存储），本轮**未动**——它与 WebDAV
+箭头行的「漏了的空实现」性质不同。
+
 **「备份口令」设置项（2026-09-06 处理）**：本地导出/恢复的"单独设长口令"已通过口令对话框
 实现（每次导出/恢复弹框输口令，可输 PIN 也可输任意长口令，`sync_passphrase_hint` 提示"默认
 沿用 PIN"）。持久化独立口令只服务于 WebDAV 无人值守备份，WebDAV 可砍后它没有消费方。所以
