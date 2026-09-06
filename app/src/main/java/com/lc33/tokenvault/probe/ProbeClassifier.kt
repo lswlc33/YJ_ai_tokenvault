@@ -31,7 +31,7 @@ data class Classification(
     /** 模型级结果，仅 L3 的"模型不存在"时非空。 */
     val modelState: ModelProbeState? = null,
 
-    /** 上游原始 message 前 200 字符（脱敏后）。可能是空。 */
+    /** 上游原始 message 前 200 字符（**未脱敏**，调用方负责过 `Redactor`）。可能是空。 */
     val detail: String? = null,
 
     /** 需要本地化补充说明时非空。UI 据此在 detail 之外再拼一句。 */
