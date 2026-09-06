@@ -246,9 +246,6 @@
     </string-array>
 
     <!-- Data -->
-    <string name="data_section_catalog">Model metadata</string>
-    <string name="data_catalog">Sync from models.dev</string>
-    <string name="data_catalog_summary">Context window, output limit, pricing and modalities. Runs even while the vault is locked — it touches no secrets.</string>
     <string name="data_section_organize">Organise</string>
     <string name="data_groups_summary">Create, rename, reorder and delete the groups used on the manage page</string>
     <string name="data_section_log">Log</string>

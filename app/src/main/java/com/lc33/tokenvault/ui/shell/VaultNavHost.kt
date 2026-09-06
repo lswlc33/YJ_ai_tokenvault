@@ -312,7 +312,6 @@ fun VaultNavHost(
             val vm: DataViewModel = hiltViewModel()
             DataScreen(
                 onBack = back,
-                onSyncCatalog = {},
                 onOpenGroups = { nav.navigate(GroupsRoute) },
                 onOpenLog = { nav.navigate(LogRoute) },
                 onClearProbeResults = vm::clearProbeResults,

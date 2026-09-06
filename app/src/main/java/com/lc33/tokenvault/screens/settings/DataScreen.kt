@@ -21,7 +21,6 @@ import com.lc33.tokenvault.ui.miuix.SectionTitle
 @Composable
 fun DataScreen(
     onBack: () -> Unit,
-    onSyncCatalog: () -> Unit,
     onOpenGroups: () -> Unit,
     onOpenLog: () -> Unit,
     onClearProbeResults: () -> Unit,
@@ -32,15 +31,6 @@ fun DataScreen(
     var confirmLog by remember { mutableStateOf(false) }
 
     SettingsSubPage(titleRes = R.string.data_title, onBack = onBack) {
-        item { SectionTitle(text = stringResource(R.string.data_section_catalog)) }
-        item {
-            AppArrowRow(
-                title = stringResource(R.string.data_catalog),
-                summary = stringResource(R.string.data_catalog_summary),
-                onClick = onSyncCatalog,
-            )
-        }
-
         item { SectionTitle(text = stringResource(R.string.data_section_organize)) }
         item {
             AppArrowRow(

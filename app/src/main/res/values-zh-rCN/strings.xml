@@ -245,9 +245,6 @@
     </string-array>
 
     <!-- Data -->
-    <string name="data_section_catalog">模型元数据</string>
-    <string name="data_catalog">从 models.dev 同步</string>
-    <string name="data_catalog_summary">上下文窗口、输出上限、价格与模态。它不碰任何秘密，所以金库锁定时也能跑。</string>
     <string name="data_section_organize">组织</string>
     <string name="data_groups_summary">新建、重命名、排序、删除管理页用的那些分组</string>
     <string name="data_section_log">日志</string>
