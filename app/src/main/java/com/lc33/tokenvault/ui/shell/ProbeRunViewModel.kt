@@ -27,7 +27,7 @@ import kotlinx.coroutines.flow.stateIn
  */
 @HiltViewModel
 class ProbeRunViewModel @Inject constructor(
-    probeEngine: ProbeEngine,
+    private val probeEngine: ProbeEngine,
     probeRunDao: ProbeRunDao,
 ) : ViewModel() {
 
@@ -52,6 +52,11 @@ class ProbeRunViewModel @Inject constructor(
             nowMs = System.currentTimeMillis(),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), UiState())
+
+    /** 仅重试上一轮的失败项与未探测项（§13.4）。无失败项 / 已在跑 / 锁定态时是 no-op。 */
+    fun retryFailed() {
+        probeEngine.retryFailed()
+    }
 
     private companion object {
         const val STOP_TIMEOUT_MS = 5_000L

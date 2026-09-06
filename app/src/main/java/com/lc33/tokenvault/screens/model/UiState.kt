@@ -143,10 +143,32 @@ data class ManageUiState(
     val groups: List<UiGroup> = emptyList(),
     val selectedGroupId: Long? = null,
     val providers: List<UiProviderRow> = emptyList(),
+    /** 排序档。默认按手动排序（`sortOrder`），也就是用户拖出来的原始顺序。 */
+    val sort: ProviderSort = ProviderSort.MANUAL,
+    /** 多选模式选中的供应商 id 集合。空集合 = 非多选态。 */
+    val selection: Set<Long> = emptySet(),
 ) {
     /** 当前分组下要显示的行。分组是纯 UI 筛选，不需要回数据层重查。 */
     val visibleProviders: List<UiProviderRow>
         get() = if (selectedGroupId == null) providers else providers.filter { it.groupId == selectedGroupId }
+
+    /** 是否处于多选模式。 */
+    val selecting: Boolean get() = selection.isNotEmpty()
+}
+
+/** 管理页的排序档（§13.4「排序 chip」）。 */
+enum class ProviderSort {
+    /** 手动排序（`providers.sortOrder`），新建默认落在这里。 */
+    MANUAL,
+
+    /** 名称（拼音 / 字典序）。 */
+    NAME,
+
+    /** 余额（同一币种才有可比性，异币种的排在最后）。 */
+    BALANCE,
+
+    /** 最近探测（`lastProbeAt` 降序，从没测过的排最后）。 */
+    LAST_PROBE,
 }
 
 data class ProviderDetailUiState(

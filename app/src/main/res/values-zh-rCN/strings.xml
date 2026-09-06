@@ -133,6 +133,20 @@
     <string name="group_all">全部</string>
     <string name="manage_search_hint">搜索供应商</string>
     <string name="manage_groups_cd">分组管理</string>
+    <string name="manage_sort_manual">手动排序</string>
+    <string name="manage_sort_name">名称</string>
+    <string name="manage_sort_balance">余额</string>
+    <string name="manage_sort_last_probe">最近探测</string>
+    <string name="manage_selected_count">已选 %1$d 项</string>
+    <string name="manage_select_all">全选</string>
+    <string name="manage_deselect_all">取消全选</string>
+    <string name="manage_exit_selection_cd">退出多选</string>
+    <string name="manage_batch_change_group">改分组</string>
+    <string name="manage_batch_delete">删除</string>
+    <string name="manage_batch_delete_cd">删除选中</string>
+    <string name="manage_batch_delete_title">删除这些供应商？</string>
+    <string name="manage_batch_delete_desc">将删除 %1$d 家供应商，连同它们的密钥、模型和平台账号一并删除，且无法撤销。</string>
+    <string name="manage_batch_ungrouped">未分组</string>
     <string name="manage_empty_group_title">这个分组下没有供应商</string>
     <string name="manage_empty_group_desc">还没有供应商归到这个分组。可以在供应商编辑页里改分组，或者回到「全部」。</string>
     <string name="groups_title">分组</string>
@@ -200,6 +214,11 @@
     <string name="probe_section_cost">成本</string>
     <string name="probe_thresholds">余额低额阈值</string>
     <string name="probe_thresholds_summary">按币种配置。默认 USD 5、CNY 30。</string>
+    <string name="probe_thresholds_hint">余额低于这个数时在仪表盘标出。欠费（负数）无论阈值如何都会标出。</string>
+    <string name="probe_thresholds_usd">美元（USD）</string>
+    <string name="probe_thresholds_cny">人民币（CNY）</string>
+    <string name="probe_thresholds_invalid">请输入不小于 0 的数字</string>
+    <string name="probe_thresholds_save">保存</string>
     <string name="probe_section_rate">限流</string>
     <string name="probe_pacing">每 host 的间隔与请求预算</string>
     <string name="probe_pacing_summary">只限并发是不够的：挂 Cloudflare 的站在 2.4 秒内第 3 个请求就回了 error 1015。所以同一个 host 的相邻请求之间有最小间隔。</string>
@@ -208,11 +227,17 @@
     <string name="probe_sniff_summary">只在手动探测时做。一旦这个 host 撞了限流就立即停止。</string>
     <string name="probe_keywords">客户端拦截关键词</string>
     <string name="probe_keywords_summary">哪些响应文案意味着「客户端不对」而不是「密钥无效」。有的站用 401 回这件事。</string>
+    <string name="probe_keywords_hint">响应命中任意一个关键词时，判为「客户端被拦」而不是「密钥无效」。匹配时忽略大小写与空白，只看响应体前 2 KB。</string>
+    <string name="probe_keywords_add">添加关键词</string>
+    <string name="probe_keywords_empty">还没有关键词，将使用默认列表。</string>
+    <string name="probe_keywords_delete">删除</string>
     <string name="probe_section_network">网络</string>
     <string name="probe_verbose_log">详细 HTTP 日志</string>
     <string name="probe_verbose_log_summary">会记响应体，截断到 2 KB 并脱敏。默认关，因为上游的错误消息里经常回显密钥的一部分。</string>
     <string name="probe_proxy">手动 HTTP 代理</string>
     <string name="probe_proxy_summary">留空表示走系统代理</string>
+    <string name="probe_proxy_hint">主机与端口，例如 127.0.0.1:7890。探测、余额查询以及之后的更新检查都会走它。留空表示走系统代理。</string>
+    <string name="probe_proxy_invalid">请输入 host:port，例如 127.0.0.1:7890</string>
     <string-array name="auto_probe_options">
         <item>关闭</item>
         <item>解锁后</item>

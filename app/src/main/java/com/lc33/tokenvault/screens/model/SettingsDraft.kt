@@ -21,8 +21,6 @@ data class SettingsDraft(
     val blurNavBar: Boolean = true,
 
     // 安全
-    val idleLock: Boolean = false,
-    val lockOnScreenOff: Boolean = false,
     val secureFlag: Boolean = true,
     val clipboardClearIndex: Int = 1,
 

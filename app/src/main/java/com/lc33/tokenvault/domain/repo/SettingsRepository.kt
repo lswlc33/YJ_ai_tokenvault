@@ -33,4 +33,55 @@ interface SettingsRepository {
     fun observeAutoLockTimeout(): Flow<AutoLockTimeout>
 
     suspend fun setAutoLockTimeout(timeout: AutoLockTimeout)
+
+    /**
+     * 前台空闲锁定（§7.4）。默认关闭。
+     *
+     * 开 = 用户在解锁态下 [AutoLockPolicy.IDLE_LOCK_SECONDS] 秒不碰屏幕就锁。
+     * 关 = 只有切后台 / 屏幕关闭 / 手动这三条路能锁。
+     */
+    fun observeIdleLock(): Flow<Boolean>
+
+    suspend fun setIdleLock(enabled: Boolean)
+
+    /**
+     * 屏幕关闭即锁定（§7.4）。默认关闭。
+     *
+     * 开 = 收到 `ACTION_SCREEN_OFF` 就锁，不等任何时限。关 = 屏幕关闭走普通的后台锁定。
+     */
+    fun observeLockOnScreenOff(): Flow<Boolean>
+
+    suspend fun setLockOnScreenOff(enabled: Boolean)
+
+    /**
+     * 余额低额提醒阈值，按币种（§9.3、§13.4 探测设置页）。
+     *
+     * 键是 ISO 4217 币种代码，值是"低于这个数判 LOW"的金额。
+     * **没写过时发 [com.lc33.tokenvault.domain.model.BalanceSnapshot.DEFAULT_THRESHOLDS]**，
+     * 不是发空 map 让调用方自己填——否则"默认多少"就有几份定义（红线 15）。
+     */
+    fun observeBalanceThresholds(): Flow<Map<String, Double>>
+
+    suspend fun setBalanceThresholds(thresholds: Map<String, Double>)
+
+    /**
+     * 客户端拦截关键词（§8.2、§13.4 探测设置页）。
+     *
+     * 命中任一关键词的响应判 `CLIENT_BLOCKED` 而不是 `UNAUTHORIZED`/`FORBIDDEN`。
+     * **没写过时发 [com.lc33.tokenvault.probe.ProbeClassifier.DEFAULT_CLIENT_KEYWORDS]**。
+     *
+     * 关键词是匹配**上游协议内容**的，不是 UI 文案，所以不进 strings.xml（i18n-exempt）。
+     */
+    fun observeClientKeywords(): Flow<List<String>>
+
+    suspend fun setClientKeywords(keywords: List<String>)
+
+    /**
+     * 手动 HTTP 代理（§7.5、§13.4 探测设置页）。`host:port` 字符串，空 = 走系统代理。
+     *
+     * 代理对国内用户是刚需（访问 GitHub、被墙的中转站）。**没写过时发空串**（系统代理）。
+     */
+    fun observeProxy(): Flow<String>
+
+    suspend fun setProxy(hostPort: String)
 }

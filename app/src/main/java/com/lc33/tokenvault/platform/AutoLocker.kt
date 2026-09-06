@@ -50,6 +50,20 @@ class AutoLocker(
     @Volatile
     var timeout: AutoLockTimeout = AutoLockPolicy.DEFAULT
 
+    /**
+     * 前台空闲锁定开关（§7.4）。开 = [AutoLockPolicy.IDLE_LOCK_SECONDS] 秒不摸屏幕就锁。
+     *
+     * 与 [timeout] 一样写成可变字段：这个对象是应用级单例，而权威存储是 `app_settings` 里的
+     * 键，`TokenVaultApp` 订阅之后写进来。默认 false（安全侧默认值只影响「设置还没读上来」那
+     * 一小段，而这一项默认就该是关）。
+     */
+    @Volatile
+    var idleLock: Boolean = false
+
+    /** 屏幕关闭即锁定（§7.4）。开 = 收到 `ACTION_SCREEN_OFF` 当场锁。默认关。 */
+    @Volatile
+    var lockOnScreenOff: Boolean = false
+
     private val _locked = MutableSharedFlow<Unit>(
         extraBufferCapacity = 1,
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
@@ -60,6 +74,15 @@ class AutoLocker(
 
     private var backgroundedAtMs: Long? = null
     private var pending: Job? = null
+
+    /** 前台空闲计时的挂起任务。null = 没起（关着 / 锁着 / 暂停中）。 */
+    private var idleJob: Job? = null
+
+    /**
+     * 长任务（探测 / 备份）进行中挂起空闲计时的计数。用计数而不是布尔，因为探测与备份
+     * 可能重叠，任一方结束都不能把另一方的暂停一起解掉。
+     */
+    private var idlePausedCount = 0
 
     /**
      * 整个应用进了后台（进程级，Activity 之间切换不算）。
@@ -106,14 +129,77 @@ class AutoLocker(
     }
 
     /**
+     * 用户摸了一下屏幕 / 按了一个键（§7.4，`dispatchTouchEvent` 与按键事件里调）。
+     *
+     * 只在解锁态 + 开关开着时重起空闲计时。锁着时调是空操作——不该把一次锁屏前的
+     * 点击当成「解锁后的交互」。
+     */
+    fun onUserInteraction() {
+        synchronized(guard) {
+            if (!session.isUnlocked || !idleLock) return
+            startIdleTimerLocked()
+        }
+    }
+
+    /** 屏幕关闭（`ACTION_SCREEN_OFF`）。开开关就当场锁，否则什么都不做。 */
+    fun onScreenOff() {
+        synchronized(guard) {
+            if (!lockOnScreenOff) return
+            lockIfUnlocked()
+        }
+    }
+
+    /**
+     * 长任务（探测 / 备份）开始时挂起前台空闲计时（§7.4 / §8.5 / 红线 28）。
+     *
+     * 纯等待型任务不会触发 `dispatchTouchEvent`，所以「指望用户戳屏幕重置计时」在探测
+     * 一轮（预算 120 秒）期间必然自己锁掉自己。挂起之后计时清零，任务结束由
+     * [resumeIdleLock] 重新起算。
+     */
+    fun pauseIdleLock() {
+        synchronized(guard) {
+            idlePausedCount++
+            cancelIdleLocked()
+        }
+    }
+
+    /** 长任务结束，恢复前台空闲计时。没被挂起过时是幂等的空操作。 */
+    fun resumeIdleLock() {
+        synchronized(guard) {
+            if (idlePausedCount <= 0) return
+            idlePausedCount--
+            if (idlePausedCount == 0) startIdleTimerLocked()
+        }
+    }
+
+    /**
      * 已经锁着就什么都不做——**不重复发 [locked]**：界面收到它会把状态清成初始值，
      * 而用户此刻可能正在锁屏上输 PIN，清掉等于把他敲的几位吃掉。
      */
     private fun lockIfUnlocked() {
         if (!session.isUnlocked) return
+        cancelIdleLocked()
         session.lock()
         onLock()
         _locked.tryEmit(Unit)
+    }
+
+    /** 重起前台空闲计时。调用方须持有 [guard]。开关关着 / 锁着 / 暂停中都不起。 */
+    private fun startIdleTimerLocked() {
+        cancelIdleLocked()
+        if (!idleLock || !session.isUnlocked || idlePausedCount > 0) return
+        idleJob = scope.launch {
+            delay(AutoLockPolicy.IDLE_LOCK_SECONDS * MILLIS_PER_SECOND)
+            synchronized(guard) {
+                lockIfUnlocked()
+            }
+        }
+    }
+
+    /** 取消前台空闲计时。调用方须持有 [guard]。 */
+    private fun cancelIdleLocked() {
+        idleJob?.cancel()
+        idleJob = null
     }
 
     companion object {

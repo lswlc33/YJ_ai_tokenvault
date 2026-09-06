@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -19,8 +20,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.lc33.tokenvault.R
 import com.lc33.tokenvault.screens.model.ManageUiState
+import com.lc33.tokenvault.screens.model.ProviderSort
 import com.lc33.tokenvault.ui.common.EmptyState
 import com.lc33.tokenvault.ui.miuix.AppBottomSheet
+import com.lc33.tokenvault.ui.miuix.AppDialog
 import com.lc33.tokenvault.ui.miuix.AppFab
 import com.lc33.tokenvault.ui.miuix.AppFilterChip
 import com.lc33.tokenvault.ui.miuix.AppIcon
@@ -55,32 +58,96 @@ fun ManageScreen(
     onOpenGroups: () -> Unit,
     onNewProvider: () -> Unit,
     onImport: () -> Unit,
+    onQueryChange: (String) -> Unit,
+    onSort: (ProviderSort) -> Unit,
+    onEnterSelection: (Long) -> Unit,
+    onToggleSelect: (Long) -> Unit,
+    onSelectAll: (List<Long>) -> Unit,
+    onClearSelection: () -> Unit,
+    onBatchDelete: (Set<Long>) -> Unit,
+    onBatchSetGroup: (Set<Long>, Long?) -> Unit,
 ) {
     val scrollState = rememberAppTopBarScrollState()
     val tokens = LocalAppTokens.current
     val query = rememberAppTextFieldState()
     var showCreateSheet by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showGroupPicker by remember { mutableStateOf(false) }
+
+    // 搜索串由状态驱动：state.query 与输入框 state 双向同步（转屏 / 重组不丢）。
+    val queryState = state.query
+    LaunchedEffect(queryState) {
+        if (query.text != queryState) query.setText(queryState)
+    }
+
+    val selecting = state.selecting
+    val visibleRows = state.visibleProviders
+    val selectedCount = state.selection.size
 
     AppScaffold(
         topBar = {
             AppTopBar(
-                title = stringResource(R.string.manage_title),
+                title = if (selecting) {
+                    stringResource(R.string.manage_selected_count, selectedCount)
+                } else {
+                    stringResource(R.string.manage_title)
+                },
                 scrollState = scrollState,
+                navigationIcon = if (selecting) {
+                    {
+                        AppIconButton(
+                            icon = AppIcon.Back,
+                            contentDescription = stringResource(R.string.manage_exit_selection_cd),
+                            onClick = onClearSelection,
+                        )
+                    }
+                } else {
+                    {}
+                },
                 actions = {
-                    AppIconButton(
-                        icon = AppIcon.Tune,
-                        contentDescription = stringResource(R.string.manage_groups_cd),
-                        onClick = onOpenGroups,
-                    )
+                    if (selecting) {
+                        AppTextButton(
+                            text = stringResource(
+                                if (selectedCount == visibleRows.size && visibleRows.isNotEmpty()) {
+                                    R.string.manage_deselect_all
+                                } else {
+                                    R.string.manage_select_all
+                                },
+                            ),
+                            onClick = {
+                                if (selectedCount == visibleRows.size && visibleRows.isNotEmpty()) {
+                                    onClearSelection()
+                                } else {
+                                    onSelectAll(visibleRows.map { it.id })
+                                }
+                            },
+                        )
+                    } else {
+                        AppIconButton(
+                            icon = AppIcon.Tune,
+                            contentDescription = stringResource(R.string.manage_groups_cd),
+                            onClick = onOpenGroups,
+                        )
+                    }
                 },
             )
         },
-        floatingActionButton = {
-            AppFab(
-                icon = AppIcon.Add,
-                contentDescription = stringResource(R.string.add_cd),
-                onClick = { showCreateSheet = true },
-            )
+        floatingActionButton = if (selecting) {
+            {
+                AppFab(
+                    icon = AppIcon.Delete,
+                    contentDescription = stringResource(R.string.manage_batch_delete_cd),
+                    onClick = { showDeleteConfirm = true },
+                )
+            }
+        } else {
+            {
+                AppFab(
+                    icon = AppIcon.Add,
+                    contentDescription = stringResource(R.string.add_cd),
+                    onClick = { showCreateSheet = true },
+                )
+            }
         },
     ) { padding ->
         Column(
@@ -101,13 +168,21 @@ fun ManageScreen(
                 state = state,
                 onSelectGroup = onSelectGroup,
             )
+            SortRow(
+                sort = state.sort,
+                onSort = onSort,
+            )
             ProviderList(
                 state = state,
                 scrollState = scrollState,
+                selecting = selecting,
                 onOpenProvider = onOpenProvider,
+                onEnterSelection = onEnterSelection,
+                onToggleSelect = onToggleSelect,
                 onSelectGroup = onSelectGroup,
                 onNewProvider = onNewProvider,
                 onImport = onImport,
+                onBatchSetGroup = { showGroupPicker = true },
             )
         }
     }
@@ -132,6 +207,34 @@ fun ManageScreen(
                 onImport()
             },
             modifier = Modifier.fillMaxWidth(),
+        )
+    }
+
+    // 批量删除二次确认。文案里写清连带删掉什么（§13.4）。
+    AppDialog(
+        show = showDeleteConfirm,
+        onDismissRequest = { showDeleteConfirm = false },
+        title = stringResource(R.string.manage_batch_delete_title),
+        summary = stringResource(R.string.manage_batch_delete_desc, selectedCount),
+        confirmText = stringResource(R.string.manage_batch_delete),
+        onConfirm = {
+            showDeleteConfirm = false
+            onBatchDelete(state.selection)
+        },
+    )
+
+    // 批量改分组：列出分组（含「未分组」），点一个就落。
+    AppBottomSheet(
+        show = showGroupPicker,
+        onDismissRequest = { showGroupPicker = false },
+        title = stringResource(R.string.manage_batch_change_group),
+    ) {
+        GroupPickerSheet(
+            groups = state.groups,
+            onPick = { groupId ->
+                showGroupPicker = false
+                onBatchSetGroup(state.selection, groupId)
+            },
         )
     }
 }
@@ -162,14 +265,77 @@ private fun GroupFilterRow(
     }
 }
 
+/** 排序 chip（名称 / 余额 / 最近探测 / 手动）。 */
+@Composable
+private fun SortRow(
+    sort: ProviderSort,
+    onSort: (ProviderSort) -> Unit,
+) {
+    val tokens = LocalAppTokens.current
+    val labels = mapOf(
+        ProviderSort.MANUAL to stringResource(R.string.manage_sort_manual),
+        ProviderSort.NAME to stringResource(R.string.manage_sort_name),
+        ProviderSort.BALANCE to stringResource(R.string.manage_sort_balance),
+        ProviderSort.LAST_PROBE to stringResource(R.string.manage_sort_last_probe),
+    )
+    val order = listOf(
+        ProviderSort.MANUAL,
+        ProviderSort.NAME,
+        ProviderSort.BALANCE,
+        ProviderSort.LAST_PROBE,
+    )
+    LazyRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = tokens.itemSpacing),
+        contentPadding = PaddingValues(horizontal = tokens.screenPadding),
+        horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
+    ) {
+        items(order.size) { index ->
+            val key = order[index]
+            AppFilterChip(
+                text = labels.getValue(key),
+                selected = sort == key,
+                onClick = { onSort(key) },
+            )
+        }
+    }
+}
+
+/** 批量改分组面板：第一项「未分组」，其余是自定义分组。 */
+@Composable
+private fun GroupPickerSheet(
+    groups: List<com.lc33.tokenvault.screens.model.UiGroup>,
+    onPick: (Long?) -> Unit,
+) {
+    // 第一枚是「全部」伪分组（id == null），这里要的是「未分组」（groupId = null），
+    // 语义不同：把它过滤掉，另放一枚「未分组」在最前。
+    AppTextButton(
+        text = stringResource(R.string.manage_batch_ungrouped),
+        onClick = { onPick(null) },
+        modifier = Modifier.fillMaxWidth(),
+    )
+    groups.filter { it.id != null }.forEach { group ->
+        AppTextButton(
+            text = group.name,
+            onClick = { onPick(group.id) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
 @Composable
 private fun ProviderList(
     state: ManageUiState,
     scrollState: com.lc33.tokenvault.ui.miuix.AppTopBarScrollState,
+    selecting: Boolean,
     onOpenProvider: (Long) -> Unit,
+    onEnterSelection: (Long) -> Unit,
+    onToggleSelect: (Long) -> Unit,
     onSelectGroup: (Long?) -> Unit,
     onNewProvider: () -> Unit,
     onImport: () -> Unit,
+    onBatchSetGroup: () -> Unit,
 ) {
     val tokens = LocalAppTokens.current
     val rows = state.visibleProviders
@@ -202,7 +368,26 @@ private fun ProviderList(
         verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
     ) {
         items(rows.size) { index ->
-            ProviderRow(rows[index], onClick = onOpenProvider)
+            val row = rows[index]
+            ProviderRow(
+                row = row,
+                selecting = selecting,
+                selected = row.id in state.selection,
+                onClick = { id -> if (selecting) onToggleSelect(id) else onOpenProvider(id) },
+                onLongPress = onEnterSelection,
+            )
+        }
+        if (selecting) {
+            // 多选态底部操作条：改分组（删除走 FAB）。
+            item {
+                AppTextButton(
+                    text = stringResource(R.string.manage_batch_change_group),
+                    onClick = onBatchSetGroup,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = tokens.screenPadding),
+                )
+            }
         }
         item { Spacer(modifier = Modifier.height(tokens.fabListBottomSpace)) }
     }

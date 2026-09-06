@@ -66,6 +66,18 @@ data object RecoveryKeyRoute
 @Serializable
 data object ProbeSettingsRoute
 
+/** 余额低额阈值编辑（探测设置页的二级页）。 */
+@Serializable
+data object BalanceThresholdsRoute
+
+/** 客户端拦截关键词编辑（探测设置页的二级页）。 */
+@Serializable
+data object ClientKeywordsRoute
+
+/** 手动 HTTP 代理编辑（探测设置页的二级页）。 */
+@Serializable
+data object ProxyRoute
+
 @Serializable
 data object ProfileListRoute
 

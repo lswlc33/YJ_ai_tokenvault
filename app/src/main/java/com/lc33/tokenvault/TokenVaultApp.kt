@@ -55,6 +55,14 @@ class TokenVaultApp : Application() {
         appScope.launch {
             settings.observeAutoLockTimeout().collect { autoLocker.timeout = it }
         }
+        // 前台空闲锁定与屏幕关闭即锁定：同样是进程级订阅，因为 AutoLocker 是应用单例，
+        // 而且这两项得在用户还没打开设置页时就生效（§7.4）。
+        appScope.launch {
+            settings.observeIdleLock().collect { autoLocker.idleLock = it }
+        }
+        appScope.launch {
+            settings.observeLockOnScreenOff().collect { autoLocker.lockOnScreenOff = it }
+        }
         // 内置客户端预设（§8.2）。幂等，只碰公开数据，锁定态也能跑；启动时种一次，
         // 既覆盖新装用户，也随版本刷新"没改过"的条目。
         appScope.launch { profileSeeder.seed() }

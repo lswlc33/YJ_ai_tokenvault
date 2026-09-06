@@ -159,12 +159,15 @@ object VaultModule {
     fun provideAutoLocker(
         session: VaultSession,
         @AppScope scope: CoroutineScope,
-        probeEngine: ProbeEngine,
+        probeEngine: javax.inject.Provider<ProbeEngine>,
     ): AutoLocker = AutoLocker(
         session = session,
         scope = scope,
         elapsedRealtimeMs = SystemClock::elapsedRealtime,
-        onLock = probeEngine::onLock,
+        // 惰性取引擎而不是构造参数直接注入：AutoLocker 与 ProbeEngine 互相引用（引擎要
+        // pause/resume 空闲锁定，锁定时要停引擎），直接注入会成 Hilt 构造环。onLock 只在
+        // 运行时被调，所以这里延后到回调里再 get() 是安全的。
+        onLock = { probeEngine.get().onLock() },
     )
 
     @Provides
@@ -189,6 +192,11 @@ object VaultModule {
             .addCallback(
                 object : androidx.room.RoomDatabase.Callback() {
                     override fun onOpen(db: SupportSQLiteDatabase) {
+                        // 外键约束必须显式开（SQLite 默认 OFF）。不开的话，实体上写的
+                        // ForeignKey.CASCADE（删供应商连带删 Key/账号/模型）与 SET_NULL
+                        // （删分组置空 provider.groupId）全是摆设——删掉父行后子表里会留下
+                        // 孤儿行，而编译与单测都发现不了。
+                        db.execSQL("PRAGMA foreign_keys = ON")
                         // Room 的 @Index 表达不了部分唯一索引，所以 idx_keys_default 手写。
                         // 放在 onOpen 且 IF NOT EXISTS：万一某个版本漏了它，升级上来会自动补。
                         VaultDatabase.applyHandWrittenSchema(db)
@@ -231,13 +239,22 @@ object VaultModule {
     fun provideHostGate(): HostGate = HostGate()
 
     /**
-     * 探测引擎用的单个 OkHttpClient（§8.1）。超时与并发上限都在 [OkHttpEngine.buildDefaultClient]
-     * 里，这一层只负责单例化。
+     * 手动 HTTP 代理的运行时提供者（§7.5）。订阅设置、缓存解析后的 [java.net.Proxy]，
+     * [OkHttpEngine] 每次请求时读一次，改了就立刻生效。
      */
     @Provides
     @Singleton
-    fun provideOkHttpEngine(hostGate: HostGate): OkHttpEngine =
-        OkHttpEngine(OkHttpEngine.buildDefaultClient(), hostGate)
+    fun provideProxyProvider(settings: com.lc33.tokenvault.domain.repo.SettingsRepository): com.lc33.tokenvault.net.ProxyProvider =
+        com.lc33.tokenvault.net.ProxyProvider(settings)
+
+    /**
+     * 探测引擎用的单个 OkHttpClient（§8.1）。超时与并发上限都在 [OkHttpEngine.buildDefaultClient]
+     * 里，这一层只负责单例化。手动代理由 [ProxyProvider] 在每次请求时动态套用。
+     */
+    @Provides
+    @Singleton
+    fun provideOkHttpEngine(hostGate: HostGate, proxy: com.lc33.tokenvault.net.ProxyProvider): OkHttpEngine =
+        OkHttpEngine(OkHttpEngine.buildDefaultClient(), hostGate, proxy::current)
 
     /**
      * 探测引擎宿主（§8.5）。**`@Singleton` 不是 ViewModel**，所以绑定在这里而不是让
@@ -259,6 +276,8 @@ object VaultModule {
         session: VaultSession,
         engine: OkHttpEngine,
         audit: com.lc33.tokenvault.domain.repo.AuditLogRepository,
+        settings: com.lc33.tokenvault.domain.repo.SettingsRepository,
+        autoLocker: AutoLocker,
         @NowEpochMs now: () -> Long,
         @AppPlaceholders placeholders: Map<String, String>,
     ): ProbeEngine = ProbeEngine(
@@ -270,6 +289,8 @@ object VaultModule {
         session = session,
         engine = engine,
         audit = audit,
+        settings = settings,
+        autoLocker = autoLocker,
         now = now,
         placeholders = placeholders,
     )

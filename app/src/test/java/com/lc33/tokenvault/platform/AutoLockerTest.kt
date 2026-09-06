@@ -168,4 +168,130 @@ class AutoLockerTest {
         // 旧实现把默认的 60 秒写死在字段里，于是这里会还差 30 秒
         assertFalse("30 秒到点必须已经锁了", session.isUnlocked)
     }
+
+    // ------------------------------------------------------------------ 前台空闲锁定
+
+    @Test
+    fun `前台空闲默认关，不摸屏幕也不会锁`() = runTest {
+        val locker = AutoLocker(session, backgroundScope) { elapsed }
+        // 默认 idleLock = false：不调用 onUserInteraction 也不该有任何计时器
+        advanceTimeBy(AutoLockPolicy.IDLE_LOCK_SECONDS * 1000L * 10)
+        runCurrent()
+        assertTrue("空闲锁定默认关闭，不摸屏幕也不该锁", session.isUnlocked)
+    }
+
+    @Test
+    fun `开着空闲锁定，到点不摸就锁`() = runTest {
+        val locker = AutoLocker(session, backgroundScope) { elapsed }
+        locker.idleLock = true
+
+        locker.onUserInteraction()
+        advanceTimeBy(AutoLockPolicy.IDLE_LOCK_SECONDS * 1000L - 1_000)
+        runCurrent()
+        assertTrue("还差一秒不许锁", session.isUnlocked)
+
+        advanceTimeBy(2_000)
+        runCurrent()
+        assertFalse("空闲到点必须锁", session.isUnlocked)
+    }
+
+    @Test
+    fun `摸一下屏幕就重置空闲计时`() = runTest {
+        val locker = AutoLocker(session, backgroundScope) { elapsed }
+        locker.idleLock = true
+        locker.onUserInteraction()
+
+        // 快到点时又摸了一下，计时应该从头起算
+        advanceTimeBy(AutoLockPolicy.IDLE_LOCK_SECONDS * 1000L - 5_000)
+        runCurrent()
+        locker.onUserInteraction()
+
+        advanceTimeBy(AutoLockPolicy.IDLE_LOCK_SECONDS * 1000L - 5_000)
+        runCurrent()
+        // 从第二次交互算起还没到 30 秒
+        assertTrue("重置后不该锁", session.isUnlocked)
+
+        advanceTimeBy(10_000)
+        runCurrent()
+        assertFalse("第二次交互到点后必须锁", session.isUnlocked)
+    }
+
+    @Test
+    fun `锁定态不摸屏幕也不起空闲计时`() = runTest {
+        session.lock()
+        val locker = AutoLocker(session, backgroundScope) { elapsed }
+        locker.idleLock = true
+        val events = mutableListOf<Unit>()
+        backgroundScope.launch { locker.locked.collect { events += it } }
+        runCurrent()
+
+        locker.onUserInteraction()
+        advanceTimeBy(AutoLockPolicy.IDLE_LOCK_SECONDS * 1000L * 2)
+        runCurrent()
+        assertEquals(0, events.size)
+    }
+
+    @Test
+    fun `长任务暂停空闲计时，结束恢复`() = runTest {
+        val locker = AutoLocker(session, backgroundScope) { elapsed }
+        locker.idleLock = true
+        locker.onUserInteraction()
+
+        locker.pauseIdleLock()
+        // 挂起期间时间远超时限，也不该锁（探测 / 备份进行中）
+        advanceTimeBy(AutoLockPolicy.IDLE_LOCK_SECONDS * 1000L * 10)
+        runCurrent()
+        assertTrue("挂起期间不许锁", session.isUnlocked)
+
+        locker.resumeIdleLock()
+        advanceTimeBy(AutoLockPolicy.IDLE_LOCK_SECONDS * 1000L - 1_000)
+        runCurrent()
+        assertTrue("恢复后从头起算，还差一秒", session.isUnlocked)
+
+        advanceTimeBy(2_000)
+        runCurrent()
+        assertFalse("恢复后到点必须锁", session.isUnlocked)
+    }
+
+    @Test
+    fun `重叠暂停只解一次不恢复`() = runTest {
+        val locker = AutoLocker(session, backgroundScope) { elapsed }
+        locker.idleLock = true
+        locker.onUserInteraction()
+
+        // 探测与备份重叠：两次暂停
+        locker.pauseIdleLock()
+        locker.pauseIdleLock()
+        locker.resumeIdleLock()
+        advanceTimeBy(AutoLockPolicy.IDLE_LOCK_SECONDS * 1000L * 2)
+        runCurrent()
+        assertTrue("只解了一次，另一个暂停仍在，不该锁", session.isUnlocked)
+
+        locker.resumeIdleLock()
+        advanceTimeBy(AutoLockPolicy.IDLE_LOCK_SECONDS * 1000L - 1_000)
+        runCurrent()
+        assertTrue(session.isUnlocked)
+        advanceTimeBy(2_000)
+        runCurrent()
+        assertFalse(session.isUnlocked)
+    }
+
+    // ------------------------------------------------------------------ 屏幕关闭即锁定
+
+    @Test
+    fun `屏幕关闭默认不锁`() = runTest {
+        val locker = AutoLocker(session, backgroundScope) { elapsed }
+        locker.onScreenOff()
+        assertTrue("屏幕关闭即锁定默认关", session.isUnlocked)
+    }
+
+    @Test
+    fun `开着屏幕关闭即锁定时，关屏当场锁`() = runTest {
+        val locker = AutoLocker(session, backgroundScope) { elapsed }
+        locker.lockOnScreenOff = true
+
+        locker.onScreenOff()
+        runCurrent()
+        assertFalse("关屏必须当场锁", session.isUnlocked)
+    }
 }

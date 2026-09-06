@@ -32,20 +32,24 @@ data class BiometricRowState(
  * - 「展示密钥时防截屏」默认开且允许关，但关掉的后果要写在副文案里。
  * - 恢复密钥那一行是"忘记 PIN"唯一的出路（§7.1），所以它不藏在折叠区里。
  *
- * **生物识别那一行与自动锁定那一行都不吃 [SettingsDraft]**：前者的权威存储是
- * `boot.biometricEnabled`（红线 5），后者是 `app_settings.autoLockSeconds`（红线 31），
- * 两者都由 `SecurityViewModel` 从各自的权威存储派生。剩下几项还在 [SettingsDraft] 上，
- * 那是它们各自的消费方写完之后的活（前台空闲计时、屏幕关闭即锁定都还没有代码读它们），
- * 现在是**切页保留、杀进程丢弃**。
+ * **生物识别那一行、自动锁定那一行、前台空闲与屏幕关闭两行都不吃 [SettingsDraft]**：
+ * 前两者的权威存储分别是 `boot.biometricEnabled`（红线 5）与 `app_settings.autoLockSeconds`
+ * （红线 31），后两者是 `app_settings.idleLockSeconds` / `app_settings.lockOnScreenOff`，
+ * 四者都由 `SecurityViewModel` 从各自的权威存储派生。剩下几项还在 [SettingsDraft] 上，
+ * 那是它们各自的消费方写完之后的活，现在是**切页保留、杀进程丢弃**。
  */
 @Composable
 fun SecurityScreen(
     draft: SettingsDraft,
     biometric: BiometricRowState,
     autoLockIndex: Int,
+    idleLock: Boolean,
+    lockOnScreenOff: Boolean,
     onChange: (SettingsDraft) -> Unit,
     onBiometricChange: (Boolean) -> Unit,
     onAutoLockIndexChange: (Int) -> Unit,
+    onIdleLockChange: (Boolean) -> Unit,
+    onLockOnScreenOffChange: (Boolean) -> Unit,
     onBack: () -> Unit,
     onChangePin: () -> Unit,
     onRecoveryKey: () -> Unit,
@@ -100,15 +104,15 @@ fun SecurityScreen(
             AppSwitchRow(
                 title = stringResource(R.string.security_idle_lock),
                 summary = stringResource(R.string.security_idle_lock_summary),
-                checked = draft.idleLock,
-                onCheckedChange = { onChange(draft.copy(idleLock = it)) },
+                checked = idleLock,
+                onCheckedChange = onIdleLockChange,
             )
         }
         item {
             AppSwitchRow(
                 title = stringResource(R.string.security_lock_on_screen_off),
-                checked = draft.lockOnScreenOff,
-                onCheckedChange = { onChange(draft.copy(lockOnScreenOff = it)) },
+                checked = lockOnScreenOff,
+                onCheckedChange = onLockOnScreenOffChange,
             )
         }
 

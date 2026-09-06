@@ -313,6 +313,27 @@ class SecurityViewModel @Inject constructor(
         viewModelScope.launch { settings.setAutoLockTimeout(AutoLockPolicy.at(index)) }
     }
 
+    // ------------------------------------------------------------------ 前台空闲 / 屏幕关闭锁定
+
+    /**
+     * 前台空闲锁定开关。权威是 `app_settings.idleLockSeconds`（红线 31），这里从同一条流
+     * 派生，不自己记一份。初值 false（这一项默认就是关）。
+     */
+    val idleLock: StateFlow<Boolean> = settings.observeIdleLock()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun onIdleLockChange(enabled: Boolean) {
+        viewModelScope.launch { settings.setIdleLock(enabled) }
+    }
+
+    /** 屏幕关闭即锁定开关。权威是 `app_settings.lockOnScreenOff`。默认关。 */
+    val lockOnScreenOff: StateFlow<Boolean> = settings.observeLockOnScreenOff()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun onLockOnScreenOffChange(enabled: Boolean) {
+        viewModelScope.launch { settings.setLockOnScreenOff(enabled) }
+    }
+
     override fun onCleared() {
         pinBuffer.zeroize()
         newPin?.zeroize()

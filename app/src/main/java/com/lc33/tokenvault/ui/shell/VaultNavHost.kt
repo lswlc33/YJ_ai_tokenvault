@@ -38,6 +38,9 @@ import com.lc33.tokenvault.screens.model.SettingsDraft
 import com.lc33.tokenvault.screens.probe.ProbeRunScreen
 import com.lc33.tokenvault.screens.settings.AboutScreen
 import com.lc33.tokenvault.screens.settings.AppearanceScreen
+import com.lc33.tokenvault.screens.settings.BalanceThresholdsScreen
+import com.lc33.tokenvault.screens.settings.ClientKeywordsScreen
+import com.lc33.tokenvault.screens.settings.ProxyScreen
 import com.lc33.tokenvault.screens.settings.DataScreen
 import com.lc33.tokenvault.screens.settings.LogScreen
 import com.lc33.tokenvault.screens.settings.ProbeSettingsScreen
@@ -113,6 +116,14 @@ fun VaultNavHost(
                 onOpenGroups = { nav.navigate(GroupsRoute) },
                 onNewProvider = { nav.navigate(ProviderEditorRoute()) },
                 onImport = { nav.navigate(ImportRoute) },
+                onQueryChange = vm::onQueryChange,
+                onSort = vm::onSort,
+                onEnterSelection = vm::enterSelection,
+                onToggleSelect = vm::toggleSelect,
+                onSelectAll = vm::selectAll,
+                onClearSelection = vm::clearSelection,
+                onBatchDelete = vm::batchDelete,
+                onBatchSetGroup = vm::batchSetGroup,
             )
         }
 
@@ -175,6 +186,8 @@ fun VaultNavHost(
             val vm: SecurityViewModel = hiltViewModel()
             val biometric by vm.biometric.collectAsStateWithLifecycle()
             val autoLockIndex by vm.autoLockIndex.collectAsStateWithLifecycle()
+            val idleLock by vm.idleLock.collectAsStateWithLifecycle()
+            val lockOnScreenOff by vm.lockOnScreenOff.collectAsStateWithLifecycle()
             // 系统弹框的文案由系统画，所以要在这里取好传下去（ViewModel 读不到资源）。
             val enableTitle = stringResource(R.string.biometric_prompt_enable_title)
             val enableSubtitle = stringResource(R.string.biometric_prompt_enable_subtitle)
@@ -184,6 +197,8 @@ fun VaultNavHost(
                 draft = settings,
                 biometric = biometric,
                 autoLockIndex = autoLockIndex,
+                idleLock = idleLock,
+                lockOnScreenOff = lockOnScreenOff,
                 onChange = { settings = it },
                 onBiometricChange = { wanted ->
                     activity?.let {
@@ -191,6 +206,8 @@ fun VaultNavHost(
                     }
                 },
                 onAutoLockIndexChange = vm::onAutoLockIndexChange,
+                onIdleLockChange = vm::onIdleLockChange,
+                onLockOnScreenOffChange = vm::onLockOnScreenOffChange,
                 onBack = back,
                 onChangePin = { nav.navigate(ChangePinRoute) },
                 onRecoveryKey = { nav.navigate(RecoveryKeyRoute) },
@@ -235,9 +252,30 @@ fun VaultNavHost(
                 onChange = { settings = it },
                 onBack = back,
                 onOpenManage = ::openManage,
-                onEditThresholds = {},
-                onEditKeywords = {},
-                onEditProxy = {},
+                onEditThresholds = { nav.navigate(BalanceThresholdsRoute) },
+                onEditKeywords = { nav.navigate(ClientKeywordsRoute) },
+                onEditProxy = { nav.navigate(ProxyRoute) },
+            )
+        }
+        composable<BalanceThresholdsRoute> {
+            val vm: BalanceThresholdsViewModel = hiltViewModel()
+            BalanceThresholdsScreen(
+                viewModel = vm,
+                onBack = back,
+            )
+        }
+        composable<ClientKeywordsRoute> {
+            val vm: ClientKeywordsViewModel = hiltViewModel()
+            ClientKeywordsScreen(
+                viewModel = vm,
+                onBack = back,
+            )
+        }
+        composable<ProxyRoute> {
+            val vm: ProxyViewModel = hiltViewModel()
+            ProxyScreen(
+                viewModel = vm,
+                onBack = back,
             )
         }
         composable<ProfileListRoute> {
@@ -371,7 +409,7 @@ fun VaultNavHost(
                 skipped = run.skipped,
                 succeeded = run.succeeded,
                 onBack = back,
-                onRetryFailed = {},
+                onRetryFailed = vm::retryFailed,
                 onOpenProvider = { id -> nav.navigate(ProviderDetailRoute(id)) },
             )
         }

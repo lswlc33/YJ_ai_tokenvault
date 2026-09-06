@@ -17,6 +17,7 @@ import com.lc33.tokenvault.screens.model.BalanceSummary
 import com.lc33.tokenvault.screens.model.ContentCounts
 import com.lc33.tokenvault.screens.model.HealthBreakdown
 import com.lc33.tokenvault.screens.model.ProbeRunSummary
+import com.lc33.tokenvault.screens.model.ProviderSort
 import com.lc33.tokenvault.screens.model.UiGroup
 import com.lc33.tokenvault.screens.model.UiHealth
 import com.lc33.tokenvault.screens.model.UiKeyRow
@@ -125,7 +126,11 @@ fun hostOf(apiRoot: String): String = apiRoot
 fun ClientProfile.displayName(defaultProfileName: String): String =
     if (builtinKey == "default") defaultProfileName else name
 
-fun ProviderSummary.toRow(health: UiHealth, staleThisRound: Boolean = false): UiProviderRow =
+fun ProviderSummary.toRow(
+    health: UiHealth,
+    staleThisRound: Boolean = false,
+    lastProbeAt: Long? = null,
+): UiProviderRow =
     UiProviderRow(
         id = provider.id,
         name = provider.name,
@@ -145,6 +150,8 @@ fun ProviderSummary.toRow(health: UiHealth, staleThisRound: Boolean = false): Ui
         balanceFailed = provider.balance?.failed == true,
         health = health,
         staleThisRound = staleThisRound,
+        sortOrder = provider.sortOrder,
+        lastProbeAt = lastProbeAt,
     )
 
 /**
@@ -323,3 +330,69 @@ fun ProbeRunEntity.toSummary(): ProbeRunSummary = ProbeRunSummary(
     // 未探测 = total - done（§8.5：超预算 / 撞 host 预算 / 锁定被标 SKIPPED 的不算 done）。
     skipped = total - done,
 )
+
+// ---------------------------------------------------------------- 管理页搜索与排序
+
+/**
+ * 管理页搜索（§13.4「搜名称、备注、host、分组名」）。
+ *
+ * **只碰明文列**：名称 / 备注 / host。不搜密钥、账号、密码本身——那些是加密列（红线 3 的推论），
+ * 也根本不在 [UiProviderRow] 上。分组名由调用方连同 row 一起传进来（[groupNameOf]），
+ * 因为分组是另一张表，行模型上只有 `groupId`。
+ *
+ * 匹配是**小写 + 去空白**后的子串包含：与 [ProbeClassifier] 同一套约定，避免
+ * "OpenAI "（带空格）这种输入匹配不上。
+ *
+ * 空 query 恒 true（不过滤）。
+ */
+fun matchesQuery(row: UiProviderRow, groupName: String?, query: String): Boolean {
+    if (query.isBlank()) return true
+    val q = query.trim().lowercase()
+    val haystacks = listOfNotNull(
+        row.name,
+        row.note,
+        row.host,
+        groupName,
+    ).map { it.trim().lowercase() }
+    return haystacks.any { it.contains(q) }
+}
+
+/**
+ * 分组名查表：把 `groupId` 换成名字，供搜索与排序用。null 分组（未分组）返回 null。
+ */
+fun groupNameOf(groups: List<Group>, groupId: Long?): String? =
+    if (groupId == null) null else groups.firstOrNull { it.id == groupId }?.name
+
+/**
+ * 管理页排序（§13.4「排序 chip」）。纯函数、稳定排序：同键时按名称兜底，
+ * 否则每次数据回流列表顺序都会跳，而用户正要点其中一行。
+ *
+ * 各档语义：
+ * - [ProviderSort.MANUAL]：`sortOrder` 升序（0 在最前），同值按名称。
+ * - [ProviderSort.NAME]：名称字典序。
+ * - [ProviderSort.BALANCE]：金额数值降序（同一币种才有可比性，异币种排最后）。
+ * - [ProviderSort.LAST_PROBE]：`lastProbeAt` 降序，从没测过的（null）排最后。
+ */
+fun sortProviders(rows: List<UiProviderRow>, sort: ProviderSort): List<UiProviderRow> = when (sort) {
+    ProviderSort.MANUAL -> rows.sortedWith(compareBy({ it.sortOrder }, { it.name }))
+    ProviderSort.NAME -> rows.sortedWith(compareBy({ it.name }, { it.sortOrder }))
+    ProviderSort.BALANCE -> rows.sortedWith(
+        compareBy(
+            { it.balance == null },          // 没余额的排最后
+            { it.balance?.currency ?: "" },  // 币种字母序兜底：异币种不比金额（§9.3 不做汇率换算）
+            { -(balanceNumeric(it.balance)) }, // 同币种内金额降序
+            { it.name },
+        ),
+    )
+    ProviderSort.LAST_PROBE -> rows.sortedWith(
+        compareBy(
+            { it.lastProbeAt == null },      // 没测过的排最后
+            { -(it.lastProbeAt ?: 0L) },     // 时间降序（越新越前）
+            { it.name },
+        ),
+    )
+}
+
+/** 余额金额的数值形式，用于排序。解析不出来的（理论上不会有）当 0。 */
+private fun balanceNumeric(money: UiMoney?): Double =
+    money?.amount?.toDoubleOrNull() ?: 0.0

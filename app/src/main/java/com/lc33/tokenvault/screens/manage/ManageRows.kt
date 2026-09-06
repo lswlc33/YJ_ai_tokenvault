@@ -30,9 +30,14 @@ import com.lc33.tokenvault.ui.common.labelOf
 import com.lc33.tokenvault.ui.common.relativeLabel
 import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppChip
+import com.lc33.tokenvault.ui.miuix.AppIcon
+import com.lc33.tokenvault.ui.miuix.AppIconTint
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
+import com.lc33.tokenvault.ui.miuix.appOnPrimaryColor
+import com.lc33.tokenvault.ui.miuix.appPrimaryColor
 import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
+import com.lc33.tokenvault.ui.miuix.appTrackColor
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
 import com.lc33.tokenvault.ui.theme.LocalProviderPalette
 
@@ -61,14 +66,30 @@ private fun ColorBadge(name: String, colorIndex: Int) {
 }
 
 @Composable
-internal fun ProviderRow(row: UiProviderRow, onClick: (Long) -> Unit) {
+internal fun ProviderRow(
+    row: UiProviderRow,
+    selecting: Boolean,
+    selected: Boolean,
+    onClick: (Long) -> Unit,
+    onLongPress: (Long) -> Unit,
+) {
     val tokens = LocalAppTokens.current
-    AppCard(modifier = rowModifier(), onClick = { onClick(row.id) }) {
+    AppCard(
+        modifier = rowModifier(),
+        onClick = { onClick(row.id) },
+        onLongPress = if (selecting) null else { -> onLongPress(row.id) },
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            ColorBadge(row.name, row.colorIndex)
+            // 多选态：左侧是对勾；非多选态：左侧是色块。二者互斥，不叠。
+            if (selecting) {
+                SelectionMark(selected)
+            } else {
+                ColorBadge(row.name, row.colorIndex)
+            }
             Column(modifier = Modifier.weight(1f)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -145,6 +166,27 @@ internal fun ProviderRow(row: UiProviderRow, onClick: (Long) -> Unit) {
                 color = appSecondaryTextColor,
             )
         }
+    }
+}
+
+/** 多选态左侧的对勾。选中实心、未选中空心。 */
+@Composable
+private fun SelectionMark(selected: Boolean) {
+    Box(
+        modifier = Modifier
+            .size(36.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(
+                if (selected) appPrimaryColor
+                else appTrackColor,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        AppIconTint(
+            icon = AppIcon.Ok,
+            size = 18.dp,
+            tint = if (selected) appOnPrimaryColor else appSecondaryTextColor,
+        )
     }
 }
 

@@ -101,6 +101,9 @@ val appSecondaryTextColor: Color
 val appPrimaryColor: Color
     @Composable get() = MiuixTheme.colorScheme.primary
 
+val appOnPrimaryColor: Color
+    @Composable get() = MiuixTheme.colorScheme.onPrimary
+
 val appDividerColor: Color
     @Composable get() = MiuixTheme.colorScheme.dividerLine
 
@@ -118,12 +121,14 @@ fun AppCard(
     modifier: Modifier = Modifier,
     insideMargin: PaddingValues = PaddingValues(16.dp),
     onClick: (() -> Unit)? = null,
+    onLongPress: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Card(
         modifier = modifier,
         insideMargin = insideMargin,
         onClick = onClick,
+        onLongPress = onLongPress,
         content = content,
     )
 }

@@ -6,6 +6,7 @@ import com.lc33.tokenvault.domain.repo.ApiKeyRepository
 import com.lc33.tokenvault.domain.repo.GroupRepository
 import com.lc33.tokenvault.domain.repo.ProviderRepository
 import com.lc33.tokenvault.screens.model.ManageUiState
+import com.lc33.tokenvault.screens.model.ProviderSort
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,6 +38,15 @@ class ManageViewModel @Inject constructor(
 
     private val selectedGroupId = MutableStateFlow<Long?>(null)
 
+    /** 搜索串。与分组筛选一样是纯 UI 状态，筛一下不回数据层重查。 */
+    private val query = MutableStateFlow("")
+
+    /** 排序档。默认手动排序（`sortOrder`）。 */
+    private val sort = MutableStateFlow(ProviderSort.MANUAL)
+
+    /** 多选模式的选中集合。空集合 = 非多选态。 */
+    private val selection = MutableStateFlow<Set<Long>>(emptySet())
+
     /**
      * 「全部」那一枚 chip 的名字。
      *
@@ -49,28 +59,116 @@ class ManageViewModel @Inject constructor(
         if (allLabel.value != label) allLabel.value = label
     }
 
-    val state: StateFlow<ManageUiState> = combine(
+    /** 数据层的三份原始数据一次取好。分开 map 多次就要 combine 多次，那才会不同步。 */
+    private data class Snapshot(
+        val summaries: List<com.lc33.tokenvault.domain.model.ProviderSummary>,
+        val groups: List<com.lc33.tokenvault.domain.model.Group>,
+        val keys: List<com.lc33.tokenvault.domain.model.ApiKey>,
+    )
+
+    /** 五个纯 UI 控件态。和 [Snapshot] 分开 combine，避免单个 combine 塞 8 个流丢类型。 */
+    private data class Controls(
+        val selected: Long?,
+        val label: String,
+        val query: String,
+        val sort: ProviderSort,
+        val selection: Set<Long>,
+    )
+
+    private val snapshot = combine(
         providers.observeSummaries(),
         groups.observeGroups(),
         keys.observeAll(),
+    ) { summaries, groupList, allKeys ->
+        Snapshot(summaries, groupList, allKeys)
+    }
+
+    private val controls = combine(
         selectedGroupId,
         allLabel,
-    ) { summaries, groupList, allKeys, selected, label ->
+        query,
+        sort,
+        selection,
+    ) { selected, label, q, s, sel ->
+        Controls(selected, label, q, s, sel)
+    }
+
+    val state: StateFlow<ManageUiState> = combine(
+        snapshot,
+        controls,
+    ) { snap, ctrl ->
         // 每家的聚合状态要它自己那几把密钥的 health。全部密钥一次订阅、在这里按 providerId
         // 分组，所以这一段不发额外的 SQL
-        val healths = allKeys.groupBy({ it.providerId }, { it.health })
-        val rows = summaries.map { summary ->
-            summary.toRow(health = aggregateHealth(healths[summary.provider.id].orEmpty()))
+        val healths = snap.keys.groupBy({ it.providerId }, { it.health })
+        // 每家「最近探测」= 它那几把密钥 checkedAt 的最大值（§13.4「最近探测」排序档）。
+        val lastProbeByProvider = snap.keys.groupBy({ it.providerId }, { it.checkedAt })
+            .mapValues { (_, stamps) -> stamps.mapNotNull { it }.maxOrNull() }
+        val rows = snap.summaries.map { summary ->
+            summary.toRow(
+                health = aggregateHealth(healths[summary.provider.id].orEmpty()),
+                lastProbeAt = lastProbeByProvider[summary.provider.id],
+            )
         }
+        // 搜索 → 排序，都发生在内存里（红线 10：数据从 Flow 来，不回数据层重查）。
+        val filtered = rows.filter { matchesQuery(it, groupNameOf(snap.groups, it.groupId), ctrl.query) }
         ManageUiState(
-            groups = groupChips(label, groupList, rows),
-            selectedGroupId = selected,
-            providers = rows,
+            groups = groupChips(ctrl.label, snap.groups, rows),
+            selectedGroupId = ctrl.selected,
+            providers = sortProviders(filtered, ctrl.sort),
+            sort = ctrl.sort,
+            selection = ctrl.selection,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), ManageUiState())
 
     fun onSelectGroup(id: Long?) {
         selectedGroupId.value = id
+    }
+
+    fun onQueryChange(value: String) {
+        if (query.value != value) query.value = value
+    }
+
+    fun onSort(value: ProviderSort) {
+        if (sort.value != value) sort.value = value
+    }
+
+    // ---------------------------------------------------------------- 多选
+
+    /** 长按进入多选并选中这一行。 */
+    fun enterSelection(id: Long) {
+        selection.value = setOf(id)
+    }
+
+    /** 多选态里点某一行：切换它的选中。 */
+    fun toggleSelect(id: Long) {
+        val current = selection.value
+        selection.value = if (id in current) current - id else current + id
+    }
+
+    /** 全选当前筛选后的可见行。 */
+    fun selectAll(visibleIds: List<Long>) {
+        selection.value = visibleIds.toSet()
+    }
+
+    /** 退出多选。 */
+    fun clearSelection() {
+        selection.value = emptySet()
+    }
+
+    /** 批量删除。连带删密钥 / 账号 / 模型（外键 CASCADE），调用方已做二次确认。 */
+    fun batchDelete(ids: Set<Long>) {
+        viewModelScope.launch {
+            ids.forEach { id -> runCatching { providers.delete(id) } }
+            selection.value = emptySet()
+        }
+    }
+
+    /** 批量改分组。走 [ProviderRepository.setGroup]（一条 SQL 更新多行）。 */
+    fun batchSetGroup(ids: Set<Long>, groupId: Long?) {
+        viewModelScope.launch {
+            runCatching { providers.setGroup(ids.toList(), groupId) }
+            selection.value = emptySet()
+        }
     }
 
     fun onAddGroup(name: String) {

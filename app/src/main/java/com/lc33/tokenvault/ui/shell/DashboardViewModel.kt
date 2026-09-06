@@ -6,10 +6,10 @@ import com.lc33.tokenvault.data.dao.ProbeRunDao
 import com.lc33.tokenvault.engine.BalanceEngine
 import com.lc33.tokenvault.engine.ProbeEngine
 import com.lc33.tokenvault.domain.model.ApiKey
-import com.lc33.tokenvault.domain.model.BalanceSnapshot
 import com.lc33.tokenvault.domain.model.ProviderSummary
 import com.lc33.tokenvault.domain.repo.ApiKeyRepository
 import com.lc33.tokenvault.domain.repo.ProviderRepository
+import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.probe.ProbeProgress
 import com.lc33.tokenvault.screens.model.BackupStatus
 import com.lc33.tokenvault.screens.model.DashboardUiState
@@ -46,6 +46,7 @@ import kotlinx.coroutines.launch
 class DashboardViewModel @Inject constructor(
     providers: ProviderRepository,
     keys: ApiKeyRepository,
+    settings: SettingsRepository,
     private val probeEngine: ProbeEngine,
     private val balanceEngine: BalanceEngine,
     probeRunDao: ProbeRunDao,
@@ -61,10 +62,12 @@ class DashboardViewModel @Inject constructor(
 
     val state: StateFlow<DashboardUiState> = combine(
         snapshot,
+        settings.observeBalanceThresholds(),
         probeEngine.progress,
         probeRunDao.observeLatest(),
-    ) { snap, progress, lastRun ->
+    ) { snap, thresholds, progress, lastRun ->
         snap.toUiState(
+            thresholds = thresholds,
             progress = progress?.toUiProgress(),
             lastRun = lastRun?.toSummary(),
         )
@@ -109,6 +112,7 @@ class DashboardViewModel @Inject constructor(
     }
 
     private fun Snapshot.toUiState(
+        thresholds: Map<String, Double>,
         progress: com.lc33.tokenvault.screens.model.ProbeProgress?,
         lastRun: ProbeRunSummary?,
     ): DashboardUiState = DashboardUiState(
@@ -118,9 +122,9 @@ class DashboardViewModel @Inject constructor(
         attention = attentionItemsOf(
             summaries = summaries,
             healthByProvider = keys.groupBy({ it.providerId }, { it.health }),
-            // 阈值的用户入口在设置 → 探测（还没接），所以现在用 §9.3 的初值。
-            // 写死一个数字在这里是红线 15 禁的，从领域常量取就不是：它有名字、有出处、能改
-            thresholds = BalanceSnapshot.DEFAULT_THRESHOLDS,
+            // 阈值来自设置（§13.4 探测设置页），默认 §9.3 的初值。
+            // 不写死数字在这里（红线 15）：初值是有名字、有出处的领域常量。
+            thresholds = thresholds,
         ),
         // 上一轮探测摘要：`probe_runs` 最新一行。相对时间由页面算（红线 19），
         // 这里给时间戳。没跑过就是 null → 卡片画"还没探测过"。

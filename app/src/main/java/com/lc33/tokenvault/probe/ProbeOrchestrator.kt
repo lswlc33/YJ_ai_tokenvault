@@ -55,6 +55,7 @@ class ProbeOrchestrator(
     private val hostIntervalMs: (String) -> Long = { 0L },
     private val onRateLimited: (String) -> Unit = {},
     private val budget: ProbeBudget = ProbeBudget(),
+    private val clientKeywords: List<String> = ProbeClassifier.DEFAULT_CLIENT_KEYWORDS,
 ) {
 
     /**
@@ -132,6 +133,7 @@ class ProbeOrchestrator(
                 body = response.body,
                 error = response.error,
                 level = task.level,
+                clientKeywords = clientKeywords,
             )
 
             emit(

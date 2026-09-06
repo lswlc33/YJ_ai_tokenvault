@@ -16,6 +16,8 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import java.io.IOException
+import java.net.InetSocketAddress
+import java.net.Proxy
 import java.net.URI
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
@@ -36,6 +38,7 @@ import kotlin.coroutines.resume
 class OkHttpEngine(
     private val client: OkHttpClient,
     private val hostGate: HostGate,
+    private val proxyProvider: () -> Proxy? = { null },
 ) {
 
     /**
@@ -70,7 +73,10 @@ class OkHttpEngine(
         // 首字节延迟：用 per-call EventListener 记录 requestStart → responseHeadersEnd。
         var latencyMs: Long? = null
         val started = System.nanoTime()
-        val timedClient = client.newBuilder()
+        val builder = client.newBuilder()
+        // 手动代理（§7.5）：每次请求时读当前设置，改了就立刻生效，不必重建单例 client。
+        proxyProvider()?.let { builder.proxy(it) }
+        val timedClient = builder
             .eventListener(object : okhttp3.EventListener() {
                 override fun responseHeadersEnd(call: Call, response: Response) {
                     latencyMs = (System.nanoTime() - started) / 1_000_000
@@ -146,6 +152,40 @@ class OkHttpEngine(
     companion object {
         /** M5 阶段的默认 UA；M6 起由客户端预设（HeaderAssembler）提供。 */
         const val DEFAULT_USER_AGENT = "YuanJi/0.1.0 (Android)"
+
+        /**
+         * 解析手动代理串 `host:port` → [Proxy]。空串 / 非法串返回 null（走系统代理）。
+         *
+         * 这是纯函数，放进 companion 而不是散在各处判：`net` 层的这道判断只该有一份
+         * （§7.5 的原话——"纯函数 + 一处调用点，不允许各处自己判"）。
+         *
+         * 支持 IPv6 用方括号（`[::1]:8080`）；缺端口时用 80。
+         */
+        fun parseProxy(hostPort: String?): Proxy? {
+            if (hostPort.isNullOrBlank()) return null
+            val s = hostPort.trim()
+            // 拒绝 URL 形式的输入（`http://…`、`host/path`）：这里只收 `host[:port]`。
+            // 与 ProxyViewModel.isValidHostPort 的判断保持一致。
+            if (s.contains("://") || s.contains('/')) return null
+            // 纯冒号（空 host 空 port）这类无意义输入直接拒绝。
+            if (s == ":") return null
+            // IPv6：`[::1]:8080`。取最后一个 `:` 前的 `[...]` 里的内容当 host。
+            val host: String
+            val port: Int
+            val lastColon = s.lastIndexOf(':')
+            if (s.startsWith("[") && lastColon > 0 && s.substring(0, lastColon).endsWith("]")) {
+                host = s.substring(1, lastColon - 1)
+                port = s.substring(lastColon + 1).toIntOrNull() ?: 80
+            } else if (lastColon > 0) {
+                host = s.substring(0, lastColon)
+                port = s.substring(lastColon + 1).toIntOrNull() ?: 80
+            } else {
+                host = s
+                port = 80
+            }
+            if (host.isBlank()) return null
+            return Proxy(Proxy.Type.HTTP, InetSocketAddress(host, port))
+        }
 
         /**
          * 按 §8.1 的配置建单例 client。

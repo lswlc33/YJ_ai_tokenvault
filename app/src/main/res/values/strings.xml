@@ -134,6 +134,20 @@
     <string name="group_all">All</string>
     <string name="manage_search_hint">Search providers</string>
     <string name="manage_groups_cd">Manage groups</string>
+    <string name="manage_sort_manual">Manual</string>
+    <string name="manage_sort_name">Name</string>
+    <string name="manage_sort_balance">Balance</string>
+    <string name="manage_sort_last_probe">Last probe</string>
+    <string name="manage_selected_count">%1$d selected</string>
+    <string name="manage_select_all">Select all</string>
+    <string name="manage_deselect_all">Deselect all</string>
+    <string name="manage_exit_selection_cd">Exit selection</string>
+    <string name="manage_batch_change_group">Change group</string>
+    <string name="manage_batch_delete">Delete</string>
+    <string name="manage_batch_delete_cd">Delete selected</string>
+    <string name="manage_batch_delete_title">Delete providers?</string>
+    <string name="manage_batch_delete_desc">This deletes %1$d providers together with their keys, models and platform accounts. This cannot be undone.</string>
+    <string name="manage_batch_ungrouped">No group</string>
     <string name="manage_empty_group_title">Nothing in this group</string>
     <string name="manage_empty_group_desc">No provider is assigned to this group yet. Assign one in the provider editor, or go back to All.</string>
     <string name="groups_title">Groups</string>
@@ -201,6 +215,11 @@
     <string name="probe_section_cost">Cost</string>
     <string name="probe_thresholds">Low-balance thresholds</string>
     <string name="probe_thresholds_summary">Per currency. Defaults: USD 5, CNY 30.</string>
+    <string name="probe_thresholds_hint">When a balance drops below this amount, it is flagged on the dashboard. Negative balances are always flagged regardless of threshold.</string>
+    <string name="probe_thresholds_usd">US Dollar (USD)</string>
+    <string name="probe_thresholds_cny">Chinese Yuan (CNY)</string>
+    <string name="probe_thresholds_invalid">Enter a number of 0 or more</string>
+    <string name="probe_thresholds_save">Save</string>
     <string name="probe_section_rate">Rate limiting</string>
     <string name="probe_pacing">Per-host pacing and budget</string>
     <string name="probe_pacing_summary">Concurrency alone is not enough: a Cloudflare-fronted gateway returned error 1015 on the third request within 2.4 seconds. There is a minimum gap between requests to the same host.</string>
@@ -209,11 +228,17 @@
     <string name="probe_sniff_summary">On a manual probe only. Stops immediately if the host rate-limits us.</string>
     <string name="probe_keywords">Client-block keywords</string>
     <string name="probe_keywords_summary">Response text that means "wrong client" rather than "bad key". Some gateways answer 401 for this.</string>
+    <string name="probe_keywords_hint">When a response matches any of these, it is classified as "client blocked" instead of "bad key". Matched case-insensitively after removing whitespace, on the first 2 KB of the body.</string>
+    <string name="probe_keywords_add">Add keyword</string>
+    <string name="probe_keywords_empty">No keywords. The default list applies.</string>
+    <string name="probe_keywords_delete">Delete</string>
     <string name="probe_section_network">Network</string>
     <string name="probe_verbose_log">Verbose HTTP log</string>
     <string name="probe_verbose_log_summary">Records response bodies, truncated to 2 KB and redacted. Off by default because upstream errors echo parts of your key.</string>
     <string name="probe_proxy">Manual HTTP proxy</string>
     <string name="probe_proxy_summary">Empty means use the system proxy</string>
+    <string name="probe_proxy_hint">Host and port, e.g. 127.0.0.1:7890. Used for probing, balance checks, and later update checks. Empty means use the system proxy.</string>
+    <string name="probe_proxy_invalid">Enter host:port, e.g. 127.0.0.1:7890</string>
     <string-array name="auto_probe_options">
         <item>Off</item>
         <item>After unlocking</item>

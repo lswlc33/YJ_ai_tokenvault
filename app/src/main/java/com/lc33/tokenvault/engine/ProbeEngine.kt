@@ -19,11 +19,13 @@ import com.lc33.tokenvault.domain.repo.ApiKeyRepository
 import com.lc33.tokenvault.domain.repo.AuditLogRepository
 import com.lc33.tokenvault.domain.repo.ClientProfileRepository
 import com.lc33.tokenvault.domain.repo.ProviderRepository
+import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.endpoint.HeaderAssembler
 import com.lc33.tokenvault.endpoint.ProbeRequest
 import com.lc33.tokenvault.endpoint.ProbeRequestBuilder
 import com.lc33.tokenvault.endpoint.ProbeResponse
 import com.lc33.tokenvault.net.OkHttpEngine
+import com.lc33.tokenvault.platform.AutoLocker
 import com.lc33.tokenvault.platform.VaultSession
 import com.lc33.tokenvault.probe.PlannedTask
 import com.lc33.tokenvault.probe.ProbeBudget
@@ -78,6 +80,8 @@ class ProbeEngine @Inject constructor(
     private val session: VaultSession,
     private val engine: OkHttpEngine,
     private val audit: AuditLogRepository,
+    private val settings: SettingsRepository,
+    private val autoLocker: AutoLocker,
     @NowEpochMs private val now: () -> Long,
     @AppPlaceholders private val placeholders: Map<String, String>,
 ) {
@@ -116,12 +120,32 @@ class ProbeEngine @Inject constructor(
      * 已在跑则不重复启动（幂等）；锁定态直接不启动——探测需要 reveal 密钥，而那是
      * 要借 DEK 的（§6.1 推论 3）。返回 false 表示这次没有启动。
      */
-    fun start(): Boolean {
+    fun start(): Boolean = startScoped(runScope = "all") { true }
+
+    /**
+     * 仅重试上一轮的失败项与未探测项（明细页"重试失败项"，§13.4）。
+     *
+     * 复用 [startScoped]：把上一轮 [ProbeItemResult.outcome] 是失败 / 跳过 / 取消的
+     * `taskId` 提出来当过滤条件，只重跑这些任务，其它原样保留在 [lastRound] 里。
+     * 返回 false 表示没有可重试的项、或已在跑、或锁定态。
+     */
+    fun retryFailed(): Boolean {
+        if (running) return false
+        if (!session.isUnlocked) return false
+        val retryIds = _lastRound.value
+            .filter { it.outcome != ProbeOutcome.SUCCESS }
+            .map { it.taskId }
+            .toSet()
+        if (retryIds.isEmpty()) return false
+        return startScoped(runScope = "retry") { it.id in retryIds }
+    }
+
+    private fun startScoped(runScope: String, filter: (PlannedTask) -> Boolean): Boolean {
         if (running) return false
         if (!session.isUnlocked) return false
 
         currentJob = scope.launch {
-            runRound()
+            runRound(runScope, filter)
         }
         return true
     }
@@ -137,9 +161,24 @@ class ProbeEngine @Inject constructor(
 
     // ------------------------------------------------------------------ 一轮
 
-    private suspend fun runRound() {
+    /**
+     * 跑一轮。@param scope `probe_runs.scope` 的值——全量是 `"all"`，重试是 `"retry"`。
+     * @param filter 在 [ProbePlan] 产出的骨架任务上做二级过滤：全量恒 true，重试只留失败项。
+     */
+    private suspend fun runRound(scope: String, filter: (PlannedTask) -> Boolean) {
+        // 探测进行中挂起前台空闲锁定（§7.4 / 红线 28）：一轮预算 120 秒，用户不摸屏幕
+        // 是常态，不挂起就会自己锁掉自己。finally 保证任何退出路径（含取消 / 锁定）都恢复。
+        autoLocker.pauseIdleLock()
+        try {
+            runRoundInner(scope, filter)
+        } finally {
+            autoLocker.resumeIdleLock()
+        }
+    }
+
+    private suspend fun runRoundInner(scope: String, filter: (PlannedTask) -> Boolean) {
         val runId = runDao.insert(
-            ProbeRunEntity(scope = "all", startedAt = now(), total = 0, done = 0),
+            ProbeRunEntity(scope = scope, startedAt = now(), total = 0, done = 0),
         )
 
         // 新一轮：清空上一轮的累计快照，明细页随之刷新成"这一轮刚开始"。
@@ -151,6 +190,8 @@ class ProbeEngine @Inject constructor(
         val allKeys: List<ApiKey> = keys.observeAll().first()
         val profileList: List<ClientProfile> = clientProfiles.observeAll().first()
         val defaultProfile = profileList.firstOrNull { it.builtinKey == "default" }
+        // 客户端拦截关键词来自设置（§13.4 探测设置页），默认 §8.2 的内置表。
+        val clientKeywords = settings.observeClientKeywords().first()
 
         val plan: ProbePlan = ProbePlanBuilder.build(providerList) { pid ->
             allKeys.filter { it.providerId == pid && it.enabled }
@@ -160,8 +201,10 @@ class ProbeEngine @Inject constructor(
             profileList.firstOrNull { it.id == id } ?: defaultProfile
 
         // 把骨架任务组装成完整 ProbeTask（含完整头）。reveal 在这里发生。
+        // 重试时只留 filter 命中的任务（§13.4 的"仅重试失败项"）。
         val tasks = mutableListOf<ProbeTask>()
         for (planned in plan.tasks) {
+            if (!filter(planned)) continue
             planned.toTask(profileOf(planned.clientProfileId))?.let { tasks += it }
         }
 
@@ -185,6 +228,7 @@ class ProbeEngine @Inject constructor(
                 rateLimitedHosts += host
             },
             budget = ProbeBudget(),
+            clientKeywords = clientKeywords,
         )
 
         val taskById = tasks.associateBy { it.id }
@@ -205,6 +249,7 @@ class ProbeEngine @Inject constructor(
                         provider = providerById[result.providerId],
                         profiles = profileList,
                         defaultProfile = defaultProfile,
+                        clientKeywords = clientKeywords,
                     )?.let { final = it }
                 }
 
@@ -325,6 +370,7 @@ class ProbeEngine @Inject constructor(
         provider: Provider?,
         profiles: List<ClientProfile>,
         defaultProfile: ClientProfile?,
+        clientKeywords: List<String>,
     ): ProbeItemResult? {
         if (task == null || provider == null) return null
         if (task.host in rateLimitedHosts) return null
@@ -369,6 +415,7 @@ class ProbeEngine @Inject constructor(
                     body = response.body,
                     error = response.error,
                     level = task.level,
+                    clientKeywords = clientKeywords,
                 )
 
                 // 还是被拦 → 试下一个预设。

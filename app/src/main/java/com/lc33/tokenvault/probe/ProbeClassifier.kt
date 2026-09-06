@@ -85,8 +85,12 @@ object ProbeClassifier {
      * 这些是匹配**上游返回的协议内容**的，不是 UI 文案（i18n-exempt，理由同
      * `Protocol.ALIAS_NOISE`：把关键词搬进 strings.xml 会让"英文界面的用户匹配一段中文
      * 错误"失效）。
+     *
+     * **默认值**：用户可在设置 → 探测里编辑（§13.4），改过之后 [classify] 收到的
+     * [clientKeywords] 参数就来自 `app_settings` 而不是这份常量。所以这份常量只是
+     * "没改过时的初值"，不是权威（红线 31：配置项只有一个权威存储，这里是运行时传参）。
      */
-    private val CLIENT_KEYWORDS = listOf(
+    val DEFAULT_CLIENT_KEYWORDS = listOf(
         "unauthorized client", "unauthorized_client", "invalid client",
         "client not allowed", "forbidden client", "unsupported client",
         "user-agent", "ua 校验", "客户端", "claude code", "codex", "不支持该客户端", // i18n-exempt: 匹配上游响应，非 UI 文案
@@ -108,6 +112,7 @@ object ProbeClassifier {
         body: String?,
         error: Throwable?,
         level: ProbeLevel,
+        clientKeywords: List<String> = DEFAULT_CLIENT_KEYWORDS,
     ): Classification {
         // 第 1 行：取消。
         if (error is kotlinx.coroutines.CancellationException) {
@@ -130,7 +135,7 @@ object ProbeClassifier {
         val normalized = normalizeBody(body)
 
         // 第 3 行：客户端校验关键词，**含 401**，排在鉴权之前。
-        if (matchesAny(normalized, CLIENT_KEYWORDS)) {
+        if (matchesAny(normalized, clientKeywords)) {
             return Classification(
                 ProbeOutcome.CONCLUSIVE_FAIL,
                 health = KeyHealth.CLIENT_BLOCKED,

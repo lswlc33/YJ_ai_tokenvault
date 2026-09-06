@@ -21,9 +21,12 @@ import com.lc33.tokenvault.data.entity.GroupEntity
 import com.lc33.tokenvault.data.entity.ModelEntity
 import com.lc33.tokenvault.data.entity.ProviderAccountEntity
 import com.lc33.tokenvault.data.entity.ProviderEntity
+import com.lc33.tokenvault.platform.AutoLocker
 import com.lc33.tokenvault.platform.FileBootStore
 import com.lc33.tokenvault.platform.VaultSession
 import java.io.File
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -96,6 +99,11 @@ class BackupEngineTest {
             codec = BackupCodec(SecureRandomBytes),
             random = SecureRandomBytes,
             audit = noopAudit(),
+            autoLocker = AutoLocker(
+                session = session,
+                scope = CoroutineScope(Dispatchers.Unconfined),
+                elapsedRealtimeMs = { 0L },
+            ),
             now = { now },
         )
     }

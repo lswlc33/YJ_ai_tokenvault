@@ -110,4 +110,44 @@ class OkHttpEngineTest {
         gate.onRateLimited("a.example.com")
         assertEquals(200, gate.currentIntervalMs("a.example.com"))
     }
+
+    // ---------------------------------------------------------------- parseProxy
+
+    @Test
+    fun `空串和空白串返回 null（走系统代理）`() {
+        org.junit.Assert.assertNull(OkHttpEngine.parseProxy(null))
+        org.junit.Assert.assertNull(OkHttpEngine.parseProxy(""))
+        org.junit.Assert.assertNull(OkHttpEngine.parseProxy("   "))
+    }
+
+    @Test
+    fun `host port 解析出 HTTP 代理`() {
+        val proxy = OkHttpEngine.parseProxy("127.0.0.1:7890")!!
+        assertEquals(java.net.Proxy.Type.HTTP, proxy.type())
+        val addr = proxy.address() as java.net.InetSocketAddress
+        assertEquals("127.0.0.1", addr.hostString)
+        assertEquals(7890, addr.port)
+    }
+
+    @Test
+    fun `缺端口时默认 80`() {
+        val proxy = OkHttpEngine.parseProxy("proxy.example.com")!!
+        val addr = proxy.address() as java.net.InetSocketAddress
+        assertEquals(80, addr.port)
+    }
+
+    @Test
+    fun `IPv6 方括号形式解析正确`() {
+        val proxy = OkHttpEngine.parseProxy("[::1]:8080")!!
+        val addr = proxy.address() as java.net.InetSocketAddress
+        // hostString 会把 `::1` 规范成完整形式 `0:0:0:0:0:0:0:1`，用 InetAddress 比对语义。
+        assertEquals(java.net.InetAddress.getByName("::1"), addr.address)
+        assertEquals(8080, addr.port)
+    }
+
+    @Test
+    fun `非法串返回 null`() {
+        org.junit.Assert.assertNull(OkHttpEngine.parseProxy("http://proxy.example.com"))
+        org.junit.Assert.assertNull(OkHttpEngine.parseProxy(":"))
+    }
 }

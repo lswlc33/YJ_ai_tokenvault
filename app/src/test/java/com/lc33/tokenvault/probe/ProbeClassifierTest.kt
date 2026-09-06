@@ -257,4 +257,30 @@ class ProbeClassifierTest {
         assertEquals(KeyHealth.CONFIG_ERROR, r.health)
         assertEquals(ClassificationReason.BadPath, r.reason)
     }
+
+    @Test
+    fun `自定义客户端关键词覆盖默认表`() {
+        // 自定义表里没有"unauthorized client"，所以这个响应不再判 CLIENT_BLOCKED，
+        // 落到 403 分支（FORBIDDEN）。这正是设置页改关键词要达成的效果。
+        val r = ProbeClassifier.classify(
+            403,
+            "unauthorized client detected",
+            null,
+            ProbeLevel.L2_KEY_VALIDITY,
+            clientKeywords = listOf("my custom phrase"),
+        )
+        assertEquals(KeyHealth.FORBIDDEN, r.health)
+    }
+
+    @Test
+    fun `自定义客户端关键词能命中默认表之外的内容`() {
+        val r = ProbeClassifier.classify(
+            401,
+            "gateway says your agent is blocked",
+            null,
+            ProbeLevel.L2_KEY_VALIDITY,
+            clientKeywords = listOf("agent is blocked"),
+        )
+        assertEquals(KeyHealth.CLIENT_BLOCKED, r.health)
+    }
 }

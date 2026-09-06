@@ -35,6 +35,12 @@ object AutoLockPolicy {
 
     val DEFAULT: AutoLockTimeout = AutoLockTimeout.After(DEFAULT_SECONDS)
 
+    /**
+     * 前台空闲锁定的固定时限（§7.4）。用户只能开/关，不能调时长——时长本身没有
+     * 用户可感的差异，多一档下拉只是多一个要解释的东西。30 秒是 §7.4 明确写的最低档位。
+     */
+    const val IDLE_LOCK_SECONDS = 30
+
     /** 与 `R.array.auto_lock_options` 同序：立即 / 30 秒 / 1 分钟 / 5 分钟 / 从不。 */
     val OPTIONS: List<AutoLockTimeout> = listOf(
         AutoLockTimeout.After(0),

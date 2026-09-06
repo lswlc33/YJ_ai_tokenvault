@@ -48,6 +48,7 @@ import com.lc33.tokenvault.domain.Protocol
 import com.lc33.tokenvault.domain.model.LogCategory
 import com.lc33.tokenvault.domain.model.LogLevel
 import com.lc33.tokenvault.domain.repo.AuditLogRepository
+import com.lc33.tokenvault.platform.AutoLocker
 import com.lc33.tokenvault.platform.BootState
 import com.lc33.tokenvault.platform.BootStore
 import kotlinx.serialization.json.Json
@@ -87,6 +88,7 @@ class BackupEngine @Inject constructor(
     private val codec: BackupCodec,
     private val random: RandomBytes,
     private val audit: AuditLogRepository,
+    private val autoLocker: AutoLocker,
     @param:NowEpochMs private val now: () -> Long,
 ) {
 
@@ -101,6 +103,16 @@ class BackupEngine @Inject constructor(
      * @return 完整包字节（magic + header + 密文 payload），调用方负责 SAF 写出。
      */
     suspend fun export(password: CharArray): ByteArray {
+        // 导出也挂起前台空闲锁定（§7.4）：导出大库要 reveal 全部密钥，中途被锁会丢进度。
+        autoLocker.pauseIdleLock()
+        try {
+            return exportInner(password)
+        } finally {
+            autoLocker.resumeIdleLock()
+        }
+    }
+
+    private suspend fun exportInner(password: CharArray): ByteArray {
         val deviceId = deviceId()
 
         // 自然键映射：本机 id → 分组名 / 预设键（导出时 provider 的外键列转自然键）
@@ -298,6 +310,16 @@ class BackupEngine @Inject constructor(
      * @return 恢复了多少条供应商（供 UI 提示）。
      */
     suspend fun restore(bytes: ByteArray, password: CharArray, mode: RestoreMode): RestoreResult {
+        // 恢复同样挂起前台空闲锁定（§7.4），finally 保证任何退出路径（含重抛）都恢复。
+        autoLocker.pauseIdleLock()
+        try {
+            return restoreInner(bytes, password, mode)
+        } finally {
+            autoLocker.resumeIdleLock()
+        }
+    }
+
+    private suspend fun restoreInner(bytes: ByteArray, password: CharArray, mode: RestoreMode): RestoreResult {
         val decoded = try {
             codec.decode(bytes, password)
         } catch (t: Throwable) {
