@@ -3,7 +3,7 @@
 架构与不变量。这里写的都是**改坏了不会立刻报错**的东西——编译通过、测试也可能通过，
 但会在某个时刻造成不可挽回的后果。动到相关代码时先读这一页。
 
-怎么动手在 `AGENTS.md`，完整设计与每条规则的推导在 `计划.md`。
+怎么动手在 `AGENTS.md`，完整设计与每条规则的推导在 `old_plan.md`。
 
 ## 分层
 
@@ -33,7 +33,7 @@ screens/    页面。不出现 SQL，不构造 HTTP 请求，不直接接触 cry
 - **设置只管软件自己**：设置（外观 / 安全 / 探测 / 客户端预设 / 数据）、同步、关于、更新。
 
 "探测"**不是**一级页：它是动作不是内容。入口在仪表盘（一个按钮），逐项结果在
-`ProbeRunRoute` 二级页，"去改"永远只有一个去处——管理页。详见 `计划.md` §13.1、§13.4。
+`ProbeRunRoute` 二级页，"去改"永远只有一个去处——管理页。详见 `old_plan.md` §13.1、§13.4。
 
 - 仓库接口定义在 `domain/repo/`，实现在 `data/`。ViewModel 只依赖接口。
 - Room 实体只存在于 `data/`，与 `domain/` 的模型是两套类，中间有显式映射器。
@@ -56,6 +56,10 @@ screens/    页面。不出现 SQL，不构造 HTTP 请求，不直接接触 cry
    `app_settings` 不得重复这些键。备份的 `appSettings` 白名单要显式包含它们。
 6. **默认 Key 恰好一张。** 新增第一张自动设默认；设默认时同事务清掉其它；
    删除默认那张后自动把 `sortOrder` 最小的启用 Key 顶上——否则四个余额适配器会静默失效。
+7. **外键约束必须显式开**（`onOpen` 里 `PRAGMA foreign_keys = ON`）。SQLite 默认 OFF，
+   不开的话实体上的 `ForeignKey.CASCADE`（删供应商连带删 Key/账号/模型）与 `SET_NULL`
+   （删分组置空 `provider.groupId`）**全是摆设**——删掉父行后子表里留下孤儿行，而编译
+   与 JVM 单测都发现不了（FakeDao 没有 SQLite）。这条 2026-09-06 修掉，用仪器测试锁住。
 
 ## 加密边界（"关于"页必须与此一致）
 
@@ -71,7 +75,7 @@ SQLCipher 额外保护的只是元数据，代价是每 ABI 多 1–2 MB 原生�
 代价必须诚实写出来：**元数据在应用私有目录里是明文的**。宣传语因此只能说
 "密钥与账号密码经 AES-256-GCM 加密存储"，不能说"整库加密"。
 
-## 36 条红线（一句话版，推导见 `计划.md` §3）
+## 36 条红线（一句话版，推导见 `old_plan.md` §3）
 
 **密钥与加密**
 
@@ -156,7 +160,7 @@ M0（仓库与骨架）已完成：Gradle + 版本目录 + Hilt + MIUIX 主题 +
 system image。
 
 M0.5（协议踩点）已完成，2026-09-04。`ProtocolSpike.kt` 打了三家真实中转站，五个答案与
-四条顺带撞出来的事实都写进了 `计划.md` §16「M0.5 实测结论」，脱敏 fixture 在
+四条顺带撞出来的事实都写进了 `old_plan.md` §16「M0.5 实测结论」，脱敏 fixture 在
 `app/src/test/resources/fixtures/`（`probe-matrix.json` 是 16 条去重响应形态，
 M5 的 `classify()` 单测直接读它）。红线 33–35 就是这一轮补的。
 唯一没拿到的是**额度耗尽的真实响应**（三个账号都还有余额），记在 §18。
@@ -230,6 +234,21 @@ M1（安全底座）**已完成**，2026-09-06。引导 → 设 PIN → 抄恢�
 **“离开应用后锁定”那个下拉已经接上了**（见下面 M3 第三步）。当时刻意没做半截接线是对的：
 这一项的权威存储是 `app_settings`（红线 31），接在 boot 上将来还得再迁一次。
 
+**前台空闲锁定 + 屏幕关闭即锁定**（§7.4 收尾，2026-09-06 落地）：
+- 两个开关从 `SettingsDraft` 迁到 `app_settings`（键 `idleLockSeconds` / `lockOnScreenOff`，
+  默认都关）；`AutoLocker` 加 `idleLock` / `lockOnScreenOff` 两个 `@Volatile` 字段，由
+  `TokenVaultApp` 里两条进程级订阅写入（同 `timeout` 的路子）。
+- 空闲计时：`MainActivity.onUserInteraction()`（触屏与按键都会回调的规范钩子，非 androidx
+  受限 API）调 `AutoLocker.onUserInteraction()` 重起一个 30 秒计时（`AutoLockPolicy.IDLE_LOCK_SECONDS`，
+  固定时长、不给用户调）。计时用 `scope.launch { delay(...) }`，JVM 单测虚拟时间可推。
+- 屏幕关闭：`MainActivity` 注册 `ACTION_SCREEN_OFF` 广播，收到调 `onScreenOff()`，开关开着
+  就当场 `lockIfUnlocked()`。随 Activity 注销。
+- **长任务挂起**（红线 28）：`ProbeEngine.runRound` 与 `BackupEngine.export/restore` 用
+  `try/finally` 包 `autoLocker.pauseIdleLock()/resumeIdleLock()`，否则探测一轮（预算 120 秒）
+  会被 30 秒空闲锁定自己打断。挂起用计数而非布尔，探测与备份重叠时只解一次不恢复。
+- **Hilt 循环依赖**：`AutoLocker` 需要 `ProbeEngine`（锁定时停引擎），引擎又需要 `AutoLocker`
+  （挂起空闲锁定）。`provideAutoLocker` 改收 `Provider<ProbeEngine>`，`onLock` 回调里才 `get()`。
+
 M2（数据层）**基本完成**：10 张表 + 10 个 DAO + v1 schema JSON、`data/mapper` 的列编解码
 （CSV 与 JSON 列往返）、实体↔领域映射器、`domain/repo/` 三个接口 + `data/repo/` 三个实现
 （分组 / 供应商 / 密钥）都已提交。
@@ -291,8 +310,10 @@ M3（接真数据）**管理那一支已完成**，2026-09-06。管理页、供�
   `ApiKeyRepository.observeAll()` 一条订阅取代了 `ManageViewModel` 里那个按家 combine 的 N+1。
 
 **自动锁定时限落库了**，`SettingsRepository` 因此落地——**但它只有这一项**。
-七个设置页其余那些仍然是内存态 `SettingsDraft`：它们大半还没有消费方（前台空闲计时、
-屏幕关闭即锁定的代码都没写），先落库只会得到一批「存下来了但没人读」的键（红线 16）。
+七个设置页其余那些仍然是内存态 `SettingsDraft`：它们大半还没有消费方，先落库只会得到
+一批「存下来了但没人读」的键（红线 16）。后来（§7.4 收尾）前台空闲锁定与屏幕关闭即锁定
+两项也有了消费方、从 `SettingsDraft` 迁到 `app_settings`，见下方 M1 之后的「前台空闲 / 屏幕
+关闭锁定」小节。
 
 - **存的是秒数，不是下拉的下标**（`app_settings.autoLockSeconds`）。存下标的代价是
   「以后在中间插一档」会让所有已存的设置悄悄改变含义，而没有任何迁移能发现它。
@@ -314,7 +335,7 @@ M3（接真数据）**管理那一支已完成**，2026-09-06。管理页、供�
 
 下一步：M5 探测引擎的**接线半拉**（`ProbeEngine` @Singleton 宿主 + VaultSession 取消桥接 +
 逐项落库 + Hilt 绑定 + 仪表盘触发），然后是 M6 客户端伪装（L1+L2 已就绪，M6 补嗅探与预设）。
-里程碑表见 `计划.md` §16。
+里程碑表见 `old_plan.md` §16。
 
 ### M4：文本导入（2026-09-06）
 
@@ -350,7 +371,7 @@ M3（接真数据）**管理那一支已完成**，2026-09-06。管理页、供�
   `setText()`（把剪贴板文本填进输入框，走 `setTextAndPlaceCursorAtEnd` 而非重建 state）。
 
 单测 290 个全绿（1 个 spike 按设计跳过）；`lint` 0 error / 23 warning；`assembleDebug` 通过。
-**ADB 端到端还没跑**（本机当前没有连接设备）：`计划.md` §16 里 M4 的验收是"ADB 流程里把
+**ADB 端到端还没跑**（本机当前没有连接设备）：`old_plan.md` §16 里 M4 的验收是"ADB 流程里把
 真实 `示例数据.md` 一次粘贴成功"，这一步要插设备。数据层的正确性已经由 290 个单测覆盖
 （含 ImportWriter 用真 `VaultSession` + `SecretBox` 的端到端加密往返）。
 
@@ -386,6 +407,13 @@ M3（接真数据）**管理那一支已完成**，2026-09-06。管理页、供�
 
 单测 328 个全绿（1 个 spike 按设计跳过）；`lint` 0 error / 23 warning；`assembleDebug` 通过。
 
+**仅重试失败项（2026-09-06 补）**：明细页 `onRetryFailed` 从空实现接成真动作。`ProbeEngine`
+加 `retryFailed()`——把上一轮 `lastRound` 里 `outcome != SUCCESS` 的 `taskId` 提出来当过滤条件，
+复用 `runRound` 重跑（`startScoped(runScope, filter)` 抽出二级过滤，`start()` 恒 true、重试只留
+失败项，`probe_runs.scope` 分别记 `"all"` / `"retry"`）。过滤发生在 `ProbePlan` 产出的骨架任务上，
+所以 `probeEnabled = 0` 的供应商、reveal 失败的 Key 依旧会被 `ProbePlanBuilder` / `toTask` 挡掉——
+重试不会绕过总闸（§8.6）。`ProbeRunViewModel` 暴露 `retryFailed()`，`VaultNavHost` 接 `vm::retryFailed`。
+
 ### M6：客户端伪装（2026-09-06，纯函数层 + 预设 UI + 自动嗅探）
 
 验收 = 测试 9（cURL 解析）/ 10（头部组装）/ 嗅探顺序全绿，四项全绿。**整条链路没有一处硬编码
@@ -418,3 +446,126 @@ UA 或特征头**（红线 22）——预设是数据不是代码。
 **还没做**：设备端到端（Agent Router 三条路径——默认 UA 被 401 拦 → 换 `claude_code` 转可用 →
 换 `x-api-key` 也绕过；JustDoWork 403 空 body 给"上游没说原因"；全试过仍被拦给"TLS 指纹"
 终止结论）。这一步要插设备、要花真实额度，`示例数据.md` 每轮只勾一家。
+
+**拦截关键词设置（2026-09-06 补）**：`CLIENT_BLOCKED` 识别关键词从硬编码 `CLIENT_KEYWORDS`
+接成 `app_settings` 可编辑项。`ProbeClassifier.classify` 增加 `clientKeywords` 参数（默认
+`DEFAULT_CLIENT_KEYWORDS`）；`ProbeOrchestrator` 增 `clientKeywords` 构造参数；`ProbeEngine`
+注入 `SettingsRepository` 读 `observeClientKeywords()`，传给编排器与 `trySniff`。
+`SettingsRepository` 加 `observeClientKeywords` / `setClientKeywords`（JSON 数组存 `value`，
+键 `clientKeywords`）。新增 `ClientKeywordsRoute` + `ClientKeywordsViewModel` +
+`ClientKeywordsScreen`（增删关键词，点保存才写库——内存副本，中途退出不落半截改动）。
+设备上已验证：删 `unauthorized client` + 加 `my custom phrase` → 保存 → 落库 JSON 数组正确。
+
+### M7：余额（2026-09-06，纯逻辑层 + 引擎 + UI 接线）
+
+- **`balance/` 八个文件**：`BalanceAdapter` 接口 + `BalanceSnapshot` + `FormatMoney`
+  （`BigDecimal.setScale(2, HALF_UP)`，先舍入再相加）；六个内置适配器——`NewApiAdapter` /
+  `DeepSeekAdapter` / `OpenRouterAdapter` / `SimpleBalanceAdapter`（SiliconFlow + Moonshot）/
+  `CustomJsonAdapter`，外加 `none`。`BalanceRegistry.forProvider` 按 `balanceKind` 选适配器。
+- **`NewApiAdapter` 先校准换算比**：解析前试读 `/api/status` 的 `quota_per_unit`，校准失败
+  不致命——用默认值继续但 `quotaCalibrated` 保持 0，UI 据此标"换算比未校准"（§9.2）。
+  绝不截断响应体（Agent Router 那份 5.4 KB 的字段排在公告之后）。
+- **`engine/BalanceEngine`**（`@Singleton`）：单家点一下查一次，与 `ProbeEngine` 分开（生命周期
+  与取消语义不同）。解出鉴权材料（令牌或默认 Key）→ 构造请求 → 执行 → 解析 → 落库；
+  失败（网络/解析）也落一条 `error`，让 UI 区分"查询失败"与"余额为 0"（§9.3）。
+  明文最短存活，`finally` 里 `zeroize`。余额响应体**绝不原样进日志**（红线 32）。
+- **UI 接线**：`DashboardViewModel.refreshBalance` 逐家刷、经 `observeSummaries` 自然流回
+  （红线 10）；余额明细页按 `balance != null` 与 `balanceFailed` 分两组（三种状态，不是两种）。
+- 测试 4/5 相关用例在 `BalanceAdapterTest`（13 个用例，含 newapi 校准、缺字段不整条失败、
+  FormatMoney 舍入）。
+
+**还没做**：设备端到端（真实余额数字与后台对得上），以及"每个适配器贴一份真实响应样例"
+（§4.3 第 6 步——贴不出来就该删预设，这一步要真实额度）。
+
+**阈值设置（2026-09-06 补）**：余额低额阈值从硬编码 `DEFAULT_THRESHOLDS` 接成
+`app_settings` 可编辑项。`SettingsRepository` 加 `observeBalanceThresholds` /
+`setBalanceThresholds`（JSON 存 `value`，键 `balanceThresholds`，读方向单向容错）；
+`DashboardViewModel` 从 `DEFAULT_THRESHOLDS` 改为订阅仓库（红线 10）；新增
+`BalanceThresholdsRoute` 二级页 + `BalanceThresholdsViewModel` / `BalanceThresholdsScreen`，
+编辑 USD / CNY 两个币种。初值仍是 `DEFAULT_THRESHOLDS`（红线 15：有名字有出处的领域常量）。
+设备上已验证：改 10/100 → 保存落库 → 重进读到 10/100（曾踩一个坑——`remember` 初值在
+Room 首帧异步返回前就用默认 5/30 建了输入框，真实值到了也不更新，改 ViewModel 初始值
+为 null、读到非空才建输入框后修复）。
+
+**手动代理设置（2026-09-06 补）**：手动 HTTP 代理从无到有接成 `app_settings` 可编辑项。
+`SettingsRepository` 加 `observeProxy` / `setProxy`（纯字符串存 `value`，键 `httpProxy`）；
+`net/OkHttpEngine` 增 `proxyProvider: () -> Proxy?` 构造参数，在每次请求的
+`client.newBuilder().proxy(...)` 上按需套用（`OkHttpClient.proxy` 是构造期属性，不能改
+单例，只能 per-request 重建）；新增 `net/ProxyProvider`（`@Singleton`，订阅 `observeProxy`、
+把解析结果缓进 `AtomicReference<Proxy?>`，供 `proxy::current` 引用）。`parseProxy` 是
+companion 里的纯函数（`host:port` → `Proxy`），支持 IPv6 方括号 `[::1]:8080`、缺端口默认 80、
+空串/空白/`://`/纯冒号等非法串返回 null（走系统代理）。新增 `ProxyRoute` 二级页 +
+`ProxyViewModel`（粗校验，拒绝 `://`、`/`、空格）/ `ProxyScreen`（单个 `host:port` 输入框）。
+
+### M8：模型元数据（可砍，纯逻辑层已做，WorkManager 拉取未做）
+
+- **`catalog/`**：`ModelCatalogMatcher` 三级匹配（精确 key → 精确 modelId → 归一化 id）全部
+  走索引，结果写回 `models.catalogKey`；`CatalogNormalize` 归一化。`ModelCatalogDao` 有
+  `findByKey` / `findByModelId` / `findByNormId` / `upsertAll` / `clear`。测试 9 个用例。
+- **没做**：WorkManager 拉取 `api.json`（4.46 MB）那一半——`TokenVaultApp` 注释明确
+  "现在还没有 Worker"，`DataScreen` 的"同步元数据"入口是空实现（`onSyncCatalog = {}`）。
+  这是 §4.4 的第 1–3 步（分块解析、每 200 行一个事务、TTL 7 天 + 仅 UNMETERED 自动更新）。
+  `model_catalog` 表已建、DAO 已建，差的是拉取与入库那一步。**可砍**：不影响核心四件事。
+
+### M9：备份与同步（2026-09-06，编解码 + 引擎 + SAF 接线）
+
+- **`backup/`**：`BackupCodec`（`magic ‖ headerLen ‖ header(明文 JSON) ‖ payload(AES-256-GCM)`，
+  AAD 绑 header 原始字节）、`BackupHeader` / `BackupPayload`。测试 7 个用例。
+- **`engine/BackupEngine`**（643 行）：导出/恢复编排。三条硬规矩落地——跨表引用用自然键
+  （分组名 / `builtinKey` / 指纹重算，红线 27）、明文只在导出这一瞬出现（恢复端用自己 DEK
+  重加密）、**不搬探测结果**（`health` / `lastOutcome` / `checkedAt` / `probeState` 导出时
+  就不写，红线 28）。恢复三种模式（覆盖/合并/仅新增，默认合并），整过程单事务。
+- **SAF 接线**（`VaultNavHost.SyncRouteContent`）：`CreateDocument` / `OpenDocument`、
+  口令用 `AppSecretTextField`、用完即擦、恢复模式选择、事件走 Snackbar。
+  M4 留下的 SAF 导出入口也一并填掉。
+- **appSettings 白名单**显式含 `themeMode` / `localeTag`（权威存储在 boot，boot 不进备份）。
+- 测试：`BackupCodecTest` 7 + `BackupPayloadTest` + `BackupEngineTest` 5，含往返断言。
+
+**还没做**：第二台设备真机恢复验证（分组与客户端预设必须对得上，红线 27）；WebDAV 半边
+（可砍，`onWebDav = {}` 空实现）。
+
+### M10：打磨与发布（2026-09-06，发布链路已落地）
+
+- **`audit_log` 持久化 + 日志页**：`AuditLogDao` 有 `observeRecent` / `trimToCount` /
+  `trimOlderThan`（条数 + 天数双重上限），`LogScreen` + `LogViewModel` 接真数据；
+  `DataScreen` 有清日志入口。
+- **README.md**：功能、隐私声明、**如实写明 6 位 PIN 挡不住离线穷举**（§7.6），以及
+  "元数据明文"的诚实边界。
+- **发布链路**（`.github/workflows/ci.yml`）：单测 + lint + 仪器编译 + `assembleNightly`
+  合并成一次 gradlew 调用；keystore 以 base64 存在 secret `VAULT_RELEASE_KEYSTORE_BASE64`，
+  workflow 解码后设 `VAULT_RELEASE_STORE_FILE`；nightly 预发布走 `nightly-build` tag
+  （仓库规则禁止建 `nightly` tag，GH013）。这一串 CI 迭代了 12 个提交才调通。
+
+**还没做**：搜索/排序/批量操作；宽屏双栏（可砍）；无障碍 TalkBack 走通主路径；
+更新页接 GitHub Releases API（`onCheckNow = {}` 空实现）。
+
+**搜索 / 排序 / 批量（2026-09-06 补）**：管理页三项落地。搜索与排序是纯函数
+（`ui/shell/UiMapping.kt` 的 `matchesQuery` / `sortProviders`，可 JVM 单测）：搜名称/备注/
+host/分组名（**不搜加密列**，红线 3 推论），匹配是"小写 + 去空白"后的子串包含（与
+`ProbeClassifier` 同一套约定）；排序四档（手动 `sortOrder` / 名称 / 余额 / 最近探测）。
+余额档按币种字母序分块、块内金额降序（异币种不比金额，§9.3），最近探测用该家密钥
+`checkedAt` 的最大值。`ManageUiState` 加 `sort` / `selection`；`ManageViewModel` 用两层
+`combine`（`Snapshot` 数据三流 + `Controls` 五个 UI 态流）避免单个 combine 塞 8 个流丢类型。
+多选：`AppCard` 增 `onLongPress` 透传（MIUIX `Card` 本就有）、长按进多选、顶栏换全选/退出、
+FAB 换删除、底部"改分组"条；批量删除二次确认（文案写清连带删密钥/模型/账号），
+批量改分组走已有的 `ProviderRepository.setGroup`。新增 `appOnPrimaryColor` 颜色出口
+（`SelectionMark` 对勾用，页面不 import MIUIX）。
+
+### 全局收尾状态（2026-09-06）
+
+单测 **425 个**全绿（1 个 spike 按设计跳过）；`lint` 0 error；`assembleDebug` / `assembleNightly`
+通过；strings 两份各 490 键。**功能层（M0–M10 的代码、测试、UI 接线）已全部落地并提交**
+（最后一批提交 `cc8129f` M4–M6 纯逻辑层、`89b9c95` M7–M10 UI 接线、其后 12 个 CI 收尾）。
+
+**唯一剩余的工作都是"要设备/要额度/要硬件"的验收，不是功能缺失**：
+
+1. ADB 端到端：**M4 粘贴导入已在设备上跑通**（2026-09-06，输入单家块 → 解析预览
+   → 确认 → 落库 → 详情页解出明文 `sk-test1234567890`；含明文弹层 `screencap` 全黑，
+   `FLAG_SECURE` 继承正确）。剩 M5/M6/M7 探测与余额（要花真实额度）。
+2. 生物识别设备验证（当前设备无指纹硬件）。
+3. 额度耗尽的真实响应采集（等 DeepSeek 余额自然耗尽）。
+4. 仪器测试（`androidTest/` 现有 `VaultDatabaseTest` 6 个用例，覆盖 `idx_keys_default`
+   部分唯一索引、外键 CASCADE 与 SET_NULL；`BootStore` 原子写已由 JVM 单测覆盖。
+   还差 `FLAG_SECURE` 的 connectedTest（功能上已验证——M4 详情页明文弹层截屏全黑）、
+   Room 迁移测试（当前只有 v1，升 v2 时补）。
+5. M8 的 WorkManager 拉取（可砍）。

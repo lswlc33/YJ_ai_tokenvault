@@ -1,7 +1,7 @@
 # AGENTS.md
 
 元记 · AI Token Vault —— Android 原生（Kotlin + Compose + MIUIX）。
-完整设计在 `计划.md`，架构不变量在 `CLAUDE.md`，这份文件只讲**怎么动手**。
+完整设计在 `old_plan.md`，架构不变量在 `CLAUDE.md`，这份文件只讲**怎么动手**。
 
 ## 常用命令
 
@@ -86,7 +86,7 @@ CI 与单测都会检查。
 整理 fixture 时读后者。**入库前必须自己再核一遍**——上游会把密钥后 4 位回显在错误消息里，
 new-api 的 `/api/user/self` 还会回显访问令牌、邮箱与用户名。
 
-已经采到的结果在 `app/src/test/resources/fixtures/`，结论写进了 `计划.md` §16
+已经采到的结果在 `app/src/test/resources/fixtures/`，结论写进了 `old_plan.md` §16
 「M0.5 实测结论」。**不要为了"验证一下"重跑它**：一轮约 30 个请求，上次花掉了
 Agent Router 约 $0.5 的免费额度。
 
