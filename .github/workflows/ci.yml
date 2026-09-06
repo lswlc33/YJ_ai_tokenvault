@@ -111,7 +111,7 @@ jobs:
       # 只有签过名的包才值得挂到预发布上：未签名的 APK 装不上，
       # 放上去只会让人下到一个不能用的文件。
       - name: 刷新 nightly 预发布
-        if: github.ref == 'refs/heads/master' && github.event_name == 'push' && env.signed == 'true'
+        if: github.ref == 'refs/heads/master' && env.signed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
