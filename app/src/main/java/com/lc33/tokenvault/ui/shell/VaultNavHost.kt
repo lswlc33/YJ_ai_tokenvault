@@ -535,7 +535,6 @@ private fun SyncRouteContent(
         onBack = onBack,
         onExport = { pendingAction = PendingSyncAction.Export },
         onImport = { pendingAction = PendingSyncAction.Import },
-        onBackupPassphrase = {},
         onWebDav = {},
     )
 

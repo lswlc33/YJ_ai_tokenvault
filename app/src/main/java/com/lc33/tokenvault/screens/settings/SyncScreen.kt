@@ -38,7 +38,6 @@ fun SyncScreen(
     onBack: () -> Unit,
     onExport: () -> Unit,
     onImport: () -> Unit,
-    onBackupPassphrase: () -> Unit,
     onWebDav: () -> Unit,
 ) {
     SettingsSubPage(titleRes = R.string.sync_title, onBack = onBack) {
@@ -60,10 +59,15 @@ fun SyncScreen(
             )
         }
         item {
-            AppArrowRow(
-                title = stringResource(R.string.sync_passphrase),
-                summary = stringResource(R.string.sync_passphrase_summary),
-                onClick = onBackupPassphrase,
+            // 备份口令默认沿用 PIN，导出/恢复时每次输入（可换任意长口令）。这里没有
+            // 独立的设置页——"单独设长口令"就是导出时输一个不同于 PIN 的口令，
+            // 持久化独立口令属于 WebDAV 无人值守备份（可砍），所以只留一行常驻提示
+            // （§12.1），不做成一个点了没反应的箭头行。
+            AppText(
+                text = stringResource(R.string.sync_passphrase_summary),
+                style = AppTextStyle.Footnote,
+                color = appSecondaryTextColor,
+                modifier = Modifier.padding(horizontal = LocalAppTokens.current.screenPadding),
             )
         }
 
