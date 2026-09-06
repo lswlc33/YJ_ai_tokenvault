@@ -1,6 +1,7 @@
 package com.lc33.tokenvault.domain.repo
 
 import com.lc33.tokenvault.domain.AutoLockTimeout
+import com.lc33.tokenvault.domain.DefaultProbeSettings
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -115,4 +116,15 @@ interface SettingsRepository {
     fun observeUpdateChannel(): Flow<Int>
 
     suspend fun setUpdateChannel(channel: Int)
+
+    /**
+     * 新建供应商时的探测默认值（§8.3、红线 36）。**不是总开关**——权威在每家供应商
+     * 自己的行上，这里只是「新建时拷进 `ProviderDraft`」的初值。
+     *
+     * **没写过时发 [com.lc33.tokenvault.domain.DefaultProbeSettings] 的默认值**
+     * （`true/true/true/false`，与 `ProviderDraft` 的硬编码默认一致）。
+     */
+    fun observeDefaultProbeSettings(): Flow<DefaultProbeSettings>
+
+    suspend fun setDefaultProbeSettings(settings: DefaultProbeSettings)
 }

@@ -40,11 +40,10 @@ data class ProviderDraft(
     /**
      * 探测开关，**每家单独存**（红线 36）。
      *
-     * 新建时用这里的硬编码默认值（`true/true/true/false`）——设置页那四个
-     * 「新建默认值」开关（`SettingsDraft.defaultProbe*`）目前**还没接进来**，改它们
-     * 不会影响这里的初值。接线后再改成从设置拷一份。每家站的规则都不一样：有的按
-     * ToS 不允许自动化探测，有的三个请求就限流，有的每次调用都真扣钱，全局一个
-     * 开关表达不了"这一家别碰"。
+     * 新建时从设置页「新建默认值」拷一份进来（`ProviderEditorViewModel` 在新建分支读
+     * `SettingsRepository.observeDefaultProbeSettings()`），不是硬编码；之后这家供应商
+     * 独立，改设置不会动它。每家站的规则都不一样：有的按 ToS 不允许自动化探测，
+     * 有的三个请求就限流，有的每次调用都真扣钱，全局一个开关表达不了"这一家别碰"。
      */
     val probeEnabled: Boolean = true,
     val probeReachability: Boolean = true,

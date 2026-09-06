@@ -6,7 +6,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.lc33.tokenvault.R
-import com.lc33.tokenvault.screens.model.SettingsDraft
 import com.lc33.tokenvault.ui.miuix.AppArrowRow
 import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppSwitchRow
@@ -32,10 +31,16 @@ import com.lc33.tokenvault.ui.theme.LocalAppTokens
  */
 @Composable
 fun ProbeSettingsScreen(
-    draft: SettingsDraft,
     sniffClientProfile: Boolean,
-    onChange: (SettingsDraft) -> Unit,
+    defaultProbeReachability: Boolean,
+    defaultProbeKeys: Boolean,
+    defaultProbeBalance: Boolean,
+    defaultProbeModels: Boolean,
     onSniffClientProfileChange: (Boolean) -> Unit,
+    onDefaultProbeReachabilityChange: (Boolean) -> Unit,
+    onDefaultProbeKeysChange: (Boolean) -> Unit,
+    onDefaultProbeBalanceChange: (Boolean) -> Unit,
+    onDefaultProbeModelsChange: (Boolean) -> Unit,
     onBack: () -> Unit,
     onOpenManage: () -> Unit,
     onEditThresholds: () -> Unit,
@@ -51,30 +56,30 @@ fun ProbeSettingsScreen(
         item {
             AppSwitchRow(
                 title = stringResource(R.string.editor_probe_reachability),
-                checked = draft.defaultProbeReachability,
-                onCheckedChange = { onChange(draft.copy(defaultProbeReachability = it)) },
+                checked = defaultProbeReachability,
+                onCheckedChange = onDefaultProbeReachabilityChange,
             )
         }
         item {
             AppSwitchRow(
                 title = stringResource(R.string.editor_probe_keys),
-                checked = draft.defaultProbeKeys,
-                onCheckedChange = { onChange(draft.copy(defaultProbeKeys = it)) },
+                checked = defaultProbeKeys,
+                onCheckedChange = onDefaultProbeKeysChange,
             )
         }
         item {
             AppSwitchRow(
                 title = stringResource(R.string.editor_probe_balance),
-                checked = draft.defaultProbeBalance,
-                onCheckedChange = { onChange(draft.copy(defaultProbeBalance = it)) },
+                checked = defaultProbeBalance,
+                onCheckedChange = onDefaultProbeBalanceChange,
             )
         }
         item {
             AppSwitchRow(
                 title = stringResource(R.string.editor_probe_models),
                 summary = stringResource(R.string.editor_probe_models_summary),
-                checked = draft.defaultProbeModels,
-                onCheckedChange = { onChange(draft.copy(defaultProbeModels = it)) },
+                checked = defaultProbeModels,
+                onCheckedChange = onDefaultProbeModelsChange,
             )
         }
 

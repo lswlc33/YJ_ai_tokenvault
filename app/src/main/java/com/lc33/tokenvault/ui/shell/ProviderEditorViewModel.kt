@@ -11,6 +11,7 @@ import com.lc33.tokenvault.domain.model.Provider
 import com.lc33.tokenvault.domain.repo.ClientProfileRepository
 import com.lc33.tokenvault.domain.repo.GroupRepository
 import com.lc33.tokenvault.domain.repo.ProviderRepository
+import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.endpoint.NormalizeResult
 import com.lc33.tokenvault.endpoint.normalizeBaseUrl
 import com.lc33.tokenvault.screens.model.ProviderDraft
@@ -47,6 +48,7 @@ class ProviderEditorViewModel @Inject constructor(
     private val providers: ProviderRepository,
     private val groupRepository: GroupRepository,
     private val clientProfiles: ClientProfileRepository,
+    private val settings: SettingsRepository,
     savedState: SavedStateHandle,
 ) : ViewModel() {
 
@@ -98,6 +100,19 @@ class ProviderEditorViewModel @Inject constructor(
                     _draft.value = provider.toDraft(groupIndexOf(provider.groupId, groupList), profileList)
                 }
                 _loaded.value = true
+            }
+        } else {
+            // 新建：探测默认值从设置拷一份进来（§8.3、红线 36）。只在这一刻读一次，
+            // 之后这家供应商独立——改设置不会动它。读的是 snapshot 而非订阅：新建页
+            // 的生命周期短，没必要为一个草稿初值挂一条长期订阅。
+            viewModelScope.launch {
+                val defaults = settings.observeDefaultProbeSettings().first()
+                _draft.value = _draft.value.copy(
+                    probeReachability = defaults.reachability,
+                    probeKeys = defaults.keys,
+                    probeBalance = defaults.balance,
+                    probeModels = defaults.models,
+                )
             }
         }
     }

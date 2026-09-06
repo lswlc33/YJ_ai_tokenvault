@@ -325,7 +325,7 @@ M3（接真数据）**管理那一支已完成**，2026-09-06。管理页、供�
 | `squircle` / `blurNavBar` | 外观（圆角 / 底栏模糊） | 无消费方（MIUIX 主题没接这两个开关） |
 | `secureFlag` | 展示密钥时挂 FLAG_SECURE | `RevealKeySheet` 不读；`SecureFlag.kt` 注释明说解锁/引导/恢复密钥页「始终挂、与开关无关」 |
 | ~~`clipboardClearIndex`~~ | ~~剪贴板自动清除~~ | ✅ **已接真（2026-09-06）**：`app_settings.clipboardClearSeconds`（存秒数，`ClipboardClearPolicy`），`AndroidSecureClipboard` 订阅缓存、`copy` 时跟随设置，默认 60 秒 |
-| `defaultProbeReachability/Keys/Balance/Models` | 新建供应商时的默认值 | `ProviderDraft()` 硬编码 `true/true/true/false`，从不读 `SettingsDraft`（2026-09-06 已把两处撒谎注释改成如实标注"未接线"） |
+| `defaultProbeReachability/Keys/Balance/Models` | 新建供应商时的默认值 | ✅ **已接真（2026-09-06）**：`app_settings.defaultProbe`（JSON 对象存四个布尔，键名即字段名），`ProviderEditorViewModel` 新建分支读 `observeDefaultProbeSettings().first()` 覆盖草稿初值，`ProbeSettingsViewModel` 派生四开关；读方向缺字段用默认补、坏数据落回全默认 |
 | ~~`sniffClientProfile`~~ | ~~客户端嗅探开关~~ | ✅ **已接真（2026-09-06）**：`app_settings.sniffClientProfile`，`ProbeEngine.trySniff` 前判断，默认开（读方向坏值容错到开，与空闲锁定相反） |
 | ~~`verboseHttpLog`~~ | ~~详细 HTTP 日志~~ | ✅ **已移除（2026-09-06）**：详细日志整套未实现、不在剩余计划内，开关拨动没效果是撑谎 |
 | ~~`autoProbeIndex`~~ | ~~自动探测~~ | ✅ **已移除（2026-09-06）**：自动探测的 Worker 调度未实现、不在剩余计划内，下拉拨动没效果是撑谎 |
@@ -343,14 +343,15 @@ M3（接真数据）**管理那一支已完成**，2026-09-06。管理页、供�
 所以**没有在 2026-09-06 那批「消除撑谎」里一并做**，留作一个独立的、需要逐项拍板的
 技术债清理项，而不是机械删几个开关。例外是「消费方已经写好、只差开关接线」的几项，
 它们不涉及产品决策、默认值与既有行为一致，已单独接真（2026-09-06）：
-`sniffClientProfile`、`clipboardClearIndex`、`updateChannelIndex`；以及「承诺了未实现
+`sniffClientProfile`、`clipboardClearIndex`、`updateChannelIndex`、`defaultProbe*`
+（`defaultProbe*` 之前误判为「产品决策」，实际设计意图 §8.3/红线 36 明确要求「设置里
+的同名项是新建时的默认值」，接真路径清晰，属漏接而非决策）；以及「承诺了未实现
 且不在剩余计划内的功能」的几项（`verboseHttpLog`/`autoProbeIndex`/`autoBackup`/
 `autoCheckUpdate`），它们拨动没效果是撑谎，已一并移除（2026-09-06）。
 
-**清单收敛后，真正剩下的假开关只有两组**：
+**清单收敛后，真正剩下的假开关只有两组，都需用户拍板**：
 1. `squircle` / `blurNavBar`（外观，MIUIX 主题能力未接）——外观决策。
 2. `secureFlag`（防截屏能否关，文案承诺可关但代码始终挂）——安全决策。
-3. `defaultProbe*` 四项（新建供应商默认探测值）——产品决策（默认值放哪）。
 
 - **存的是秒数，不是下拉的下标**（`app_settings.autoLockSeconds`）。存下标的代价是
   「以后在中间插一档」会让所有已存的设置悄悄改变含义，而没有任何迁移能发现它。

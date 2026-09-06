@@ -5,6 +5,7 @@ import com.lc33.tokenvault.data.entity.AppSettingEntity
 import com.lc33.tokenvault.domain.AutoLockPolicy
 import com.lc33.tokenvault.domain.AutoLockTimeout
 import com.lc33.tokenvault.domain.ClipboardClearPolicy
+import com.lc33.tokenvault.domain.DefaultProbeSettings
 import com.lc33.tokenvault.domain.model.BalanceSnapshot
 import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.probe.ProbeClassifier
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -113,6 +115,14 @@ class RoomSettingsRepository @Inject constructor(
         dao.put(AppSettingEntity(key = KEY_UPDATE_CHANNEL, value = channel.toString()))
     }
 
+    override fun observeDefaultProbeSettings(): Flow<DefaultProbeSettings> = dao.observeAll()
+        .map { rows -> decodeDefaultProbe(rows.firstOrNull { it.key == KEY_DEFAULT_PROBE }?.value) }
+        .distinctUntilChanged()
+
+    override suspend fun setDefaultProbeSettings(settings: DefaultProbeSettings) {
+        dao.put(AppSettingEntity(key = KEY_DEFAULT_PROBE, value = encodeDefaultProbe(settings)))
+    }
+
     private companion object {
         /**
          * 键名照 §7.4 里的写法。
@@ -137,6 +147,8 @@ class RoomSettingsRepository @Inject constructor(
         const val KEY_CLIPBOARD_CLEAR = "clipboardClearSeconds"
 
         const val KEY_UPDATE_CHANNEL = "updateChannel"
+
+        const val KEY_DEFAULT_PROBE = "defaultProbe"
 
         /**
          * 阈值 → JSON 对象（键 = 币种代码，值 = 金额）。
@@ -190,6 +202,45 @@ class RoomSettingsRepository @Inject constructor(
                 }
             }.getOrDefault(ProbeClassifier.DEFAULT_CLIENT_KEYWORDS)
         }
+
+        /**
+         * 默认探测值 → JSON 对象（四个布尔，键名照 [DefaultProbeSettings] 字段名）。
+         *
+         * 用对象而不是数组，理由同 [encodeThresholds]：字段顺序无关紧要，
+         * 未来加字段只增不改，旧值不丢。
+         */
+        fun encodeDefaultProbe(settings: DefaultProbeSettings): String = buildJsonObject {
+            put(KEY_PROBE_REACHABILITY, JsonPrimitive(settings.reachability))
+            put(KEY_PROBE_KEYS, JsonPrimitive(settings.keys))
+            put(KEY_PROBE_BALANCE, JsonPrimitive(settings.balance))
+            put(KEY_PROBE_MODELS, JsonPrimitive(settings.models))
+        }.toString()
+
+        /**
+         * JSON → 默认探测值。**读方向单向容错**：缺哪个字段就用 [DefaultProbeSettings]
+         * 的默认值补，坏数据不拖垮新建流程。没写过的键返回全默认。
+         */
+        fun decodeDefaultProbe(raw: String?): DefaultProbeSettings {
+            if (raw == null) return DefaultProbeSettings()
+            val defaults = DefaultProbeSettings()
+            return runCatching {
+                val obj = json.parseToJsonElement(raw).jsonObject
+                DefaultProbeSettings(
+                    reachability = obj[KEY_PROBE_REACHABILITY]?.jsonPrimitive?.booleanOrNull ?: defaults.reachability,
+                    keys = obj[KEY_PROBE_KEYS]?.jsonPrimitive?.booleanOrNull ?: defaults.keys,
+                    balance = obj[KEY_PROBE_BALANCE]?.jsonPrimitive?.booleanOrNull ?: defaults.balance,
+                    models = obj[KEY_PROBE_MODELS]?.jsonPrimitive?.booleanOrNull ?: defaults.models,
+                )
+            }.getOrDefault(defaults)
+        }
+
+        const val KEY_PROBE_REACHABILITY = "reachability"
+
+        const val KEY_PROBE_KEYS = "keys"
+
+        const val KEY_PROBE_BALANCE = "balance"
+
+        const val KEY_PROBE_MODELS = "models"
 
         /** 与 [com.lc33.tokenvault.data.mapper.ColumnCodecs] 同款：读方向单向容错。 */
         private val json = Json { ignoreUnknownKeys = true }

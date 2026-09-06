@@ -3,6 +3,7 @@ package com.lc33.tokenvault.data.repo
 import app.cash.turbine.test
 import com.lc33.tokenvault.domain.AutoLockPolicy
 import com.lc33.tokenvault.domain.AutoLockTimeout
+import com.lc33.tokenvault.domain.DefaultProbeSettings
 import com.lc33.tokenvault.domain.model.BalanceSnapshot
 import com.lc33.tokenvault.probe.ProbeClassifier
 import kotlinx.coroutines.test.runTest
@@ -311,6 +312,60 @@ class SettingsRepositoryTest {
         dao.put(com.lc33.tokenvault.data.entity.AppSettingEntity(key = "updateChannel", value = "99"))
         repo.observeUpdateChannel().test {
             assertEquals(0, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    // ---------------------------------------------------------------- 新建默认探测值
+
+    @Test
+    fun `默认探测值没写过时发全默认`() = runTest {
+        repo.observeDefaultProbeSettings().test {
+            assertEquals(DefaultProbeSettings(), awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `默认探测值写了能读回来`() = runTest {
+        val custom = DefaultProbeSettings(reachability = false, keys = true, balance = false, models = true)
+        repo.setDefaultProbeSettings(custom)
+        repo.observeDefaultProbeSettings().test {
+            assertEquals(custom, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `默认探测值存的是 JSON 对象，键名是字段名`() = runTest {
+        repo.setDefaultProbeSettings(DefaultProbeSettings())
+        val raw = dao.rows.single { it.key == "defaultProbe" }.value
+        assertEquals("{\"reachability\":true,\"keys\":true,\"balance\":true,\"models\":false}", raw)
+    }
+
+    @Test
+    fun `默认探测值缺字段时用默认值补，坏数据落回全默认`() = runTest {
+        // 只写一个字段：其余字段该落回默认，而不是抛异常拖垮新建流程。
+        dao.put(
+            com.lc33.tokenvault.data.entity.AppSettingEntity(
+                key = "defaultProbe",
+                value = "{\"models\":true}",
+            ),
+        )
+        repo.observeDefaultProbeSettings().test {
+            assertEquals(
+                DefaultProbeSettings(reachability = true, keys = true, balance = true, models = true),
+                awaitItem(),
+            )
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        // 整个 JSON 坏了：落回全默认。
+        dao.put(
+            com.lc33.tokenvault.data.entity.AppSettingEntity(key = "defaultProbe", value = "not-json"),
+        )
+        repo.observeDefaultProbeSettings().test {
+            assertEquals(DefaultProbeSettings(), awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
     }
