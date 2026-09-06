@@ -120,8 +120,9 @@ fun ProviderEditorScreen(
         )
     }
 
-    // dirty 只看地址与名称这两处足够代表"用户动过东西"了；真正的 dirty 判定
-    // 在 M3 接真数据时由 ViewModel 比对整个 draft。
+    // dirty 只看地址与名称这两处足够代表"用户动过东西"了。完整的逐字段比对在
+    // ViewModel 的 save 流程里做（它拿到的 draft 与这里的文本态是同一份数据），
+    // 这里的判定只服务于"返回时要不要弹放弃对话框"。
     val dirty = name.text != draft.name || baseUrl.text != draft.baseUrl
     BackHandler(enabled = dirty) { showDiscardDialog = true }
 
