@@ -181,7 +181,7 @@ v2 显式迁移，红线 9）。
 | --- | --- |
 | 1 | `ClientProfile` 领域模型（表已有）+ DAO + 仓库（最小集：`observeAll` / `findByBuiltinKey` / `add` / `update` / `delete`） |
 | 2 | **`ProfileSeeder` 幂等种入 8 个内置预设**（M2 遗留项，预设内容见 `old_plan.md` §8.2 表；`zcode` 留空位） |
-| 3 | `endpoint/HeaderAssembler`（纯函数）：预设头按序覆盖 → **鉴权头最后加且不可被覆盖** → 占位符展开 → `bodyPatch` 按 RFC 7386 合并 |
+| 3 | `endpoint/HeaderAssembler`（纯函数）：预设头按序覆盖 → **鉴权头最后加且不可被覆盖** → 占位符展开 → `bodyPatch` 按 RFC 7386 合并（`mergeBodyPatch` 纯函数 + 测试已就绪；**消费方未接**——只在 L3 逐模型 POST 的极简 body 里叠加，M5 只发 L1/L2 GET，故 `bodyPatch` 零消费路径，随 L3 落地） |
 | 4 | `importer/CurlParser`（纯函数）：续行 / 引号 / `-H` / `-A` / `--data-raw`；自动剔除 `Authorization` / `cookie` / `content-length` / `host` 并在预览页告知 |
 | 5 | 预设 UI：设置 → 客户端预设（列表 / 编辑 / cURL 导入）；**供应商编辑页的「客户端预设」下拉接真数据并落库**（现在只有一项且不落库） |
 | 6 | 自动嗅探：`CLIENT_BLOCKED` 时**先换鉴权头**（Bearer ↔ x-api-key）→ 再按顺序最多试 4 个预设（匹配本协议的排前、其余也要试）；命中写回 `clientProfileId` / `authStyle`；**本轮该 host 出现过 429 立即停止嗅探**（红线 29） |

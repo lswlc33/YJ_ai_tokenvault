@@ -510,6 +510,10 @@ UA 或特征头**（红线 22）——预设是数据不是代码。
   `anthropic-version` 出现即忽略并记 warn，红线 22）→ 占位符展开。占位符值（`app_version` /
   `android_release` / `arch`）由 `@AppPlaceholders` 注入（红线 20），`{uuid}` / `{random_hex:N}`
   现算。`mergeBodyPatch` 按 RFC 7386 合并，`null` 值删键；解析失败原样返回不抛（红线 8）。
+  **消费方未接**：`mergeBodyPatch` 纯函数 + 测试就绪，但只在「极简探测 body」（
+  `ProbeRequestBuilder.inference()` 的 POST body）里叠加 `bodyPatch`，而 M5 只发 L1/L2
+  （GET，无 body）——所以 `client_profiles.bodyPatch` 目前**有产生路径（cURL 导入）与
+  UI（编辑器）但零消费路径**，随 L3（逐模型 POST 探测，红线 36 仅手动）一起落地。
 - **`importer/CurlParser`**（测试 9）：续行 / 引号 / `-H` / `-A` / `--data-raw`；自动剔除
   `Authorization` / `cookie` / `content-length` / `host`，剔除清单回传给预览页告知。
 - **`data/seed/ProfileSeeder` + `BuiltinPresets`**：幂等种入 8 个内置预设，按 `builtinRev`
