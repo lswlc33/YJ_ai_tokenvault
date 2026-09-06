@@ -191,9 +191,14 @@ private fun SelectionMark(selected: Boolean) {
 }
 
 @Composable
-internal fun KeyRow(row: UiKeyRow, nowMs: Long, onClick: () -> Unit) {
+internal fun KeyRow(
+    row: UiKeyRow,
+    nowMs: Long,
+    onClick: () -> Unit,
+    onLongPress: (() -> Unit)? = null,
+) {
     val tokens = LocalAppTokens.current
-    AppCard(modifier = rowModifier(), onClick = onClick) {
+    AppCard(modifier = rowModifier(), onClick = onClick, onLongPress = onLongPress) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing),

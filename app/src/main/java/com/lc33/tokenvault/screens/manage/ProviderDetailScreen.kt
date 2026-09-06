@@ -69,6 +69,8 @@ fun ProviderDetailScreen(
     onSetDefaultKey: (Long) -> Unit,
     onDeleteKey: (Long) -> Unit,
     onRefreshBalance: () -> Unit,
+    onProbeProvider: () -> Unit,
+    onProbeKey: (Long) -> Unit,
 ) {
     SecureScreen()
     val scrollState = rememberAppTopBarScrollState()
@@ -106,7 +108,7 @@ fun ProviderDetailScreen(
             contentPadding = padding,
             verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
         ) {
-            item { HeaderCard(state, onRefreshBalance) }
+            item { HeaderCard(state, onRefreshBalance, onProbeProvider) }
 
             item {
                 Row(
@@ -134,9 +136,23 @@ fun ProviderDetailScreen(
                     )
                 }
             } else {
+                item {
+                    // 长按是隐藏手势，不提示用户永远不知道能单 Key 探测（§8.6）
+                    AppText(
+                        text = stringResource(R.string.detail_probe_key),
+                        style = AppTextStyle.Footnote,
+                        color = appSecondaryTextColor,
+                        modifier = Modifier.padding(horizontal = tokens.screenPadding),
+                    )
+                }
                 items(state.keys.size) { index ->
                     val row = state.keys[index]
-                    KeyRow(row, state.nowMs, onClick = { onRevealKey(row.id) })
+                    KeyRow(
+                        row = row,
+                        nowMs = state.nowMs,
+                        onClick = { onRevealKey(row.id) },
+                        onLongPress = { onProbeKey(row.id) },
+                    )
                 }
             }
 
@@ -319,7 +335,11 @@ private fun RevealKeySheet(
 }
 
 @Composable
-private fun HeaderCard(state: ProviderDetailUiState, onRefreshBalance: () -> Unit) {
+private fun HeaderCard(
+    state: ProviderDetailUiState,
+    onRefreshBalance: () -> Unit,
+    onProbeProvider: () -> Unit,
+) {
     val tokens = LocalAppTokens.current
     val provider = state.provider
     AppCard(
@@ -364,6 +384,11 @@ private fun HeaderCard(state: ProviderDetailUiState, onRefreshBalance: () -> Uni
             text = stringResource(R.string.detail_balance_refresh),
             onClick = onRefreshBalance,
             modifier = Modifier.padding(top = tokens.itemSpacing),
+        )
+        AppTextButton(
+            text = stringResource(R.string.detail_probe_provider),
+            onClick = onProbeProvider,
+            modifier = Modifier.padding(top = 4.dp),
         )
     }
 }

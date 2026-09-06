@@ -166,6 +166,8 @@ fun VaultNavHost(
                     onSetDefaultKey = vm::onSetDefaultKey,
                     onDeleteKey = vm::onDeleteKey,
                     onRefreshBalance = vm::refreshBalance,
+                    onProbeProvider = vm::probeProvider,
+                    onProbeKey = vm::probeKey,
                 )
             }
         }

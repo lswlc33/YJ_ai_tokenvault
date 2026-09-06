@@ -621,6 +621,8 @@
     <string name="detail_key_delete_body">There is no way to get it back. If it is the default one, the enabled key sorted first takes over automatically.</string>
     <string name="detail_key_reveal_hint">Copy puts it on the clipboard and clears it after a while. Leaving this sheet wipes the plain text.</string>
     <string name="detail_balance_refresh">Check balance</string>
+    <string name="detail_probe_provider">Probe this provider</string>
+    <string name="detail_probe_key">Long-press a key to probe just that one</string>
     <string name="clipboard_label_api_key">YuanJi key</string>
     <string name="editor_group_none">Ungrouped</string>
     <string name="editor_profile_default">Default (no disguise)</string>

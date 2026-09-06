@@ -10,6 +10,7 @@ import com.lc33.tokenvault.domain.model.Provider
 import com.lc33.tokenvault.domain.repo.ApiKeyRepository
 import com.lc33.tokenvault.domain.repo.ProviderRepository
 import com.lc33.tokenvault.engine.BalanceEngine
+import com.lc33.tokenvault.engine.ProbeEngine
 import com.lc33.tokenvault.platform.SecureClipboard
 import com.lc33.tokenvault.screens.model.ProviderDetailUiState
 import com.lc33.tokenvault.screens.model.UiHealth
@@ -47,6 +48,7 @@ class ProviderDetailViewModel @Inject constructor(
     private val providers: ProviderRepository,
     private val keys: ApiKeyRepository,
     private val balanceEngine: BalanceEngine,
+    private val probeEngine: ProbeEngine,
     private val clipboard: SecureClipboard,
     savedState: SavedStateHandle,
 ) : ViewModel() {
@@ -180,6 +182,16 @@ class ProviderDetailViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { balanceEngine.refresh(providerId) }
         }
+    }
+
+    /** 详情页「探测这一家」。只发 L1+L2（零成本，红线 36），结果流回 `probe_runs` 与明细页。 */
+    fun probeProvider() {
+        probeEngine.probeProvider(providerId)
+    }
+
+    /** 详情页 Key 行「单 Key 探测」。只发一次 L2（零成本），验证这一张 Key 是否有效。 */
+    fun probeKey(keyId: Long) {
+        probeEngine.probeKey(keyId)
     }
 
     private fun Provider.toDetailRow(rows: List<UiKeyRow>): UiProviderRow = UiProviderRow(

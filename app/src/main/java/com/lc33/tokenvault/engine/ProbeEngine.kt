@@ -140,6 +140,26 @@ class ProbeEngine @Inject constructor(
         return startScoped(runScope = "retry") { it.id in retryIds }
     }
 
+    /**
+     * 只探测这一家（详情页「探测这一家」，§8.6 手动触发点）。
+     *
+     * 与 [start] 同一套编排，只是把 `providerId` 不匹配的骨架任务过滤掉——所以
+     * `probeEnabled = 0`、端点规范化失败、reveal 失败的 Key 依旧被 `ProbePlanBuilder` /
+     * `toTask` 挡掉，单家探测不绕过总闸。只发 L1+L2（零成本，红线 36）。
+     * 返回 false 表示已在跑、或锁定态。
+     */
+    fun probeProvider(providerId: Long): Boolean =
+        startScoped(runScope = "provider:$providerId") { it.providerId == providerId }
+
+    /**
+     * 只探测这一张 Key（详情页 Key 行「单 Key 探测」，§8.6 手动触发点）。
+     *
+     * 复用 [startScoped] 的二级过滤，只留 `keyId` 命中的 L2 任务。单张 Key 只发一次 L2
+     * （零成本），不触发 L3（红线 36）。返回 false 表示已在跑、或锁定态。
+     */
+    fun probeKey(keyId: Long): Boolean =
+        startScoped(runScope = "key:$keyId") { it.keyId == keyId }
+
     private fun startScoped(runScope: String, filter: (PlannedTask) -> Boolean): Boolean {
         if (running) return false
         if (!session.isUnlocked) return false
