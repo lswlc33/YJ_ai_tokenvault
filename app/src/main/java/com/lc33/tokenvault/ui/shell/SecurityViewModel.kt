@@ -5,8 +5,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lc33.tokenvault.crypto.RecoveryKey
 import com.lc33.tokenvault.crypto.zeroize
+import com.lc33.tokenvault.domain.AutoLockPolicy
 import com.lc33.tokenvault.domain.BiometricAvailability
 import com.lc33.tokenvault.domain.PinPolicy
+import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.platform.AutoLocker
 import com.lc33.tokenvault.platform.BiometricCapability
 import com.lc33.tokenvault.platform.BiometricOutcome
@@ -56,6 +58,7 @@ class SecurityViewModel @Inject constructor(
     private val autoLocker: AutoLocker,
     private val biometricUnlocker: BiometricUnlocker,
     private val capability: BiometricCapability,
+    private val settings: SettingsRepository,
 ) : ViewModel() {
 
     private val _changePin = MutableStateFlow(ChangePinUiState())
@@ -285,6 +288,29 @@ class SecurityViewModel @Inject constructor(
 
     fun onLockNow() {
         autoLocker.lockNow()
+    }
+
+    // ------------------------------------------------------------------ 自动锁定时限
+
+    /**
+     * 下拉当前选中的那一枚。
+     *
+     * **从仓库派生而不自己记一份**（红线 31）：真正生效的值由 `TokenVaultApp` 从同一条流
+     * 写给 [AutoLocker]。自己记一份的表现就是这一项以前那个毛病——设置页画着「立即」、
+     * 而实际上等了 60 秒。
+     *
+     * 初值给默认档而不是 0：流还没发第一个值时先画一个不存在的「立即」，比画默认档更像谎话。
+     */
+    val autoLockIndex: StateFlow<Int> = settings.observeAutoLockTimeout()
+        .map { AutoLockPolicy.indexOf(it) }
+        .stateIn(
+            viewModelScope,
+            SharingStarted.Eagerly,
+            AutoLockPolicy.indexOf(AutoLockPolicy.DEFAULT),
+        )
+
+    fun onAutoLockIndexChange(index: Int) {
+        viewModelScope.launch { settings.setAutoLockTimeout(AutoLockPolicy.at(index)) }
     }
 
     override fun onCleared() {

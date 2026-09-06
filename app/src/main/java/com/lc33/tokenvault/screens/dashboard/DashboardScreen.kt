@@ -73,7 +73,15 @@ fun DashboardScreen(
             contentPadding = padding,
             verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
         ) {
-            item { BalanceCard(state.balance, onRefreshBalance, onOpenBalanceBreakdown) }
+            item {
+                BalanceCard(
+                    balance = state.balance,
+                    nowMs = state.nowMs,
+                    canRefresh = state.canRefreshBalance,
+                    onRefresh = onRefreshBalance,
+                    onOpenBreakdown = onOpenBalanceBreakdown,
+                )
+            }
             item { CountsCard(state.counts, onOpenManage) }
             item { HealthCard(state.health) }
             item { AttentionCard(state.attention, onOpenProvider) }

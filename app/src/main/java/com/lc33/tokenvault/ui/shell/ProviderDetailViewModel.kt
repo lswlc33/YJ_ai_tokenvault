@@ -9,6 +9,7 @@ import com.lc33.tokenvault.domain.model.ApiKey
 import com.lc33.tokenvault.domain.model.Provider
 import com.lc33.tokenvault.domain.repo.ApiKeyRepository
 import com.lc33.tokenvault.domain.repo.ProviderRepository
+import com.lc33.tokenvault.engine.BalanceEngine
 import com.lc33.tokenvault.platform.SecureClipboard
 import com.lc33.tokenvault.screens.model.ProviderDetailUiState
 import com.lc33.tokenvault.screens.model.UiHealth
@@ -45,6 +46,7 @@ import kotlinx.coroutines.withContext
 class ProviderDetailViewModel @Inject constructor(
     private val providers: ProviderRepository,
     private val keys: ApiKeyRepository,
+    private val balanceEngine: BalanceEngine,
     private val clipboard: SecureClipboard,
     savedState: SavedStateHandle,
 ) : ViewModel() {
@@ -173,6 +175,13 @@ class ProviderDetailViewModel @Inject constructor(
         _revealed.value = null
     }
 
+    /** 详情页「查余额」。结果经 observeProvider 那条订阅流回，不用手动刷新（红线 10）。 */
+    fun refreshBalance() {
+        viewModelScope.launch {
+            runCatching { balanceEngine.refresh(providerId) }
+        }
+    }
+
     private fun Provider.toDetailRow(rows: List<UiKeyRow>): UiProviderRow = UiProviderRow(
         id = id,
         name = name,
@@ -187,6 +196,7 @@ class ProviderDetailViewModel @Inject constructor(
         modelCount = 0,
         accountCount = 0,
         balance = balance.toUiMoney(),
+        balanceFailed = balance?.failed == true,
         health = aggregateOf(rows),
         staleThisRound = false,
     )

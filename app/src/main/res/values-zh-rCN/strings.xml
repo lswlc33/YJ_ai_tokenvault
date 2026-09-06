@@ -39,6 +39,11 @@
     <string name="dashboard_attention_title">需要处理</string>
     <string name="dashboard_attention_none">暂无需要处理的项</string>
     <string name="dashboard_attention_fix_client">换客户端预设</string>
+    <!-- One wording per attention kind, app wide (invariant 17). Each says what to do next. -->
+    <string name="attention_key_rejected">上游拒了这把密钥。换一把，或者检查端点地址。</string>
+    <string name="attention_client_blocked">被客户端校验拦下，换个 User-Agent 就能过</string>
+    <string name="attention_config_error">端点或参数不被接受。去检查这家的配置。</string>
+    <string name="attention_low_balance">余额低于该币种的提醒阈值</string>
     <string name="dashboard_probe_title">上次探测</string>
     <string name="dashboard_probe_never">还没探测过</string>
     <string name="dashboard_probe_start">开始探测</string>
@@ -124,17 +129,7 @@
     <string name="about_not_password_manager_row">这不是密码管理器</string>
     <string name="about_not_password_manager_summary">平台账号只是本地记录：不填充、无 TOTP、不做泄露检测</string>
 
-    <!-- M0.8 sample content. Deleted together with screens/sample/ once M3 wires up real data. -->
-    <string name="sample_ago_12min">12 分钟前</string>
-    <string name="sample_ago_2hour">2 小时前</string>
-    <string name="sample_attention_client_blocked">被客户端校验拦住 —— 换个 User-Agent 就能通</string>
-    <string name="sample_attention_low_balance">余额低于该币种的阈值</string>
-    <string name="sample_note_company">公司专用账号</string>
-    <string name="sample_note_backup">备用账号</string>
-    <string name="sample_key_main">主号</string>
-    <string name="sample_key_spare">备用</string>
-    <string name="sample_account_github">GitHub 登录</string>
-    <string name="sample_account_email">邮箱登录</string>
+    <!-- Sample content for the two screens that still have no data source (import preview, client profiles). -->
     <string name="group_all">全部</string>
     <string name="manage_search_hint">搜索供应商</string>
     <string name="manage_groups_cd">分组管理</string>
@@ -148,9 +143,7 @@
     <string name="detail_section_accounts">平台账号</string>
     <string name="detail_accounts_empty">这家还没有平台账号。只存在本地，永远不会替你填写。</string>
     <string name="detail_add_account">添加平台账号</string>
-    <string name="sample_group_work">工作</string>
-    <string name="sample_group_spare">备用</string>
-    <string name="sample_group_official">官方</string>    <!-- Appearance -->
+    <!-- Appearance -->
     <string name="appearance_section_theme">主题</string>
     <string name="appearance_color_scheme">配色模式</string>
     <string name="appearance_squircle">连续圆角</string>
@@ -240,7 +233,29 @@
     <string name="data_clear_probe">清空探测结果</string>
     <string name="data_clear_probe_summary">全部回到「未探测」。密钥、模型、账号都保留。</string>
     <string name="data_clear_log">清空日志</string>
-    <string name="data_clear_log_summary">不可撤销</string>    <!-- Sync -->
+    <string name="data_clear_log_summary">不可撤销</string>
+    <string name="data_clear_probe_confirm_title">清空全部探测结果？</string>
+    <string name="data_clear_probe_confirm_body">所有密钥回到「未探测」。密钥、模型与账号本身都会保留。</string>
+    <string name="data_clear_log_confirm_title">清空整份日志？</string>
+    <string name="data_clear_log_confirm_body">所有日志条目都会被删除，不可撤销。</string>
+    <string name="log_title">日志</string>
+    <string name="log_empty">还没有日志。探测、余额与备份事件会出现在这里，写入前已脱敏。</string>
+
+    <!-- 日志级别与分类的显示文案。日志页按级别着色（红线 17：颜色 + 文字），分类做筛选。 -->
+    <string name="log_level_debug">调试</string>
+    <string name="log_level_info">信息</string>
+    <string name="log_level_warn">警告</string>
+    <string name="log_level_error">错误</string>
+    <string name="log_category_lock">锁定</string>
+    <string name="log_category_vault">金库</string>
+    <string name="log_category_probe">探测</string>
+    <string name="log_category_balance">余额</string>
+    <string name="log_category_catalog">元数据</string>
+    <string name="log_category_backup">备份</string>
+    <string name="log_category_http">网络</string>
+    <string name="log_category_account">账号</string>
+
+    <!-- Sync -->
     <string name="sync_section_local">备份文件</string>
     <string name="sync_export">导出加密备份</string>
     <string name="sync_export_summary">自包含：KDF 参数与盐都在包里，所以能在一台从没见过这台机器的手机上恢复</string>
@@ -255,6 +270,17 @@
     <string name="sync_auto">自动备份</string>
     <string name="sync_auto_summary">金库锁定时跳过，下次解锁后补做</string>
     <string name="sync_auto_wifi">仅 Wi-Fi</string>
+    <string name="sync_passphrase_prompt">输入备份口令</string>
+    <string name="sync_passphrase_hint">默认沿用 PIN</string>
+    <string name="sync_result_exported">备份已导出</string>
+    <string name="sync_result_restored">已恢复 %1$d 家供应商</string>
+    <string name="sync_result_failed">失败：%1$s</string>
+    <string name="sync_restore_mode">合并方式</string>
+    <string name="sync_mode_overwrite">覆盖</string>
+    <string name="sync_mode_merge">合并</string>
+    <string name="sync_mode_add_only">仅新增</string>
+    <string name="sync_confirm">确定</string>
+    <string name="sync_cancel">取消</string>
 
     <!-- Update -->
     <string name="update_section_channel">渠道</string>
@@ -279,7 +305,30 @@
     <string name="profiles_from_curl_summary">抓一次真实客户端的请求，把 cURL 粘进来。Authorization 与 cookie 会被剔除，预览页会说明剔除了哪些。</string>
     <string name="profiles_disclaimer">这里的版本号与头部集合来自社区观察，没有官方文档，而且会随那些客户端升级而漂移。它们的作用是给一个能用的起点，不是权威值。可靠的路径是自己抓一次包再用 cURL 导入。</string>
     <string name="profiles_verified">已实测</string>
-    <string name="profiles_custom">自定义</string>    <!-- Secret reveal / relative time -->
+    <string name="profiles_custom">自定义</string>
+    <string name="profile_name_default">元记（默认）</string>
+    <string name="profile_editor_title">客户端预设</string>
+    <string name="profile_editor_new_title">新建客户端预设</string>
+    <string name="profile_editor_name">名称</string>
+    <string name="profile_editor_user_agent">User-Agent</string>
+    <string name="profile_editor_headers">请求头</string>
+    <string name="profile_editor_headers_hint">每行一个请求头，格式「名称: 值」。顺序会被保留。</string>
+    <string name="profile_editor_body_patch">Body 补丁</string>
+    <string name="profile_editor_body_patch_hint">叠到极简探测 body 上的 JSON merge patch。「{}」表示不叠。</string>
+    <string name="profile_editor_protocols">适用协议</string>
+    <string name="profile_editor_protocols_hint">只是排序提示，不是硬过滤。</string>
+    <string name="profile_editor_delete">删除</string>
+    <string name="profile_editor_delete_title">删除这个预设？</string>
+    <string name="profile_editor_delete_summary">这个自定义预设会被删除。内置预设不可删除。</string>
+    <string name="profile_editor_from_curl">从 cURL 导入</string>
+    <string name="profile_editor_from_curl_hint">粘贴从真实客户端抓来的 cURL。Authorization 与 cookie 会被剔除。</string>
+    <string name="profile_editor_parse">解析</string>
+    <string name="profile_editor_curl_dropped">已剔除请求头：%1$s</string>
+    <string name="profile_editor_save_empty_name">名称不能为空</string>
+    <string name="profile_editor_save_empty_ua">User-Agent 不能为空</string>
+    <string name="profile_editor_curl_failed">无法解析这段 cURL</string>
+    <string name="profile_editor_builtin_note">内置预设可以编辑但不能删除，你的修改会在升级后保留。</string>
+    <!-- Secret reveal / relative time -->
     <string name="secret_reveal_cd">展开</string>
     <string name="secret_conceal_cd">遮蔽</string>
     <string name="secret_copy_cd">复制</string>
@@ -288,7 +337,8 @@
     <string name="time_minutes_ago">%1$d 分钟前</string>
     <string name="time_hours_ago">%1$d 小时前</string>
     <string name="time_days_ago">%1$d 天前</string>
-    <string name="time_future">时间戳在未来</string>    <!-- Provider editor -->
+    <string name="time_future">时间戳在未来</string>
+    <string name="time_duration_seconds">%1$d 秒</string>    <!-- Provider editor -->
     <string name="editor_save">保存</string>
     <string name="editor_section_basic">基本信息</string>
     <string name="editor_name">名称</string>
@@ -370,22 +420,35 @@
     <string name="import_selected">将导入</string>
     <string name="import_skipped">跳过</string>
     <string name="import_counts">%1$d 张密钥 · %2$d 个模型 · %3$d 个账号</string>
+    <plurals name="import_parse_errors">
+        <item quantity="other">%1$d 块解析失败被跳过——通常是缺了供应商名称。</item>
+    </plurals>
     <plurals name="import_confirm">
         <item quantity="other">导入 %1$d 家</item>
     </plurals>
+    <!-- Import preview issues (invariant 17: one wording per state) -->
+    <string name="import_issue_missing_name">缺供应商名称</string>
+    <string name="import_issue_bad_endpoint">请求地址带了查询参数或片段——会原样保留，去编辑页改</string>
+    <string name="import_issue_insecure_endpoint">这个地址是 http://——要在编辑页打开「允许不安全连接」才能用</string>
+    <string name="import_issue_model_name">这里有个模型 id 看起来像显示名——导入前先确认</string>
+    <string name="import_issue_protocol_added">有模型用了这家没列出的协议，已自动补上</string>
+    <string name="import_issue_balance_credential">NewAPI 余额需要访问令牌和用户 ID——可以先导入，之后补</string>
+    <string name="import_issue_client_profile">客户端预设匹配不到，已忽略</string>
+    <string name="import_issue_account_incomplete">有条平台账号缺用户名或密码——只记一半也会导入</string>
+    <string name="import_issue_account_duplicate">重复的平台账号已跳过</string>
 
     <!-- Probe run -->
     <string name="probe_run_failed">失败</string>
     <string name="probe_run_skipped">本轮未探测</string>
     <string name="probe_run_succeeded">成功</string>
     <string name="probe_run_retry">仅重试失败项与未探测项</string>
+    <string name="probe_run_empty_desc">还没探测过，所以这里没有结果可看。</string>
 
     <!-- Balance breakdown -->
     <string name="balance_failed_section">查询失败</string>
-    <string name="balance_failed_hint">没能读到余额——这与「余额是 0」不是一回事</string>    <string name="sample_import_issue_model_name">「DeepSeek V4 Pro」看起来是显示名而不是模型 id，导入前先确认一下</string>
-    <string name="sample_probe_detail_client">401 unauthorized client detected —— 换个 User-Agent 就能通</string>
-    <string name="sample_probe_detail_ratelimited">本轮该 host 撞了限流，后续可选请求已停发</string>
-    <string name="sample_probe_detail_budget">本轮该 host 的请求预算已用完</string>    <!-- Per-provider probe switches (invariant 36) -->
+    <string name="balance_empty_desc">余额查询按供应商单独配置，入口在供应商编辑页。</string>
+    <string name="balance_failed_hint">没能读到余额——这与「余额是 0」不是一回事</string>
+    <!-- Per-provider probe switches (invariant 36) -->
     <string name="editor_section_probe">探测</string>
     <string name="editor_probe_enabled">允许探测这一家</string>
     <string name="editor_probe_enabled_summary">条款里明确不允许自动化检测的站，把它关掉</string>
@@ -527,6 +590,7 @@
     <string name="detail_key_delete_title">删掉这把密钥？</string>
     <string name="detail_key_delete_body">删掉没法找回。如果它是默认那张，排在最前的启用密钥会自动顶上。</string>
     <string name="detail_key_reveal_hint">复制会放进剪贴板并在一段时间后自动清除。离开这一层就擦掉明文。</string>
+    <string name="detail_balance_refresh">查余额</string>
     <string name="clipboard_label_api_key">元记密钥</string>
     <string name="editor_group_none">未分组</string>
     <string name="editor_profile_default">默认（不伪装）</string>

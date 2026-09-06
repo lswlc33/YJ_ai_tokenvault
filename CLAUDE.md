@@ -227,12 +227,8 @@ M1（安全底座）**已完成**，2026-09-06。引导 → 设 PIN → 抄恢�
 自动锁定切后台 66 秒后回到前台是锁屏，而且 `pidof` 前后同一个 PID——所以是**那个活着的
 进程自己锁的**，不是进程被杀之后的假阳性。
 
-**已知缺口：安全设置里"离开应用后锁定"那个下拉还没接上。** 五个选项
-（立即 / 30 秒 / 1 分钟 / 5 分钟 / 从不）只改内存里的 `SettingsDraft`，
-`AutoLocker.timeoutSeconds` 始终是默认的 60 秒。刻意没做半截接线：这一项的权威存储
-应该是 `app_settings`（红线 31），而那要等 M3 的 `SettingsRepository`；
-接在 boot 上是错的权威，将来还得再迁一次。选"立即"却仍然等 60 秒是"设置项撒谎"，
-所以它排在 M3 的第一批。
+**“离开应用后锁定”那个下拉已经接上了**（见下面 M3 第三步）。当时刻意没做半截接线是对的：
+这一项的权威存储是 `app_settings`（红线 31），接在 boot 上将来还得再迁一次。
 
 M2（数据层）**基本完成**：10 张表 + 10 个 DAO + v1 schema JSON、`data/mapper` 的列编解码
 （CSV 与 JSON 列往返）、实体↔领域映射器、`domain/repo/` 三个接口 + `data/repo/` 三个实现
@@ -261,18 +257,164 @@ M3（接真数据）**管理那一支已完成**，2026-09-06。管理页、供�
   （给 Room 用），而 `value` 的 setter 会用 `equals` 判"变了没"，于是
   `copy(isDefault = true)` 这种只动了未参与比较字段的写入会被静默丢掉。
 
-**还吃 `screens/sample/` 的**：仪表盘六块卡、探测明细、余额明细、粘贴导入、
-客户端预设列表。详情页的模型与平台账号是空列表（仓库分别在 M5 / M6）。
-编辑页的"客户端预设"下拉只有一项且不落库——内置预设是数据不是代码（红线 22），
-它的 seed 在 M5。
+**还吃 `screens/sample/` 的只剩两处**：粘贴导入的预览（解析器在 M4）与客户端预设列表
+（`ProfileSeeder` 在 M5）。详情页的模型与平台账号是空列表（仓库分别在 M5 / M6）。
+编辑页的「客户端预设」下拉只有一项且不落库——内置预设是数据不是代码（红线 22）。
 
-下一步：`SettingsRepository`（把七个设置页与"离开应用后锁定"落到 `app_settings`）、
-仪表盘计数接真数据、然后 M4 的粘贴导入。里程碑表见 `计划.md` §16。
+### M3 第三步：仪表盘接真数据 + 自动锁定时限落库（2026-09-06）
 
-单测 229 个全绿（1 个 spike 按设计跳过），21 个 suite；`lint` 0 error / 23 warning
-（12 个 UnusedResources 是 M0.8 留下的死文案，后续会用上或删掉；剩下的是 6 个
-PluralsCandidate、2 个依赖有新版、2 个 Modifier 工厂命名、1 个拼写）；
-strings 两份各 427 条 string + 7 条 string-array，键名零差异。
-**仪器测试仍然是空的**（只有 `HiltTestRunner.kt`），所以 `计划.md` §14.3 里需要设备的三项
-——Keystore 往返、boot 原子写杀进程、`FLAG_SECURE` + 剪贴板——目前只有手工验证，
-没有自动化覆盖。
+两件事，共同点是**它们不是功能缺失，是软件在对用户撒谎**：首屏的假数字，以及一个
+选了「立即」却等 60 秒的安全开关。
+
+**仪表盘六块卡不再有假数字。** 三块接真数据（余额 / 内容计数 / 健康分布），另三块给
+**空态**（需要处理算得出来但目前必然为空；上次探测在 M5；备份在 M9）。余额明细页也接上了。
+
+- **聚合全部走 `ui/shell/UiMapping.kt` 里的纯函数**（`contentCountsOf` / `healthBreakdownOf` /
+  `balanceSummaryOf` / `attentionItemsOf`），仪表盘与管理页用同一批。两处各算一遍的代价很具体：
+  首屏说 10 把、管理页加起来是 9 把，而两个数字都「看起来对」。
+- **健康分布只算已启用的密钥**，因为计数卡那条聚合 SQL 带了 `enabled = 1`。不一致的表现是
+  同一屏里「密钥 1」与「2 张全部可用」同时出现。
+- **余额有三种状态，不是两种**（§9.3）：有金额（含 0）/ 试过但失败 / 压根没配置。
+  `UiProviderRow` 因此除了 `balance: UiMoney?` 还有 `balanceFailed`——只看前者为 null 的话，
+  一个刚建好、没开余额查询的供应商会被列到「查询失败」下面（这个错真的在设备上出现过一次，
+  是逐屏核对时抓到的）。
+- **需要处理只读 `health`**（红线 11），而且「额度不足」与「余额低于阈值」去重成一行：
+  两条路径指向同一件事。全部 `UNKNOWN` 时这一卡是空的——「还没探测过」不是要处理的问题。
+- **没实现的动作不画按钮**：`DashboardUiState.canProbe` / `canRefreshBalance` 现在都是 false，
+  于是「开始探测」与余额刷新图标根本不渲染。一个点下去什么都不会发生的按钮和假数字是同一类
+  问题。两个里程碑做完就把这两个字段一起删掉。副作用：`ProbeRunRoute` 目前从界面上进不来
+  （入口只在有过一轮探测时才画），所以那一页顺手加了空态。
+- **需要本地化的东西不在 UiState 里拼好**（红线 19）：余额的「更新于」给时间戳，
+  「需要处理」给 `AttentionKind` 枚举，文案由 `ui/common` 的 `messageOf` 统一给（红线 17）。
+- 顺手补的两个洞：`relativeLabel(now, then)` 现在是相对时间的**唯一入口**，以前直接调
+  `relativeTimeLabel` 而不传 `absoluteLabel`，于是超过 30 天的时间静静地渲染成空串；
+  `ApiKeyRepository.observeAll()` 一条订阅取代了 `ManageViewModel` 里那个按家 combine 的 N+1。
+
+**自动锁定时限落库了**，`SettingsRepository` 因此落地——**但它只有这一项**。
+七个设置页其余那些仍然是内存态 `SettingsDraft`：它们大半还没有消费方（前台空闲计时、
+屏幕关闭即锁定的代码都没写），先落库只会得到一批「存下来了但没人读」的键（红线 16）。
+
+- **存的是秒数，不是下拉的下标**（`app_settings.autoLockSeconds`）。存下标的代价是
+  「以后在中间插一档」会让所有已存的设置悄悄改变含义，而没有任何迁移能发现它。
+- **「从不」是显式的一档**（`AutoLockTimeout.Never`），不用 `null` 也不用 `-1`：
+  哨兵值在算术里会静默变成「0 秒后锁」或者「永不锁」，而这是个安全设置。
+  解不出来的存储值一律回默认档（失败往安全那一侧倒）。
+- **订阅在 `TokenVaultApp` 里，不在设置页的 ViewModel 里。** 那个 ViewModel 只在用户站在
+  那一页时活着，接在它上面的表现是「设成立即 → 退出设置 → 切后台」又退回 60 秒。
+  `AutoLocker.timeout` 因此是个 `@Volatile` 字段，写入方只有那一条进程级订阅。
+- `RoomSettingsRepository` 订阅**整张表**再挑那一个键，所以后面必须跟 `distinctUntilChanged`：
+  不跟的表现是每改一次别的开关，`AutoLocker` 就被重设一次时限。
+
+**这一步的设备验证**（2026-09-06，逐屏 `uiautomator dump`）：仪表盘读出 1 家 / 1 把 /
+0 模型 / 0 账号，与管理页的「0 / 1 张可用」对得上；余额明细页给的是空态而不是「查询失败」；
+下拉选一轮后库里依次是 `30` / `0` / `never` / `300` / `60`（秒数，不是下标）；选「立即」后
+按 HOME、3 秒后回到前台是锁屏；选「从不」后后台 **75 秒**回来仍然解锁（旧行为会在 60 秒处
+锁掉，所以这一条才是决定性的）；两次前后 `pidof` 同一个 PID，所以不是进程被杀之后的假阳性；
+选 5 分钟后 `am force-stop` 再进去，下拉仍是 5 分钟。
+
+下一步：M5 探测引擎的**接线半拉**（`ProbeEngine` @Singleton 宿主 + VaultSession 取消桥接 +
+逐项落库 + Hilt 绑定 + 仪表盘触发），然后是 M6 客户端伪装（L1+L2 已就绪，M6 补嗅探与预设）。
+里程碑表见 `计划.md` §16。
+
+### M4：文本导入（2026-09-06）
+
+粘贴 → 预览 → 确认，整条路通了。解析器在 `importer/`（纯 Kotlin，测试 8 全绿），
+落库编排在 `data/repo/ImportWriter.kt`，UI 在 `ImportViewModel` + `ImportScreen`。
+
+- **解析器 `TextImporter` 是纯函数**，`parse(text) → ParseResult(records, errors)`。
+  输出 [ParsedRecord]（含 `keys` / `accounts` / `models` 子项 + `issues`），
+  秘密字段（API Key / 访问令牌 / 账号 / 密码）是 `CharArray`（红线 1），非秘密用 `String`。
+  单测喂 `app/src/test/resources/sample_import.txt`（脱敏 fixture，与真实 `示例数据.md`
+  逐字节等价）。
+- **块字段终止规则**（§11.1 第 1–5 条）写死在状态机里：`支持端点类型` 后面隔空行、
+  `模型列表` 紧跟字段名、最后一条无 `---` 结尾（EOF 是合法终止）三条都有用例。
+  字段名识别用**前缀匹配**（`fieldNameOf`）而不是正则——字段名里有空格（`API Key`），
+  括号说明可能是半角 `(…)` 也可能是全角 `（…）`。
+- **字段名是导入格式的协议，不是 UI 文案**，所以 `TextImporter` / `TextExporter` 里的
+  中文字面量（`供应商名称` / `备注` / `官方接口` / 密钥 label `主号` / `备用 N`）都逐行
+  打了 `// i18n-exempt` 标记（与 `Protocol.fromAlias` 的 `ALIAS_NOISE` 同一个理由：把它们
+  搬进 strings.xml 会跟着界面语言变，于是"英文用户粘贴中文数据"就解析不出来）。
+- **落库编排 `ImportWriter`** 把一条记录写成：供应商 → 密钥（第一张默认，靠
+  `ApiKeyRepository.add` 的不变量）→ 账号 → 模型，整批在 `TransactionRunner` 里。
+  账号的明文走 `ProviderAccountRepository.add`，密钥走 `ApiKeyRepository.add`，
+  各自内部都有"两步写"（AAD 绑主键，红线 24）。
+- **新增两个仓库接口**：`ProviderAccountRepository` / `ModelRepository`（domain 层），
+  各自只有导入需要的 `add` + `observeByProvider`。它们本属 M6 / M5，这里为了导入落地
+  先建了最小版。`ProviderAccountDao` 因此补了 `setUsername` / `setPassword` 两个回填方法
+  （两步写，不复用 `@Update` 整行替换）。
+- **反向导出 `TextExporter`**（§11.3）是纯函数，`exportProvider(...)` 拼出同格式文本；
+  遮蔽 / 明文的选择由调用方决定（调用方负责 `reveal` + `SecretMask.of`）。测试断言**往返**：
+  导出再导入能解析回同样的东西。明文导出时用 `PLAINTEXT_WARNING` 插警告行。
+  **UI 的 SAF 保存入口还没做**（§11.3 是可砍项，§14.4），核心验收"粘贴导入"已闭环。
+- `SecureClipboard` 补了 `read()`（「从剪贴板填充」用），`AppTextFieldState` 补了
+  `setText()`（把剪贴板文本填进输入框，走 `setTextAndPlaceCursorAtEnd` 而非重建 state）。
+
+单测 290 个全绿（1 个 spike 按设计跳过）；`lint` 0 error / 23 warning；`assembleDebug` 通过。
+**ADB 端到端还没跑**（本机当前没有连接设备）：`计划.md` §16 里 M4 的验收是"ADB 流程里把
+真实 `示例数据.md` 一次粘贴成功"，这一步要插设备。数据层的正确性已经由 290 个单测覆盖
+（含 ImportWriter 用真 `VaultSession` + `SecretBox` 的端到端加密往返）。
+
+### M5：探测引擎（2026-09-06，只做 L1+L2）
+
+验收 = 测试 2 / 3 / 12 / 14 全绿，**四项全绿**。核心是三个纯 Kotlin 包 + 一个 net 层：
+
+- **`endpoint/` 三协议请求构造**（测试 2）：`ProbeRequest` / `ProbeResponse` 纯数据，
+  `ProbeRequestBuilder` 纯函数出 CHAT / RESPONSES / ANTHROPIC 的 method / URL / 头 / body。
+  `max_tokens = 16`（§5.2，只保证被接受、不保证拿到内容，红线 34）；CHAT/RESPONSES 用
+  `Authorization: Bearer`，ANTHROPIC 用 `x-api-key` + `anthropic-version`（红线 22 后半句）。
+  无密钥时基线检测用 `Bearer yj-probe-invalid`（不是空头）。`MockWebServer` 验证真实报文。
+- **`probe/ProbeClassifier`**（测试 3）：`classify(status, body, error, level)` 单函数，
+  严格按 §8.4 矩阵短路。四条原则都落了地：额度关键词优先于状态码、客户端关键词排在 401
+  之前（红线 33）、L2 遇 400 判 OK 而非 CONFIG_ERROR、body 空/纯文本不因解析失败升级
+  （红线 35）。用例直接读 `fixtures/probe-matrix.json` 16 条真实响应。
+  **关键词匹配在"小写 + 去空白"后的文本上做，关键词本身也要去空白**——否则
+  `unauthorized client`（含空格）在去空白的 body 里永远匹配不上（这是个实测会踩的坑）。
+- **`probe/ModelMerger`**（测试 12）：三路合并纯函数，返回 `ModelMergePlan`（insert/touch/
+  disable 三个动作列表）。`discoveredVia == 本协议` 才停用（红线 30），manual 行永不动（红线 13）。
+- **`probe/ProbeOrchestrator`**（测试 14）：编排纯逻辑，依赖 `ProbeTransport`（发请求抽象）。
+  逐项推流 `Flow<ProbeItemResult>`、取消即停、总预算超时、每 host 请求预算（`12 + 密钥数 +
+  模型数`）、429 后停该 host 后续请求（红线 29）、host 间隔。`runTest` 虚拟时间全绿。
+- **`net/OkHttpEngine` + `HostGate`**：单例 OkHttpClient（connect 8s / read 20s / call 35s /
+  dispatcher 8 & per-host 3），host 门闸默认 800ms、429 加倍封顶 8s。`http://` 必须
+  `allowInsecure` 才放行（§7.5）。首字节延迟用 per-call `EventListener`。
+  **MockWebServer 用 `mockwebserver3`（OkHttp 5.x），API 与旧版不同**：`MockResponse.Builder()
+  .code(n).body(s)`、`server.close()`（不是 shutdown）、`RecordedRequest.requestLine`。
+
+**还没做（M5 的"接线"半拉）**：`ProbeEngine`（`@Singleton` 宿主，`StateFlow<ProbeProgress>`、
+`VaultSession` 锁定时取消、逐项落库 DAO）、Hilt 绑定、仪表盘 `onStartProbe` 触发、`probe_runs`
+落库。目前 `ProbeOrchestrator` 是纯逻辑，UI 的 `onStartProbe` 还是空实现（`VaultNavHost.kt:91`）。
+
+单测 328 个全绿（1 个 spike 按设计跳过）；`lint` 0 error / 23 warning；`assembleDebug` 通过。
+
+### M6：客户端伪装（2026-09-06，纯函数层 + 预设 UI + 自动嗅探）
+
+验收 = 测试 9（cURL 解析）/ 10（头部组装）/ 嗅探顺序全绿，四项全绿。**整条链路没有一处硬编码
+UA 或特征头**（红线 22）——预设是数据不是代码。
+
+- **`endpoint/HeaderAssembler`**（测试 10）：纯函数按 §8.2 顺序组装——基础头 → 预设头按序覆盖
+  （UA 取预设值）→ **鉴权头最后加且预设不得覆盖**（`Authorization` / `x-api-key` /
+  `anthropic-version` 出现即忽略并记 warn，红线 22）→ 占位符展开。占位符值（`app_version` /
+  `android_release` / `arch`）由 `@AppPlaceholders` 注入（红线 20），`{uuid}` / `{random_hex:N}`
+  现算。`mergeBodyPatch` 按 RFC 7386 合并，`null` 值删键；解析失败原样返回不抛（红线 8）。
+- **`importer/CurlParser`**（测试 9）：续行 / 引号 / `-H` / `-A` / `--data-raw`；自动剔除
+  `Authorization` / `cookie` / `content-length` / `host`，剔除清单回传给预览页告知。
+- **`data/seed/ProfileSeeder` + `BuiltinPresets`**：幂等种入 8 个内置预设，按 `builtinRev`
+  刷新**未被用户改过**（`userEdited == false`）的条目；自定义预设 `sortOrder = max + 1`。
+- **预设 UI**：设置 → 客户端预设（列表 / 编辑 / cURL 导入）接真数据，走 `ProfileListViewModel` +
+  `ProfileEditorViewModel` + `ProfileEditorScreen`；内置预设可编辑不可删（`delete()` 对
+  `builtinKey` 非空 no-op）。**供应商编辑页的「客户端预设」下拉接真数据并落库**——
+  `Provider.toDraft` / `ProviderDraft.toProvider` 的 `clientProfileId` 映射集中在一处，
+  下标 0 = 默认（显式 null）、越界 = 保留原值（与 groupId 同一套理由）。
+- **自动嗅探**（`probe/SniffPlan.kt` + `engine/ProbeEngine.trySniff`）：`CLIENT_BLOCKED` 时先换
+  鉴权头（Bearer ↔ x-api-key，一次请求）→ 再按序试最多 4 个内置预设（**匹配本协议的排前、
+  不匹配的也要试**，「适用协议」是排序提示不是硬过滤，§8.2 M0.5 实测）。命中写回
+  `clientProfileId` + 置 `verified`，或写回 `authStyle`；**本轮该 host 出现过 429 立即停**
+  （红线 29，`rateLimitedHosts` 与编排器各自记一份）。
+- **`ProbeTask.headers` 语义变更**：从"鉴权头"扩成"最终完整头，已由引擎用 `HeaderAssembler`
+  组好"——这样 `PlannedTask` 骨架仍然不含密钥明文（纯 Kotlin 包不碰 reveal，§6.1 推论 3），
+  引擎在发请求前才 reveal、组头、`zeroize`。
+
+单测 381 个全绿（1 个 spike 按设计跳过）；`lint` 0 error / 24 warning；`assembleDebug` 通过。
+**还没做**：设备端到端（Agent Router 三条路径——默认 UA 被 401 拦 → 换 `claude_code` 转可用 →
+换 `x-api-key` 也绕过；JustDoWork 403 空 body 给"上游没说原因"；全试过仍被拦给"TLS 指纹"
+终止结论）。这一步要插设备、要花真实额度，`示例数据.md` 每轮只勾一家。

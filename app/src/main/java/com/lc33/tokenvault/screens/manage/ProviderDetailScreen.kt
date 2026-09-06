@@ -39,6 +39,7 @@ import com.lc33.tokenvault.ui.miuix.appTopBarScroll
 import com.lc33.tokenvault.ui.miuix.rememberAppTopBarScrollState
 import com.lc33.tokenvault.ui.miuix.rememberSecretTextFieldState
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
+import com.lc33.tokenvault.ui.theme.LocalStatusPalette
 
 /**
  * 供应商详情 —— 这一家的密钥 / 模型 / 平台账号都在这里看、也在这里改
@@ -67,6 +68,7 @@ fun ProviderDetailScreen(
     onCloseReveal: () -> Unit,
     onSetDefaultKey: (Long) -> Unit,
     onDeleteKey: (Long) -> Unit,
+    onRefreshBalance: () -> Unit,
 ) {
     SecureScreen()
     val scrollState = rememberAppTopBarScrollState()
@@ -104,7 +106,7 @@ fun ProviderDetailScreen(
             contentPadding = padding,
             verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
         ) {
-            item { HeaderCard(state) }
+            item { HeaderCard(state, onRefreshBalance) }
 
             item {
                 Row(
@@ -317,7 +319,7 @@ private fun RevealKeySheet(
 }
 
 @Composable
-private fun HeaderCard(state: ProviderDetailUiState) {
+private fun HeaderCard(state: ProviderDetailUiState, onRefreshBalance: () -> Unit) {
     val tokens = LocalAppTokens.current
     val provider = state.provider
     AppCard(
@@ -340,15 +342,35 @@ private fun HeaderCard(state: ProviderDetailUiState) {
         ) {
             provider.protocols.forEach { protocol -> AppChip(text = protocol) }
         }
-        if (provider.balance != null) {
-            AppText(
-                text = "${provider.balance.currency} ${provider.balance.amount}",
-                style = AppTextStyle.Title,
-                modifier = Modifier.padding(top = tokens.itemSpacing),
-            )
+        // 余额：三种状态要可区分（§9.3）——有金额 / 查询失败 / 没配置。
+        when {
+            provider.balance != null -> {
+                AppText(
+                    text = provider.balance.toDisplay(),
+                    style = AppTextStyle.Title,
+                    modifier = Modifier.padding(top = tokens.itemSpacing),
+                )
+            }
+            provider.balanceFailed -> {
+                AppText(
+                    text = stringResource(R.string.balance_failed_section),
+                    style = AppTextStyle.Secondary,
+                    color = LocalStatusPalette.current.warn,
+                    modifier = Modifier.padding(top = tokens.itemSpacing),
+                )
+            }
         }
+        AppTextButton(
+            text = stringResource(R.string.detail_balance_refresh),
+            onClick = onRefreshBalance,
+            modifier = Modifier.padding(top = tokens.itemSpacing),
+        )
     }
 }
+
+/** 金额 + 币种符号。符号由币种查表（红线 15 不硬编码）。 */
+private fun com.lc33.tokenvault.screens.model.UiMoney.toDisplay(): String =
+    com.lc33.tokenvault.balance.FormatMoney.format(amount.toDoubleOrNull() ?: 0.0, currency)
 
 @Composable
 private fun AccountsEmptyHint() {

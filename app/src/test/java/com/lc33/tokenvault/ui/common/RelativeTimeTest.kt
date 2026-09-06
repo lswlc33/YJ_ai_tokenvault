@@ -57,4 +57,14 @@ class RelativeTimeTest {
         // 一分钟内的时钟漂移不算未来，否则每次都要显示"时间不可信"
         assertEquals(RelativeBucket.JustNow, relativeBucketOf(now, now + 30_000))
     }
+
+    @Test
+    fun `耗时不向下取整`() {
+        // 0.4 秒的探测若向下取整会显示"0 秒"，等于说"没花时间"——那是在说谎。
+        assertEquals(1, durationSeconds(400))
+        assertEquals(1, durationSeconds(1))
+        assertEquals(0, durationSeconds(0))
+        assertEquals(2, durationSeconds(1001))
+        assertEquals(120, durationSeconds(120_000))
+    }
 }

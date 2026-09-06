@@ -6,8 +6,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
@@ -17,6 +17,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.lc33.tokenvault.R
+import com.lc33.tokenvault.importer.ImportIssue
 import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppChip
 import com.lc33.tokenvault.ui.miuix.AppIcon
@@ -36,15 +37,18 @@ import com.lc33.tokenvault.ui.theme.LocalAppTokens
 import com.lc33.tokenvault.ui.theme.LocalStatusPalette
 
 /** 预览里的一条待导入供应商。 */
-data class ParsedPreview(
+data class ImportPreview(
     val name: String,
     val host: String,
     val keyCount: Int,
     val modelCount: Int,
     val accountCount: Int,
     val protocols: List<String>,
-    /** 已本地化的问题描述。非空表示这一条需要用户过一眼。 */
-    val issues: List<String> = emptyList(),
+    /**
+     * 机器可读的问题枚举。**不是已经本地化的句子**（红线 19）：ViewModel 读不到资源，
+     * 文案由 [issueMessageOf] 统一给（红线 17）。
+     */
+    val issues: List<ImportIssue> = emptyList(),
     val selected: Boolean = true,
 )
 
@@ -59,16 +63,18 @@ data class ParsedPreview(
  */
 @Composable
 fun ImportScreen(
-    previews: List<ParsedPreview>,
+    previews: List<ImportPreview>,
+    parseErrors: Int,
+    importing: Boolean,
     onBack: () -> Unit,
-    onFillFromClipboard: () -> Unit,
     onParse: (String) -> Unit,
     onToggle: (Int) -> Unit,
     onConfirm: () -> Unit,
+    readClipboard: () -> String?,
 ) {
     val scrollState = rememberAppTopBarScrollState()
     val tokens = LocalAppTokens.current
-    val raw = rememberAppTextFieldState()
+    val textFieldState = rememberAppTextFieldState()
 
     AppScaffold(
         topBar = {
@@ -103,7 +109,7 @@ fun ImportScreen(
                     verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
                 ) {
                     AppTextField(
-                        state = raw,
+                        state = textFieldState,
                         label = stringResource(R.string.import_paste_label),
                         singleLine = false,
                         supportingText = stringResource(R.string.import_paste_hint),
@@ -111,13 +117,33 @@ fun ImportScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing)) {
                         AppTextButton(
                             text = stringResource(R.string.import_from_clipboard),
-                            onClick = onFillFromClipboard,
+                            onClick = {
+                                val text = readClipboard()
+                                if (text != null) {
+                                    textFieldState.setText(text)
+                                    onParse(text)
+                                }
+                            },
                         )
                         AppTextButton(
                             text = stringResource(R.string.import_parse),
-                            onClick = { onParse(raw.text) },
+                            onClick = { onParse(textFieldState.text) },
                         )
                     }
+                }
+            }
+
+            if (parseErrors > 0) {
+                item {
+                    AppText(
+                        text = pluralStringResource(R.plurals.import_parse_errors, parseErrors, parseErrors),
+                        style = AppTextStyle.Footnote,
+                        color = LocalStatusPalette.current.error,
+                        modifier = Modifier.padding(
+                            horizontal = tokens.screenPadding,
+                            vertical = tokens.itemSpacing,
+                        ),
+                    )
                 }
             }
 
@@ -145,6 +171,7 @@ fun ImportScreen(
                         previews.count { it.selected },
                         previews.count { it.selected },
                     ),
+                    enabled = !importing && previews.any { it.selected },
                     onClick = onConfirm,
                     modifier = Modifier.padding(
                         horizontal = tokens.screenPadding,
@@ -157,8 +184,24 @@ fun ImportScreen(
     }
 }
 
+/** 导入问题的文案（红线 17：同一状态只有一套文案；红线 19：文案在资源里）。 */
 @Composable
-private fun PreviewCard(preview: ParsedPreview, onToggle: () -> Unit) {
+fun issueMessageOf(issue: ImportIssue): String = stringResource(
+    when (issue) {
+        ImportIssue.MISSING_NAME -> R.string.import_issue_missing_name
+        ImportIssue.BAD_ENDPOINT -> R.string.import_issue_bad_endpoint
+        ImportIssue.INSECURE_ENDPOINT -> R.string.import_issue_insecure_endpoint
+        ImportIssue.MODEL_NAME_REVIEW -> R.string.import_issue_model_name
+        ImportIssue.MODEL_PROTOCOL_ADDED -> R.string.import_issue_protocol_added
+        ImportIssue.BALANCE_MISSING_CREDENTIAL -> R.string.import_issue_balance_credential
+        ImportIssue.CLIENT_PROFILE_UNKNOWN -> R.string.import_issue_client_profile
+        ImportIssue.ACCOUNT_INCOMPLETE -> R.string.import_issue_account_incomplete
+        ImportIssue.ACCOUNT_DUPLICATE -> R.string.import_issue_account_duplicate
+    },
+)
+
+@Composable
+private fun PreviewCard(preview: ImportPreview, onToggle: () -> Unit) {
     val tokens = LocalAppTokens.current
     AppCard(
         modifier = Modifier
@@ -205,7 +248,7 @@ private fun PreviewCard(preview: ParsedPreview, onToggle: () -> Unit) {
         )
         preview.issues.forEach { issue ->
             AppText(
-                text = issue,
+                text = issueMessageOf(issue),
                 style = AppTextStyle.Footnote,
                 color = LocalStatusPalette.current.warn,
                 modifier = Modifier.padding(top = 3.dp),
@@ -213,4 +256,3 @@ private fun PreviewCard(preview: ParsedPreview, onToggle: () -> Unit) {
         }
     }
 }
-

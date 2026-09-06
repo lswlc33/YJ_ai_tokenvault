@@ -13,6 +13,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.lc33.tokenvault.R
 import com.lc33.tokenvault.screens.model.AttentionItem
+import com.lc33.tokenvault.screens.model.AttentionKind
 import com.lc33.tokenvault.screens.model.BackupStatus
 import com.lc33.tokenvault.screens.model.BalanceSummary
 import com.lc33.tokenvault.screens.model.ContentCounts
@@ -20,11 +21,15 @@ import com.lc33.tokenvault.screens.model.DashboardUiState
 import com.lc33.tokenvault.screens.model.HealthBreakdown
 import com.lc33.tokenvault.screens.model.UiHealth
 import com.lc33.tokenvault.ui.common.BarSegment
+import com.lc33.tokenvault.ui.common.RelativeBucket
 import com.lc33.tokenvault.ui.common.SegmentedBar
 import com.lc33.tokenvault.ui.common.StatTile
 import com.lc33.tokenvault.ui.common.StatusDot
 import com.lc33.tokenvault.ui.common.colorOf
+import com.lc33.tokenvault.ui.common.durationSeconds
 import com.lc33.tokenvault.ui.common.labelOf
+import com.lc33.tokenvault.ui.common.messageOf
+import com.lc33.tokenvault.ui.common.relativeLabel
 import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppDivider
 import com.lc33.tokenvault.ui.miuix.AppIcon
@@ -51,6 +56,8 @@ private fun CardTitle(text: String) {
 @Composable
 internal fun BalanceCard(
     balance: BalanceSummary,
+    nowMs: Long,
+    canRefresh: Boolean,
     onRefresh: () -> Unit,
     onOpenBreakdown: () -> Unit,
 ) {
@@ -63,19 +70,27 @@ internal fun BalanceCard(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 CardTitle(stringResource(R.string.dashboard_balance_title))
-                if (balance.updatedAgo != null) {
+                if (balance.updatedAt != null) {
+                    // 分档在纯函数里、文案在资源里（RelativeTime.kt 就是为此拆开的），
+                    // 所以 ViewModel 给的是时间戳而不是一句“12 分钟前”
                     AppText(
-                        text = stringResource(R.string.dashboard_balance_updated, balance.updatedAgo),
+                        text = stringResource(
+                            R.string.dashboard_balance_updated,
+                            relativeLabel(nowMs, balance.updatedAt),
+                        ),
                         style = AppTextStyle.Footnote,
                         color = appSecondaryTextColor,
                     )
                 }
             }
-            AppIconButton(
-                icon = AppIcon.Refresh,
-                contentDescription = stringResource(R.string.refresh_cd),
-                onClick = onRefresh,
-            )
+            // 余额适配器在 M7。按钮画出来但点了什么都不发生，和假数字是同一类问题
+            if (canRefresh) {
+                AppIconButton(
+                    icon = AppIcon.Refresh,
+                    contentDescription = stringResource(R.string.refresh_cd),
+                    onClick = onRefresh,
+                )
+            }
         }
         if (balance.perCurrency.isEmpty()) {
             AppText(
@@ -195,13 +210,14 @@ internal fun AttentionCard(items: List<AttentionItem>, onOpenProvider: (Long) ->
             Column(modifier = Modifier.padding(top = tokens.itemSpacing)) {
                 StatusDot(color = colorOf(item.health), label = item.providerName)
                 AppText(
-                    text = item.message,
+                    text = messageOf(item.kind),
                     style = AppTextStyle.Secondary,
                     color = appSecondaryTextColor,
                     modifier = Modifier.padding(top = 2.dp),
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing)) {
-                    if (item.offerClientProfileFix) {
+                    // 只有“被客户端校验拦下”这一档有一键修法，其余三档点整行进详情页
+                    if (item.kind == AttentionKind.ClientBlocked) {
                         AppTextButton(
                             text = stringResource(R.string.dashboard_attention_fix_client),
                             onClick = { onOpenProvider(item.providerId) },
@@ -264,11 +280,15 @@ internal fun ProbeCard(
                 modifier = Modifier.padding(vertical = tokens.itemSpacing),
             )
         } else {
+            // 相对时间与耗时在页面层现算（红线 19：ViewModel 给时间戳，不拼文案）。
             AppText(
                 text = stringResource(
                     R.string.dashboard_probe_finished,
-                    lastRun.finishedAgo,
-                    lastRun.durationLabel,
+                    relativeLabel(state.nowMs, lastRun.finishedAtMs),
+                    stringResource(
+                        R.string.time_duration_seconds,
+                        durationSeconds(lastRun.durationMs),
+                    ),
                 ),
                 style = AppTextStyle.Secondary,
                 modifier = Modifier.padding(top = tokens.itemSpacing),
@@ -287,7 +307,11 @@ internal fun ProbeCard(
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing)) {
-            AppTextButton(text = stringResource(R.string.dashboard_probe_start), onClick = onStart)
+            // 探测引擎在 M5。没实现之前不画这两个按钮：一个点下去什么都不会发生的
+            // “开始探测”比没有这个按钮更伤信任
+            if (state.canProbe) {
+                AppTextButton(text = stringResource(R.string.dashboard_probe_start), onClick = onStart)
+            }
             if (lastRun != null) {
                 AppTextButton(
                     text = stringResource(R.string.dashboard_probe_detail),

@@ -1,5 +1,6 @@
 package com.lc33.tokenvault
 
+import com.lc33.tokenvault.domain.AutoLockPolicy
 import com.lc33.tokenvault.ui.theme.AppColorSchemeMode
 import java.io.File
 import org.junit.Assert.assertTrue
@@ -154,8 +155,24 @@ class ArchitectureRulesTest {
         // R.array.color_scheme_modes 的条目数与 AppColorSchemeMode 的常量数必须相等。
         // 不等的表现不是崩溃而是错位：加了一个枚举值忘了加文案，用户选"深色"得到壁纸取色；
         // 反过来 entries[index] 会越界。两种都编译得过。
-        val enumCount = AppColorSchemeMode.entries.size
+        fail(
+            "配色下拉按下标取值，两边数量必须一致（红线 17 的同一条道理）：",
+            arrayItemCountMismatches("color_scheme_modes", AppColorSchemeMode.entries.size, "AppColorSchemeMode"),
+        )
+    }
 
+    @Test
+    fun `自动锁定下拉的选项数与策略表一致`() {
+        // 同上，但后果更重：错位一格就是“选「立即」得到 5 分钟”，而这是个安全设置。
+        // AutoLockPolicy.OPTIONS 末尾那一枚是「从不」，少一项就把它变成了「5 分钟」
+        fail(
+            "自动锁定下拉按下标取值，两边数量必须一致（§7.4）：",
+            arrayItemCountMismatches("auto_lock_options", AutoLockPolicy.OPTIONS.size, "AutoLockPolicy.OPTIONS"),
+        )
+    }
+
+    /** 比每一份 strings.xml 里某个 `string-array` 的条目数与代码侧那张表的长度。 */
+    private fun arrayItemCountMismatches(arrayName: String, expected: Int, codeSide: String): List<String> {
         val resRoot = sequenceOf(File("src/main/res"), File("app/src/main/res"))
             .firstOrNull { it.isDirectory } ?: error("找不到 res 目录")
         val stringFiles = resRoot.listFiles()!!
@@ -164,19 +181,18 @@ class ArchitectureRulesTest {
             .filter { it.isFile }
         assertTrue("至少要比到一份 strings.xml", stringFiles.isNotEmpty())
 
-        val violations = stringFiles.mapNotNull { xml ->
+        return stringFiles.mapNotNull { xml ->
             val array = xml.readText()
-                .substringAfter("""<string-array name="color_scheme_modes">""", "")
+                .substringAfter("""<string-array name="$arrayName">""", "")
                 .substringBefore("</string-array>")
             val count = Regex("<item>").findAll(array).count()
             val where = "${xml.parentFile!!.name}/strings.xml"
             when {
-                array.isEmpty() -> "$where 里没有 color_scheme_modes"
-                count != enumCount -> "$where 有 $count 项，AppColorSchemeMode 有 $enumCount 个"
+                array.isEmpty() -> "$where 里没有 $arrayName"
+                count != expected -> "$where 有 $count 项，$codeSide 有 $expected 个"
                 else -> null
             }
         }
-        fail("配色下拉按下标取值，两边数量必须一致（红线 17 的同一条道理）：", violations)
     }
 
     /**

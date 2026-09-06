@@ -3,6 +3,7 @@ package com.lc33.tokenvault.ui.shell
 import com.lc33.tokenvault.domain.AuthStyle
 import com.lc33.tokenvault.domain.BalanceKind
 import com.lc33.tokenvault.domain.Protocol
+import com.lc33.tokenvault.domain.model.ClientProfile
 import com.lc33.tokenvault.domain.model.Group
 import com.lc33.tokenvault.domain.model.Provider
 import com.lc33.tokenvault.domain.model.ProviderProbeSettings
@@ -43,7 +44,7 @@ val BALANCE_KINDS: List<BalanceKind> = listOf(
 /** 鉴权风格下拉的顺序，对应 `R.array.auth_styles`。 */
 val AUTH_STYLES: List<AuthStyle> = listOf(AuthStyle.AUTO, AuthStyle.BEARER, AuthStyle.X_API_KEY)
 
-fun Provider.toDraft(groupIndex: Int): ProviderDraft = ProviderDraft(
+fun Provider.toDraft(groupIndex: Int, profiles: List<ClientProfile> = emptyList()): ProviderDraft = ProviderDraft(
     id = id,
     name = name,
     note = note.orEmpty(),
@@ -56,8 +57,9 @@ fun Provider.toDraft(groupIndex: Int): ProviderDraft = ProviderDraft(
     protocols = supportedProtocols,
     balanceKindIndex = BALANCE_KINDS.indexOf(balanceKind).coerceAtLeast(0),
     balanceUserId = balanceUserId.orEmpty(),
-    // 客户端预设还没有仓库（内置预设的 seed 在 M5），所以这一格暂时固定 0
-    profileIndex = 0,
+    // 下标 0 是「默认（不伪装）」= clientProfileId null；其余按传入的 profiles 顺序对齐。
+    // 下标越界（预设列表还没加载完 / 该预设已被删）时回 0，但保存侧会保留原值而不是清空。
+    profileIndex = profileIndexOf(clientProfileId, profiles),
     probeEnabled = probe.enabled,
     probeReachability = probe.reachability,
     probeKeys = probe.keyValidity,
@@ -81,6 +83,7 @@ fun ProviderDraft.toProvider(
     existing: Provider?,
     normalized: NormalizeResult.Ok,
     groups: List<Group>,
+    profiles: List<ClientProfile> = emptyList(),
 ): Provider {
     val endpoints = normalized.endpoints
     val base = existing ?: Provider(name = name, apiBaseUrl = baseUrl, apiRoot = endpoints.apiRoot)
@@ -100,6 +103,12 @@ fun ProviderDraft.toProvider(
         },
         authStyle = AUTH_STYLES.getOrElse(authStyleIndex) { AuthStyle.AUTO },
         allowInsecure = allowInsecure,
+        // 下标 0 是「默认（不伪装）」→ 显式置 null；下标越界（预设列表还没加载完）→
+        // 保留原值，当成"清掉伪装"会让一次保存悄悄改掉这家（与 groupId 同一套理由）
+        clientProfileId = when {
+            profileIndex == 0 -> null
+            else -> profiles.getOrNull(profileIndex - 1)?.id ?: existing?.clientProfileId
+        },
         // 下标 0 是「未分组」。下标越界时保留原来那一组而不是清空：越界只可能是
         // "分组列表还没加载完"，而把它当成"用户要取消分组"会让一次保存悄悄改掉分组
         groupId = if (groupIndex == 0) {
@@ -127,4 +136,16 @@ fun ProviderDraft.toProvider(
             models = probeModels,
         ),
     )
+}
+
+/**
+ * `clientProfileId` → 下拉下标（0 = 默认，其余 = `profiles` 里的下标 + 1）。
+ *
+ * 找不到（预设已被删）时回 0：编辑页显示「默认（不伪装）」，但保存侧会保留原值，
+ * 所以这一次保存不会静默把伪装清掉。
+ */
+private fun profileIndexOf(clientProfileId: Long?, profiles: List<ClientProfile>): Int {
+    if (clientProfileId == null) return 0
+    val index = profiles.indexOfFirst { it.id == clientProfileId }
+    return if (index < 0) 0 else index + 1
 }

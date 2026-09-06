@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -21,6 +23,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
 import com.lc33.tokenvault.R
+import com.lc33.tokenvault.engine.RestoreMode
 import com.lc33.tokenvault.screens.dashboard.BalanceBreakdownScreen
 import com.lc33.tokenvault.screens.dashboard.DashboardScreen
 import com.lc33.tokenvault.screens.lock.ChangePinScreen
@@ -30,27 +33,34 @@ import com.lc33.tokenvault.screens.manage.ImportScreen
 import com.lc33.tokenvault.screens.manage.ManageScreen
 import com.lc33.tokenvault.screens.manage.ProviderDetailScreen
 import com.lc33.tokenvault.screens.manage.ProviderEditorScreen
+import com.lc33.tokenvault.screens.model.BackupStatus
 import com.lc33.tokenvault.screens.model.SettingsDraft
 import com.lc33.tokenvault.screens.probe.ProbeRunScreen
-import com.lc33.tokenvault.screens.sample.SampleContent
 import com.lc33.tokenvault.screens.settings.AboutScreen
 import com.lc33.tokenvault.screens.settings.AppearanceScreen
 import com.lc33.tokenvault.screens.settings.DataScreen
+import com.lc33.tokenvault.screens.settings.LogScreen
 import com.lc33.tokenvault.screens.settings.ProbeSettingsScreen
 import com.lc33.tokenvault.screens.settings.ProfileListScreen
+import com.lc33.tokenvault.screens.settings.ProfileEditorScreen
 import com.lc33.tokenvault.screens.settings.SecurityScreen
 import com.lc33.tokenvault.screens.settings.SettingsScreen
 import com.lc33.tokenvault.screens.settings.SyncScreen
 import com.lc33.tokenvault.screens.settings.UpdateScreen
+import com.lc33.tokenvault.ui.miuix.AppDialog
+import com.lc33.tokenvault.ui.miuix.AppSecretTextField
+import com.lc33.tokenvault.ui.miuix.AppTextButton
+import com.lc33.tokenvault.ui.miuix.LocalAppSnackbar
+import com.lc33.tokenvault.ui.miuix.rememberSecretTextFieldState
+import kotlinx.coroutines.launch
 
 /**
  * 导航图。
  *
- * **M3 起管理那一支吃真数据**：管理页、供应商详情、供应商编辑、分组管理都接 ViewModel +
- * 仓库；分组筛选那个"当前选中"是纯 UI 状态，留在 `ManageViewModel` 里。
- *
- * 剩下的仍然来自 [SampleContent]：仪表盘六块卡、探测明细、余额明细、粘贴导入、
- * 客户端预设列表。它们各自等自己的里程碑（§16），而不是"接了一半假装接完"。
+ * **M3 起管理那一支与仪表盘吃真数据**：管理页、供应商详情、供应商编辑、分组管理、
+ * 仪表盘六块卡与余额明细都接 ViewModel + 仓库；分组筛选那个"当前选中"是纯 UI 状态，
+ * 留在 `ManageViewModel` 里。M4 起粘贴导入的预览吃真解析器，M6 起客户端预设列表 / 编辑页
+ * 与供应商编辑页的预设下拉吃真仓库——`screens/sample` 那个样例包已随 M6 删除。
  */
 @Composable
 fun VaultNavHost(
@@ -75,16 +85,18 @@ fun VaultNavHost(
         modifier = modifier,
     ) {
         composable<DashboardRoute> {
+            val vm: DashboardViewModel = hiltViewModel()
+            val dashboard by vm.state.collectAsStateWithLifecycle()
             DashboardScreen(
-                state = SampleContent.dashboard(),
+                state = dashboard,
                 onOpenProvider = { id -> nav.navigate(ProviderDetailRoute(id)) },
                 onOpenManage = ::openManage,
                 onOpenProbeRun = { nav.navigate(ProbeRunRoute) },
                 onOpenSync = { nav.navigate(SyncRoute) },
                 onOpenBalanceBreakdown = { nav.navigate(BalanceBreakdownRoute) },
-                onStartProbe = {},
-                onCancelProbe = {},
-                onRefreshBalance = {},
+                onStartProbe = vm::startProbe,
+                onCancelProbe = vm::cancelProbe,
+                onRefreshBalance = vm::refreshBalance,
             )
         }
 
@@ -142,6 +154,7 @@ fun VaultNavHost(
                     onCloseReveal = vm::onCloseKeySheet,
                     onSetDefaultKey = vm::onSetDefaultKey,
                     onDeleteKey = vm::onDeleteKey,
+                    onRefreshBalance = vm::refreshBalance,
                 )
             }
         }
@@ -161,6 +174,7 @@ fun VaultNavHost(
         composable<SecurityRoute> {
             val vm: SecurityViewModel = hiltViewModel()
             val biometric by vm.biometric.collectAsStateWithLifecycle()
+            val autoLockIndex by vm.autoLockIndex.collectAsStateWithLifecycle()
             // 系统弹框的文案由系统画，所以要在这里取好传下去（ViewModel 读不到资源）。
             val enableTitle = stringResource(R.string.biometric_prompt_enable_title)
             val enableSubtitle = stringResource(R.string.biometric_prompt_enable_subtitle)
@@ -169,12 +183,14 @@ fun VaultNavHost(
             SecurityScreen(
                 draft = settings,
                 biometric = biometric,
+                autoLockIndex = autoLockIndex,
                 onChange = { settings = it },
                 onBiometricChange = { wanted ->
                     activity?.let {
                         vm.onBiometricChange(wanted, it, enableTitle, enableSubtitle, promptCancel)
                     }
                 },
+                onAutoLockIndexChange = vm::onAutoLockIndexChange,
                 onBack = back,
                 onChangePin = { nav.navigate(ChangePinRoute) },
                 onRecoveryKey = { nav.navigate(RecoveryKeyRoute) },
@@ -225,33 +241,59 @@ fun VaultNavHost(
             )
         }
         composable<ProfileListRoute> {
+            val vm: ProfileListViewModel = hiltViewModel()
+            val profiles by vm.profiles.collectAsStateWithLifecycle()
+            val defaultName = stringResource(R.string.profile_name_default)
             ProfileListScreen(
-                profiles = SampleContent.profiles(),
+                profiles = profiles,
+                defaultName = defaultName,
                 onBack = back,
-                onOpenProfile = {},
-                onNewFromCurl = {},
+                onOpenProfile = { id -> nav.navigate(ProfileEditorRoute(id)) },
+                onNewFromCurl = { nav.navigate(ProfileEditorRoute()) },
             )
         }
+        composable<ProfileEditorRoute> { entry ->
+            val route = entry.toRoute<ProfileEditorRoute>()
+            val vm: ProfileEditorViewModel = hiltViewModel()
+            val loaded by vm.loaded.collectAsStateWithLifecycle()
+            val profile by vm.profile.collectAsStateWithLifecycle()
+            LaunchedEffect(vm) { vm.saved.collect { back() } }
+            LaunchedEffect(vm) { vm.deleted.collect { back() } }
+            if (loaded) {
+                ProfileEditorScreen(
+                    initial = profile,
+                    onBack = back,
+                    onSave = vm::save,
+                    onDelete = vm::delete,
+                )
+            }
+        }
         composable<DataRoute> {
+            val vm: DataViewModel = hiltViewModel()
             DataScreen(
                 onBack = back,
                 onSyncCatalog = {},
                 onOpenGroups = { nav.navigate(GroupsRoute) },
-                onOpenLog = {},
-                onClearProbeResults = {},
-                onClearLog = {},
+                onOpenLog = { nav.navigate(LogRoute) },
+                onClearProbeResults = vm::clearProbeResults,
+                onClearLog = vm::clearLog,
+            )
+        }
+        composable<LogRoute> {
+            val vm: LogViewModel = hiltViewModel()
+            val entries by vm.entries.collectAsStateWithLifecycle()
+            LogScreen(
+                entries = entries,
+                onBack = back,
             )
         }
         composable<SyncRoute> {
-            SyncScreen(
+            val vm: SyncViewModel = hiltViewModel()
+            SyncRouteContent(
                 draft = settings,
-                backup = SampleContent.dashboard().backup,
                 onChange = { settings = it },
                 onBack = back,
-                onExport = {},
-                onImport = {},
-                onBackupPassphrase = {},
-                onWebDav = {},
+                vm = vm,
             )
         }
         composable<UpdateRoute> {
@@ -268,16 +310,21 @@ fun VaultNavHost(
             val vm: ProviderEditorViewModel = hiltViewModel()
             val draft by vm.draft.collectAsStateWithLifecycle()
             val groups by vm.groups.collectAsStateWithLifecycle()
+            val profiles by vm.profiles.collectAsStateWithLifecycle()
             val loaded by vm.loaded.collectAsStateWithLifecycle()
             LaunchedEffect(vm) { vm.saved.collect { back() } }
             // 下标 0 固定是「未分组」，与 ProviderDraftMapping 里那张表对齐
             val ungrouped = stringResource(R.string.editor_group_none)
+            // 客户端预设下拉：0 = 「默认（不伪装）」，其余按仓库返回的预设顺序对齐。
+            // 内置 `default` 那一枚的显示名要本地化，其余品牌名 / 自定义名直接用。
+            val profileDefaultLabel = stringResource(R.string.profile_name_default)
+            val editorProfileDefault = stringResource(R.string.editor_profile_default)
             if (loaded) {
                 ProviderEditorScreen(
                     draft = draft,
                     groupNames = listOf(ungrouped) + groups.map { it.name },
-                    // 客户端预设还没有仓库（内置预设的 seed 在 M5），这一格暂时只有一项
-                    profileNames = listOf(stringResource(R.string.editor_profile_default)),
+                    profileNames = listOf(editorProfileDefault) +
+                        profiles.map { it.displayName(profileDefaultLabel) },
                     onChange = vm::onChange,
                     onBack = back,
                     onSave = vm::onSave,
@@ -285,13 +332,19 @@ fun VaultNavHost(
             }
         }
         composable<ImportRoute> {
+            val vm: ImportViewModel = hiltViewModel()
+            val previews by vm.previews.collectAsStateWithLifecycle()
+            val parseErrors by vm.parseErrorCount.collectAsStateWithLifecycle()
+            val importing by vm.importing.collectAsStateWithLifecycle()
             ImportScreen(
-                previews = SampleContent.previews(),
+                previews = previews,
+                parseErrors = parseErrors,
+                importing = importing,
                 onBack = back,
-                onFillFromClipboard = {},
-                onParse = {},
-                onToggle = {},
-                onConfirm = back,
+                onParse = vm::parse,
+                onToggle = vm::toggle,
+                onConfirm = { vm.confirm { back() } },
+                readClipboard = vm::readClipboard,
             )
         }
         composable<GroupsRoute> {
@@ -306,22 +359,31 @@ fun VaultNavHost(
                 onDelete = vm::onDeleteGroup,
             )
         }
+        // 探测明细。入口在仪表盘的"查看明细"（有过一轮探测才画）。这一页只读：
+        // 看上一轮结果、重试失败项。
         composable<ProbeRunRoute> {
+            val vm: ProbeRunViewModel = hiltViewModel()
+            val run by vm.state.collectAsStateWithLifecycle()
             ProbeRunScreen(
-                lastRun = SampleContent.dashboard().lastRun,
-                failed = SampleContent.probeFailed(),
-                skipped = SampleContent.probeSkipped(),
-                succeeded = SampleContent.probeSucceeded(),
+                lastRun = run.lastRun,
+                nowMs = run.nowMs,
+                failed = run.failed,
+                skipped = run.skipped,
+                succeeded = run.succeeded,
                 onBack = back,
                 onRetryFailed = {},
                 onOpenProvider = { id -> nav.navigate(ProviderDetailRoute(id)) },
             )
         }
         composable<BalanceBreakdownRoute> {
-            val providers = SampleContent.manage().providers
+            val vm: DashboardViewModel = hiltViewModel()
+            val rows by vm.providerRows.collectAsStateWithLifecycle()
             BalanceBreakdownScreen(
-                providers = providers.filter { it.id != 1L },
-                failedProviders = providers.filter { it.id == 1L },
+                // 失败与成功分两组，而“压根没配置余额查询”的一组都不进（§9.3 的三种状态）。
+                // 用 balanceFailed 而不是 `balance == null`：后者把“没查过”也归进了失败，
+                // 于是一个刚建好的供应商会被报成“没能读到余额”
+                providers = rows.filter { it.balance != null },
+                failedProviders = rows.filter { it.balanceFailed },
                 onBack = back,
                 onOpenProvider = { id -> nav.navigate(ProviderDetailRoute(id)) },
             )
@@ -343,3 +405,153 @@ private fun openAppLocaleSettings(context: Context) {
     )
     runCatching { context.startActivity(locale) }.onFailure { context.startActivity(details) }
 }
+
+/**
+ * 同步页的 SAF 接线（§12.1）。
+ *
+ * SAF 文件读写（`CreateDocument` / `OpenDocument`）在这里而不是 ViewModel 里做：
+ * 那两个 contract 要 `ActivityResultRegistry`，属于平台能力。这里只负责：
+ * 1. 导出：让用户选目标文件 → 输口令 → 写包。
+ * 2. 恢复：让用户选备份文件 → 输口令 → 选合并方式 → 落库。
+ *
+ * 口令用 [AppSecretTextField]（键盘不联想、不记忆），用完即擦。恢复失败与成功都走
+ * Snackbar 反馈，不弹状态对话框。
+ */
+@Composable
+private fun SyncRouteContent(
+    draft: SettingsDraft,
+    onChange: (SettingsDraft) -> Unit,
+    onBack: () -> Unit,
+    vm: SyncViewModel,
+) {
+    val context = LocalContext.current
+    val snackbar = LocalAppSnackbar.current
+    val backup by vm.backup.collectAsStateWithLifecycle()
+
+    val passphrasePrompt = stringResource(R.string.sync_passphrase_prompt)
+    val passphraseHint = stringResource(R.string.sync_passphrase_hint)
+    val confirm = stringResource(R.string.sync_confirm)
+    val cancel = stringResource(R.string.sync_cancel)
+    val exported = stringResource(R.string.sync_result_exported)
+    val failedPrefix = stringResource(R.string.sync_result_failed)
+
+    // 口令对话框：一段明文口令，只在提交那一刻活一次
+    var pendingAction by remember { mutableStateOf<PendingSyncAction?>(null) }
+    val passphraseState = rememberSecretTextFieldState()
+
+    // 恢复模式选择
+    var restoreModePicker by remember { mutableStateOf(false) }
+    var pendingRestore by remember { mutableStateOf<PendingRestore?>(null) }
+
+    // 事件 → Snackbar
+    LaunchedEffect(vm) {
+        vm.events.collect { event ->
+            when (event) {
+                is SyncEvent.ExportSucceeded -> snackbar?.show(exported)
+                is SyncEvent.ExportFailed ->
+                    snackbar?.show(failedPrefix.format(event.message ?: "?"))
+                is SyncEvent.RestoreSucceeded ->
+                    snackbar?.show(
+                        context.resources.getString(R.string.sync_result_restored, event.importedProviders),
+                    )
+                is SyncEvent.RestoreFailed ->
+                    snackbar?.show(failedPrefix.format(event.message ?: "?"))
+            }
+        }
+    }
+
+    // 导出目标文件选择
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/octet-stream"),
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val password = passphraseState.chars
+        vm.export(password) { bytes ->
+            context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
+                ?: throw java.io.IOException("cannot open output stream")
+        }
+        passphraseState.clear()
+        pendingAction = null
+    }
+
+    // 导入文件选择
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            ?: return@rememberLauncherForActivityResult
+        val password = passphraseState.chars
+        pendingRestore = PendingRestore(bytes, password)
+        restoreModePicker = true
+        passphraseState.clear()
+        pendingAction = null
+    }
+
+    SyncScreen(
+        draft = draft,
+        backup = backup,
+        onChange = onChange,
+        onBack = onBack,
+        onExport = { pendingAction = PendingSyncAction.Export },
+        onImport = { pendingAction = PendingSyncAction.Import },
+        onBackupPassphrase = {},
+        onWebDav = {},
+    )
+
+    // 口令对话框
+    AppDialog(
+        show = pendingAction != null,
+        onDismissRequest = {
+            passphraseState.clear()
+            pendingAction = null
+        },
+        title = passphrasePrompt,
+        confirmText = confirm,
+        onConfirm = {
+            when (pendingAction) {
+                PendingSyncAction.Export -> exportLauncher.launch("yuanji-backup.yjv")
+                PendingSyncAction.Import -> importLauncher.launch(arrayOf("*/*"))
+                null -> Unit
+            }
+        },
+    ) {
+        AppSecretTextField(
+            state = passphraseState,
+            label = passphraseHint,
+            singleLine = true,
+        )
+    }
+
+    // 恢复模式选择
+    AppDialog(
+        show = restoreModePicker,
+        onDismissRequest = {
+            pendingRestore?.password?.let { it.fill(0.toChar()) }
+            pendingRestore = null
+            restoreModePicker = false
+        },
+        title = stringResource(R.string.sync_restore_mode),
+        confirmText = null,
+    ) {
+        AppTextButton(text = stringResource(R.string.sync_mode_merge), onClick = {
+            pendingRestore?.let { vm.restore(it.bytes, it.password, RestoreMode.MERGE) }
+            restoreModePicker = false
+        })
+        AppTextButton(text = stringResource(R.string.sync_mode_overwrite), onClick = {
+            pendingRestore?.let { vm.restore(it.bytes, it.password, RestoreMode.OVERWRITE) }
+            restoreModePicker = false
+        })
+        AppTextButton(text = stringResource(R.string.sync_mode_add_only), onClick = {
+            pendingRestore?.let { vm.restore(it.bytes, it.password, RestoreMode.ADD_ONLY) }
+            restoreModePicker = false
+        })
+    }
+}
+
+/** 导出口令之后要触发的动作。 */
+private enum class PendingSyncAction { Export, Import }
+
+/** 待恢复的包字节 + 口令（口令用完必须擦）。 */
+private class PendingRestore(val bytes: ByteArray, val password: CharArray)
+

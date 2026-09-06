@@ -40,6 +40,11 @@
     <string name="dashboard_attention_title">Needs attention</string>
     <string name="dashboard_attention_none">Nothing needs attention</string>
     <string name="dashboard_attention_fix_client">Switch client profile</string>
+    <!-- One wording per attention kind, app wide (invariant 17). Each says what to do next. -->
+    <string name="attention_key_rejected">The upstream rejected this key. Replace it or check the endpoint.</string>
+    <string name="attention_client_blocked">Blocked by client check — a different User-Agent gets through</string>
+    <string name="attention_config_error">Endpoint or parameters not accepted. Check the provider settings.</string>
+    <string name="attention_low_balance">Balance below the threshold for this currency</string>
     <string name="dashboard_probe_title">Last probe</string>
     <string name="dashboard_probe_never">Never probed</string>
     <string name="dashboard_probe_start">Start probe</string>
@@ -125,17 +130,7 @@
     <string name="about_not_password_manager_row">Not a password manager</string>
     <string name="about_not_password_manager_summary">Platform accounts are a local record: no autofill, no TOTP, no leak checks</string>
 
-    <!-- M0.8 sample content. Deleted together with screens/sample/ once M3 wires up real data. -->
-    <string name="sample_ago_12min">12 minutes ago</string>
-    <string name="sample_ago_2hour">2 hours ago</string>
-    <string name="sample_attention_client_blocked">Blocked by client check — a different User-Agent gets through</string>
-    <string name="sample_attention_low_balance">Balance below the threshold for this currency</string>
-    <string name="sample_note_company">Company account</string>
-    <string name="sample_note_backup">Spare account</string>
-    <string name="sample_key_main">Main</string>
-    <string name="sample_key_spare">Spare</string>
-    <string name="sample_account_github">GitHub sign-in</string>
-    <string name="sample_account_email">Email sign-in</string>
+    <!-- Sample content for the two screens that still have no data source (import preview, client profiles). -->
     <string name="group_all">All</string>
     <string name="manage_search_hint">Search providers</string>
     <string name="manage_groups_cd">Manage groups</string>
@@ -149,9 +144,7 @@
     <string name="detail_section_accounts">Platform accounts</string>
     <string name="detail_accounts_empty">No platform account for this provider. Stored locally, never filled in for you.</string>
     <string name="detail_add_account">Add platform account</string>
-    <string name="sample_group_work">Work</string>
-    <string name="sample_group_spare">Spare</string>
-    <string name="sample_group_official">Official</string>    <!-- Appearance -->
+    <!-- Appearance -->
     <string name="appearance_section_theme">Theme</string>
     <string name="appearance_color_scheme">Color scheme</string>
     <string name="appearance_squircle">Squircle corners</string>
@@ -241,7 +234,29 @@
     <string name="data_clear_probe">Clear probe results</string>
     <string name="data_clear_probe_summary">Everything goes back to "not probed". Keys, models and accounts are kept.</string>
     <string name="data_clear_log">Clear the log</string>
-    <string name="data_clear_log_summary">Cannot be undone</string>    <!-- Sync -->
+    <string name="data_clear_log_summary">Cannot be undone</string>
+    <string name="data_clear_probe_confirm_title">Clear all probe results?</string>
+    <string name="data_clear_probe_confirm_body">Every key goes back to "not probed". Keys, models and accounts themselves are kept.</string>
+    <string name="data_clear_log_confirm_title">Clear the entire log?</string>
+    <string name="data_clear_log_confirm_body">All log entries are deleted. This cannot be undone.</string>
+    <string name="log_title">Log</string>
+    <string name="log_empty">Nothing logged yet. Probe, balance and backup events show up here, redacted before they are written.</string>
+
+    <!-- 日志级别与分类的显示文案。日志页按级别着色（红线 17：颜色 + 文字），分类做筛选。 -->
+    <string name="log_level_debug">Debug</string>
+    <string name="log_level_info">Info</string>
+    <string name="log_level_warn">Warning</string>
+    <string name="log_level_error">Error</string>
+    <string name="log_category_lock">Lock</string>
+    <string name="log_category_vault">Vault</string>
+    <string name="log_category_probe">Probe</string>
+    <string name="log_category_balance">Balance</string>
+    <string name="log_category_catalog">Catalog</string>
+    <string name="log_category_backup">Backup</string>
+    <string name="log_category_http">HTTP</string>
+    <string name="log_category_account">Account</string>
+
+    <!-- Sync -->
     <string name="sync_section_local">Backup file</string>
     <string name="sync_export">Export an encrypted backup</string>
     <string name="sync_export_summary">Self-contained: it carries its own KDF parameters and salt, so it restores on a phone that has never seen this one</string>
@@ -256,6 +271,17 @@
     <string name="sync_auto">Back up automatically</string>
     <string name="sync_auto_summary">Skipped while the vault is locked, and made up after the next unlock</string>
     <string name="sync_auto_wifi">Wi-Fi only</string>
+    <string name="sync_passphrase_prompt">Enter the backup passphrase</string>
+    <string name="sync_passphrase_hint">Defaults to your PIN</string>
+    <string name="sync_result_exported">Backup exported</string>
+    <string name="sync_result_restored">Restored %1$d providers</string>
+    <string name="sync_result_failed">Failed: %1$s</string>
+    <string name="sync_restore_mode">How to merge</string>
+    <string name="sync_mode_overwrite">Overwrite</string>
+    <string name="sync_mode_merge">Merge</string>
+    <string name="sync_mode_add_only">Add only</string>
+    <string name="sync_confirm">Confirm</string>
+    <string name="sync_cancel">Cancel</string>
 
     <!-- Update -->
     <string name="update_section_channel">Channel</string>
@@ -280,7 +306,30 @@
     <string name="profiles_from_curl_summary">Capture a real client request, paste the cURL. Authorization and cookies are stripped and the preview says which.</string>
     <string name="profiles_disclaimer">Version numbers and header sets here come from community observation, not official documentation, and they drift as those clients are updated. They are a working starting point, not authoritative values. The reliable path is importing a cURL you captured yourself.</string>
     <string name="profiles_verified">Verified</string>
-    <string name="profiles_custom">Custom</string>    <!-- Secret reveal / relative time -->
+    <string name="profiles_custom">Custom</string>
+    <string name="profile_name_default">YuanJi (Default)</string>
+    <string name="profile_editor_title">Client profile</string>
+    <string name="profile_editor_new_title">New client profile</string>
+    <string name="profile_editor_name">Name</string>
+    <string name="profile_editor_user_agent">User-Agent</string>
+    <string name="profile_editor_headers">Headers</string>
+    <string name="profile_editor_headers_hint">One header per line, in the form \u201cName: Value\u201d. Order is preserved.</string>
+    <string name="profile_editor_body_patch">Body patch</string>
+    <string name="profile_editor_body_patch_hint">JSON merge patch applied to the minimal probe body. \u201c{}\u201d means none.</string>
+    <string name="profile_editor_protocols">Applies to</string>
+    <string name="profile_editor_protocols_hint">A sorting hint, not a hard filter.</string>
+    <string name="profile_editor_delete">Delete</string>
+    <string name="profile_editor_delete_title">Delete profile?</string>
+    <string name="profile_editor_delete_summary">This custom profile will be removed. Built-in profiles cannot be deleted.</string>
+    <string name="profile_editor_from_curl">Import from cURL</string>
+    <string name="profile_editor_from_curl_hint">Paste a cURL captured from a real client. Authorization and cookies are stripped.</string>
+    <string name="profile_editor_parse">Parse</string>
+    <string name="profile_editor_curl_dropped">Removed headers: %1$s</string>
+    <string name="profile_editor_save_empty_name">Name cannot be empty</string>
+    <string name="profile_editor_save_empty_ua">User-Agent cannot be empty</string>
+    <string name="profile_editor_curl_failed">Could not parse this cURL</string>
+    <string name="profile_editor_builtin_note">Built-in profiles can be edited but not deleted. Your edits are kept across upgrades.</string>
+    <!-- Secret reveal / relative time -->
     <string name="secret_reveal_cd">Reveal</string>
     <string name="secret_conceal_cd">Hide</string>
     <string name="secret_copy_cd">Copy</string>
@@ -289,7 +338,8 @@
     <string name="time_minutes_ago">%1$d min ago</string>
     <string name="time_hours_ago">%1$d h ago</string>
     <string name="time_days_ago">%1$d d ago</string>
-    <string name="time_future">timestamp is in the future</string>    <!-- Provider editor -->
+    <string name="time_future">timestamp is in the future</string>
+    <string name="time_duration_seconds">%1$d s</string>    <!-- Provider editor -->
     <string name="editor_save">Save</string>
     <string name="editor_section_basic">Basics</string>
     <string name="editor_name">Name</string>
@@ -372,23 +422,37 @@
     <string name="import_selected">Will import</string>
     <string name="import_skipped">Skipped</string>
     <string name="import_counts">%1$d keys · %2$d models · %3$d accounts</string>
+    <plurals name="import_parse_errors">
+        <item quantity="one">%1$d block could not be parsed and was skipped — usually a missing provider name.</item>
+        <item quantity="other">%1$d blocks could not be parsed and were skipped — usually a missing provider name.</item>
+    </plurals>
     <plurals name="import_confirm">
         <item quantity="one">Import 1 provider</item>
         <item quantity="other">Import %1$d providers</item>
     </plurals>
+    <!-- Import preview issues (invariant 17: one wording per state) -->
+    <string name="import_issue_missing_name">Missing a provider name</string>
+    <string name="import_issue_bad_endpoint">The request address has a query string or fragment — it will be kept as-is, fix it in the editor</string>
+    <string name="import_issue_insecure_endpoint">This address is http:// — enable "allow insecure" in the editor to use it</string>
+    <string name="import_issue_model_name">A model id here looks like a display name — check it before importing</string>
+    <string name="import_issue_protocol_added">A model uses a protocol this provider does not list; it has been added</string>
+    <string name="import_issue_balance_credential">NewAPI balance needs an access token and a user id — you can add them later</string>
+    <string name="import_issue_client_profile">The client preset could not be matched and was ignored</string>
+    <string name="import_issue_account_incomplete">A platform account is missing its username or password — half of it is still imported</string>
+    <string name="import_issue_account_duplicate">A duplicate platform account was skipped</string>
 
     <!-- Probe run -->
     <string name="probe_run_failed">Failed</string>
     <string name="probe_run_skipped">Not probed this round</string>
     <string name="probe_run_succeeded">Succeeded</string>
     <string name="probe_run_retry">Retry the failed and unprobed items</string>
+    <string name="probe_run_empty_desc">Nothing has been probed yet, so there are no results to show.</string>
 
     <!-- Balance breakdown -->
     <string name="balance_failed_section">Query failed</string>
-    <string name="balance_failed_hint">Could not read the balance — this is not the same as a balance of zero</string>    <string name="sample_import_issue_model_name">"DeepSeek V4 Pro" looks like a display name rather than a model id — check it before importing</string>
-    <string name="sample_probe_detail_client">401 unauthorized client detected — a different User-Agent gets through</string>
-    <string name="sample_probe_detail_ratelimited">Stopped after the host rate-limited us this round</string>
-    <string name="sample_probe_detail_budget">Per-host request budget for this round was used up</string>    <!-- Per-provider probe switches (invariant 36) -->
+    <string name="balance_empty_desc">A balance query is set per provider, in the provider editor.</string>
+    <string name="balance_failed_hint">Could not read the balance — this is not the same as a balance of zero</string>
+    <!-- Per-provider probe switches (invariant 36) -->
     <string name="editor_section_probe">Probing</string>
     <string name="editor_probe_enabled">Allow probing this provider</string>
     <string name="editor_probe_enabled_summary">Turn this off for a provider whose terms forbid automated checks</string>
@@ -531,6 +595,7 @@
     <string name="detail_key_delete_title">Delete this key?</string>
     <string name="detail_key_delete_body">There is no way to get it back. If it is the default one, the enabled key sorted first takes over automatically.</string>
     <string name="detail_key_reveal_hint">Copy puts it on the clipboard and clears it after a while. Leaving this sheet wipes the plain text.</string>
+    <string name="detail_balance_refresh">Check balance</string>
     <string name="clipboard_label_api_key">YuanJi key</string>
     <string name="editor_group_none">Ungrouped</string>
     <string name="editor_profile_default">Default (no disguise)</string>

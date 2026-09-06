@@ -5,8 +5,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lc33.tokenvault.crypto.zeroize
 import com.lc33.tokenvault.domain.Protocol
+import com.lc33.tokenvault.domain.model.ClientProfile
 import com.lc33.tokenvault.domain.model.Group
 import com.lc33.tokenvault.domain.model.Provider
+import com.lc33.tokenvault.domain.repo.ClientProfileRepository
 import com.lc33.tokenvault.domain.repo.GroupRepository
 import com.lc33.tokenvault.domain.repo.ProviderRepository
 import com.lc33.tokenvault.endpoint.NormalizeResult
@@ -44,6 +46,7 @@ import kotlinx.coroutines.launch
 class ProviderEditorViewModel @Inject constructor(
     private val providers: ProviderRepository,
     private val groupRepository: GroupRepository,
+    private val clientProfiles: ClientProfileRepository,
     savedState: SavedStateHandle,
 ) : ViewModel() {
 
@@ -51,6 +54,10 @@ class ProviderEditorViewModel @Inject constructor(
     private val providerId: Long = savedState.get<Long>("id") ?: 0L
 
     val groups: StateFlow<List<Group>> = groupRepository.observeGroups()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** 客户端伪装预设。编辑页那个下拉的选项就是「默认（不伪装）」+ 这一份。 */
+    val profiles: StateFlow<List<ClientProfile>> = clientProfiles.observeAll()
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private val _draft = MutableStateFlow(ProviderDraft())
@@ -83,10 +90,12 @@ class ProviderEditorViewModel @Inject constructor(
                 // 先等分组列表到位：groupIndex 是按列表下标算的，列表还空着时算出来一定是 0，
                 // 表现是"这家明明分了组，编辑页却显示未分组"——而一保存就真的把分组清掉了
                 val groupList = groupRepository.observeGroups().first()
+                // 预设列表同样要等到位：profileIndex 也是按下标算的，列表空着时算出来是 0
+                val profileList = clientProfiles.observeAll().first()
                 val provider = providers.find(providerId)
                 if (provider != null) {
                     loadedProvider = provider
-                    _draft.value = provider.toDraft(groupIndexOf(provider.groupId, groupList))
+                    _draft.value = provider.toDraft(groupIndexOf(provider.groupId, groupList), profileList)
                 }
                 _loaded.value = true
             }
@@ -112,7 +121,7 @@ class ProviderEditorViewModel @Inject constructor(
         }
         viewModelScope.launch {
             try {
-                providers.save(draft.toProvider(loadedProvider, normalized, groups.value), token)
+                providers.save(draft.toProvider(loadedProvider, normalized, groups.value, profiles.value), token)
                 _saved.tryEmit(Unit)
             } finally {
                 token?.zeroize()

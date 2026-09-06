@@ -19,6 +19,10 @@ import com.lc33.tokenvault.screens.model.ProbeRunSummary
 import com.lc33.tokenvault.screens.model.UiHealth
 import com.lc33.tokenvault.ui.common.StatusDot
 import com.lc33.tokenvault.ui.common.colorOf
+import com.lc33.tokenvault.ui.common.durationSeconds
+import com.lc33.tokenvault.ui.common.labelOf
+import com.lc33.tokenvault.ui.common.relativeLabel
+import com.lc33.tokenvault.ui.common.EmptyState
 import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppIconButton
@@ -35,11 +39,10 @@ import com.lc33.tokenvault.ui.theme.LocalAppTokens
 
 /** 一项探测结果。`detail` 是已脱敏的上游 message 前 200 字符。 */
 data class ProbeItemRow(
-    val target: String,
+    /** 供应商名。明细页每一项要能看出"是哪一家"（§13.4）。 */
+    val providerName: String,
     val providerId: Long,
     val health: UiHealth,
-    /** 已本地化的结论，例如"密钥无效"或"本轮未探测"。 */
-    val outcome: String,
     val detail: String?,
     val latencyMs: Long?,
 )
@@ -59,6 +62,7 @@ data class ProbeItemRow(
 @Composable
 fun ProbeRunScreen(
     lastRun: ProbeRunSummary?,
+    nowMs: Long,
     failed: List<ProbeItemRow>,
     skipped: List<ProbeItemRow>,
     succeeded: List<ProbeItemRow>,
@@ -84,6 +88,16 @@ fun ProbeRunScreen(
             )
         },
     ) { padding ->
+        // 三组都空且没有上一轮：这一页没有任何内容可画。不给空态的表现是一屏白，
+        // 而那看起来像加载失败
+        if (lastRun == null && failed.isEmpty() && skipped.isEmpty() && succeeded.isEmpty()) {
+            EmptyState(
+                title = stringResource(R.string.dashboard_probe_never),
+                description = stringResource(R.string.probe_run_empty_desc),
+                modifier = Modifier.padding(padding),
+            )
+            return@AppScaffold
+        }
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -92,7 +106,7 @@ fun ProbeRunScreen(
             verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
         ) {
             if (lastRun != null) {
-                item { SummaryCard(lastRun, failed.isNotEmpty() || skipped.isNotEmpty(), onRetryFailed) }
+                item { SummaryCard(lastRun, nowMs, failed.isNotEmpty() || skipped.isNotEmpty(), onRetryFailed) }
             }
             if (failed.isNotEmpty()) {
                 item { SectionTitle(text = stringResource(R.string.probe_run_failed)) }
@@ -112,7 +126,12 @@ fun ProbeRunScreen(
 }
 
 @Composable
-private fun SummaryCard(run: ProbeRunSummary, hasRetryable: Boolean, onRetry: () -> Unit) {
+private fun SummaryCard(
+    run: ProbeRunSummary,
+    nowMs: Long,
+    hasRetryable: Boolean,
+    onRetry: () -> Unit,
+) {
     val tokens = LocalAppTokens.current
     AppCard(
         modifier = Modifier
@@ -120,7 +139,11 @@ private fun SummaryCard(run: ProbeRunSummary, hasRetryable: Boolean, onRetry: ()
             .padding(horizontal = tokens.screenPadding),
     ) {
         AppText(
-            text = stringResource(R.string.dashboard_probe_finished, run.finishedAgo, run.durationLabel),
+            text = stringResource(
+                R.string.dashboard_probe_finished,
+                relativeLabel(nowMs, run.finishedAtMs),
+                stringResource(R.string.time_duration_seconds, durationSeconds(run.durationMs)),
+            ),
             style = AppTextStyle.Body,
         )
         AppText(
@@ -155,12 +178,9 @@ private fun ItemCard(row: ProbeItemRow, onOpenProvider: (Long) -> Unit) {
         onClick = { onOpenProvider(row.providerId) },
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            // 两行：目标是 "host · modelId"，等宽字体下一行放不下，
-            // 截成 "ps.air-outer.com ·" 等于把最要紧的那半截掉了
             AppText(
-                text = row.target,
+                text = row.providerName,
                 style = AppTextStyle.Body,
-                fontFamily = tokens.monoFontFamily,
                 maxLines = 2,
                 modifier = Modifier.weight(1f),
             )
@@ -173,7 +193,9 @@ private fun ItemCard(row: ProbeItemRow, onOpenProvider: (Long) -> Unit) {
             }
         }
         Column(modifier = Modifier.padding(top = 4.dp)) {
-            StatusDot(color = colorOf(row.health), label = row.outcome)
+            // 状态点：颜色由 health 决定，标签用四档通用文案（labelOf）。与列表页同一条
+            // 约定——这里不造一套"密钥无效/余额不足"的专属文案（红线 17：同一状态全应用一套文案）。
+            StatusDot(color = colorOf(row.health), label = labelOf(row.health))
             if (row.detail != null) {
                 // 上游 message 已经过 Redactor：它经常回显密钥的一部分（M0.5 实测）
                 AppText(

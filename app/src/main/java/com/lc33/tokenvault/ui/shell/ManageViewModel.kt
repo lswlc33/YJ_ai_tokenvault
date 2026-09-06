@@ -8,12 +8,10 @@ import com.lc33.tokenvault.domain.repo.ProviderRepository
 import com.lc33.tokenvault.screens.model.ManageUiState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -26,10 +24,10 @@ import kotlinx.coroutines.launch
  *    因为它订阅的是数据库。
  * 2. **分组筛选是纯 UI 状态**，留在 ViewModel 里而不是回数据层重查——筛一下就发一条
  *    SQL 只会让"点两下 chip"变成两次 IO，而结果和内存里过滤一模一样。
- * 3. **聚合状态由每家的密钥健康算**，所以要订阅全部密钥的 health 列。这一步不解密
- *    （§6.1 推论 3）：health 是明文列，锁定态也读得到。
+ * 3. **聚合状态由每家的密钥健康算**，所以要订阅全部密钥的 health 列。**一条订阅，不是每家
+ *    一条**：按家订阅是 N+1，而且新增一家时那一整组 Flow 要重建，列表会闪一下。
+ *    这一步不解密（§6.1 推论 3）：health 是明文列，锁定态也读得到。
  */
-@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class ManageViewModel @Inject constructor(
     private val providers: ProviderRepository,
@@ -54,33 +52,22 @@ class ManageViewModel @Inject constructor(
     val state: StateFlow<ManageUiState> = combine(
         providers.observeSummaries(),
         groups.observeGroups(),
+        keys.observeAll(),
         selectedGroupId,
         allLabel,
-    ) { summaries, groupList, selected, label ->
-        // 每家的聚合状态要它自己那几把密钥的 health。放在 combine 里逐家取是 N+1，
-        // 所以下面用 observeAllHealth 一次订阅全部，这里只做拼装。
-        Triple(summaries, groupList, selected to label)
-    }.combine(healthByProvider()) { (summaries, groupList, selection), healthMap ->
+    ) { summaries, groupList, allKeys, selected, label ->
+        // 每家的聚合状态要它自己那几把密钥的 health。全部密钥一次订阅、在这里按 providerId
+        // 分组，所以这一段不发额外的 SQL
+        val healths = allKeys.groupBy({ it.providerId }, { it.health })
         val rows = summaries.map { summary ->
-            summary.toRow(health = aggregateHealth(healthMap[summary.provider.id].orEmpty()))
+            summary.toRow(health = aggregateHealth(healths[summary.provider.id].orEmpty()))
         }
         ManageUiState(
-            groups = groupChips(selection.second, groupList, rows),
-            selectedGroupId = selection.first,
+            groups = groupChips(label, groupList, rows),
+            selectedGroupId = selected,
             providers = rows,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), ManageUiState())
-
-    /** providerId → 那家所有密钥的持久结论。只读 health 列，不碰密文。 */
-    private fun healthByProvider() = providers.observeSummaries().flatMapLatest { summaries ->
-        if (summaries.isEmpty()) {
-            MutableStateFlow(emptyMap())
-        } else {
-            combine(summaries.map { s -> keys.observeByProvider(s.provider.id) }) { perProvider ->
-                perProvider.flatMap { it }.groupBy({ it.providerId }, { it.health })
-            }
-        }
-    }
 
     fun onSelectGroup(id: Long?) {
         selectedGroupId.value = id

@@ -1,0 +1,92 @@
+供应商名称 Agent Router
+备注 公司专用账号
+官网链接 https://ps.air-outer.com/
+API Key sk-TEST0000000000000000000000000000000000000000000000000001
+API请求地址 https://ps.air-outer.com/v1
+
+支持端点类型
+
+- Chat Completions
+- Responses (原生)
+- Anthropic Messages
+
+模型列表
+gpt-5.6-sol Responses
+claude-opus-5 Anthropic
+deepseek-v4-flash Responses
+
+余额查询类型 NewAPI
+请求地址 https://ps.air-outer.com 不填默认是端点域名
+访问令牌(在个人安全设置里获取)
+TESTtoken0000000000000000000000000001=
+用户ID 199628
+
+---
+
+供应商名称 JustDoWork
+备注 备用账号
+官网链接 https://api.justwoker.icu/
+API Key sk-TEST0000000000000000000000000000000000000000000000000002
+API请求地址 https://api.justwoker.icu/v1
+
+支持端点类型
+
+- Anthropic Messages
+
+模型列表
+claude-opus-5 Anthropic
+claude-opus-5-thinking Anthropic
+
+余额查询类型 NewAPI
+请求地址 https://api.justwoker.icu 不填默认是端点域名
+访问令牌(在个人安全设置里获取)
+TESTtoken0000000000000000000000000002==
+用户ID 16749
+
+---
+
+供应商名称 DeepSeek
+备注 无
+官网链接 https://api.deepseek.com
+API Key sk-TEST0000000000000000000000000000000000000000000000000003
+API请求地址 https://api.deepseek.com/v1
+
+支持端点类型
+
+- Responses
+- Chat
+
+模型列表
+deepseek-v4-flash Responses
+DeepSeek V4 Pro Responses
+
+余额查询类型 官方接口
+
+---
+
+供应商名称 多账号
+备注 无
+官网链接 https://api.example.com
+API Key sk-TEST0000000000000000000000000000000000000000000000000004
+API请求地址 https://api.example.com/v1
+
+支持端点类型
+
+- Chat
+
+模型列表
+test-model Chat
+
+余额查询类型 NewAPI
+请求地址 https://api.example.com
+访问令牌(在个人安全设置里获取)
+TESTtoken0000000000000000000000000004==
+用户ID 10001
+
+平台账号 company@example.com
+平台密码 Password1
+账号备注 公司主号
+
+平台账号 13800138000
+平台密码 Password2
+账号备注 备用号

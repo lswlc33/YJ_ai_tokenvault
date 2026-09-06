@@ -72,6 +72,8 @@ class LockViewModelTest {
         override fun clearNow() {
             cleared++
         }
+
+        override fun read(): String? = null
     }
 
     /** 生物识别：这一套用例都不走那条路，调到就是测试自己写错了。 */

@@ -4,6 +4,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.res.stringResource
 import com.lc33.tokenvault.R
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 
 /**
  * 相对时间的分档。
@@ -68,3 +72,31 @@ fun relativeTimeLabel(bucket: RelativeBucket, absoluteLabel: String = ""): Strin
     RelativeBucket.Absolute -> absoluteLabel
     RelativeBucket.Future -> stringResource(R.string.time_future)
 }
+
+/**
+ * 两个时间戳 → 一句现成的话。**每一个要显示相对时间的地方都该调这一个。**
+ *
+ * 它存在的理由是 `Absolute` 那一档：[relativeTimeLabel] 的 `absoluteLabel` 默认是空串，
+ * 于是“超过 30 天”的时间会静静地渲染成**什么都没有**——那一行看起来就像从未探测过。
+ * 日期格式交给 `ofLocalizedDate`：“用什么格式写日期”是语言与地区的事，不该写成字面量。
+ */
+@Composable
+fun relativeLabel(nowMillis: Long, thenMillis: Long): String {
+    val bucket = relativeBucketOf(nowMillis, thenMillis)
+    val absolute = if (bucket == RelativeBucket.Absolute) absoluteDateLabel(thenMillis) else ""
+    return relativeTimeLabel(bucket, absolute)
+}
+
+/** 本地化的短日期。时区用设备当前的：这一串是给人看的，不参与任何计算。 */
+private fun absoluteDateLabel(epochMillis: Long): String =
+    DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
+        .format(Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()))
+
+/**
+ * 一段耗时（毫秒）→ 向上取整到秒的整数。
+ *
+ * 探测一轮的"耗时"就是这么算的：`finishedAt - startedAt`。向下取整会让一场
+ * 0.4 秒的探测显示成"0 秒"，而向上取整至少给"1 秒"，这更诚实——那场探测确实花了时间。
+ * 文案（`time_duration_seconds`）由调用方用 `stringResource` 取，这里只给秒数（红线 19）。
+ */
+fun durationSeconds(durationMs: Long): Long = (durationMs + 999) / 1000

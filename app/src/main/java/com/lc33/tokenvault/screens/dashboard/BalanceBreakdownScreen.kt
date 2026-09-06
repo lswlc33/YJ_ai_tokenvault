@@ -15,6 +15,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.lc33.tokenvault.R
 import com.lc33.tokenvault.screens.model.UiProviderRow
+import com.lc33.tokenvault.ui.common.EmptyState
 import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppIconButton
@@ -37,6 +38,10 @@ import com.lc33.tokenvault.ui.theme.LocalStatusPalette
  * **按币种分组，组内不求跨币种的和**（§9.3）：不做汇率换算，所以任何"总计"都只能
  * 在同一个币种内出现。查询失败的行单独一组，且与"余额为 0"必须可区分——
  * 前者是"不知道"，后者是"知道且是 0"。
+ *
+ * [failedProviders] 只装**试过且失败**的那几家（`UiProviderRow.balanceFailed`）。
+ * 压根没配置余额查询的两组都不进：列到失败那一组里，用户会去查一个不存在的故障。
+ * 两组都空时整页是空态。
  */
 @Composable
 fun BalanceBreakdownScreen(
@@ -67,6 +72,16 @@ fun BalanceBreakdownScreen(
             )
         },
     ) { padding ->
+        // 两组都空 = 一家也没配置过余额查询。不给空态的表现是一屏只剩一句
+        // 「不做汇率换算」的脚注，看起来像数据丢了
+        if (byCurrency.isEmpty() && failedProviders.isEmpty()) {
+            EmptyState(
+                title = stringResource(R.string.dashboard_balance_none),
+                description = stringResource(R.string.balance_empty_desc),
+                modifier = Modifier.padding(padding),
+            )
+            return@AppScaffold
+        }
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()

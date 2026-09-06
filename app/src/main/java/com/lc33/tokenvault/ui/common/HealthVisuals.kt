@@ -5,6 +5,7 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import com.lc33.tokenvault.R
+import com.lc33.tokenvault.screens.model.AttentionKind
 import com.lc33.tokenvault.screens.model.UiHealth
 import com.lc33.tokenvault.ui.theme.LocalStatusPalette
 
@@ -34,5 +35,22 @@ fun labelOf(health: UiHealth): String = stringResource(
         UiHealth.Warn -> R.string.health_warn
         UiHealth.Error -> R.string.health_error
         UiHealth.Unknown -> R.string.health_unknown
+    },
+)
+
+/**
+ * “需要处理”每一档的那一句话。与 [labelOf] 同一个理由：同一个状态全应用只有一套文案
+ * （红线 17）。ViewModel 那一侧只给 [AttentionKind]，它读不到资源（红线 19）。
+ *
+ * 每一句都要包含“接下来干什么”：“密钥无效”只是结论，而这张卡的名字叫“需要处理”。
+ */
+@Composable
+@ReadOnlyComposable
+fun messageOf(kind: AttentionKind): String = stringResource(
+    when (kind) {
+        AttentionKind.KeyRejected -> R.string.attention_key_rejected
+        AttentionKind.ClientBlocked -> R.string.attention_client_blocked
+        AttentionKind.ConfigError -> R.string.attention_config_error
+        AttentionKind.LowBalance -> R.string.attention_low_balance
     },
 )

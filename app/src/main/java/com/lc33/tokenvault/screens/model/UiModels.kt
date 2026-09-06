@@ -45,7 +45,23 @@ data class UiProviderRow(
     val okKeyCount: Int,
     val modelCount: Int,
     val accountCount: Int,
+    /**
+     * 已格式化的余额。null 表示**没有可显示的金额**，而那有两种原因，由 [balanceFailed] 区分。
+     */
     val balance: UiMoney?,
+    /**
+     * 余额查询**试过且失败了**。
+     *
+     * 三种状态必须在 UI 上可区分（§9.3），而单一个 `balance: UiMoney?` 只能表达两种：
+     *
+     * - 有金额（含 0）——`balance != null`；
+     * - 试过但失败——`balance == null && balanceFailed`；
+     * - **根本没配置 / 从未查过**——`balance == null && !balanceFailed`。
+     *
+     * 把后两种归成一类的表现很具体：一个刚建好、压根没开余额查询的供应商，
+     * 会在余额明细里被列到“查询失败”下面，于是用户去查一个不存在的故障。
+     */
+    val balanceFailed: Boolean = false,
     val health: UiHealth,
     /** `lastOutcome` 是瞬时类时为真：主状态仍是上一次的持久结论（红线 11）。 */
     val staleThisRound: Boolean = false,

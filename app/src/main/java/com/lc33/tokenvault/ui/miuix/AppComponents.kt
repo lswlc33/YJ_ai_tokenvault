@@ -16,6 +16,7 @@ import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.clearText
 import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
@@ -525,6 +526,17 @@ class AppTextFieldState internal constructor(internal val state: TextFieldState)
     fun clear() {
         state.clearText()
         state.undoState.clearHistory()
+    }
+
+    /**
+     * 覆盖输入框文本。粘贴导入的「从剪贴板填充」用它：把剪贴板里的整段文本填进来。
+     *
+     * 走 `setTextAndPlaceCursorAtEnd` 而不是重新建一个 state——重建会让输入框的焦点、
+     * 滚动位置与撤销历史一起丢，而且拿不到旧的 state 引用。
+     */
+    @OptIn(ExperimentalFoundationApi::class)
+    fun setText(text: String) {
+        state.setTextAndPlaceCursorAtEnd(text)
     }
 }
 

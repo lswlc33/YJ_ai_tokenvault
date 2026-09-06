@@ -69,8 +69,16 @@ data object ProbeSettingsRoute
 @Serializable
 data object ProfileListRoute
 
+/** 编辑 / 新建一个客户端预设。id = 0 表示新建（可从 cURL 导入）。 */
+@Serializable
+data class ProfileEditorRoute(val id: Long = 0)
+
 @Serializable
 data object DataRoute
+
+/** 日志页（audit_log）。数据页的「日志」入口。 */
+@Serializable
+data object LogRoute
 
 @Serializable
 data object SyncRoute
