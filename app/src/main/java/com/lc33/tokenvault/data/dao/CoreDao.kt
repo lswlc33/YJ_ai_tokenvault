@@ -42,6 +42,10 @@ interface GroupDao {
     @Query("DELETE FROM groups WHERE id = :id")
     suspend fun delete(id: Long)
 
+    /** 清空整表（备份"覆盖恢复"用）。 */
+    @Query("DELETE FROM groups")
+    suspend fun clear()
+
     /** 拖拽排序。一个事务里把整段顺序写完，避免中间态被 Flow 观察到。 */
     @Transaction
     suspend fun reorder(idsInOrder: List<Long>) {
@@ -102,6 +106,10 @@ interface ProviderDao {
     @Query("DELETE FROM providers WHERE id = :id")
     suspend fun delete(id: Long)
 
+    /** 清空整表（备份"覆盖恢复"用）。靠外键 CASCADE 连带删 keys / accounts / models。 */
+    @Query("DELETE FROM providers")
+    suspend fun clear()
+
     @Query("UPDATE providers SET groupId = :groupId, updatedAt = :now WHERE id IN (:ids)")
     suspend fun setGroup(ids: List<Long>, groupId: Long?, now: Long)
 
@@ -145,6 +153,10 @@ interface ApiKeyDao {
 
     @Query("SELECT * FROM api_keys ORDER BY providerId, sortOrder, id")
     fun observeAll(): Flow<List<ApiKeyEntity>>
+
+    /** 全量快照（备份导出用）。 */
+    @Query("SELECT * FROM api_keys ORDER BY providerId, sortOrder, id")
+    suspend fun findAll(): List<ApiKeyEntity>
 
     @Query("SELECT * FROM api_keys WHERE providerId = :providerId ORDER BY sortOrder, id")
     suspend fun findByProvider(providerId: Long): List<ApiKeyEntity>
@@ -238,6 +250,22 @@ interface ApiKeyDao {
         httpStatus: Int?,
         checkedAt: Long,
     )
+
+    /**
+     * 把所有密钥的探测字段重置回「未探测」（数据页的「清空探测结果」）。
+     *
+     * 一条语句改全表：`health` 回 unknown、`lastOutcome` 回 skipped、瞬时结果全清。
+     * 只动探测字段，`secretEnc` / `fingerprint` / `label` 这些内容列一律不碰——
+     * 清空探测结果不是删密钥（`data_clear_probe_summary` 说得很清楚）。
+     */
+    @Query(
+        """
+        UPDATE api_keys SET
+            health = 'unknown', lastOutcome = 'skipped', healthDetail = NULL,
+            httpStatus = NULL, latencyMs = NULL, checkedAt = NULL, okAt = NULL
+        """,
+    )
+    suspend fun resetProbeResults()
 
     // ------------------------------------------------------------------ 默认 Key 不变量
 

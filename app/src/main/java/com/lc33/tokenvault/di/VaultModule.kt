@@ -1,9 +1,11 @@
 package com.lc33.tokenvault.di
 
 import android.content.Context
+import android.os.Build
 import android.os.SystemClock
 import androidx.room.Room
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.lc33.tokenvault.BuildConfig
 import com.lc33.tokenvault.crypto.RandomBytes
 import com.lc33.tokenvault.crypto.SecretBox
 import com.lc33.tokenvault.crypto.SecureRandomBytes
@@ -19,6 +21,9 @@ import com.lc33.tokenvault.data.dao.ProbeRunDao
 import com.lc33.tokenvault.data.dao.ProviderAccountDao
 import com.lc33.tokenvault.data.dao.ProviderDao
 import com.lc33.tokenvault.domain.BiometricAvailability
+import com.lc33.tokenvault.engine.ProbeEngine
+import com.lc33.tokenvault.net.HostGate
+import com.lc33.tokenvault.net.OkHttpEngine
 import com.lc33.tokenvault.platform.AndroidSecureClipboard
 import com.lc33.tokenvault.platform.AutoLocker
 import com.lc33.tokenvault.platform.BiometricCapability
@@ -57,6 +62,16 @@ annotation class AppScope
 @Retention(AnnotationRetention.BINARY)
 annotation class NowEpochMs
 
+/**
+ * 客户端伪装预设里的占位符值（`{app_version}` / `{android_release}` / `{arch}`）。
+ *
+ * 这些是平台能力（红线 20）：`app_version` 来自 `BuildConfig`、其余来自 `Build`，探测引擎
+ * 是纯逻辑不该自己读。`{uuid}` / `{random_hex:N}` 由 `HeaderAssembler` 自己现算，不在这里。
+ */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class AppPlaceholders
+
 @Module
 @InstallIn(SingletonComponent::class)
 object VaultModule {
@@ -75,10 +90,24 @@ object VaultModule {
     @NowEpochMs
     fun provideNow(): () -> Long = System::currentTimeMillis
 
+    @Provides
+    @Singleton
+    @AppPlaceholders
+    fun provideAppPlaceholders(): Map<String, String> = mapOf(
+        "app_version" to BuildConfig.VERSION_NAME,
+        "android_release" to Build.VERSION.RELEASE,
+        "arch" to (Build.SUPPORTED_ABIS.firstOrNull() ?: "generic"),
+    )
+
     /** 字段级加解密。`SecretBox` 自己无状态，随机源注进去（测试里换成确定源）。 */
     @Provides
     @Singleton
     fun provideSecretBox(random: RandomBytes): SecretBox = SecretBox(random)
+
+    /** 落日志前的脱敏（红线 32）。已知明文秘密暂给空集合，只靠正则兜底。 */
+    @Provides
+    @Singleton
+    fun provideRedactor(): com.lc33.tokenvault.crypto.Redactor = com.lc33.tokenvault.crypto.Redactor()
 
     /**
      * boot 文件放在 `filesDir` 而不是 `SharedPreferences`：
@@ -130,10 +159,12 @@ object VaultModule {
     fun provideAutoLocker(
         session: VaultSession,
         @AppScope scope: CoroutineScope,
+        probeEngine: ProbeEngine,
     ): AutoLocker = AutoLocker(
         session = session,
         scope = scope,
         elapsedRealtimeMs = SystemClock::elapsedRealtime,
+        onLock = probeEngine::onLock,
     )
 
     @Provides
@@ -188,6 +219,60 @@ object VaultModule {
     @Provides fun provideAuditLogDao(db: VaultDatabase): AuditLogDao = db.auditLogDao()
 
     @Provides fun provideAppSettingDao(db: VaultDatabase): AppSettingDao = db.appSettingDao()
+
+    // ------------------------------------------------------------------ 网络与探测
+
+    /**
+     * host 级最小间隔门闸（§8.1 末尾、红线 29）。**应用级单例**：间隔状态要跨轮、跨页面
+     * 记住——撞过一次 429 的 host 在下一轮也不该立刻回到 800ms。
+     */
+    @Provides
+    @Singleton
+    fun provideHostGate(): HostGate = HostGate()
+
+    /**
+     * 探测引擎用的单个 OkHttpClient（§8.1）。超时与并发上限都在 [OkHttpEngine.buildDefaultClient]
+     * 里，这一层只负责单例化。
+     */
+    @Provides
+    @Singleton
+    fun provideOkHttpEngine(hostGate: HostGate): OkHttpEngine =
+        OkHttpEngine(OkHttpEngine.buildDefaultClient(), hostGate)
+
+    /**
+     * 探测引擎宿主（§8.5）。**`@Singleton` 不是 ViewModel**，所以绑定在这里而不是让
+     * 某个页面去 `hiltViewModel`——它要能跨页面存活。
+     */
+    @Provides
+    @Singleton
+    fun provideBackupCodec(random: RandomBytes): com.lc33.tokenvault.backup.BackupCodec =
+        com.lc33.tokenvault.backup.BackupCodec(random)
+
+    @Provides
+    @Singleton
+    fun provideProbeEngine(
+        providers: com.lc33.tokenvault.domain.repo.ProviderRepository,
+        keys: com.lc33.tokenvault.domain.repo.ApiKeyRepository,
+        clientProfiles: com.lc33.tokenvault.domain.repo.ClientProfileRepository,
+        keyDao: ApiKeyDao,
+        runDao: ProbeRunDao,
+        session: VaultSession,
+        engine: OkHttpEngine,
+        audit: com.lc33.tokenvault.domain.repo.AuditLogRepository,
+        @NowEpochMs now: () -> Long,
+        @AppPlaceholders placeholders: Map<String, String>,
+    ): ProbeEngine = ProbeEngine(
+        providers = providers,
+        keys = keys,
+        clientProfiles = clientProfiles,
+        keyDao = keyDao,
+        runDao = runDao,
+        session = session,
+        engine = engine,
+        audit = audit,
+        now = now,
+        placeholders = placeholders,
+    )
 }
 
 /** 让 `BiometricAvailability` 也能被直接注入（设置页要显示当前档位）。 */

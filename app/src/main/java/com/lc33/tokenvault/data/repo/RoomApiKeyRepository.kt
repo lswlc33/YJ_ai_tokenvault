@@ -38,6 +38,9 @@ class RoomApiKeyRepository @Inject constructor(
     override fun observeByProvider(providerId: Long): Flow<List<ApiKey>> =
         dao.observeByProvider(providerId).map { rows -> rows.map { it.toDomain() } }
 
+    override fun observeAll(): Flow<List<ApiKey>> =
+        dao.observeAll().map { rows -> rows.map { it.toDomain() } }
+
     override suspend fun find(id: Long): ApiKey? = dao.findById(id)?.toDomain()
 
     override suspend fun add(providerId: Long, label: String, secret: CharArray): Long {

@@ -17,6 +17,15 @@ interface ApiKeyRepository {
 
     fun observeByProvider(providerId: Long): Flow<List<ApiKey>>
 
+    /**
+     * 全库的密钥。
+     *
+     * 给“要把所有家一起算”的地方用（仪表盘的健康分布、管理页每一行的聚合状态）。
+     * **一条订阅而不是每家一条**：按家订阅是 N+1，而且新增一家时那一整组 Flow 要重建，
+     * 于是列表会闪一下。不解密，所以锁定态也能读（§6.1 推论 3）。
+     */
+    fun observeAll(): Flow<List<ApiKey>>
+
     suspend fun find(id: Long): ApiKey?
 
     /**

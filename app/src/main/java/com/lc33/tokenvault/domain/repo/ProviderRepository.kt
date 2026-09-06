@@ -1,5 +1,6 @@
 package com.lc33.tokenvault.domain.repo
 
+import com.lc33.tokenvault.domain.model.BalanceSnapshot
 import com.lc33.tokenvault.domain.model.Provider
 import com.lc33.tokenvault.domain.model.ProviderSummary
 import kotlinx.coroutines.flow.Flow
@@ -37,4 +38,18 @@ interface ProviderRepository {
     suspend fun delete(id: Long)
 
     suspend fun setGroup(ids: List<Long>, groupId: Long?)
+
+    /**
+     * 解出 NewAPI 那类适配器要用的独立访问令牌明文。
+     *
+     * @return 新分配的 [CharArray]，**调用方用完必须擦**；没有令牌时返回 null。
+     * @throws com.lc33.tokenvault.crypto.VaultLockedException 锁定态。
+     */
+    suspend fun revealBalanceToken(id: Long): CharArray?
+
+    /** 落一次余额查询的结果（§9.3）。[snapshot] 的 amount 为 null 且 error 非空 = 查询失败。 */
+    suspend fun updateBalance(id: Long, snapshot: BalanceSnapshot, calibrated: Boolean)
+
+    /** `quotaPerUnit` 被 `/api/status` 校准后单独写（校准失败不碰余额）。 */
+    suspend fun calibrateQuotaPerUnit(id: Long, quotaPerUnit: Double)
 }

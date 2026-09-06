@@ -4,9 +4,14 @@ import android.app.Application
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
+import com.lc33.tokenvault.data.seed.ProfileSeeder
+import com.lc33.tokenvault.di.AppScope
+import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.platform.AutoLocker
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 /**
  * Hilt 入口。
@@ -25,6 +30,16 @@ class TokenVaultApp : Application() {
     @Inject
     lateinit var autoLocker: AutoLocker
 
+    @Inject
+    lateinit var settings: SettingsRepository
+
+    @Inject
+    lateinit var profileSeeder: ProfileSeeder
+
+    @Inject
+    @AppScope
+    lateinit var appScope: CoroutineScope
+
     override fun onCreate() {
         super.onCreate()
         ProcessLifecycleOwner.get().lifecycle.addObserver(
@@ -34,5 +49,14 @@ class TokenVaultApp : Application() {
                 override fun onStart(owner: LifecycleOwner) = autoLocker.onEnterForeground()
             },
         )
+        // 自动锁定时限接在**这里**而不是安全设置页的 ViewModel 上：那个 ViewModel 只在用户
+        // 站在那一页时活着，于是"设成立即、退出设置、切后台"会退回默认的 60 秒。
+        // 这条订阅活得和进程一样长，而且只碰明文列，所以锁定态也能跑（§6.1 推论 2）。
+        appScope.launch {
+            settings.observeAutoLockTimeout().collect { autoLocker.timeout = it }
+        }
+        // 内置客户端预设（§8.2）。幂等，只碰公开数据，锁定态也能跑；启动时种一次，
+        // 既覆盖新装用户，也随版本刷新"没改过"的条目。
+        appScope.launch { profileSeeder.seed() }
     }
 }

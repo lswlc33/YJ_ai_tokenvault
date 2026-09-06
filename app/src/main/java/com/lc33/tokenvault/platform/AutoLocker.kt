@@ -1,5 +1,7 @@
 package com.lc33.tokenvault.platform
 
+import com.lc33.tokenvault.domain.AutoLockPolicy
+import com.lc33.tokenvault.domain.AutoLockTimeout
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
@@ -28,19 +30,25 @@ import kotlinx.coroutines.launch
 class AutoLocker(
     private val session: VaultSession,
     private val scope: CoroutineScope,
+    /** 锁定发生时顺带通知（探测引擎要停，§7.4 / §8.5）。默认空，测试不传。 */
+    private val onLock: () -> Unit = {},
     private val elapsedRealtimeMs: () -> Long,
 ) {
 
     private val guard = Any()
 
     /**
-     * 切后台多少秒之后锁。
+     * 切后台多久之后锁。
      *
-     * 权威存储将来在 `app_settings`（M2 的 `SettingsRepository`），那时把它改成从仓库读；
-     * 现在只有默认值，所以先放一个可写的字段而不是硬编码常量——硬编码的话，接设置项时
-     * 要改的地方会散在两处。
+     * **权威存储是 `app_settings` 里的那一个键**（红线 31）：`TokenVaultApp` 订阅
+     * `SettingsRepository` 之后写进来，这里不自己再读一份。写成可变字段而不是构造参数，
+     * 因为这个对象是应用级单例、活得比任何一次设置变更都长。
+     *
+     * 默认值只在「设置还没读上来」的那一小段里生效，所以它必须落在**安全的那一侧**
+     * （60 秒，而不是从不）。
      */
-    var timeoutSeconds: Int = DEFAULT_TIMEOUT_SECONDS
+    @Volatile
+    var timeout: AutoLockTimeout = AutoLockPolicy.DEFAULT
 
     private val _locked = MutableSharedFlow<Unit>(
         extraBufferCapacity = 1,
@@ -53,14 +61,20 @@ class AutoLocker(
     private var backgroundedAtMs: Long? = null
     private var pending: Job? = null
 
-    /** 整个应用进了后台（进程级，Activity 之间切换不算）。 */
+    /**
+     * 整个应用进了后台（进程级，Activity 之间切换不算）。
+     *
+     * 选了「从不」就连定时器都不起，也不记「什么时候进后台的」——记了就会漏出一条路：
+     * 在后台期间把设置改回有限时限，回到前台那一下会拿着一个很旧的时间戳立刻锁掉。
+     */
     fun onEnterBackground() {
         synchronized(guard) {
             if (!session.isUnlocked) return
+            val after = timeout as? AutoLockTimeout.After ?: return
             backgroundedAtMs = elapsedRealtimeMs()
             pending?.cancel()
             pending = scope.launch {
-                delay(timeoutSeconds * MILLIS_PER_SECOND)
+                delay(after.seconds * MILLIS_PER_SECOND)
                 synchronized(guard) {
                     backgroundedAtMs = null
                     lockIfUnlocked()
@@ -76,7 +90,8 @@ class AutoLocker(
             pending = null
             val since = backgroundedAtMs ?: return
             backgroundedAtMs = null
-            if (elapsedRealtimeMs() - since >= timeoutSeconds * MILLIS_PER_SECOND) lockIfUnlocked()
+            val after = timeout as? AutoLockTimeout.After ?: return
+            if (elapsedRealtimeMs() - since >= after.seconds * MILLIS_PER_SECOND) lockIfUnlocked()
         }
     }
 
@@ -97,12 +112,11 @@ class AutoLocker(
     private fun lockIfUnlocked() {
         if (!session.isUnlocked) return
         session.lock()
+        onLock()
         _locked.tryEmit(Unit)
     }
 
     companion object {
-        /** §7.4 的默认值。 */
-        const val DEFAULT_TIMEOUT_SECONDS = 60
         private const val MILLIS_PER_SECOND = 1000L
     }
 }

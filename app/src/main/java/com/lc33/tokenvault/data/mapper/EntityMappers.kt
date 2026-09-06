@@ -2,6 +2,7 @@ package com.lc33.tokenvault.data.mapper
 
 import com.lc33.tokenvault.data.dao.ProviderSummaryRow
 import com.lc33.tokenvault.data.entity.ApiKeyEntity
+import com.lc33.tokenvault.data.entity.AuditLogEntity
 import com.lc33.tokenvault.data.entity.ClientProfileEntity
 import com.lc33.tokenvault.data.entity.GroupEntity
 import com.lc33.tokenvault.data.entity.ModelEntity
@@ -16,9 +17,12 @@ import com.lc33.tokenvault.domain.ProbeOutcome
 import com.lc33.tokenvault.domain.Protocol
 import com.lc33.tokenvault.domain.model.AiModel
 import com.lc33.tokenvault.domain.model.ApiKey
+import com.lc33.tokenvault.domain.model.AuditEntry
 import com.lc33.tokenvault.domain.model.BalanceSnapshot
 import com.lc33.tokenvault.domain.model.ClientProfile
 import com.lc33.tokenvault.domain.model.Group
+import com.lc33.tokenvault.domain.model.LogCategory
+import com.lc33.tokenvault.domain.model.LogLevel
 import com.lc33.tokenvault.domain.model.Provider
 import com.lc33.tokenvault.domain.model.ProviderAccount
 import com.lc33.tokenvault.domain.model.ProviderProbeSettings
@@ -316,4 +320,17 @@ fun ClientProfile.toEntity(): ClientProfileEntity = ClientProfileEntity(
     builtinRev = builtinRev,
     userEdited = userEdited,
     sortOrder = sortOrder,
+)
+
+// ------------------------------------------------------------------ audit_log
+
+fun AuditLogEntity.toDomain(): AuditEntry = AuditEntry(
+    id = id,
+    at = at,
+    level = LogLevel.fromWireName(level),
+    category = LogCategory.fromWireName(category),
+    providerId = providerId,
+    keyId = keyId,
+    message = message,
+    detail = detail,
 )

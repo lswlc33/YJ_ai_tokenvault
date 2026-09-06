@@ -1,5 +1,7 @@
 package com.lc33.tokenvault.platform
 
+import com.lc33.tokenvault.domain.AutoLockPolicy
+import com.lc33.tokenvault.domain.AutoLockTimeout
 import java.io.File
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -48,7 +50,7 @@ class AutoLockerTest {
         assertTrue("前置条件：用例开始时是解锁态", session.isUnlocked)
     }
 
-    private val timeoutMs = AutoLocker.DEFAULT_TIMEOUT_SECONDS * 1000L
+    private val timeoutMs = AutoLockPolicy.DEFAULT_SECONDS * 1000L
 
     @Test
     fun `切后台到点就在后台锁掉`() = runTest {
@@ -122,5 +124,48 @@ class AutoLockerTest {
         advanceTimeBy(timeoutMs * 2)
         runCurrent()
         assertEquals(0, events.size)
+    }
+
+    @Test
+    fun `选了从不就真的不锁，回到前台也不补锁`() = runTest {
+        val locker = AutoLocker(session, backgroundScope) { elapsed }
+        locker.timeout = AutoLockTimeout.Never
+
+        locker.onEnterBackground()
+        advanceTimeBy(timeoutMs * 100)
+        runCurrent()
+        assertTrue("选了从不时定时器都不该起", session.isUnlocked)
+
+        // 定时器被冻住那条补锁路径同样要认「从不」：少这一句的表现是选了从不、
+        // 切后台一小时再回来，却在回来那一下被锁了
+        elapsed = timeoutMs * 100
+        locker.onEnterForeground()
+        assertTrue("回到前台也不该补锁", session.isUnlocked)
+    }
+
+    @Test
+    fun `选了立即就切后台当场锁`() = runTest {
+        val locker = AutoLocker(session, backgroundScope) { elapsed }
+        locker.timeout = AutoLockTimeout.After(0)
+
+        locker.onEnterBackground()
+        runCurrent()
+        assertFalse("选了立即就不该再等", session.isUnlocked)
+    }
+
+    @Test
+    fun `改短时限后切后台按新值算`() = runTest {
+        val locker = AutoLocker(session, backgroundScope) { elapsed }
+        locker.timeout = AutoLockTimeout.After(30)
+
+        locker.onEnterBackground()
+        advanceTimeBy(29_000)
+        runCurrent()
+        assertTrue(session.isUnlocked)
+
+        advanceTimeBy(2_000)
+        runCurrent()
+        // 旧实现把默认的 60 秒写死在字段里，于是这里会还差 30 秒
+        assertFalse("30 秒到点必须已经锁了", session.isUnlocked)
     }
 }

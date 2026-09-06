@@ -33,6 +33,14 @@ interface SecureClipboard {
     /** 立刻清空（设置里那个"立即清除剪贴板"的按钮）。 */
     fun clearNow()
 
+    /**
+     * 读剪贴板文本。粘贴导入的"从剪贴板填充"用它。
+     *
+     * 返回 null 表示剪贴板里没有文本（可能是空、或是一张图 / 一个文件）。
+     * 读取本身是平台能力，所以也走这个接口而不是让 ViewModel 直接拿 `ClipboardManager`。
+     */
+    fun read(): String?
+
     companion object {
         /** 默认 60 秒（§7.5）。设置里可改，0 表示不清除。 */
         const val DEFAULT_AUTO_CLEAR_SECONDS = 60
@@ -90,6 +98,9 @@ class AndroidSecureClipboard(
         // 用空 ClipData 覆盖而不是 clearPrimaryClip()：后者在部分 ROM 上是空实现
         manager?.setPrimaryClip(ClipData.newPlainText("", ""))
     }
+
+    override fun read(): String? =
+        manager?.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text?.toString()
 
     private fun currentText(): String? =
         manager?.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text?.toString()

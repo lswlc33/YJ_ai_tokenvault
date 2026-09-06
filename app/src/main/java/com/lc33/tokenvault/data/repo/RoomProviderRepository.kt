@@ -2,11 +2,13 @@ package com.lc33.tokenvault.data.repo
 
 import com.lc33.tokenvault.crypto.FieldAad
 import com.lc33.tokenvault.crypto.toUtf8
+import com.lc33.tokenvault.crypto.utf8Chars
 import com.lc33.tokenvault.crypto.zeroize
 import com.lc33.tokenvault.data.dao.ProviderDao
 import com.lc33.tokenvault.data.mapper.toDomain
 import com.lc33.tokenvault.data.mapper.toEntity
 import com.lc33.tokenvault.di.NowEpochMs
+import com.lc33.tokenvault.domain.model.BalanceSnapshot
 import com.lc33.tokenvault.domain.model.Provider
 import com.lc33.tokenvault.domain.model.ProviderSummary
 import com.lc33.tokenvault.domain.repo.ProviderRepository
@@ -94,6 +96,31 @@ class RoomProviderRepository @Inject constructor(
     override suspend fun delete(id: Long) = dao.delete(id)
 
     override suspend fun setGroup(ids: List<Long>, groupId: Long?) = dao.setGroup(ids, groupId, now())
+
+    override suspend fun revealBalanceToken(id: Long): CharArray? {
+        val enc = dao.findById(id)?.balanceTokenEnc ?: return null
+        val bytes = cipher.open(enc, FieldAad.of(TABLE, id, COLUMN_BALANCE_TOKEN))
+        return try {
+            bytes.utf8Chars()
+        } finally {
+            bytes.zeroize()
+        }
+    }
+
+    override suspend fun updateBalance(id: Long, snapshot: BalanceSnapshot, calibrated: Boolean) =
+        dao.updateBalance(
+            id = id,
+            amount = snapshot.amount,
+            used = snapshot.used,
+            currency = snapshot.currency,
+            raw = snapshot.raw,
+            checkedAt = snapshot.checkedAt ?: now(),
+            error = snapshot.error,
+            calibrated = calibrated,
+        )
+
+    override suspend fun calibrateQuotaPerUnit(id: Long, quotaPerUnit: Double) =
+        dao.calibrateQuotaPerUnit(id, quotaPerUnit)
 
     private companion object {
         const val TABLE = "providers"

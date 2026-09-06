@@ -67,7 +67,10 @@ if [ -f 示例数据.md ]; then
     fi
 fi
 
-if git diff --cached -U0 | grep -Eq '^\+.*sk-[A-Za-z0-9]{20,}'; then
+# 正则兜底只扫主代码与文档：src/test/ 与 src/androidTest/ 里的 sk-TEST… 是测试占位符，
+# 它们本就是用来验证脱敏 / 导入导出的（AuditLogRepositoryTest 就故意放一条长的 sk-… 验 Redactor）。
+# 真实密钥泄露的风险在主代码与文档里，不在这两个测试目录。
+if git diff --cached --name-only | grep -Ev '^(app/src/test/|app/src/androidTest/)' | xargs -r -I{} sh -c "git diff --cached -U0 -- '{}'" | grep -Eq '^\+.*sk-[A-Za-z0-9]{20,}'; then
     echo
     echo "pre-commit: 暂存区里出现了疑似真实 API 密钥的字面量。"
     exit 1

@@ -1,11 +1,23 @@
 package com.lc33.tokenvault.data.repo
 
 import com.lc33.tokenvault.data.dao.ApiKeyDao
+import com.lc33.tokenvault.data.dao.AppSettingDao
+import com.lc33.tokenvault.data.dao.AuditLogDao
+import com.lc33.tokenvault.data.dao.ClientProfileDao
 import com.lc33.tokenvault.data.dao.GroupDao
+import com.lc33.tokenvault.data.dao.ModelDao
+import com.lc33.tokenvault.data.dao.ProbeRunDao
+import com.lc33.tokenvault.data.dao.ProviderAccountDao
 import com.lc33.tokenvault.data.dao.ProviderDao
 import com.lc33.tokenvault.data.dao.ProviderSummaryRow
 import com.lc33.tokenvault.data.entity.ApiKeyEntity
+import com.lc33.tokenvault.data.entity.AppSettingEntity
+import com.lc33.tokenvault.data.entity.AuditLogEntity
+import com.lc33.tokenvault.data.entity.ClientProfileEntity
 import com.lc33.tokenvault.data.entity.GroupEntity
+import com.lc33.tokenvault.data.entity.ModelEntity
+import com.lc33.tokenvault.data.entity.ProbeRunEntity
+import com.lc33.tokenvault.data.entity.ProviderAccountEntity
 import com.lc33.tokenvault.data.entity.ProviderEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,6 +73,11 @@ internal class FakeGroupDao : GroupDao {
         revision.value++
     }
 
+    override suspend fun clear() {
+        store.clear()
+        revision.value++
+    }
+
     override suspend fun setSortOrder(id: Long, sortOrder: Int) =
         replace(id) { it.copy(sortOrder = sortOrder) }
 
@@ -101,6 +118,11 @@ internal class FakeProviderDao : ProviderDao {
 
     override suspend fun delete(id: Long) {
         store.removeAll { it.id == id }
+        revision.value++
+    }
+
+    override suspend fun clear() {
+        store.clear()
         revision.value++
     }
 
@@ -151,6 +173,12 @@ internal class FakeApiKeyDao : ApiKeyDao {
 
     val rows: List<ApiKeyEntity> get() = store.toList()
 
+    /** 测试专用：直接清空（模拟新设备空库）。 */
+    fun clearForTest() {
+        store.clear()
+        revision.value++
+    }
+
     private fun ordered(list: List<ApiKeyEntity> = store) =
         list.sortedWith(compareBy({ it.sortOrder }, { it.id }))
 
@@ -158,6 +186,8 @@ internal class FakeApiKeyDao : ApiKeyDao {
         revision.map { ordered(store.filter { it.providerId == providerId }) }
 
     override fun observeAll(): Flow<List<ApiKeyEntity>> = revision.map { ordered() }
+
+    override suspend fun findAll(): List<ApiKeyEntity> = ordered()
 
     override suspend fun findByProvider(providerId: Long): List<ApiKeyEntity> =
         ordered(store.filter { it.providerId == providerId })
@@ -239,6 +269,21 @@ internal class FakeApiKeyDao : ApiKeyDao {
         )
     }
 
+    override suspend fun resetProbeResults() {
+        store.indices.forEach { i ->
+            store[i] = store[i].copy(
+                health = "unknown",
+                lastOutcome = "skipped",
+                healthDetail = null,
+                httpStatus = null,
+                latencyMs = null,
+                checkedAt = null,
+                okAt = null,
+            )
+        }
+        revision.value++
+    }
+
     private inline fun replace(id: Long, transform: (ApiKeyEntity) -> ApiKeyEntity) {
         val index = store.indexOfFirst { it.id == id }
         if (index < 0) return
@@ -251,5 +296,295 @@ internal class FakeApiKeyDao : ApiKeyDao {
 internal class ImmediateTransactions : TransactionRunner {
     override suspend fun <R> inTransaction(block: suspend () -> R): R = block()
 }
+
+internal class FakeProviderAccountDao : ProviderAccountDao {
+    private val store = mutableListOf<ProviderAccountEntity>()
+    private val revision = MutableStateFlow(0)
+    private var nextId = 1L
+
+    val rows: List<ProviderAccountEntity> get() = store.toList()
+
+    /** 测试专用：直接清空。 */
+    fun clearForTest() {
+        store.clear()
+        revision.value++
+    }
+
+    private fun ordered() = store.sortedWith(compareBy({ it.sortOrder }, { it.id }))
+
+    override fun observeByProvider(providerId: Long): Flow<List<ProviderAccountEntity>> =
+        revision.map { ordered().filter { it.providerId == providerId } }
+
+    override suspend fun findAll(): List<ProviderAccountEntity> = ordered()
+
+    override suspend fun findById(id: Long): ProviderAccountEntity? = store.firstOrNull { it.id == id }
+
+    override suspend fun insert(account: ProviderAccountEntity): Long {
+        val id = nextId++
+        store += account.copy(id = id)
+        revision.value++
+        return id
+    }
+
+    override suspend fun update(account: ProviderAccountEntity) = replace(account.id) { account }
+
+    override suspend fun delete(id: Long) {
+        store.removeAll { it.id == id }
+        revision.value++
+    }
+
+    override suspend fun setUsername(id: Long, enc: ByteArray, fp: String, now: Long) =
+        replace(id) { it.copy(usernameEnc = enc, usernameFp = fp, updatedAt = now) }
+
+    override suspend fun setPassword(id: Long, enc: ByteArray, now: Long) =
+        replace(id) { it.copy(passwordEnc = enc, updatedAt = now) }
+
+    private inline fun replace(id: Long, transform: (ProviderAccountEntity) -> ProviderAccountEntity) {
+        val index = store.indexOfFirst { it.id == id }
+        if (index < 0) return
+        store[index] = transform(store[index])
+        revision.value++
+    }
+}
+
+internal class FakeModelDao : ModelDao {
+    private val store = mutableListOf<ModelEntity>()
+    private val revision = MutableStateFlow(0)
+    private var nextId = 1L
+
+    val rows: List<ModelEntity> get() = store.toList()
+
+    /** 测试专用：直接清空。 */
+    fun clearForTest() {
+        store.clear()
+        revision.value++
+    }
+
+    private fun ordered() = store.sortedWith(compareBy({ it.sortOrder }, { it.modelId }))
+
+    override fun observeByProvider(providerId: Long): Flow<List<ModelEntity>> =
+        revision.map { ordered().filter { it.providerId == providerId } }
+
+    override fun observeAll(): Flow<List<ModelEntity>> = revision.map { ordered() }
+
+    override suspend fun findAll(): List<ModelEntity> = ordered()
+
+    override suspend fun findByProvider(providerId: Long): List<ModelEntity> =
+        ordered().filter { it.providerId == providerId }
+
+    override suspend fun findById(id: Long): ModelEntity? = store.firstOrNull { it.id == id }
+
+    override suspend fun insertIgnoring(model: ModelEntity): Long {
+        val id = nextId++
+        store += model.copy(id = id)
+        revision.value++
+        return id
+    }
+
+    override suspend fun update(model: ModelEntity) = replace(model.id) { model }
+
+    override suspend fun delete(id: Long) {
+        store.removeAll { it.id == id }
+        revision.value++
+    }
+
+    override suspend fun setEnabled(id: Long, enabled: Boolean) =
+        replace(id) { it.copy(enabled = enabled) }
+
+    override suspend fun touchLastSeen(id: Long, now: Long) =
+        replace(id) { it.copy(lastSeenAt = now) }
+
+    override suspend fun disableVanished(providerId: Long, protocol: String, seenModelIds: List<String>) {
+        store.indices
+            .filter {
+                val m = store[it]
+                m.providerId == providerId && m.source == "discovered" &&
+                    m.discoveredVia == protocol && m.modelId !in seenModelIds
+            }
+            .forEach { store[it] = store[it].copy(enabled = false) }
+        revision.value++
+    }
+
+    override suspend fun applyProbeResult(
+        id: Long,
+        probeState: String,
+        lastOutcome: String,
+        detail: String?,
+        latencyMs: Long?,
+        probedAt: Long,
+    ) = replace(id) {
+        it.copy(
+            probeState = probeState,
+            lastOutcome = lastOutcome,
+            probeDetail = detail,
+            latencyMs = latencyMs,
+            probedAt = probedAt,
+        )
+    }
+
+    override suspend fun applyTransientOutcome(id: Long, lastOutcome: String, detail: String?, probedAt: Long) =
+        replace(id) { it.copy(lastOutcome = lastOutcome, probeDetail = detail, probedAt = probedAt) }
+
+    private inline fun replace(id: Long, transform: (ModelEntity) -> ModelEntity) {
+        val index = store.indexOfFirst { it.id == id }
+        if (index < 0) return
+        store[index] = transform(store[index])
+        revision.value++
+    }
+}
+
+/**
+ * 设置表。主键是 `key`，所以 [put] 是 upsert；同一个键写两次得到一行而不是两行。
+ *
+ * 同样用「可变列表 + revision」：[AppSettingEntity] 的 `equals` 把 `valueBlob` 算进来了，
+ * 而那是个 `ByteArray`——拿 `MutableStateFlow<List<...>>` 当行表时这一类写入的丢掉方式都是静默的。
+ */
+internal class FakeAppSettingDao : AppSettingDao {
+    private val store = mutableListOf<AppSettingEntity>()
+    private val revision = MutableStateFlow(0)
+
+    val rows: List<AppSettingEntity> get() = store.toList()
+
+    override fun observeAll(): Flow<List<AppSettingEntity>> = revision.map { store.toList() }
+
+    override suspend fun find(key: String): AppSettingEntity? = store.firstOrNull { it.key == key }
+
+    override suspend fun put(setting: AppSettingEntity) {
+        val index = store.indexOfFirst { it.key == setting.key }
+        if (index < 0) store += setting else store[index] = setting
+        revision.value++
+    }
+
+    override suspend fun remove(key: String) {
+        store.removeAll { it.key == key }
+        revision.value++
+    }
+}
+
+internal class FakeClientProfileDao : ClientProfileDao {
+    private val store = mutableListOf<ClientProfileEntity>()
+    private val revision = MutableStateFlow(0)
+    private var nextId = 1L
+
+    val rows: List<ClientProfileEntity> get() = store.toList()
+
+    private fun ordered() = store.sortedWith(compareBy({ it.sortOrder }, { it.id }))
+
+    override fun observeAll(): Flow<List<ClientProfileEntity>> = revision.map { ordered() }
+
+    override suspend fun findAll(): List<ClientProfileEntity> = ordered()
+
+    override suspend fun findById(id: Long): ClientProfileEntity? = store.firstOrNull { it.id == id }
+
+    override suspend fun findByBuiltinKey(builtinKey: String): ClientProfileEntity? =
+        store.firstOrNull { it.builtinKey == builtinKey }
+
+    override suspend fun insert(profile: ClientProfileEntity): Long {
+        val id = nextId++
+        store += profile.copy(id = id)
+        revision.value++
+        return id
+    }
+
+    override suspend fun update(profile: ClientProfileEntity) = replace(profile.id) { profile }
+
+    override suspend fun deleteCustom(id: Long) {
+        store.removeAll { it.id == id && it.builtinKey == null }
+        revision.value++
+    }
+
+    override suspend fun clearCustom() {
+        store.removeAll { it.builtinKey == null }
+        revision.value++
+    }
+
+    private inline fun replace(id: Long, transform: (ClientProfileEntity) -> ClientProfileEntity) {
+        val index = store.indexOfFirst { it.id == id }
+        if (index < 0) return
+        store[index] = transform(store[index])
+        revision.value++
+    }
+}
+
+internal class FakeProbeRunDao : ProbeRunDao {
+    private val store = mutableListOf<ProbeRunEntity>()
+    private val revision = MutableStateFlow(0)
+    private var nextId = 1L
+
+    val rows: List<ProbeRunEntity> get() = store.toList()
+
+    override fun observeLatest(): Flow<ProbeRunEntity?> = revision.map {
+        store.maxByOrNull { it.startedAt }
+    }
+
+    override suspend fun findById(id: Long): ProbeRunEntity? = store.firstOrNull { it.id == id }
+
+    override suspend fun insert(run: ProbeRunEntity): Long {
+        val id = nextId++
+        store += run.copy(id = id)
+        revision.value++
+        return id
+    }
+
+    override suspend fun update(run: ProbeRunEntity) {
+        val index = store.indexOfFirst { it.id == run.id }
+        if (index < 0) return
+        store[index] = run
+        revision.value++
+    }
+
+    override suspend fun trim(keep: Int) {
+        val kept = store.sortedByDescending { it.startedAt }.take(keep).toSet()
+        store.removeAll { it !in kept }
+        revision.value++
+    }
+
+    override suspend fun clear() {
+        store.clear()
+        revision.value++
+    }
+}
+
+internal class FakeAuditLogDao : AuditLogDao {
+    private val store = mutableListOf<AuditLogEntity>()
+    private val revision = MutableStateFlow(0)
+    private var nextId = 1L
+
+    val rows: List<AuditLogEntity> get() = store.toList()
+
+    private fun ordered(limit: Int) = store.sortedByDescending { it.at }.take(limit)
+
+    override fun observeRecent(limit: Int): Flow<List<AuditLogEntity>> = revision.map { ordered(limit) }
+
+    override fun observeByProvider(providerId: Long, limit: Int): Flow<List<AuditLogEntity>> =
+        revision.map { ordered(limit).filter { it.providerId == providerId } }
+
+    override fun observeByKey(keyId: Long, limit: Int): Flow<List<AuditLogEntity>> =
+        revision.map { ordered(limit).filter { it.keyId == keyId } }
+
+    override suspend fun insert(entry: AuditLogEntity): Long {
+        val id = nextId++
+        store += entry.copy(id = id)
+        revision.value++
+        return id
+    }
+
+    override suspend fun clear() {
+        store.clear()
+        revision.value++
+    }
+
+    override suspend fun trimToCount(keep: Int) {
+        val kept = store.sortedByDescending { it.at }.take(keep).toSet()
+        store.removeAll { it !in kept }
+        revision.value++
+    }
+
+    override suspend fun trimOlderThan(before: Long) {
+        store.removeAll { it.at < before }
+        revision.value++
+    }
+}
+
 
 

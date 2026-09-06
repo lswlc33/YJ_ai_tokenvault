@@ -36,6 +36,20 @@ interface ProviderAccountDao {
 
     @Query("DELETE FROM provider_accounts WHERE id = :id")
     suspend fun delete(id: Long)
+
+    /**
+     * 回填用户名密文（新增的两步写，第二步）。
+     *
+     * AAD 绑主键（红线 24），主键插入时才分配，所以和 `api_keys.secretEnc` 一样分两步。
+     * 刻意不复用 `@Update`：那个整行替换，而这里只回填用户名这一列——整行替换会
+     * 把密码密文、`loginUrl`、`label` 一起覆盖掉。
+     */
+    @Query("UPDATE provider_accounts SET usernameEnc = :enc, usernameFp = :fp, updatedAt = :now WHERE id = :id")
+    suspend fun setUsername(id: Long, enc: ByteArray, fp: String, now: Long)
+
+    /** 回填密码密文，同理只动密码列。 */
+    @Query("UPDATE provider_accounts SET passwordEnc = :enc, updatedAt = :now WHERE id = :id")
+    suspend fun setPassword(id: Long, enc: ByteArray, now: Long)
 }
 
 @Dao
@@ -43,6 +57,10 @@ interface ClientProfileDao {
 
     @Query("SELECT * FROM client_profiles ORDER BY sortOrder, id")
     fun observeAll(): Flow<List<ClientProfileEntity>>
+
+    /** 全量快照（备份导出用）。 */
+    @Query("SELECT * FROM client_profiles ORDER BY sortOrder, id")
+    suspend fun findAll(): List<ClientProfileEntity>
 
     @Query("SELECT * FROM client_profiles WHERE id = :id")
     suspend fun findById(id: Long): ClientProfileEntity?
@@ -58,6 +76,10 @@ interface ClientProfileDao {
 
     @Query("DELETE FROM client_profiles WHERE id = :id AND builtinKey IS NULL")
     suspend fun deleteCustom(id: Long)
+
+    /** 清空**自定义**预设（`builtinKey IS NULL`），内置的由覆盖恢复时 `ProfileSeeder` 重建。 */
+    @Query("DELETE FROM client_profiles WHERE builtinKey IS NULL")
+    suspend fun clearCustom()
 
     /**
      * 种内置预设（`ProfileSeeder` 用）。
@@ -90,6 +112,10 @@ interface ModelDao {
 
     @Query("SELECT * FROM models WHERE providerId = :providerId")
     suspend fun findByProvider(providerId: Long): List<ModelEntity>
+
+    /** 全量快照（备份导出用）。 */
+    @Query("SELECT * FROM models ORDER BY providerId, sortOrder, modelId")
+    suspend fun findAll(): List<ModelEntity>
 
     @Query("SELECT * FROM models WHERE id = :id")
     suspend fun findById(id: Long): ModelEntity?
@@ -198,6 +224,10 @@ interface ProbeRunDao {
     /** 只保留最近几轮：探测明细页只看最近一轮，历史留着只是占地方。 */
     @Query("DELETE FROM probe_runs WHERE id NOT IN (SELECT id FROM probe_runs ORDER BY startedAt DESC LIMIT :keep)")
     suspend fun trim(keep: Int)
+
+    /** 清空（备份"覆盖恢复"用——红线 28：探测结果不搬，恢复后一律未探测）。 */
+    @Query("DELETE FROM probe_runs")
+    suspend fun clear()
 }
 
 @Dao

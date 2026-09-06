@@ -1,13 +1,23 @@
 package com.lc33.tokenvault.di
 
 import com.lc33.tokenvault.data.repo.RoomApiKeyRepository
+import com.lc33.tokenvault.data.repo.RoomAuditLogRepository
+import com.lc33.tokenvault.data.repo.RoomClientProfileRepository
 import com.lc33.tokenvault.data.repo.RoomGroupRepository
+import com.lc33.tokenvault.data.repo.RoomModelRepository
+import com.lc33.tokenvault.data.repo.RoomProviderAccountRepository
 import com.lc33.tokenvault.data.repo.RoomProviderRepository
+import com.lc33.tokenvault.data.repo.RoomSettingsRepository
 import com.lc33.tokenvault.data.repo.RoomTransactionRunner
 import com.lc33.tokenvault.data.repo.TransactionRunner
 import com.lc33.tokenvault.domain.repo.ApiKeyRepository
+import com.lc33.tokenvault.domain.repo.AuditLogRepository
+import com.lc33.tokenvault.domain.repo.ClientProfileRepository
 import com.lc33.tokenvault.domain.repo.GroupRepository
+import com.lc33.tokenvault.domain.repo.ModelRepository
+import com.lc33.tokenvault.domain.repo.ProviderAccountRepository
 import com.lc33.tokenvault.domain.repo.ProviderRepository
+import com.lc33.tokenvault.domain.repo.SettingsRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -39,4 +49,24 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindApiKeyRepository(impl: RoomApiKeyRepository): ApiKeyRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindSettingsRepository(impl: RoomSettingsRepository): SettingsRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindProviderAccountRepository(impl: RoomProviderAccountRepository): ProviderAccountRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindModelRepository(impl: RoomModelRepository): ModelRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindClientProfileRepository(impl: RoomClientProfileRepository): ClientProfileRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindAuditLogRepository(impl: RoomAuditLogRepository): AuditLogRepository
 }
