@@ -212,6 +212,8 @@ class ProbeEngine @Inject constructor(
         val defaultProfile = profileList.firstOrNull { it.builtinKey == "default" }
         // 客户端拦截关键词来自设置（§13.4 探测设置页），默认 §8.2 的内置表。
         val clientKeywords = settings.observeClientKeywords().first()
+        // 客户端嗅探开关（§8.2）：关掉后 CLIENT_BLOCKED 只保留结论、不换预设重试。
+        val sniffEnabled = settings.observeSniffClientProfile().first()
 
         val plan: ProbePlan = ProbePlanBuilder.build(providerList) { pid ->
             allKeys.filter { it.providerId == pid && it.enabled }
@@ -263,14 +265,16 @@ class ProbeEngine @Inject constructor(
                 // 修正后的结论覆盖这一项，否则保留 CLIENT_BLOCKED。
                 var final = result
                 if (result.health == KeyHealth.CLIENT_BLOCKED && result.keyId != null) {
-                    trySniff(
-                        blocked = result,
-                        task = taskById[result.taskId],
-                        provider = providerById[result.providerId],
-                        profiles = profileList,
-                        defaultProfile = defaultProfile,
-                        clientKeywords = clientKeywords,
-                    )?.let { final = it }
+                    if (sniffEnabled) {
+                        trySniff(
+                            blocked = result,
+                            task = taskById[result.taskId],
+                            provider = providerById[result.providerId],
+                            profiles = profileList,
+                            defaultProfile = defaultProfile,
+                            clientKeywords = clientKeywords,
+                        )?.let { final = it }
+                    }
                 }
 
                 done++

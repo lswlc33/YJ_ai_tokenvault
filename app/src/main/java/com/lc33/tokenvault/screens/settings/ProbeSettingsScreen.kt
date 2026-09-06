@@ -35,7 +35,9 @@ import com.lc33.tokenvault.ui.theme.LocalAppTokens
 @Composable
 fun ProbeSettingsScreen(
     draft: SettingsDraft,
+    sniffClientProfile: Boolean,
     onChange: (SettingsDraft) -> Unit,
+    onSniffClientProfileChange: (Boolean) -> Unit,
     onBack: () -> Unit,
     onOpenManage: () -> Unit,
     onEditThresholds: () -> Unit,
@@ -112,8 +114,8 @@ fun ProbeSettingsScreen(
             AppSwitchRow(
                 title = stringResource(R.string.probe_sniff),
                 summary = stringResource(R.string.probe_sniff_summary),
-                checked = draft.sniffClientProfile,
-                onCheckedChange = { onChange(draft.copy(sniffClientProfile = it)) },
+                checked = sniffClientProfile,
+                onCheckedChange = onSniffClientProfileChange,
             )
         }
         item {

@@ -326,16 +326,18 @@ M3（接真数据）**管理那一支已完成**，2026-09-06。管理页、供�
 | `secureFlag` | 展示密钥时挂 FLAG_SECURE | `RevealKeySheet` 不读；`SecureFlag.kt` 注释明说解锁/引导/恢复密钥页「始终挂、与开关无关」 |
 | `clipboardClearIndex` | 剪贴板自动清除 | `AndroidSecureClipboard(context, scope)` 构造没传 `autoClearSeconds` |
 | `defaultProbeReachability/Keys/Balance/Models` | 新建供应商时的默认值 | `ProviderDraft()` 硬编码 `true/true/true/false`，从不读 `SettingsDraft`（2026-09-06 已把两处撒谎注释改成如实标注"未接线"） |
-| `sniffClientProfile` | 客户端嗅探开关 | `ProbeEngine.trySniff` 在 CLIENT_BLOCKED 时无条件执行，不读开关 |
+| ~~`sniffClientProfile`~~ | ~~客户端嗅探开关~~ | ✅ **已接真（2026-09-06）**：`app_settings.sniffClientProfile`，`ProbeEngine.trySniff` 前判断，默认开（读方向坏值容错到开，与空闲锁定相反） |
 | `verboseHttpLog` | 详细 HTTP 日志 | 无消费方（详细日志未实现） |
 | `autoProbeIndex` | 自动探测 | 待确认（自动路径零成本原则下可能本就无意义） |
 | `autoBackup` / `autoBackupWifiOnly` | 自动备份 | 无 `PeriodicWorkRequest` Worker（M9 周期备份可砍） |
 | `autoCheckUpdate` | 自动检查更新 | 无后台调度（更新页「立即检查」已接，自动检查是独立可选增强） |
 
 这些不是「漏了的空实现」那种简单撑谎——每个都要先定「接真（消费方 + 权威存储）还是
-移除（承认不做）」，且多数涉及产品/安全决策（FLAG_SECURE 到底能不能关、嗅探默认开还是关、
-新建默认值放哪）。所以**没有在 2026-09-06 那批「消除撑谎」里一并做**，留作一个独立的、
-需要逐项拍板的技术债清理项，而不是机械删几个开关。
+移除（承认不做）」，且多数涉及产品/安全决策（FLAG_SECURE 到底能不能关、新建默认值放哪）。
+所以**没有在 2026-09-06 那批「消除撑谎」里一并做**，留作一个独立的、需要逐项拍板的
+技术债清理项，而不是机械删几个开关。唯一的例外是 `sniffClientProfile`：它消费方
+（`trySniff`）已经写好、只差开关接线，且默认开与既有行为一致、不涉及产品决策，所以
+已单独接真（2026-09-06）。
 
 - **存的是秒数，不是下拉的下标**（`app_settings.autoLockSeconds`）。存下标的代价是
   「以后在中间插一档」会让所有已存的设置悄悄改变含义，而没有任何迁移能发现它。

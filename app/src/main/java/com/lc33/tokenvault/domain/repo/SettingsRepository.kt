@@ -84,4 +84,14 @@ interface SettingsRepository {
     fun observeProxy(): Flow<String>
 
     suspend fun setProxy(hostPort: String)
+
+    /**
+     * 客户端嗅探开关（§8.2、§13.4 探测设置页）。
+     *
+     * 开 = 探测遇 `CLIENT_BLOCKED` 时自动换鉴权头 / 试内置预设（[com.lc33.tokenvault.engine.ProbeEngine.trySniff]）；
+     * 关 = 保留 `CLIENT_BLOCKED` 结论、不做任何重试。**没写过时发 true**（默认开，与既有行为一致）。
+     */
+    fun observeSniffClientProfile(): Flow<Boolean>
+
+    suspend fun setSniffClientProfile(enabled: Boolean)
 }

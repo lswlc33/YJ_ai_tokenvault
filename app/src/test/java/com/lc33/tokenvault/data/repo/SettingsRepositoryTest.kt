@@ -215,4 +215,34 @@ class SettingsRepositoryTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    // ---------------------------------------------------------------- 客户端嗅探
+
+    @Test
+    fun `嗅探没写过时默认开`() = runTest {
+        repo.observeSniffClientProfile().test {
+            assertEquals(true, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `嗅探关了能读回来`() = runTest {
+        repo.setSniffClientProfile(false)
+        repo.observeSniffClientProfile().test {
+            assertEquals(false, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `嗅探坏值落回开，不落回关`() = runTest {
+        // 与空闲锁定相反：嗅探的「开」是增强可用性那一侧（客户端被拦时自动兜底），
+        // 坏数据不该让探测失去这条兜底，所以读方向容错到「开」。
+        dao.put(com.lc33.tokenvault.data.entity.AppSettingEntity(key = "sniffClientProfile", value = "garbage"))
+        repo.observeSniffClientProfile().test {
+            assertEquals(true, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 }

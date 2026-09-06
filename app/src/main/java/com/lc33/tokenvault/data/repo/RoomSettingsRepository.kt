@@ -88,6 +88,14 @@ class RoomSettingsRepository @Inject constructor(
         dao.put(AppSettingEntity(key = KEY_PROXY, value = hostPort.trim()))
     }
 
+    override fun observeSniffClientProfile(): Flow<Boolean> = dao.observeAll()
+        .map { rows -> rows.firstOrNull { it.key == KEY_SNIFF_CLIENT_PROFILE }?.value.toBooleanDefaultTrue() }
+        .distinctUntilChanged()
+
+    override suspend fun setSniffClientProfile(enabled: Boolean) {
+        dao.put(AppSettingEntity(key = KEY_SNIFF_CLIENT_PROFILE, value = enabled.toString()))
+    }
+
     private companion object {
         /**
          * 键名照 §7.4 里的写法。
@@ -106,6 +114,8 @@ class RoomSettingsRepository @Inject constructor(
         const val KEY_CLIENT_KEYWORDS = "clientKeywords"
 
         const val KEY_PROXY = "httpProxy"
+
+        const val KEY_SNIFF_CLIENT_PROFILE = "sniffClientProfile"
 
         /**
          * 阈值 → JSON 对象（键 = 币种代码，值 = 金额）。
@@ -171,5 +181,14 @@ class RoomSettingsRepository @Inject constructor(
          * 这里统一落回 false——与「没写过」同一语义，读方向单向容错。
          */
         private fun String?.toBooleanSafe(): Boolean = this == "true"
+
+        /**
+         * `"false"` → false，其余（含 null / 坏值）→ true。
+         *
+         * 嗅探开关默认**开**：它的「开」是增强可用性那一侧（客户端被拦时自动找能用的
+         * 伪装），坏数据不该让探测失去这条自动兜底。与 [toBooleanSafe] 方向相反——
+         * 两个开关的安全侧不同，一个往 false 倒、一个往 true 倒。
+         */
+        private fun String?.toBooleanDefaultTrue(): Boolean = this != "false"
     }
 }

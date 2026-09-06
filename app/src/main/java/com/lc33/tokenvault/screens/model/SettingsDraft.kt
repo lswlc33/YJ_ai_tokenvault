@@ -31,8 +31,8 @@ data class SettingsDraft(
      *
      * **尚未接线**：`ProviderEditorViewModel` 新建时用 `ProviderDraft()` 的硬编码默认值
      * （`true/true/true/false`），从不读这里。改这四项当前没有任何效果——这是一个
-     * "有 UI 无消费方"的假开关，与下方 `sniffClientProfile` / `verboseHttpLog` 同属
-     * 待接真的技术债（见 CLAUDE.md「SettingsDraft 剩余假开关清单」）。接线后语义是：
+     * "有 UI 无消费方"的假开关，与下方 `verboseHttpLog` 同属待接真的技术债（见
+     * CLAUDE.md「SettingsDraft 剩余假开关清单」）。接线后语义是：
      * 新建供应商时从这里拷一份到 `ProviderDraft` 的 `probeReachability/probeKeys/
      * probeBalance/probeModels`，之后各自独立——改设置不会动已有的供应商，每家站的
      * 规则不一样，有的按 ToS 就不允许探测。
@@ -42,7 +42,6 @@ data class SettingsDraft(
     val defaultProbeBalance: Boolean = true,
     /** L3 默认关：它要花钱，而且只能手动触发。 */
     val defaultProbeModels: Boolean = false,
-    val sniffClientProfile: Boolean = true,
     val verboseHttpLog: Boolean = false,
 
     // 同步

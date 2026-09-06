@@ -249,9 +249,13 @@ fun VaultNavHost(
             )
         }
         composable<ProbeSettingsRoute> {
+            val vm: ProbeSettingsViewModel = hiltViewModel()
+            val sniffClientProfile by vm.sniffClientProfile.collectAsStateWithLifecycle()
             ProbeSettingsScreen(
                 draft = settings,
+                sniffClientProfile = sniffClientProfile,
                 onChange = { settings = it },
+                onSniffClientProfileChange = vm::onSniffClientProfileChange,
                 onBack = back,
                 onOpenManage = ::openManage,
                 onEditThresholds = { nav.navigate(BalanceThresholdsRoute) },
