@@ -27,7 +27,7 @@
 | M7 余额 | ✅ | 仅剩设备端到端（真实数字与后台对得上）+ 适配器真实响应样例；**余额阈值设置已落地**（`app_settings` 可编辑，USD/CNY）；**手动代理设置已落地**（`app_settings` 可编辑，`host:port`，支持 IPv6 方括号） |
 | M8 模型元数据 | 🟡 纯逻辑层已做 | WorkManager 拉取 `api.json` 未做（可砍） |
 | M9 备份与同步 | ✅ | 第二台设备恢复验证未做；WebDAV 半边可砍 |
-| M10 打磨与发布 | 🟡 发布链路已落地 | 宽屏双栏、TalkBack、更新页 API 未做；**搜索/排序/批量已落地** |
+| M10 打磨与发布 | 🟡 发布链路已落地 | 宽屏双栏、TalkBack 未做；**搜索/排序/批量、更新页 API 已落地** |
 | M11 可选增强 | ➖ | 逐项独立评估 |
 
 **功能层（M0–M10 的代码、测试、UI 接线）已全部落地并提交**。剩余的都是"要设备 / 要额度 /
@@ -119,7 +119,7 @@ v2 显式迁移，红线 9）。
 - `audit_log` 持久化 + 日志页（条数 + 天数双重上限）；README（如实写 6 位 PIN 挡不住离线穷举）。
 - 发布链路：ci.yml 单测+lint+仪器编译+`assembleNightly` 一次 gradlew；keystore 走 secret；
   nightly 预发布走 `nightly-build` tag（仓库规则禁建 `nightly` tag）。
-- **缺口**：搜索/排序/批量；宽屏双栏（可砍）；TalkBack 走通主路径；更新页接 GitHub Releases API。
+- **缺口**：宽屏双栏（可砍）；TalkBack 走通主路径。搜索/排序/批量、更新页（GitHub Releases API）已落地。
 
 ---
 
@@ -134,7 +134,7 @@ v2 显式迁移，红线 9）。
 | **P2** | 生物识别设备验证 | 换一台有指纹的机器（当前设备无硬件） | 有设备时 |
 | **P2** | 额度耗尽真实响应 | DeepSeek CNY 0.89 耗尽后补一次 `ProtocolSpike` 进 fixture | 余额自然耗尽时 |
 | **P2** | M8 WorkManager 拉取 | 可砍，不影响核心四件事 | 2 人日 |
-| **P2** | M10 收尾 | ~~搜索/排序/批量~~（✅ 已落地）、宽屏双栏（可砍）、TalkBack、更新页 API | 1 人日 |
+| **P2** | M10 收尾 | ~~搜索/排序/批量~~（✅ 已落地）、~~更新页 API~~（✅ 已落地）、宽屏双栏（可砍）、TalkBack | 1 人日 |
 | **P3** | M11 可选增强 | 供应商预设库 / Deep Link / SQLCipher / 桌面端 | 逐项评估 |
 
 > 粗估只用于排序，**不是承诺**。要花钱的探测（M5/M6）与余额（M7）在设备端到端里一次跑完。
@@ -235,7 +235,7 @@ v2 显式迁移，红线 9）。
 
 ---
 
-### 4.6 M10 打磨与发布 🟡（发布链路完成，搜索/批量/TalkBack/更新页待做）
+### 4.6 M10 打磨与发布 🟡（发布链路完成，搜索/批量/更新页已落地，宽屏双栏/TalkBack 待做）
 
 | 步骤 | 内容 |
 | --- | --- |
@@ -243,7 +243,7 @@ v2 显式迁移，红线 9）。
 | 2 | 搜索 / 排序 / 批量操作 ✅（2026-09-06 已落地）；**宽屏双栏（可砍）** |
 | 3 | 无障碍（TalkBack 走通主路径）；strings 双份键名对齐 |
 | 4 | release 签名（四个环境变量）；nightly + tag 两条 workflow；release 包全流程回归 |
-| 5 | 更新页接 GitHub Releases API（自动检查默认关；无网与 GitHub 不可达要给出可区分文案） |
+| 5 | 更新页接 GitHub Releases API（自动检查默认关；无网与 GitHub 不可达要给出可区分文案）✅ 已落地（`UpdateEngine` + `update/` 包 + `UpdateViewModel` 四态，`ReleaseParserMatcherTest` 覆盖） |
 | 6 | `README.md`：功能、隐私声明、**如实写明 6 位 PIN 挡不住离线穷举**（7.6） |
 
 ---
