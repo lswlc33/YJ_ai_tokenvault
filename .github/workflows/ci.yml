@@ -73,16 +73,9 @@ jobs:
 
       - uses: android-actions/setup-android@v3
         with:
-          # android-37（Android 17）还在 preview 通道，setup-android 的 stable sdkmanager
-          # 装不到它，所以这里只装 build-tools，platform 37 交给下一步用 canary 通道装。
-          packages: 'build-tools;37.0.0'
-
-      # Android 17（API 37）的 SDK Platform 尚未进 stable 通道，用 canary 通道装。
-      - name: 安装 android-37 platform（canary 通道）
-        run: |
-          set -eu
-          sdkmanager --channel=3 "platforms;android-37" || sdkmanager --channel=1 "platforms;android-37"
-          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          # Android 17 的 platform 包名是 `android-37.0`（带 minor 版本号，与 build-tools
+          # 的 37.0.0 对齐），不是 `android-37`——后者在 sdkmanager 里根本不存在。
+          packages: 'platforms;android-37.0 build-tools;37.0.0'
 
       - uses: gradle/actions/setup-gradle@v4
 
