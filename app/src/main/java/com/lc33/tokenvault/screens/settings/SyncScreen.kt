@@ -7,10 +7,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.lc33.tokenvault.R
 import com.lc33.tokenvault.screens.model.BackupStatus
-import com.lc33.tokenvault.screens.model.SettingsDraft
 import com.lc33.tokenvault.ui.miuix.AppArrowRow
 import com.lc33.tokenvault.ui.miuix.AppCard
-import com.lc33.tokenvault.ui.miuix.AppSwitchRow
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppTextButton
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
@@ -20,7 +18,7 @@ import com.lc33.tokenvault.ui.theme.LocalAppTokens
 import com.lc33.tokenvault.ui.theme.LocalStatusPalette
 
 /**
- * 同步 —— 备份 / 恢复 / 自动备份（计划.md §13.4、§12）。
+ * 同步 —— 备份 / 恢复（计划.md §13.4、§12）。
  *
  * 仪表盘那张备份卡点进来就是这一页。
  *
@@ -28,14 +26,13 @@ import com.lc33.tokenvault.ui.theme.LocalStatusPalette
  * - 备份口令默认沿用 PIN，所以传到云上的包同样是**分钟级可破**（§7.6）。提示常驻，
  *   不折叠。
  *
- * WebDAV（服务器 / 凭据 / 目录配置）是可砍项，入口已移除（`onWebDav` 空实现是撑谎）——
- * 与数据页「同步元数据」同款处理：将来实现 WebDAV 四动词 + 周期备份 Worker 时再加回。
+ * WebDAV（服务器 / 凭据 / 目录配置）与「自动备份」（周期上传到 WebDAV）都是可砍项，
+ * 入口已移除（`onWebDav` / `autoBackup` 空实现是撑谎）——自动备份依赖 WebDAV 作目标，
+ * WebDAV 砍掉后它没有消费方。将来实现 WebDAV 四动词 + 周期备份 Worker 时再加回。
  */
 @Composable
 fun SyncScreen(
-    draft: SettingsDraft,
     backup: BackupStatus,
-    onChange: (SettingsDraft) -> Unit,
     onBack: () -> Unit,
     onExport: () -> Unit,
     onImport: () -> Unit,
@@ -68,24 +65,6 @@ fun SyncScreen(
                 style = AppTextStyle.Footnote,
                 color = appSecondaryTextColor,
                 modifier = Modifier.padding(horizontal = LocalAppTokens.current.screenPadding),
-            )
-        }
-
-        item { SectionTitle(text = stringResource(R.string.sync_section_auto)) }
-        item {
-            AppSwitchRow(
-                title = stringResource(R.string.sync_auto),
-                summary = stringResource(R.string.sync_auto_summary),
-                checked = draft.autoBackup,
-                onCheckedChange = { onChange(draft.copy(autoBackup = it)) },
-            )
-        }
-        item {
-            AppSwitchRow(
-                title = stringResource(R.string.sync_auto_wifi),
-                checked = draft.autoBackupWifiOnly,
-                onCheckedChange = { onChange(draft.copy(autoBackupWifiOnly = it)) },
-                enabled = draft.autoBackup,
             )
         }
     }

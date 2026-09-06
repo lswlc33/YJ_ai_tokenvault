@@ -329,7 +329,7 @@ M3（接真数据）**管理那一支已完成**，2026-09-06。管理页、供�
 | ~~`sniffClientProfile`~~ | ~~客户端嗅探开关~~ | ✅ **已接真（2026-09-06）**：`app_settings.sniffClientProfile`，`ProbeEngine.trySniff` 前判断，默认开（读方向坏值容错到开，与空闲锁定相反） |
 | `verboseHttpLog` | 详细 HTTP 日志 | 无消费方（详细日志未实现） |
 | `autoProbeIndex` | 自动探测 | 待确认（自动路径零成本原则下可能本就无意义） |
-| `autoBackup` / `autoBackupWifiOnly` | 自动备份 | 无 `PeriodicWorkRequest` Worker（M9 周期备份可砍） |
+| ~~`autoBackup` / `autoBackupWifiOnly`~~ | ~~自动备份~~ | ✅ **已移除（2026-09-06）**：依赖 WebDAV 作目标（周期上传），WebDAV 可砍后它无消费方——之前「有意占位、等 Worker 落地」的判断与「周期备份 Worker 是可砍项」自相矛盾，纠正为同 WebDAV 一并移除 |
 | `autoCheckUpdate` | 自动检查更新 | 无后台调度（更新页「立即检查」已接，自动检查是独立可选增强） |
 | ~~`updateChannelIndex`~~ | ~~更新渠道~~ | ✅ **已接真（2026-09-06）**：`app_settings.updateChannel`（存下标 0=正式/1=nightly），`UpdateViewModel` 派生、`checkNow()` 读权威存储，默认正式版 |
 

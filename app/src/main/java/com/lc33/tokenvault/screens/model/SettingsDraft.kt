@@ -43,10 +43,6 @@ data class SettingsDraft(
     val defaultProbeModels: Boolean = false,
     val verboseHttpLog: Boolean = false,
 
-    // 同步
-    val autoBackup: Boolean = false,
-    val autoBackupWifiOnly: Boolean = true,
-
     // 更新
     val autoCheckUpdate: Boolean = false,
 )

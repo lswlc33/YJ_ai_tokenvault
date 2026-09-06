@@ -284,10 +284,6 @@
     <string name="sync_import_summary">先预览，再选合并方式。写入之前会先给本地拍一份快照。</string>
     <string name="sync_passphrase">备份口令</string>
     <string name="sync_passphrase_summary">默认沿用 PIN。6 位数字 PIN 在离线场景下是分钟级可破的，所以要往云上放之前，先单独设一个长口令。</string>
-    <string name="sync_section_auto">定时备份</string>
-    <string name="sync_auto">自动备份</string>
-    <string name="sync_auto_summary">金库锁定时跳过，下次解锁后补做</string>
-    <string name="sync_auto_wifi">仅 Wi-Fi</string>
     <string name="sync_passphrase_prompt">输入备份口令</string>
     <string name="sync_passphrase_hint">默认沿用 PIN</string>
     <string name="sync_result_exported">备份已导出</string>

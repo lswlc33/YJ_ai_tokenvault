@@ -336,8 +336,6 @@ fun VaultNavHost(
         composable<SyncRoute> {
             val vm: SyncViewModel = hiltViewModel()
             SyncRouteContent(
-                draft = settings,
-                onChange = { settings = it },
                 onBack = back,
                 vm = vm,
             )
@@ -478,8 +476,6 @@ private fun openAppLocaleSettings(context: Context) {
  */
 @Composable
 private fun SyncRouteContent(
-    draft: SettingsDraft,
-    onChange: (SettingsDraft) -> Unit,
     onBack: () -> Unit,
     vm: SyncViewModel,
 ) {
@@ -548,9 +544,7 @@ private fun SyncRouteContent(
     }
 
     SyncScreen(
-        draft = draft,
         backup = backup,
-        onChange = onChange,
         onBack = onBack,
         onExport = { pendingAction = PendingSyncAction.Export },
         onImport = { pendingAction = PendingSyncAction.Import },
