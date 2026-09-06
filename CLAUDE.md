@@ -325,7 +325,7 @@ M3（接真数据）**管理那一支已完成**，2026-09-06。管理页、供�
 | `squircle` / `blurNavBar` | 外观（圆角 / 底栏模糊） | 无消费方（MIUIX 主题没接这两个开关） |
 | `secureFlag` | 展示密钥时挂 FLAG_SECURE | `RevealKeySheet` 不读；`SecureFlag.kt` 注释明说解锁/引导/恢复密钥页「始终挂、与开关无关」 |
 | `clipboardClearIndex` | 剪贴板自动清除 | `AndroidSecureClipboard(context, scope)` 构造没传 `autoClearSeconds` |
-| `defaultProbeReachability/Keys/Balance/Models` | 新建供应商时的默认值 | `ProviderDraft()` 硬编码 `true/true/true/false`，从不读 `SettingsDraft` |
+| `defaultProbeReachability/Keys/Balance/Models` | 新建供应商时的默认值 | `ProviderDraft()` 硬编码 `true/true/true/false`，从不读 `SettingsDraft`（2026-09-06 已把两处撒谎注释改成如实标注"未接线"） |
 | `sniffClientProfile` | 客户端嗅探开关 | `ProbeEngine.trySniff` 在 CLIENT_BLOCKED 时无条件执行，不读开关 |
 | `verboseHttpLog` | 详细 HTTP 日志 | 无消费方（详细日志未实现） |
 | `autoProbeIndex` | 自动探测 | 待确认（自动路径零成本原则下可能本就无意义） |

@@ -27,10 +27,15 @@ data class SettingsDraft(
     // 探测
     val autoProbeIndex: Int = 0,
     /**
-     * 这四项是**新建供应商时的默认值**，不是总开关（红线 36）。
+     * 这四项声称是**新建供应商时的默认值**，不是总开关（红线 36）。
      *
-     * 权威在 `ProviderDraft` 的同名字段上：新建时从这里拷一份，之后各自独立。
-     * 改这里不会动已有的供应商——每家站的规则不一样，有的按 ToS 就不允许探测。
+     * **尚未接线**：`ProviderEditorViewModel` 新建时用 `ProviderDraft()` 的硬编码默认值
+     * （`true/true/true/false`），从不读这里。改这四项当前没有任何效果——这是一个
+     * "有 UI 无消费方"的假开关，与下方 `sniffClientProfile` / `verboseHttpLog` 同属
+     * 待接真的技术债（见 CLAUDE.md「SettingsDraft 剩余假开关清单」）。接线后语义是：
+     * 新建供应商时从这里拷一份到 `ProviderDraft` 的 `probeReachability/probeKeys/
+     * probeBalance/probeModels`，之后各自独立——改设置不会动已有的供应商，每家站的
+     * 规则不一样，有的按 ToS 就不允许探测。
      */
     val defaultProbeReachability: Boolean = true,
     val defaultProbeKeys: Boolean = true,
