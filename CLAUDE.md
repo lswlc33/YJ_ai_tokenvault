@@ -315,7 +315,27 @@ M3（接真数据）**管理那一支已完成**，2026-09-06。管理页、供�
 七个设置页其余那些仍然是内存态 `SettingsDraft`：它们大半还没有消费方，先落库只会得到
 一批「存下来了但没人读」的键（红线 16）。后来（§7.4 收尾）前台空闲锁定与屏幕关闭即锁定
 两项也有了消费方、从 `SettingsDraft` 迁到 `app_settings`，见下方 M1 之后的「前台空闲 / 屏幕
-关闭锁定」小节。
+关闭锁定」小节。再后来（M6/M7 收尾）拦截关键词、余额阈值、手动代理三项也迁到
+`app_settings`（都有消费方：`ProbeClassifier` / `BalanceEngine` / `OkHttpEngine`）。
+
+**`SettingsDraft` 剩余假开关清单（2026-09-06 盘点，全部是"有 UI 但无消费方"或"消费方没接"）**：
+
+| 字段 | 声称语义 | 实际状态 |
+| --- | --- | --- |
+| `squircle` / `blurNavBar` | 外观（圆角 / 底栏模糊） | 无消费方（MIUIX 主题没接这两个开关） |
+| `secureFlag` | 展示密钥时挂 FLAG_SECURE | `RevealKeySheet` 不读；`SecureFlag.kt` 注释明说解锁/引导/恢复密钥页「始终挂、与开关无关」 |
+| `clipboardClearIndex` | 剪贴板自动清除 | `AndroidSecureClipboard(context, scope)` 构造没传 `autoClearSeconds` |
+| `defaultProbeReachability/Keys/Balance/Models` | 新建供应商时的默认值 | `ProviderDraft()` 硬编码 `true/true/true/false`，从不读 `SettingsDraft` |
+| `sniffClientProfile` | 客户端嗅探开关 | `ProbeEngine.trySniff` 在 CLIENT_BLOCKED 时无条件执行，不读开关 |
+| `verboseHttpLog` | 详细 HTTP 日志 | 无消费方（详细日志未实现） |
+| `autoProbeIndex` | 自动探测 | 待确认（自动路径零成本原则下可能本就无意义） |
+| `autoBackup` / `autoBackupWifiOnly` | 自动备份 | 无 `PeriodicWorkRequest` Worker（M9 周期备份可砍） |
+| `autoCheckUpdate` | 自动检查更新 | 无后台调度（更新页「立即检查」已接，自动检查是独立可选增强） |
+
+这些不是「漏了的空实现」那种简单撑谎——每个都要先定「接真（消费方 + 权威存储）还是
+移除（承认不做）」，且多数涉及产品/安全决策（FLAG_SECURE 到底能不能关、嗅探默认开还是关、
+新建默认值放哪）。所以**没有在 2026-09-06 那批「消除撑谎」里一并做**，留作一个独立的、
+需要逐项拍板的技术债清理项，而不是机械删几个开关。
 
 - **存的是秒数，不是下拉的下标**（`app_settings.autoLockSeconds`）。存下标的代价是
   「以后在中间插一档」会让所有已存的设置悄悄改变含义，而没有任何迁移能发现它。
