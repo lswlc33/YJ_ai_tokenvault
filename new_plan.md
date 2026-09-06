@@ -106,7 +106,8 @@ v2 显式迁移，红线 9）。
 - `catalog/`：`ModelCatalogMatcher` 三级匹配（全走索引）+ `CatalogNormalize`；`ModelCatalogDao`
   的 `findByKey`/`findByModelId`/`findByNormId`/`upsertAll`/`clear`；测试 9 用例。
 - **缺口**：WorkManager 拉取 `api.json`（分块解析 + 每 200 行事务 + TTL 7 天）——`TokenVaultApp`
-  注释明确"现在还没有 Worker"，`DataScreen` 的"同步元数据"是空实现。可砍。
+  注释明确"现在还没有 Worker"；"同步元数据"的空实现入口已在消除撑谎清理中移除（`DataScreen`
+  现只有分组/日志/清空探测/清空日志四项真实功能）。可砍。
 
 ### M9（备份与同步，2026-09-06：编解码 + 引擎 + SAF 接线）
 - `backup/BackupCodec`（AAD 绑 header）+ `engine/BackupEngine`（643 行）导出/恢复编排；
