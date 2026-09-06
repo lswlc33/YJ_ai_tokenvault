@@ -1,4 +1,6 @@
-﻿# 元记 · AI Token Vault — 开发计划
+﻿please use new_plan
+
+# 元记 · AI Token Vault — 开发计划
 
 Android 原生应用。集中管理 AI API Key、端点、模型与余额，纯本地加密存储，密钥不离开设备。
 
