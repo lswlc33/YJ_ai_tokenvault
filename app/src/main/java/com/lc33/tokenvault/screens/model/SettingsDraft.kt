@@ -22,7 +22,6 @@ data class SettingsDraft(
 
     // 安全
     val secureFlag: Boolean = true,
-    val clipboardClearIndex: Int = 1,
 
     // 探测
     val autoProbeIndex: Int = 0,

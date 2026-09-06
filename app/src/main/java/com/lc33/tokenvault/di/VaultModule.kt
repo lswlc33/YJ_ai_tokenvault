@@ -21,6 +21,7 @@ import com.lc33.tokenvault.data.dao.ProbeRunDao
 import com.lc33.tokenvault.data.dao.ProviderAccountDao
 import com.lc33.tokenvault.data.dao.ProviderDao
 import com.lc33.tokenvault.domain.BiometricAvailability
+import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.engine.ProbeEngine
 import com.lc33.tokenvault.net.HostGate
 import com.lc33.tokenvault.net.OkHttpEngine
@@ -175,7 +176,8 @@ object VaultModule {
     fun provideClipboard(
         @ApplicationContext context: Context,
         @AppScope scope: CoroutineScope,
-    ): SecureClipboard = AndroidSecureClipboard(context, scope)
+        settings: SettingsRepository,
+    ): SecureClipboard = AndroidSecureClipboard(context, scope, settings)
 
     /**
      * 数据库。**应用级单例、启动即建**（§6.1 推论 1）：锁定只清 DEK、不关库，

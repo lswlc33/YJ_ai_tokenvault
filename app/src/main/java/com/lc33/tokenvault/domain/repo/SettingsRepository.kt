@@ -94,4 +94,14 @@ interface SettingsRepository {
     fun observeSniffClientProfile(): Flow<Boolean>
 
     suspend fun setSniffClientProfile(enabled: Boolean)
+
+    /**
+     * 复制密钥/密码后多久自动清空剪贴板（§7.5、§13.4 安全设置页）。
+     *
+     * 秒数，`0` = 从不（[com.lc33.tokenvault.domain.ClipboardClearPolicy] 里就是这一档）。
+     * **没写过时发 60**（默认）。
+     */
+    fun observeClipboardClearSeconds(): Flow<Int>
+
+    suspend fun setClipboardClearSeconds(seconds: Int)
 }

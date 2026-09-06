@@ -5,9 +5,11 @@ import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
 import android.os.PersistableBundle
+import com.lc33.tokenvault.domain.repo.SettingsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 /**
@@ -66,6 +68,7 @@ interface SecureClipboard {
 class AndroidSecureClipboard(
     context: Context,
     private val scope: CoroutineScope,
+    settings: SettingsRepository,
 ) : SecureClipboard {
 
     private val manager: ClipboardManager? =
@@ -73,7 +76,29 @@ class AndroidSecureClipboard(
 
     private var clearJob: Job? = null
 
+    /**
+     * 自动清除秒数的缓存。权威在 `app_settings.clipboardClearSeconds`（红线 31），
+     * 这里订阅同一条流、缓存到 volatile，`copy` 时读缓存——`copy` 是同步方法，不能挂起
+     * 去等 Room。Room 首帧到达前用默认值（60），与设置页显示一致。
+     */
+    @Volatile
+    private var configuredSeconds: Int = SecureClipboard.DEFAULT_AUTO_CLEAR_SECONDS
+
+    init {
+        scope.launch {
+            settings.observeClipboardClearSeconds().collect { configuredSeconds = it }
+        }
+    }
+
     override fun copy(label: String, value: CharArray, autoClearSeconds: Int) {
+        // 调用方传的通常是 [SecureClipboard.DEFAULT_AUTO_CLEAR_SECONDS]，这里统一换成
+        // "跟随设置"的缓存值。设置里「从不」= 0，`<= 0` 走不自动清除那一路。
+        val effectiveSeconds = if (autoClearSeconds == SecureClipboard.DEFAULT_AUTO_CLEAR_SECONDS) {
+            configuredSeconds
+        } else {
+            autoClearSeconds
+        }
+
         val clip = ClipData.newPlainText(label, String(value)).apply {
             description.extras = PersistableBundle().apply {
                 putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true)
@@ -82,13 +107,13 @@ class AndroidSecureClipboard(
         manager?.setPrimaryClip(clip) ?: return
 
         clearJob?.cancel()
-        if (autoClearSeconds <= 0) return
+        if (effectiveSeconds <= 0) return
 
         // 记下我们放进去的那份内容，到点只在"还是它"的时候才清。
         // 不比对的话，用户在这 60 秒里复制了别的东西会被我们一起吞掉。
         val ours = String(value)
         clearJob = scope.launch {
-            delay(autoClearSeconds * 1000L)
+            delay(effectiveSeconds * 1000L)
             if (currentText() == ours) clearNow()
         }
     }

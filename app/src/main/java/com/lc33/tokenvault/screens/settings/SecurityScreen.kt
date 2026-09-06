@@ -45,11 +45,13 @@ fun SecurityScreen(
     autoLockIndex: Int,
     idleLock: Boolean,
     lockOnScreenOff: Boolean,
+    clipboardClearIndex: Int,
     onChange: (SettingsDraft) -> Unit,
     onBiometricChange: (Boolean) -> Unit,
     onAutoLockIndexChange: (Int) -> Unit,
     onIdleLockChange: (Boolean) -> Unit,
     onLockOnScreenOffChange: (Boolean) -> Unit,
+    onClipboardClearIndexChange: (Int) -> Unit,
     onBack: () -> Unit,
     onChangePin: () -> Unit,
     onRecoveryKey: () -> Unit,
@@ -130,8 +132,8 @@ fun SecurityScreen(
                 title = stringResource(R.string.security_clipboard_clear),
                 summary = stringResource(R.string.security_clipboard_clear_summary),
                 items = stringArrayResource(R.array.clipboard_clear_options).toList(),
-                selectedIndex = draft.clipboardClearIndex,
-                onSelect = { onChange(draft.copy(clipboardClearIndex = it)) },
+                selectedIndex = clipboardClearIndex,
+                onSelect = onClipboardClearIndexChange,
             )
         }
     }

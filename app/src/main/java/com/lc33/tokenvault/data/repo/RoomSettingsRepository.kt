@@ -4,6 +4,7 @@ import com.lc33.tokenvault.data.dao.AppSettingDao
 import com.lc33.tokenvault.data.entity.AppSettingEntity
 import com.lc33.tokenvault.domain.AutoLockPolicy
 import com.lc33.tokenvault.domain.AutoLockTimeout
+import com.lc33.tokenvault.domain.ClipboardClearPolicy
 import com.lc33.tokenvault.domain.model.BalanceSnapshot
 import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.probe.ProbeClassifier
@@ -96,6 +97,14 @@ class RoomSettingsRepository @Inject constructor(
         dao.put(AppSettingEntity(key = KEY_SNIFF_CLIENT_PROFILE, value = enabled.toString()))
     }
 
+    override fun observeClipboardClearSeconds(): Flow<Int> = dao.observeAll()
+        .map { rows -> ClipboardClearPolicy.decode(rows.firstOrNull { it.key == KEY_CLIPBOARD_CLEAR }?.value) }
+        .distinctUntilChanged()
+
+    override suspend fun setClipboardClearSeconds(seconds: Int) {
+        dao.put(AppSettingEntity(key = KEY_CLIPBOARD_CLEAR, value = ClipboardClearPolicy.encode(seconds)))
+    }
+
     private companion object {
         /**
          * 键名照 §7.4 里的写法。
@@ -116,6 +125,8 @@ class RoomSettingsRepository @Inject constructor(
         const val KEY_PROXY = "httpProxy"
 
         const val KEY_SNIFF_CLIENT_PROFILE = "sniffClientProfile"
+
+        const val KEY_CLIPBOARD_CLEAR = "clipboardClearSeconds"
 
         /**
          * 阈值 → JSON 对象（键 = 币种代码，值 = 金额）。

@@ -245,4 +245,43 @@ class SettingsRepositoryTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    // ---------------------------------------------------------------- 剪贴板自动清除
+
+    @Test
+    fun `剪贴板清除没写过时默认 60 秒`() = runTest {
+        repo.observeClipboardClearSeconds().test {
+            assertEquals(60, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `剪贴板清除写了能读回来`() = runTest {
+        repo.setClipboardClearSeconds(300)
+        repo.observeClipboardClearSeconds().test {
+            assertEquals(300, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `剪贴板清除存的是秒数不是下标`() = runTest {
+        // 存 0 = 从不（下标 3），存 30 = 下标 0。断言读回的是秒数本身，
+        // 下标只是 UI 层的映射（ClipboardClearPolicy.indexOf）。
+        repo.setClipboardClearSeconds(0)
+        repo.observeClipboardClearSeconds().test {
+            assertEquals(0, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `剪贴板清除坏值落回默认 60`() = runTest {
+        dao.put(com.lc33.tokenvault.data.entity.AppSettingEntity(key = "clipboardClearSeconds", value = "garbage"))
+        repo.observeClipboardClearSeconds().test {
+            assertEquals(60, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 }

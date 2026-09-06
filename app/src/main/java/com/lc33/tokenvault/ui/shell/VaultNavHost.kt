@@ -190,6 +190,7 @@ fun VaultNavHost(
             val autoLockIndex by vm.autoLockIndex.collectAsStateWithLifecycle()
             val idleLock by vm.idleLock.collectAsStateWithLifecycle()
             val lockOnScreenOff by vm.lockOnScreenOff.collectAsStateWithLifecycle()
+            val clipboardClearIndex by vm.clipboardClearIndex.collectAsStateWithLifecycle()
             // 系统弹框的文案由系统画，所以要在这里取好传下去（ViewModel 读不到资源）。
             val enableTitle = stringResource(R.string.biometric_prompt_enable_title)
             val enableSubtitle = stringResource(R.string.biometric_prompt_enable_subtitle)
@@ -201,6 +202,7 @@ fun VaultNavHost(
                 autoLockIndex = autoLockIndex,
                 idleLock = idleLock,
                 lockOnScreenOff = lockOnScreenOff,
+                clipboardClearIndex = clipboardClearIndex,
                 onChange = { settings = it },
                 onBiometricChange = { wanted ->
                     activity?.let {
@@ -210,6 +212,7 @@ fun VaultNavHost(
                 onAutoLockIndexChange = vm::onAutoLockIndexChange,
                 onIdleLockChange = vm::onIdleLockChange,
                 onLockOnScreenOffChange = vm::onLockOnScreenOffChange,
+                onClipboardClearIndexChange = vm::onClipboardClearIndexChange,
                 onBack = back,
                 onChangePin = { nav.navigate(ChangePinRoute) },
                 onRecoveryKey = { nav.navigate(RecoveryKeyRoute) },

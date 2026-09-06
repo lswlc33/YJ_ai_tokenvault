@@ -7,6 +7,7 @@ import com.lc33.tokenvault.crypto.RecoveryKey
 import com.lc33.tokenvault.crypto.zeroize
 import com.lc33.tokenvault.domain.AutoLockPolicy
 import com.lc33.tokenvault.domain.BiometricAvailability
+import com.lc33.tokenvault.domain.ClipboardClearPolicy
 import com.lc33.tokenvault.domain.PinPolicy
 import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.platform.AutoLocker
@@ -332,6 +333,24 @@ class SecurityViewModel @Inject constructor(
 
     fun onLockOnScreenOffChange(enabled: Boolean) {
         viewModelScope.launch { settings.setLockOnScreenOff(enabled) }
+    }
+
+    // ------------------------------------------------------------------ 剪贴板自动清除
+
+    /**
+     * 剪贴板自动清除秒数的下拉下标。权威是 `app_settings.clipboardClearSeconds`（红线 31），
+     * 存秒数（`ClipboardClearPolicy`），这里转成下拉下标。初值给默认档。
+     */
+    val clipboardClearIndex: StateFlow<Int> = settings.observeClipboardClearSeconds()
+        .map { ClipboardClearPolicy.indexOf(it) }
+        .stateIn(
+            viewModelScope,
+            SharingStarted.Eagerly,
+            ClipboardClearPolicy.indexOf(ClipboardClearPolicy.DEFAULT_SECONDS),
+        )
+
+    fun onClipboardClearIndexChange(index: Int) {
+        viewModelScope.launch { settings.setClipboardClearSeconds(ClipboardClearPolicy.at(index)) }
     }
 
     override fun onCleared() {
