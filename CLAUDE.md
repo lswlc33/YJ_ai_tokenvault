@@ -277,7 +277,7 @@ M3（接真数据）**管理那一支已完成**，2026-09-06。管理页、供�
   `copy(isDefault = true)` 这种只动了未参与比较字段的写入会被静默丢掉。
 
 **还吃 `screens/sample/` 的只剩两处**：粘贴导入的预览（解析器在 M4）与客户端预设列表
-（`ProfileSeeder` 在 M5）。详情页的模型与平台账号是空列表（仓库分别在 M5 / M6）。
+（`ProfileSeeder` 在 M5）。详情页的模型与平台账号**已接真数据**（2026-09-06 补，见下）。
 编辑页的「客户端预设」下拉只有一项且不落库——内置预设是数据不是代码（红线 22）。
 
 ### M3 第三步：仪表盘接真数据 + 自动锁定时限落库（2026-09-06）
@@ -299,10 +299,12 @@ M3（接真数据）**管理那一支已完成**，2026-09-06。管理页、供�
   是逐屏核对时抓到的）。
 - **需要处理只读 `health`**（红线 11），而且「额度不足」与「余额低于阈值」去重成一行：
   两条路径指向同一件事。全部 `UNKNOWN` 时这一卡是空的——「还没探测过」不是要处理的问题。
-- **没实现的动作不画按钮**：`DashboardUiState.canProbe` / `canRefreshBalance` 现在都是 false，
+- **没实现的动作不画按钮**：`DashboardUiState.canProbe` / `canRefreshBalance` 当时是 false，
   于是「开始探测」与余额刷新图标根本不渲染。一个点下去什么都不会发生的按钮和假数字是同一类
-  问题。两个里程碑做完就把这两个字段一起删掉。副作用：`ProbeRunRoute` 目前从界面上进不来
-  （入口只在有过一轮探测时才画），所以那一页顺手加了空态。
+  问题。探测引擎（M5）与余额引擎（M7）接入后这两个字段恒为 true，**已于 2026-09-06 连同
+  `BalanceCard.canRefresh` 参数一起删掉**（当时注释就写着"两个都为 true 之后一起删"）。
+  副作用：`ProbeRunRoute` 目前从界面上进不来（入口只在有过一轮探测时才画），所以那一页
+  顺手加了空态。
 - **需要本地化的东西不在 UiState 里拼好**（红线 19）：余额的「更新于」给时间戳，
   「需要处理」给 `AttentionKind` 枚举，文案由 `ui/common` 的 `messageOf` 统一给（红线 17）。
 - 顺手补的两个洞：`relativeLabel(now, then)` 现在是相对时间的**唯一入口**，以前直接调
@@ -336,6 +338,21 @@ M3（接真数据）**管理那一支已完成**，2026-09-06。管理页、供�
 下一步：M5 探测引擎的**接线半拉**（`ProbeEngine` @Singleton 宿主 + VaultSession 取消桥接 +
 逐项落库 + Hilt 绑定 + 仪表盘触发），然后是 M6 客户端伪装（L1+L2 已就绪，M6 补嗅探与预设）。
 里程碑表见 `old_plan.md` §16。
+
+**详情页模型与平台账号接真数据（2026-09-06 补）**：M4 文本导入会写模型与账号（`ImportWriter`
+已接 `ModelRepository` / `ProviderAccountRepository`），但详情页此前硬编码 `emptyList()`——
+用户导入的模型 / 账号在详情页看不到，是"存进去了但没地方看"（红线 16）。补法：
+- `ProviderAccountRepository` 加 `revealUsername(id): CharArray?`（`RoomProviderAccountRepository`
+  实现，`cipher.open(usernameEnc, aadUsername(id))`，null = 没记用户名）。账号用户名也加密
+  （红线 21），遮蔽串要解密现算，与密钥同一套逻辑。
+- `ProviderDetailViewModel` 注入 `ModelRepository` + `ProviderAccountRepository`，`state` 从
+  3 流 combine 扩成 6 流——超 `kotlinx.coroutines` 的 5 流类型化上限，拆成内层 4 流（provider /
+  keys / models / accounts）`combine` 成 `DetailData`，外层再接 `masks` / `accountMasks` 两个
+  遮蔽串缓存（§9.2 同款拆法）。账号遮蔽串走独立 `accountMasks` StateFlow + 重算协程。
+- `UiMapping.kt` 加 `AiModel.toRow()`（`probeState → UiHealth`：NOT_FOUND→Error、NO_ACCESS /
+  ERROR→Warn）与 `ProviderAccount.toRow(maskedUsername)`。
+- 模型行 / 账号行的 `onClick` 仍是空实现——那是 M5 模型管理（L3 试一下/预热，要钱）与 M6
+  账号管理（展开看密码、编辑、删除）的范围，本补丁只解决"数据可见"，不碰增删改。
 
 ### M4：文本导入（2026-09-06）
 
