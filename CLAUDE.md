@@ -414,6 +414,16 @@ M3（接真数据）**管理那一支已完成**，2026-09-06。管理页、供�
 所以 `probeEnabled = 0` 的供应商、reveal 失败的 Key 依旧会被 `ProbePlanBuilder` / `toTask` 挡掉——
 重试不会绕过总闸（§8.6）。`ProbeRunViewModel` 暴露 `retryFailed()`，`VaultNavHost` 接 `vm::retryFailed`。
 
+**探测触发点（2026-09-06 补）**：详情页「探测这一家」与 Key 行长按「单 Key 探测」两个手动入口。
+`ProbeEngine` 加 `probeProvider(providerId)` / `probeKey(keyId)`，同样是 `startScoped` 的薄封装
+（`runScope` 分别记 `"provider:<id>"` / `"key:<id>"`，filter 匹配 `providerId` / `keyId`）。只发
+L1+L2（零成本，红线 36），单家/单 Key 都不绕过 `ProbePlanBuilder` 的总闸。详情页 HeaderCard 加
+「探测这一家」按钮；Key 行长按触发单 Key 探测（`AppCard.onLongPress` 已有透传），密钥区标题下
+给一行 footnote 提示长按手势（否则是隐藏入口）。`ProviderDetailViewModel` 注入 `ProbeEngine`。
+**模型三路合并落库仍没做**：它依赖 L3 模型探测（发推理调用、要钱、红线 36 仅手动），而 L3
+本身还没实现，`ModelMerger` 的写入侧没有触发源，不能单独落（否则是红线 16 的"没产生路径的字段"）。
+
+
 ### M6：客户端伪装（2026-09-06，纯函数层 + 预设 UI + 自动嗅探）
 
 验收 = 测试 9（cURL 解析）/ 10（头部组装）/ 嗅探顺序全绿，四项全绿。**整条链路没有一处硬编码

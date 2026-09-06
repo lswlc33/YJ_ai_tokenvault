@@ -159,7 +159,7 @@ v2 显式迁移，红线 9）。
 | 3 | **探测明细页 `ProbeRunScreen` 接真实数据**——当前 `VaultNavHost` 仍传 `lastRun = null` + 空列表，用户刚探测完点「查看明细」却看到空态，这是必须补的断点：`ProbeItemResult` 补 target 上下文（供应商名 / host）、行内 outcome 字符串枚举化（红线 19）、新增 `ProbeRunViewModel` 聚合结果流 |
 | 4 | **探测进行中暂停前台空闲锁定计时**（§7.4）——✅ 已落地：`ProbeEngine` 与 `BackupEngine` 用 `try/finally` 包 `pauseIdleLock()/resumeIdleLock()`；顺带把前台空闲锁定 + 屏幕关闭即锁定两个开关从 `SettingsDraft` 迁到 `app_settings` 并接通 `AutoLocker`（详见 CLAUDE.md M1 后的小节） |
 | 5 | 删掉 `DashboardUiState.canProbe` / `canRefreshBalance` 占位字段（已恒为 true）——✅ 已删（2026-09-06） |
-| 6 | 探测触发点补齐：详情页「探测这一家」、Key 行「单 Key 探测」（L3 / 升级版 L2 的入口留到 M6 之后）；**模型三路合并结果落库**（`ModelMerger` 已实现，写入侧还没接） |
+| 6 | 探测触发点补齐：详情页「探测这一家」、Key 行长按「单 Key 探测」——✅ 已落地（2026-09-06，`ProbeEngine.probeProvider`/`probeKey` 复用 `startScoped` 二级过滤，零成本 L1/L2）；**模型三路合并落库**（`ModelMerger` 已实现，写入侧还没接）——依赖 L3 模型探测（要钱、红线 36 仅手动），L3 本身未实现，写入侧无触发源不能单独做，归「要设备/额度验收」 |
 | 7 | 设备验收：飞行模式全量探测 → 全部"网络不可达"且健康结论保留；一次 429 不把可用 Key 标坏；中点取消请求立刻停；探测中切后台被锁定后已完成结果仍在 |
 
 **验收**：`old_plan.md` §17「探测与客户端伪装」前 8 条；§14.3 测试 2/3/12/14 全绿。
