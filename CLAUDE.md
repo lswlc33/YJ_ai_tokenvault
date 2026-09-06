@@ -579,6 +579,21 @@ companion 里的纯函数（`host:port` → `Proxy`），支持 IPv6 方括号 `
 **还没做**：搜索/排序/批量操作；宽屏双栏（可砍）；无障碍 TalkBack 走通主路径；
 更新页接 GitHub Releases API（`onCheckNow = {}` 空实现）。
 
+**更新页接 GitHub Releases API（2026-09-06 补）**：`onCheckNow = {}` 从空实现接成真动作。
+关键纠正——此前把「检查更新」归为「要 token」是误判：仓库是 PUBLIC，GitHub Releases API
+**匿名可读**（60 次/小时，手动检查足够），不需要 token。实现：
+- `update/` 纯 Kotlin 包：`ReleaseInfo`（tag/name/body/published_at/prerelease/html_url）、
+  `ReleaseParser.parse`（`ignoreUnknownKeys`，坏 JSON 返回空列表不抛异常）、
+  `ReleaseMatcher.match`（正式版剥 `v` 前缀比**语义化版本**；nightly 固定 `nightly-build` tag
+  无版本可比，恒视为「有可下载构建」）。版本比较用 versionName 而非 versionCode——tag 只含
+  versionName（release.yml 约定 tag 与 vaultVersionName 一致），versionCode 不暴露在 tag 里。
+- `engine/UpdateEngine`（`@Singleton`）：复用 `OkHttpEngine` 发匿名 GET（UA 兜底 / 手动代理 /
+  超时一致，host 门闸对单次 GitHub 请求无感），失败区分 `NO_NETWORK`（UnknownHost）/ 
+  `UNREACHABLE`（连不上 / 非 2xx / 解析失败），响应体不落日志（红线 32）。
+- `UpdateViewModel` + `UpdateScreen`：四态（IDLE/CHECKING/UP_TO_DATE/UPDATE_AVAILABLE/ERROR），
+  「去下载」用 `html_url` 打开浏览器（`Intent.ACTION_VIEW`）。
+- 测试 `ReleaseParserMatcherTest` 10 用例（解析容错 / 渠道匹配 / 语义化版本比较）。
+
 **搜索 / 排序 / 批量（2026-09-06 补）**：管理页三项落地。搜索与排序是纯函数
 （`ui/shell/UiMapping.kt` 的 `matchesQuery` / `sortProviders`，可 JVM 单测）：搜名称/备注/
 host/分组名（**不搜加密列**，红线 3 推论），匹配是"小写 + 去空白"后的子串包含（与
