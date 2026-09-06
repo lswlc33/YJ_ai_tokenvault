@@ -56,6 +56,7 @@ class ProviderDetailViewModel @Inject constructor(
     private val balanceEngine: BalanceEngine,
     private val probeEngine: ProbeEngine,
     private val clipboard: SecureClipboard,
+    private val knownSecrets: com.lc33.tokenvault.crypto.KnownSecrets,
     savedState: SavedStateHandle,
 ) : ViewModel() {
 
@@ -245,6 +246,9 @@ class ProviderDetailViewModel @Inject constructor(
             } ?: return@launch
             revealedPlain?.zeroize()
             revealedPlain = plain
+            // 登记已知明文：这把密钥刚被用户看到，之后若它出现在探测错误 / 审计日志里，
+            // 脱敏器（红线 32 第一道）要能认出它、擦掉它。
+            knownSecrets.add(plain)
             _revealed.value = RevealState(keyId, String(plain))
         }
     }
@@ -269,9 +273,12 @@ class ProviderDetailViewModel @Inject constructor(
                 val password = runCatching { accounts.revealPassword(accountId) }.getOrNull()
                 if (username == null && password == null) null
                 else AccountPlain(username, password)
-            } ?: return@launch
+            }             ?: return@launch
             revealedAccountPlain?.zeroize()
             revealedAccountPlain = plain
+            // 账号的用户名 / 密码也是秘密（红线 21），展开后同样登记进已知明文清单。
+            plain.username?.let(knownSecrets::add)
+            plain.password?.let(knownSecrets::add)
             _revealedAccount.value = AccountRevealState(
                 accountId = accountId,
                 label = state.value?.accounts?.firstOrNull { it.id == accountId }?.label.orEmpty(),

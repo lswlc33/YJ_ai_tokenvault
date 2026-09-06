@@ -21,9 +21,8 @@ import kotlinx.coroutines.flow.map
  * 日志表没有秘密列（它只有文本），所以锁定态也能写——日志记录的是"探测结果如何"，
  * 那件事在锁定态不该被卡住。
  *
- * [Redactor] 的"已知明文秘密"目前给空集合，只靠正则兜底挡 `sk-` / `Bearer` / 邮箱形态。
- * "当前会话已知的秘密"的收集机制（探测 reveal 时往一个注册表里加）是后续增强——
- * 它需要在探测引擎里加一个秘密注册表，属于独立改动。
+ * [Redactor] 的"已知明文秘密"第一道由 [com.lc33.tokenvault.crypto.KnownSecrets] 提供
+ * （探测 reveal / 用户展开明文时登记，锁定时清空），正则只作兜底。
  */
 @Singleton
 class RoomAuditLogRepository @Inject constructor(

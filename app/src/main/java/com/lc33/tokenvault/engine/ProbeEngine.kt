@@ -1,5 +1,6 @@
 package com.lc33.tokenvault.engine
 
+import com.lc33.tokenvault.crypto.KnownSecrets
 import com.lc33.tokenvault.crypto.Redactor
 import com.lc33.tokenvault.crypto.VaultLockedException
 import com.lc33.tokenvault.crypto.zeroize
@@ -84,6 +85,7 @@ class ProbeEngine @Inject constructor(
     private val settings: SettingsRepository,
     private val autoLocker: AutoLocker,
     private val redactor: Redactor,
+    private val knownSecrets: KnownSecrets,
     @NowEpochMs private val now: () -> Long,
     @AppPlaceholders private val placeholders: Map<String, String>,
 ) {
@@ -369,6 +371,9 @@ class ProbeEngine @Inject constructor(
                     return null
                 }
                 try {
+                    // 登记已知明文：这把密钥的明文即将进入请求头，上游若在错误消息里
+                    // 回显它的前缀/后缀 4 位，落库前的脱敏（红线 32 第一道）要能认出它。
+                    knownSecrets.add(secret)
                     ProbeRequestBuilder.authHeaders(protocol, secret, authStyle)
                 } finally {
                     secret.zeroize()
@@ -417,6 +422,9 @@ class ProbeEngine @Inject constructor(
         }
 
         try {
+            // 同一把密钥在组装阶段已登记，这里再登记一次是防御性的（去重使其无害）：
+            // 嗅探同样会把明文放进请求头，若上游回显它，脱敏第一道要能认出。
+            knownSecrets.add(secret)
             val currentProfile = profiles.firstOrNull { it.id == provider.clientProfileId } ?: defaultProfile
             val plan = SniffPlanBuilder.build(task.protocol, provider.authStyle, provider.clientProfileId, profiles)
 

@@ -6,6 +6,7 @@ import com.lc33.tokenvault.crypto.DekSlot
 import com.lc33.tokenvault.crypto.DecryptionFailedException
 import com.lc33.tokenvault.crypto.Hkdf
 import com.lc33.tokenvault.crypto.KdfParams
+import com.lc33.tokenvault.crypto.KnownSecrets
 import com.lc33.tokenvault.crypto.RandomBytes
 import com.lc33.tokenvault.crypto.RecoveryKey
 import com.lc33.tokenvault.crypto.SecureRandomBytes
@@ -56,6 +57,7 @@ class VaultSession(
     private val biometricAvailability: () -> BiometricAvailability = {
         BiometricAvailability.NO_HARDWARE
     },
+    private val knownSecrets: KnownSecrets = KnownSecrets(),
 ) {
 
     private val guard = Any()
@@ -286,6 +288,9 @@ class VaultSession(
         dek = null
         fieldKey = null
         fingerprintKey = null
+        // 锁定即清空「已知明文清单」：脱敏器（红线 32 第一道）不该在锁上之后还记着
+        // 上一把被展开过的密钥明文。
+        knownSecrets.clear()
         phase = computePhase()
     }
 

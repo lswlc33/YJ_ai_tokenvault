@@ -105,10 +105,23 @@ object VaultModule {
     @Singleton
     fun provideSecretBox(random: RandomBytes): SecretBox = SecretBox(random)
 
-    /** 落日志前的脱敏（红线 32）。已知明文秘密暂给空集合，只靠正则兜底。 */
+    /**
+     * 会话级已知明文清单（红线 32 第一道）。
+     *
+     * 做成独立单例，被 [com.lc33.tokenvault.crypto.Redactor]（消费）、
+     * [com.lc33.tokenvault.platform.VaultSession]（锁定时清空）与
+     * [com.lc33.tokenvault.ui.shell.ProviderDetailViewModel]（展开明文时登记）三方共享。
+     */
     @Provides
     @Singleton
-    fun provideRedactor(): com.lc33.tokenvault.crypto.Redactor = com.lc33.tokenvault.crypto.Redactor()
+    fun provideKnownSecrets(): com.lc33.tokenvault.crypto.KnownSecrets =
+        com.lc33.tokenvault.crypto.KnownSecrets()
+
+    /** 落日志前的脱敏（红线 32）。已知明文第一道读 [KnownSecrets]，正则兜底。 */
+    @Provides
+    @Singleton
+    fun provideRedactor(knownSecrets: com.lc33.tokenvault.crypto.KnownSecrets): com.lc33.tokenvault.crypto.Redactor =
+        com.lc33.tokenvault.crypto.Redactor(knownSecrets = knownSecrets::snapshot)
 
     /**
      * boot 文件放在 `filesDir` 而不是 `SharedPreferences`：
@@ -135,12 +148,14 @@ object VaultModule {
         bootStore: BootStore,
         random: RandomBytes,
         capability: BiometricCapability,
+        knownSecrets: com.lc33.tokenvault.crypto.KnownSecrets,
     ): VaultSession = VaultSession(
         bootStore = bootStore,
         // 当前时间是平台能力，必须注入（红线 20）——纯 Kotlin 层与会话逻辑都不直接读它
         nowEpochMs = System::currentTimeMillis,
         random = random,
         biometricAvailability = capability::current,
+        knownSecrets = knownSecrets,
     )
 
     @Provides
@@ -295,6 +310,7 @@ object VaultModule {
         settings: com.lc33.tokenvault.domain.repo.SettingsRepository,
         autoLocker: AutoLocker,
         redactor: com.lc33.tokenvault.crypto.Redactor,
+        knownSecrets: com.lc33.tokenvault.crypto.KnownSecrets,
         @NowEpochMs now: () -> Long,
         @AppPlaceholders placeholders: Map<String, String>,
     ): ProbeEngine = ProbeEngine(
@@ -309,6 +325,7 @@ object VaultModule {
         settings = settings,
         autoLocker = autoLocker,
         redactor = redactor,
+        knownSecrets = knownSecrets,
         now = now,
         placeholders = placeholders,
     )
