@@ -9,8 +9,10 @@ import kotlinx.coroutines.flow.Flow
  * 明文只在 [add] 的参数上出现，且是 [CharArray]（红线 1）：用户名与密码与密钥同等对待，
  * 同一套加密、遮蔽、脱敏策略（红线 21）。
  *
- * 这一版只有 [add] 与 [observeByProvider]——它是在 M4 文本导入落地时才建立的，
- * 因为导入需要写账号。编辑 / 删除 / 回遮在 M6 补齐。
+ * 这一版只有 [add]、[observeByProvider] 与 [revealUsername]——它是在 M4 文本导入落地时才
+ * 建立的，因为导入需要写账号。**编辑 / 删除 / 回遮密码（`revealPassword`）还没做**：账号
+ * 目前是纯只读展示（CLAUDE.md「详情页模型与平台账号接真数据」小节），展开看密码、编辑、
+ * 删除都未落地，将来补的时候再按红线 21 与密钥同等对待（30 秒回遮、剪贴板清除同一条路径）。
  */
 interface ProviderAccountRepository {
 

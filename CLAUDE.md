@@ -318,7 +318,7 @@ M3（接真数据）**管理那一支已完成**，2026-09-06。管理页、供�
 关闭锁定」小节。再后来（M6/M7 收尾）拦截关键词、余额阈值、手动代理三项也迁到
 `app_settings`（都有消费方：`ProbeClassifier` / `BalanceEngine` / `OkHttpEngine`）。
 
-**`SettingsDraft` 剩余假开关清单（2026-09-06 盘点，全部是"有 UI 但无消费方"或"消费方没接"）**：
+**`SettingsDraft` 假开关盘点清单（2026-09-06 盘点当时共 13 项，下表逐项标注最终处理结果；`SettingsDraft` 类本身已删除，见下方"清单最终收敛"）**：
 
 | 字段 | 声称语义 | 实际状态 |
 | --- | --- | --- |
@@ -460,9 +460,9 @@ M3（接真数据）**管理那一支已完成**，2026-09-06。管理页、供�
   **MockWebServer 用 `mockwebserver3`（OkHttp 5.x），API 与旧版不同**：`MockResponse.Builder()
   .code(n).body(s)`、`server.close()`（不是 shutdown）、`RecordedRequest.requestLine`。
 
-**还没做（M5 的"接线"半拉）**：`ProbeEngine`（`@Singleton` 宿主，`StateFlow<ProbeProgress>`、
+**M5 接线（已落地，见下方「补」段落）**：`ProbeEngine`（`@Singleton` 宿主，`StateFlow<ProbeProgress>`、
 `VaultSession` 锁定时取消、逐项落库 DAO）、Hilt 绑定、仪表盘 `onStartProbe` 触发、`probe_runs`
-落库。目前 `ProbeOrchestrator` 是纯逻辑，UI 的 `onStartProbe` 还是空实现（`VaultNavHost.kt:91`）。
+落库均已完成。`ProbeOrchestrator` 是纯逻辑，UI 的 `onStartProbe` 已接真（不再是空实现）。
 
 单测 328 个全绿（1 个 spike 按设计跳过）；`lint` 0 error / 23 warning；`assembleDebug` 通过。
 
@@ -601,9 +601,10 @@ companion 里的纯函数（`host:port` → `Proxy`），支持 IPv6 方括号 `
 可点击行、点了没反应（撑谎）。WebDAV 四动词 + 周期备份 Worker 是可砍项、无消费方，与数据页
 「同步元数据」同款处理——移除整个 WebDAV 区块（SectionTitle + 箭头行），删 `onWebDav` 参数
 与 3 个 string（`sync_section_webdav`/`sync_webdav`/`sync_webdav_summary`）。将来实现 WebDAV
-时再加回。**注意**：「自动备份」开关（`autoBackup`/`autoBackupWifiOnly`）是 `SettingsDraft`
-的有意占位（M0.8 临时壳，等 M9 周期备份 Worker 落地接权威存储），本轮**未动**——它与 WebDAV
-箭头行的「漏了的空实现」性质不同。
+时再加回。**注意**：「自动备份」开关（`autoBackup`/`autoBackupWifiOnly`）最初是 `SettingsDraft`
+的有意占位（M0.8 临时壳，等 M9 周期备份 Worker 落地接权威存储），与 WebDAV 箭头行的「漏了的
+空实现」性质不同；但后来（2026-09-06，提交 `dfb837f`）纠正了自相矛盾的判断——自动备份依赖
+WebDAV 作上传目标，WebDAV 可砍后它无消费方，两个开关随 WebDAV 一并移除。
 
 **「备份口令」设置项（2026-09-06 处理）**：本地导出/恢复的"单独设长口令"已通过口令对话框
 实现（每次导出/恢复弹框输口令，可输 PIN 也可输任意长口令，`sync_passphrase_hint` 提示"默认
@@ -623,8 +624,8 @@ companion 里的纯函数（`host:port` → `Proxy`），支持 IPv6 方括号 `
   workflow 解码后设 `VAULT_RELEASE_STORE_FILE`；nightly 预发布走 `nightly-build` tag
   （仓库规则禁止建 `nightly` tag，GH013）。这一串 CI 迭代了 12 个提交才调通。
 
-**还没做**：搜索/排序/批量操作；宽屏双栏（可砍）；无障碍 TalkBack 走通主路径；
-更新页接 GitHub Releases API（`onCheckNow = {}` 空实现）。
+**剩两项可砍/待验证**：宽屏双栏（可砍）；无障碍 TalkBack 走通主路径（需设备）。
+搜索/排序/批量、更新页接 GitHub Releases API 均已落地（见下方「补」段落）。
 
 **更新页接 GitHub Releases API（2026-09-06 补）**：`onCheckNow = {}` 从空实现接成真动作。
 关键纠正——此前把「检查更新」归为「要 token」是误判：仓库是 PUBLIC，GitHub Releases API
