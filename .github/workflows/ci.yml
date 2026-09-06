@@ -18,6 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       # 分层规则的第二道闸。第一道是 ArchitectureRulesTest（本地 pre-commit 就会跑），
       # 这里再 grep 一遍，防的是"有人没装 hook 直接推"。
@@ -118,10 +120,11 @@ jobs:
           set -eu
           apk=$(find app/build/outputs/apk/nightly -name '*.apk' | head -n 1)
           # nightly 是滚动更新的预发布，直接删旧建新。
-          # 注意：--target 只能指向分支名（master），不能指向裸 commit SHA——后者会让
-          # gh 尝试用该 SHA 隐式创建 tag，被仓库「ref 创建限制」拦截（报 422
-          # "Cannot create ref due to creations being restricted"）。
+          # GITHUB_TOKEN 不能通过 release API 隐式创建 tag（会报 422
+          # "Cannot create ref due to creations being restricted"），所以先显式用
+          # git push 更新 nightly tag 到当前 commit，再对已存在的 tag 建 release。
+          git push origin "$GITHUB_SHA:refs/tags/nightly" --force
           gh release delete nightly --yes > /dev/null 2>&1 || true
           gh release create nightly "$apk" \
-            --prerelease --target master --title nightly \
+            --prerelease --target nightly --title nightly \
             --notes "自动构建于 $GITHUB_SHA（$(date -u '+%Y-%m-%d %H:%M UTC')）"
