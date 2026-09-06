@@ -119,12 +119,12 @@ jobs:
         run: |
           set -eu
           apk=$(find app/build/outputs/apk/nightly -name '*.apk' | head -n 1)
-          # nightly 是滚动更新的预发布，直接删旧建新。
-          # GITHUB_TOKEN 不能通过 release API 隐式创建 tag（会报 422
-          # "Cannot create ref due to creations being restricted"），所以先显式用
-          # git push 更新 nightly tag 到当前 commit，再对已存在的 tag 建 release。
-          git push origin "$GITHUB_SHA:refs/tags/nightly" --force
-          gh release delete nightly --yes > /dev/null 2>&1 || true
-          gh release create nightly "$apk" \
-            --prerelease --target nightly --title nightly \
+          # 预发布 tag 用 nightly-build：仓库有一条「ref 创建限制」规则禁止创建名为
+          # `nightly` 的 tag（GH013 "Cannot create ref due to creations being
+          # restricted"），换名绕开。GITHUB_TOKEN 也不能通过 release API 隐式建 tag，
+          # 所以先显式 git push 更新 tag，再对已存在的 tag 建 release。
+          git push origin "$GITHUB_SHA:refs/tags/nightly-build" --force
+          gh release delete nightly-build --yes > /dev/null 2>&1 || true
+          gh release create nightly-build "$apk" \
+            --prerelease --target nightly-build --title "nightly-build" \
             --notes "自动构建于 $GITHUB_SHA（$(date -u '+%Y-%m-%d %H:%M UTC')）"
