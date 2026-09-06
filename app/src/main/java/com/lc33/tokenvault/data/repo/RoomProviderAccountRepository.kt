@@ -2,6 +2,7 @@ package com.lc33.tokenvault.data.repo
 
 import com.lc33.tokenvault.crypto.FieldAad
 import com.lc33.tokenvault.crypto.toUtf8
+import com.lc33.tokenvault.crypto.utf8Chars
 import com.lc33.tokenvault.crypto.zeroize
 import com.lc33.tokenvault.data.dao.ProviderAccountDao
 import com.lc33.tokenvault.data.entity.ProviderAccountEntity
@@ -73,6 +74,17 @@ class RoomProviderAccountRepository @Inject constructor(
         } finally {
             usernameBytes?.zeroize()
             passwordBytes?.zeroize()
+        }
+    }
+
+    override suspend fun revealUsername(id: Long): CharArray? {
+        val row = requireNotNull(dao.findById(id)) { "provider account $id not found" }
+        val enc = row.usernameEnc ?: return null
+        val plain = cipher.open(enc, aadUsername(id))
+        return try {
+            plain.utf8Chars()
+        } finally {
+            plain.zeroize()
         }
     }
 

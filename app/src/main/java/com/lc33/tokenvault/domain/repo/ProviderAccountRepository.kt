@@ -31,4 +31,10 @@ interface ProviderAccountRepository {
         password: CharArray?,
         loginUrl: String?,
     ): Long
+
+    /**
+     * 解出这条账号的**用户名明文**（遮蔽串要现算，红线 21）。返回的 [CharArray] 归调用方擦。
+     * null 表示这条账号没记用户名（只记了密码）。
+     */
+    suspend fun revealUsername(id: Long): CharArray?
 }

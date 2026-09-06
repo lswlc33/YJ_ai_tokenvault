@@ -2,13 +2,17 @@ package com.lc33.tokenvault.ui.shell
 
 import com.lc33.tokenvault.domain.BalanceState
 import com.lc33.tokenvault.domain.KeyHealth
+import com.lc33.tokenvault.domain.ModelProbeState
+import com.lc33.tokenvault.domain.ModelSource
 import com.lc33.tokenvault.domain.ProbeOutcome
 import com.lc33.tokenvault.data.entity.ProbeRunEntity
+import com.lc33.tokenvault.domain.model.AiModel
 import com.lc33.tokenvault.domain.model.ApiKey
 import com.lc33.tokenvault.domain.model.BalanceSnapshot
 import com.lc33.tokenvault.domain.model.ClientProfile
 import com.lc33.tokenvault.domain.model.Group
 import com.lc33.tokenvault.domain.model.Provider
+import com.lc33.tokenvault.domain.model.ProviderAccount
 import com.lc33.tokenvault.domain.model.ProviderSummary
 import com.lc33.tokenvault.probe.ProbeItemResult
 import com.lc33.tokenvault.screens.model.AttentionItem
@@ -18,9 +22,12 @@ import com.lc33.tokenvault.screens.model.ContentCounts
 import com.lc33.tokenvault.screens.model.HealthBreakdown
 import com.lc33.tokenvault.screens.model.ProbeRunSummary
 import com.lc33.tokenvault.screens.model.ProviderSort
+import com.lc33.tokenvault.screens.model.UiAccountRow
 import com.lc33.tokenvault.screens.model.UiGroup
 import com.lc33.tokenvault.screens.model.UiHealth
 import com.lc33.tokenvault.screens.model.UiKeyRow
+import com.lc33.tokenvault.screens.model.UiModelRow
+import com.lc33.tokenvault.screens.model.UiModelSource
 import com.lc33.tokenvault.screens.model.UiMoney
 import com.lc33.tokenvault.screens.model.UiProviderRow
 import java.math.BigDecimal
@@ -183,6 +190,45 @@ fun ApiKey.toRow(masked: String): UiKeyRow = UiKeyRow(
     latencyMs = latencyMs,
     checkedAt = checkedAt,
     isDefault = isDefault,
+)
+
+/**
+ * 模型 → 详情页模型行。
+ *
+ * 只读明文列（modelId / displayName / protocol / source / enabled），不碰任何密文——
+ * 模型本来就不加密（红线 24 只加密密钥与账号密码）。`probeState` 是模型的探测结论，
+ * 分档对齐 [KeyHealth.toUi]：NOT_FOUND 是"模型名写错"，用户能改，标 Error；
+ * NO_ACCESS / ERROR 是配置或瞬时问题，标 Warn。
+ */
+fun AiModel.toRow(): UiModelRow = UiModelRow(
+    id = id,
+    modelId = modelId,
+    displayName = displayName,
+    providerId = providerId,
+    protocol = protocol.wireName,
+    source = when (source) {
+        ModelSource.MANUAL -> UiModelSource.Manual
+        ModelSource.DISCOVERED -> UiModelSource.Discovered
+    },
+    health = when (probeState) {
+        ModelProbeState.OK -> UiHealth.Ok
+        ModelProbeState.NOT_FOUND -> UiHealth.Error
+        ModelProbeState.NO_ACCESS, ModelProbeState.ERROR -> UiHealth.Warn
+        ModelProbeState.UNKNOWN -> UiHealth.Unknown
+    },
+    enabled = enabled,
+    contextLabel = displayName,
+)
+
+/**
+ * 平台账号 → 详情页账号行。用户名遮蔽串是**解密后现算**的（红线 21），由调用方传进来，
+ * 这里不碰密文——列表页拿不到明文，想画也画不出来。
+ */
+fun ProviderAccount.toRow(maskedUsername: String): UiAccountRow = UiAccountRow(
+    id = id,
+    label = label,
+    providerId = providerId,
+    maskedUsername = maskedUsername,
 )
 
 /** 供应商的协议集合供编辑页显示；顺序按枚举声明，所以每次进页面 chips 不会跳。 */

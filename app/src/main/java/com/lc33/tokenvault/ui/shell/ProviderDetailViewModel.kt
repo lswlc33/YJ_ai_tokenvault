@@ -5,9 +5,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lc33.tokenvault.crypto.zeroize
 import com.lc33.tokenvault.domain.SecretMask
+import com.lc33.tokenvault.domain.model.AiModel
 import com.lc33.tokenvault.domain.model.ApiKey
 import com.lc33.tokenvault.domain.model.Provider
+import com.lc33.tokenvault.domain.model.ProviderAccount
 import com.lc33.tokenvault.domain.repo.ApiKeyRepository
+import com.lc33.tokenvault.domain.repo.ModelRepository
+import com.lc33.tokenvault.domain.repo.ProviderAccountRepository
 import com.lc33.tokenvault.domain.repo.ProviderRepository
 import com.lc33.tokenvault.engine.BalanceEngine
 import com.lc33.tokenvault.engine.ProbeEngine
@@ -47,6 +51,8 @@ import kotlinx.coroutines.withContext
 class ProviderDetailViewModel @Inject constructor(
     private val providers: ProviderRepository,
     private val keys: ApiKeyRepository,
+    private val models: ModelRepository,
+    private val accounts: ProviderAccountRepository,
     private val balanceEngine: BalanceEngine,
     private val probeEngine: ProbeEngine,
     private val clipboard: SecureClipboard,
@@ -65,6 +71,12 @@ class ProviderDetailViewModel @Inject constructor(
 
     private val masks = MutableStateFlow<Map<Long, Mask>>(emptyMap())
 
+    /**
+     * 账号用户名的遮蔽串缓存，按 `updatedAt` 记（和密钥 [masks] 同一套逻辑）。
+     * 用户名也加密（红线 21），遮蔽串要解密现算；密码连遮蔽串都不给，只在展开时现算。
+     */
+    private val accountMasks = MutableStateFlow<Map<Long, String>>(emptyMap())
+
     /** 当前展开的那一把明文。**全应用只在这里存一份**，关掉就擦。 */
     private var revealedPlain: CharArray? = null
 
@@ -74,23 +86,45 @@ class ProviderDetailViewModel @Inject constructor(
     /** 展开一把密钥时给界面的东西。 */
     data class RevealState(val keyId: Long, val text: String)
 
+    // 内层：四路数据流（供应商 / 密钥 / 模型 / 账号）先合成一份，外层再接两份遮蔽串缓存。
+    // 六个流超过 kotlinx.coroutines combine 的 5 流类型化上限，拆成两层（§9.2 同款拆法）。
+    private data class DetailData(
+        val provider: Provider?,
+        val keys: List<ApiKey>,
+        val models: List<AiModel>,
+        val accounts: List<ProviderAccount>,
+    )
+
     val state: StateFlow<ProviderDetailUiState?> = combine(
-        providers.observeProvider(providerId),
-        keys.observeByProvider(providerId),
+        combine(
+            providers.observeProvider(providerId),
+            keys.observeByProvider(providerId),
+            models.observeByProvider(providerId),
+            accounts.observeByProvider(providerId),
+        ) { provider, keyList, modelList, accountList ->
+            DetailData(provider, keyList, modelList, accountList)
+        },
         masks,
-    ) { provider, keyList, maskMap ->
-        if (provider == null) {
+        accountMasks,
+    ) { data, maskMap, accountMaskMap ->
+        if (data.provider == null) {
             null
         } else {
+            val provider = data.provider
             // 还没解出来的先给省略号；等下面那条协程算完会再发一次。给空串会让那一行
             // 看起来"这把密钥是空的"
-            val rows = keyList.map { key -> key.toRow(maskMap[key.id]?.text ?: SecretMask.ELLIPSIS) }
+            val keyRows = data.keys.map { key ->
+                key.toRow(maskMap[key.id]?.text ?: SecretMask.ELLIPSIS)
+            }
+            val modelRows = data.models.map { it.toRow() }
+            val accountRows = data.accounts.map { account ->
+                account.toRow(accountMaskMap[account.id] ?: SecretMask.ELLIPSIS)
+            }
             ProviderDetailUiState(
-                provider = provider.toDetailRow(rows),
-                keys = rows,
-                // 模型与平台账号还没有仓库（M5 / M6）。空列表是诚实的：确实一条都没有
-                models = emptyList(),
-                accounts = emptyList(),
+                provider = provider.toDetailRow(keyRows, modelRows.size, accountRows.size),
+                keys = keyRows,
+                models = modelRows,
+                accounts = accountRows,
                 nowMs = System.currentTimeMillis(),
             )
         }
@@ -101,6 +135,9 @@ class ProviderDetailViewModel @Inject constructor(
         // 于是遮蔽串跟着变（红线 10：从数据源知道该重算了，不靠每个写入点顺手通知）
         viewModelScope.launch {
             keys.observeByProvider(providerId).collect { list -> recomputeMasks(list) }
+        }
+        viewModelScope.launch {
+            accounts.observeByProvider(providerId).collect { list -> recomputeAccountMasks(list) }
         }
     }
 
@@ -130,6 +167,26 @@ class ProviderDetailViewModel @Inject constructor(
         val plain = runCatching { keys.reveal(keyId) }.getOrNull() ?: return SecretMask.ELLIPSIS
         return try {
             SecretMask.of(plain)
+        } finally {
+            plain.zeroize()
+        }
+    }
+
+    /** 账号用户名遮蔽串的重算，逻辑同 [recomputeMasks]。没记用户名的给空串（不是省略号）。 */
+    private suspend fun recomputeAccountMasks(list: List<ProviderAccount>) {
+        val liveIds = list.map { it.id }.toSet()
+        if (accountMasks.value.keys == liveIds) return
+
+        val computed = withContext(Dispatchers.Default) {
+            list.associate { account -> account.id to maskOfUsername(account.id) }
+        }
+        accountMasks.value = computed
+    }
+
+    private suspend fun maskOfUsername(accountId: Long): String {
+        val plain = runCatching { accounts.revealUsername(accountId) }.getOrNull() ?: return ""
+        return try {
+            SecretMask.ofUsername(plain)
         } finally {
             plain.zeroize()
         }
@@ -194,7 +251,11 @@ class ProviderDetailViewModel @Inject constructor(
         probeEngine.probeKey(keyId)
     }
 
-    private fun Provider.toDetailRow(rows: List<UiKeyRow>): UiProviderRow = UiProviderRow(
+    private fun Provider.toDetailRow(
+        rows: List<UiKeyRow>,
+        modelCount: Int,
+        accountCount: Int,
+    ): UiProviderRow = UiProviderRow(
         id = id,
         name = name,
         note = note,
@@ -205,8 +266,8 @@ class ProviderDetailViewModel @Inject constructor(
         groupId = groupId,
         keyCount = rows.size,
         okKeyCount = rows.count { it.health == UiHealth.Ok },
-        modelCount = 0,
-        accountCount = 0,
+        modelCount = modelCount,
+        accountCount = accountCount,
         balance = balance.toUiMoney(),
         balanceFailed = balance?.failed == true,
         health = aggregateOf(rows),

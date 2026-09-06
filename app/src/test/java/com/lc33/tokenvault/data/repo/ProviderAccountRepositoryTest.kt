@@ -2,6 +2,7 @@ package com.lc33.tokenvault.data.repo
 
 import com.lc33.tokenvault.crypto.FieldAad
 import com.lc33.tokenvault.crypto.SecretBox
+import com.lc33.tokenvault.crypto.zeroize
 import com.lc33.tokenvault.platform.FileBootStore
 import com.lc33.tokenvault.platform.VaultSession
 import java.io.File
@@ -116,5 +117,32 @@ class ProviderAccountRepositoryTest {
         // 假 DAO 不实现唯一约束，但指纹必须一致（真库里靠它拦重复）
         val fps = dao.rows.map { it.usernameFp }.toSet()
         assertEquals(1, fps.size)
+    }
+
+    @Test
+    fun `revealUsername 解回明文`() = runTest {
+        val id = repo.add(
+            providerId = 1,
+            label = "x",
+            username = "company@example.com".toCharArray(),
+            password = null,
+            loginUrl = null,
+        )
+        val plain = repo.revealUsername(id)
+        assertNotNull(plain)
+        assertEquals("company@example.com", String(plain!!))
+        plain.zeroize()
+    }
+
+    @Test
+    fun `没记用户名时 revealUsername 返回 null`() = runTest {
+        val id = repo.add(
+            providerId = 1,
+            label = "只记密码",
+            username = null,
+            password = "p".toCharArray(),
+            loginUrl = null,
+        )
+        assertNull(repo.revealUsername(id))
     }
 }
