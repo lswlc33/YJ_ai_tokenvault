@@ -544,7 +544,6 @@ private fun SyncRouteContent(
         onBack = onBack,
         onExport = { pendingAction = PendingSyncAction.Export },
         onImport = { pendingAction = PendingSyncAction.Import },
-        onWebDav = {},
     )
 
     // 口令对话框

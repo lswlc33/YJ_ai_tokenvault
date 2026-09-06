@@ -20,15 +20,16 @@ import com.lc33.tokenvault.ui.theme.LocalAppTokens
 import com.lc33.tokenvault.ui.theme.LocalStatusPalette
 
 /**
- * 同步 —— 备份 / 恢复 / WebDAV / 自动备份（计划.md §13.4、§12）。
+ * 同步 —— 备份 / 恢复 / 自动备份（计划.md §13.4、§12）。
  *
  * 仪表盘那张备份卡点进来就是这一页。
  *
- * 两条不能软化的措辞：
+ * 一条不能软化的措辞：
  * - 备份口令默认沿用 PIN，所以传到云上的包同样是**分钟级可破**（§7.6）。提示常驻，
  *   不折叠。
- * - WebDAV 的 `http://` 直接拦，不给"我知道风险"的快捷勾选：Basic 凭据加整个备份包
- *   明文出去，代价太大（§7.5 同一道闸）。
+ *
+ * WebDAV（服务器 / 凭据 / 目录配置）是可砍项，入口已移除（`onWebDav` 空实现是撑谎）——
+ * 与数据页「同步元数据」同款处理：将来实现 WebDAV 四动词 + 周期备份 Worker 时再加回。
  */
 @Composable
 fun SyncScreen(
@@ -38,7 +39,6 @@ fun SyncScreen(
     onBack: () -> Unit,
     onExport: () -> Unit,
     onImport: () -> Unit,
-    onWebDav: () -> Unit,
 ) {
     SettingsSubPage(titleRes = R.string.sync_title, onBack = onBack) {
         item { StatusCard(backup, onExport) }
@@ -68,15 +68,6 @@ fun SyncScreen(
                 style = AppTextStyle.Footnote,
                 color = appSecondaryTextColor,
                 modifier = Modifier.padding(horizontal = LocalAppTokens.current.screenPadding),
-            )
-        }
-
-        item { SectionTitle(text = stringResource(R.string.sync_section_webdav)) }
-        item {
-            AppArrowRow(
-                title = stringResource(R.string.sync_webdav),
-                summary = stringResource(R.string.sync_webdav_summary),
-                onClick = onWebDav,
             )
         }
 

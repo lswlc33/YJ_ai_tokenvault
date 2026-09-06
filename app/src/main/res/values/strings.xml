@@ -285,9 +285,6 @@
     <string name="sync_import_summary">Preview first, then choose how to merge. A local snapshot is taken before anything is written.</string>
     <string name="sync_passphrase">Backup passphrase</string>
     <string name="sync_passphrase_summary">Defaults to your PIN. A 6-digit PIN is minutes-to-crack offline, so set a long passphrase before putting a backup on the cloud.</string>
-    <string name="sync_section_webdav">WebDAV</string>
-    <string name="sync_webdav">Server, credentials and folder</string>
-    <string name="sync_webdav_summary">https only. Plain http would send Basic credentials and the whole backup in the clear, so it is refused rather than warned about.</string>
     <string name="sync_section_auto">Scheduled backup</string>
     <string name="sync_auto">Back up automatically</string>
     <string name="sync_auto_summary">Skipped while the vault is locked, and made up after the next unlock</string>

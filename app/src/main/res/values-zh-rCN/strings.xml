@@ -284,9 +284,6 @@
     <string name="sync_import_summary">先预览，再选合并方式。写入之前会先给本地拍一份快照。</string>
     <string name="sync_passphrase">备份口令</string>
     <string name="sync_passphrase_summary">默认沿用 PIN。6 位数字 PIN 在离线场景下是分钟级可破的，所以要往云上放之前，先单独设一个长口令。</string>
-    <string name="sync_section_webdav">WebDAV</string>
-    <string name="sync_webdav">服务器、凭据与目录</string>
-    <string name="sync_webdav_summary">只允许 https。明文 http 会把 Basic 凭据和整个备份包一起明文送出去，所以这里是直接拒绝，不是弹个警告让你确认。</string>
     <string name="sync_section_auto">定时备份</string>
     <string name="sync_auto">自动备份</string>
     <string name="sync_auto_summary">金库锁定时跳过，下次解锁后补做</string>
