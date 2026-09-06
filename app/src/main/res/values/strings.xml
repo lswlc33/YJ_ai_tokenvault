@@ -209,8 +209,6 @@
         <item>After 5 minutes</item>
         <item>Never</item>
     </string-array>    <!-- Probe settings -->
-    <string name="probe_section_when">When to probe</string>
-    <string name="probe_auto_when">Automatic probing</string>
     <string name="probe_section_cost">Cost</string>
     <string name="probe_thresholds">Low-balance thresholds</string>
     <string name="probe_thresholds_summary">Per currency. Defaults: USD 5, CNY 30.</string>
@@ -219,9 +217,6 @@
     <string name="probe_thresholds_cny">Chinese Yuan (CNY)</string>
     <string name="probe_thresholds_invalid">Enter a number of 0 or more</string>
     <string name="probe_thresholds_save">Save</string>
-    <string name="probe_section_rate">Rate limiting</string>
-    <string name="probe_pacing">Per-host pacing and budget</string>
-    <string name="probe_pacing_summary">Concurrency alone is not enough: a Cloudflare-fronted gateway returned error 1015 on the third request within 2.4 seconds. There is a minimum gap between requests to the same host.</string>
     <string name="probe_section_client">Client disguise</string>
     <string name="probe_sniff">Match a client profile automatically</string>
     <string name="probe_sniff_summary">On a manual probe only. Stops immediately if the host rate-limits us.</string>
@@ -232,18 +227,10 @@
     <string name="probe_keywords_empty">No keywords. The default list applies.</string>
     <string name="probe_keywords_delete">Delete</string>
     <string name="probe_section_network">Network</string>
-    <string name="probe_verbose_log">Verbose HTTP log</string>
-    <string name="probe_verbose_log_summary">Records response bodies, truncated to 2 KB and redacted. Off by default because upstream errors echo parts of your key.</string>
     <string name="probe_proxy">Manual HTTP proxy</string>
     <string name="probe_proxy_summary">Empty means use the system proxy</string>
     <string name="probe_proxy_hint">Host and port, e.g. 127.0.0.1:7890. Used for probing, balance checks, and later update checks. Empty means use the system proxy.</string>
     <string name="probe_proxy_invalid">Enter host:port, e.g. 127.0.0.1:7890</string>
-    <string-array name="auto_probe_options">
-        <item>Off</item>
-        <item>After unlocking</item>
-        <item>Every 6 hours, Wi-Fi only</item>
-        <item>Daily, Wi-Fi only</item>
-    </string-array>
 
     <!-- Data -->
     <string name="data_section_organize">Organise</string>
@@ -301,8 +288,6 @@
     <string name="update_section_channel">Channel</string>
     <string name="update_channel">Update channel</string>
     <string name="update_channel_summary">Nightly is not release-tested</string>
-    <string name="update_auto_check">Check automatically</string>
-    <string name="update_auto_check_summary">Off by default</string>
     <string name="update_section_honesty">What this actually does</string>
     <string name="update_check_now">Check now</string>
     <string name="update_checking">Checking…</string>
@@ -312,7 +297,7 @@
     <string name="update_open_download">Download</string>
     <string name="update_error_no_network">No network. Check your connection and try again.</string>
     <string name="update_error_unreachable">Cannot reach GitHub. You can set a proxy under Probe → HTTP proxy.</string>
-    <string name="update_honesty_default_off">· Automatic checking is off unless you turn it on.</string>
+    <string name="update_honesty_default_off">· There is no automatic checking — a check only runs when you tap Check now.</string>
     <string name="update_honesty_anonymous">· A check is one anonymous request to the GitHub releases API. No device information, no identifier, nothing about your vault.</string>
     <string name="update_honesty_no_silent_install">· There is no in-app install. That would need the install-packages permission, and an app that holds your keys should not ask for it — the download and the install go through your browser and the system installer.</string>
     <string-array name="update_channels">
@@ -489,7 +474,6 @@
     <string name="probe_section_defaults">Defaults for new providers</string>
     <string name="probe_defaults_notice">The switches below are only the defaults used when you add a provider. Each provider keeps its own copy afterwards, because every gateway is different — some forbid automated checks in their terms, some rate-limit after three requests. Changing a default here does not touch providers you already have.</string>
     <string name="probe_defaults_goto_manage">Review them provider by provider</string>
-    <string name="probe_auto_when_summary">Automatic runs never spend credit: reachability, key validity and balance only. Anything that needs a real call is left for you to tap.</string>
 
     <!-- ==================== M1 lock gate: onboarding, unlock, recovery key ==================== -->
     <string name="dialog_cancel">Cancel</string>

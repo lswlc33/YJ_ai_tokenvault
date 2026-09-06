@@ -14,9 +14,8 @@ import kotlinx.coroutines.launch
  * 探测设置页（§13.4）里**已经接真**的那一项的状态源。
  *
  * 目前只有客户端嗅探开关一项：它是这页里唯一一个"消费方已写好、只差开关接线"的设置，
- * 权威是 `app_settings.sniffClientProfile`（红线 31）。其余几项（`defaultProbe*` /
- * `autoProbeIndex` / `verboseHttpLog`）仍在 `SettingsDraft` 里，是待拍板的假开关，
- * 见 CLAUDE.md「SettingsDraft 剩余假开关清单」。
+ * 权威是 `app_settings.sniffClientProfile`（红线 31）。其余几项（`defaultProbe*`）仍在
+ * `SettingsDraft` 里，是待拍板的假开关，见 CLAUDE.md「SettingsDraft 剩余假开关清单」。
  */
 @HiltViewModel
 class ProbeSettingsViewModel @Inject constructor(

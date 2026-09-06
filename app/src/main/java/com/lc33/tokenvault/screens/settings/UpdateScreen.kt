@@ -11,11 +11,9 @@ import androidx.compose.ui.unit.dp
 import com.lc33.tokenvault.BuildConfig
 import com.lc33.tokenvault.R
 import com.lc33.tokenvault.engine.UpdateErrorKind
-import com.lc33.tokenvault.screens.model.SettingsDraft
 import com.lc33.tokenvault.ui.common.relativeLabel
 import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppDropdownRow
-import com.lc33.tokenvault.ui.miuix.AppSwitchRow
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppTextButton
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
@@ -29,7 +27,8 @@ import java.time.Instant
  * 更新（计划.md §13.4）。
  *
  * 三条诚实声明必须写在页面上，不是脚注：
- * 1. 自动检查**默认关**。
+ * 1. **没有自动检查**——检查只在用户点「立即检查」时发一次。自动检查的定时调度
+ *    未实现，所以不画那个「自动检查」开关（画了拨动没效果是撑谎）。
  * 2. 检查只发一个匿名请求，不带设备信息、不带任何标识。
  * 3. **不做应用内静默安装**——那需要 `REQUEST_INSTALL_PACKAGES`，一个管密钥的应用
  *    去要安装权限，对威胁模型的破坏远超收益（§7.6）。下载与安装交给浏览器和系统
@@ -37,8 +36,6 @@ import java.time.Instant
  */
 @Composable
 fun UpdateScreen(
-    draft: SettingsDraft,
-    onChange: (SettingsDraft) -> Unit,
     onBack: () -> Unit,
     updateState: UpdateViewModel.UiState,
     updateChannel: Int,
@@ -63,14 +60,6 @@ fun UpdateScreen(
                 items = stringArrayResource(R.array.update_channels).toList(),
                 selectedIndex = updateChannel,
                 onSelect = onUpdateChannelChange,
-            )
-        }
-        item {
-            AppSwitchRow(
-                title = stringResource(R.string.update_auto_check),
-                summary = stringResource(R.string.update_auto_check_summary),
-                checked = draft.autoCheckUpdate,
-                onCheckedChange = { onChange(draft.copy(autoCheckUpdate = it)) },
             )
         }
 

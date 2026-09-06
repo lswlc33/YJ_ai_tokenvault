@@ -327,18 +327,30 @@ M3（接真数据）**管理那一支已完成**，2026-09-06。管理页、供�
 | ~~`clipboardClearIndex`~~ | ~~剪贴板自动清除~~ | ✅ **已接真（2026-09-06）**：`app_settings.clipboardClearSeconds`（存秒数，`ClipboardClearPolicy`），`AndroidSecureClipboard` 订阅缓存、`copy` 时跟随设置，默认 60 秒 |
 | `defaultProbeReachability/Keys/Balance/Models` | 新建供应商时的默认值 | `ProviderDraft()` 硬编码 `true/true/true/false`，从不读 `SettingsDraft`（2026-09-06 已把两处撒谎注释改成如实标注"未接线"） |
 | ~~`sniffClientProfile`~~ | ~~客户端嗅探开关~~ | ✅ **已接真（2026-09-06）**：`app_settings.sniffClientProfile`，`ProbeEngine.trySniff` 前判断，默认开（读方向坏值容错到开，与空闲锁定相反） |
-| `verboseHttpLog` | 详细 HTTP 日志 | 无消费方（详细日志未实现） |
-| `autoProbeIndex` | 自动探测 | 待确认（自动路径零成本原则下可能本就无意义） |
+| ~~`verboseHttpLog`~~ | ~~详细 HTTP 日志~~ | ✅ **已移除（2026-09-06）**：详细日志整套未实现、不在剩余计划内，开关拨动没效果是撑谎 |
+| ~~`autoProbeIndex`~~ | ~~自动探测~~ | ✅ **已移除（2026-09-06）**：自动探测的 Worker 调度未实现、不在剩余计划内，下拉拨动没效果是撑谎 |
 | ~~`autoBackup` / `autoBackupWifiOnly`~~ | ~~自动备份~~ | ✅ **已移除（2026-09-06）**：依赖 WebDAV 作目标（周期上传），WebDAV 可砍后它无消费方——之前「有意占位、等 Worker 落地」的判断与「周期备份 Worker 是可砍项」自相矛盾，纠正为同 WebDAV 一并移除 |
-| `autoCheckUpdate` | 自动检查更新 | 无后台调度（更新页「立即检查」已接，自动检查是独立可选增强） |
+| ~~`autoCheckUpdate`~~ | ~~自动检查更新~~ | ✅ **已移除（2026-09-06）**：自动检查的后台调度未实现，开关拨动没效果是撑谎；更新页诚实声明改为「没有自动检查」 |
 | ~~`updateChannelIndex`~~ | ~~更新渠道~~ | ✅ **已接真（2026-09-06）**：`app_settings.updateChannel`（存下标 0=正式/1=nightly），`UpdateViewModel` 派生、`checkNow()` 读权威存储，默认正式版 |
+
+**另外顺手修的一个 bug（2026-09-06）**：探测设置页「每 host 间隔与请求预算」那一行
+（`probe_pacing`）的 `onClick` 错绑到了 `onEditThresholds`（余额阈值页）——点了「限流」却跳去
+「余额阈值」，文不对题。它本就无消费方（host 间隔 800ms 是红线 29 的合理默认、不做成可调），
+所以连同 `autoProbeIndex` / `verboseHttpLog` 一并移除（不是修复跳转，是承认「这个设置不做」）。
 
 这些不是「漏了的空实现」那种简单撑谎——每个都要先定「接真（消费方 + 权威存储）还是
 移除（承认不做）」，且多数涉及产品/安全决策（FLAG_SECURE 到底能不能关、新建默认值放哪）。
 所以**没有在 2026-09-06 那批「消除撑谎」里一并做**，留作一个独立的、需要逐项拍板的
 技术债清理项，而不是机械删几个开关。例外是「消费方已经写好、只差开关接线」的几项，
 它们不涉及产品决策、默认值与既有行为一致，已单独接真（2026-09-06）：
-`sniffClientProfile`、`clipboardClearIndex`、`updateChannelIndex`。
+`sniffClientProfile`、`clipboardClearIndex`、`updateChannelIndex`；以及「承诺了未实现
+且不在剩余计划内的功能」的几项（`verboseHttpLog`/`autoProbeIndex`/`autoBackup`/
+`autoCheckUpdate`），它们拨动没效果是撑谎，已一并移除（2026-09-06）。
+
+**清单收敛后，真正剩下的假开关只有两组**：
+1. `squircle` / `blurNavBar`（外观，MIUIX 主题能力未接）——外观决策。
+2. `secureFlag`（防截屏能否关，文案承诺可关但代码始终挂）——安全决策。
+3. `defaultProbe*` 四项（新建供应商默认探测值）——产品决策（默认值放哪）。
 
 - **存的是秒数，不是下拉的下标**（`app_settings.autoLockSeconds`）。存下标的代价是
   「以后在中间插一档」会让所有已存的设置悄悄改变含义，而没有任何迁移能发现它。

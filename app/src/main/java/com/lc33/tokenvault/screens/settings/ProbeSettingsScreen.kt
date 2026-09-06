@@ -4,13 +4,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import com.lc33.tokenvault.R
 import com.lc33.tokenvault.screens.model.SettingsDraft
 import com.lc33.tokenvault.ui.miuix.AppArrowRow
 import com.lc33.tokenvault.ui.miuix.AppCard
-import com.lc33.tokenvault.ui.miuix.AppDropdownRow
 import com.lc33.tokenvault.ui.miuix.AppSwitchRow
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppTextButton
@@ -80,31 +78,11 @@ fun ProbeSettingsScreen(
             )
         }
 
-        item { SectionTitle(text = stringResource(R.string.probe_section_when)) }
-        item {
-            AppDropdownRow(
-                title = stringResource(R.string.probe_auto_when),
-                summary = stringResource(R.string.probe_auto_when_summary),
-                items = stringArrayResource(R.array.auto_probe_options).toList(),
-                selectedIndex = draft.autoProbeIndex,
-                onSelect = { onChange(draft.copy(autoProbeIndex = it)) },
-            )
-        }
-
         item { SectionTitle(text = stringResource(R.string.probe_section_cost)) }
         item {
             AppArrowRow(
                 title = stringResource(R.string.probe_thresholds),
                 summary = stringResource(R.string.probe_thresholds_summary),
-                onClick = onEditThresholds,
-            )
-        }
-
-        item { SectionTitle(text = stringResource(R.string.probe_section_rate)) }
-        item {
-            AppArrowRow(
-                title = stringResource(R.string.probe_pacing),
-                summary = stringResource(R.string.probe_pacing_summary),
                 onClick = onEditThresholds,
             )
         }
@@ -127,14 +105,6 @@ fun ProbeSettingsScreen(
         }
 
         item { SectionTitle(text = stringResource(R.string.probe_section_network)) }
-        item {
-            AppSwitchRow(
-                title = stringResource(R.string.probe_verbose_log),
-                summary = stringResource(R.string.probe_verbose_log_summary),
-                checked = draft.verboseHttpLog,
-                onCheckedChange = { onChange(draft.copy(verboseHttpLog = it)) },
-            )
-        }
         item {
             AppArrowRow(
                 title = stringResource(R.string.probe_proxy),

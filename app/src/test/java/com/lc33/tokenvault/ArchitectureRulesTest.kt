@@ -1,6 +1,7 @@
 package com.lc33.tokenvault
 
 import com.lc33.tokenvault.domain.AutoLockPolicy
+import com.lc33.tokenvault.domain.ClipboardClearPolicy
 import com.lc33.tokenvault.ui.theme.AppColorSchemeMode
 import java.io.File
 import org.junit.Assert.assertTrue
@@ -168,6 +169,15 @@ class ArchitectureRulesTest {
         fail(
             "自动锁定下拉按下标取值，两边数量必须一致（§7.4）：",
             arrayItemCountMismatches("auto_lock_options", AutoLockPolicy.OPTIONS.size, "AutoLockPolicy.OPTIONS"),
+        )
+    }
+
+    @Test
+    fun `剪贴板清除下拉的选项数与策略表一致`() {
+        // 同「自动锁定」：按下标取值，错位一格就是「选 30 秒得到 5 分钟」。
+        fail(
+            "剪贴板清除下拉按下标取值，两边数量必须一致（§7.5）：",
+            arrayItemCountMismatches("clipboard_clear_options", ClipboardClearPolicy.OPTIONS.size, "ClipboardClearPolicy.OPTIONS"),
         )
     }
 
