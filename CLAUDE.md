@@ -192,7 +192,7 @@ M0.8（界面骨架）**已完成**。底栏是仪表盘 · 管理 · 设置，�
 验收：模拟器上 18 个页面都能进能回；深浅色各一轮、中英文各一轮；`OverlayDialog` 与
 `OverlayBottomSheet` 在二级页里都能弹；单测 22 个全绿（1 个 spike 按设计跳过）；
 `lint` 0 issue；strings 两份键名脚本对齐（各 314 项）。
-**还没做**：宽屏双栏（在 M10）、`SecretText` 接真明文与剪贴板（要 DEK，在 M3）。
+**还没做**：`SecretText` 接真明文与剪贴板（要 DEK，在 M3）。（宽屏双栏已决定不做，见 §3。）
 
 `AppTabRow` **没有用 MIUIX 的 `TabRow`**：它给所有分段算同一个固定宽度再加内边距，
 四个英文标签在 360dp 宽的屏上必然被截断，而 `minWidth` / `maxWidth` 都改不动
@@ -647,7 +647,7 @@ WebDAV 作上传目标，WebDAV 可砍后它无消费方，两个开关随 WebDA
   workflow 解码后设 `VAULT_RELEASE_STORE_FILE`；nightly 预发布走 `nightly-build` tag
   （仓库规则禁止建 `nightly` tag，GH013）。这一串 CI 迭代了 12 个提交才调通。
 
-**剩两项可砍/待验证**：宽屏双栏（可砍）；无障碍 TalkBack 走通主路径（需设备）。
+**剩一项待验证**：无障碍 TalkBack 走通主路径（需设备）。宽屏双栏已决定不做（2026-09-07）。
 搜索/排序/批量、更新页接 GitHub Releases API 均已落地（见下方「补」段落）。
 
 **更新页接 GitHub Releases API（2026-09-06 补）**：`onCheckNow = {}` 从空实现接成真动作。
