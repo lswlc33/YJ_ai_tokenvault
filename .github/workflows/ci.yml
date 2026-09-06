@@ -56,9 +56,10 @@ jobs:
               "grep -rnE '(SELECT |INSERT +INTO|UPDATE +[A-Za-z_]+ +SET|DELETE +FROM|CREATE +TABLE|Request\.Builder)' $src/screens --include='*.kt'"
           fi
 
-          # 5. 真实凭据永不入库
+          # 5. 真实凭据永不入库。src/test/ 与 src/androidTest/ 里的 sk-TEST… 是测试占位符，
+          #    与 pre-commit 一致地豁免：真实密钥泄露的风险在主代码与文档里。
           check "仓库里出现疑似真实 API 密钥的字面量（计划.md §0）" \
-            "grep -rnE 'sk-[A-Za-z0-9]{20,}' app gradle --include='*.kt' --include='*.kts' --include='*.xml' --include='*.toml'"
+            "grep -rnE 'sk-[A-Za-z0-9]{20,}' app gradle --include='*.kt' --include='*.kts' --include='*.xml' --include='*.toml' --exclude-dir=test --exclude-dir=androidTest"
           if git ls-files --error-unmatch '示例数据.md' > /dev/null 2>&1; then
             echo "::error::示例数据.md 被提交进了仓库（计划.md §0）"; fail=1
           fi
