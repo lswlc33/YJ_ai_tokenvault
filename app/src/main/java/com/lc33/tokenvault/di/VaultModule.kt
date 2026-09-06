@@ -257,6 +257,20 @@ object VaultModule {
         OkHttpEngine(OkHttpEngine.buildDefaultClient(), hostGate, proxy::current)
 
     /**
+     * 更新检查引擎（§13.4）。复用同一个 [OkHttpEngine]（UA 兜底 / 手动代理 / 超时都
+     * 一致），但语义独立：单次匿名 GET，不碰探测的 host 门闸与鉴权。
+     * `currentVersionName` 来自 [BuildConfig]，`repoUrl` 是公开仓库的 Releases 端点。
+     */
+    @Provides
+    @Singleton
+    fun provideUpdateEngine(engine: OkHttpEngine): com.lc33.tokenvault.engine.UpdateEngine =
+        com.lc33.tokenvault.engine.UpdateEngine(
+            engine = engine,
+            currentVersionName = BuildConfig.VERSION_NAME,
+            repoUrl = com.lc33.tokenvault.engine.UpdateEngine.RELEASES_URL,
+        )
+
+    /**
      * 探测引擎宿主（§8.5）。**`@Singleton` 不是 ViewModel**，所以绑定在这里而不是让
      * 某个页面去 `hiltViewModel`——它要能跨页面存活。
      */

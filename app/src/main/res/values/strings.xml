@@ -312,6 +312,13 @@
     <string name="update_auto_check_summary">Off by default</string>
     <string name="update_section_honesty">What this actually does</string>
     <string name="update_check_now">Check now</string>
+    <string name="update_checking">Checking…</string>
+    <string name="update_up_to_date">You are on the latest version.</string>
+    <string name="update_available">Version %1$s is available.</string>
+    <string name="update_published">Published %1$s</string>
+    <string name="update_open_download">Download</string>
+    <string name="update_error_no_network">No network. Check your connection and try again.</string>
+    <string name="update_error_unreachable">Cannot reach GitHub. You can set a proxy under Probe → HTTP proxy.</string>
     <string name="update_honesty_default_off">· Automatic checking is off unless you turn it on.</string>
     <string name="update_honesty_anonymous">· A check is one anonymous request to the GitHub releases API. No device information, no identifier, nothing about your vault.</string>
     <string name="update_honesty_no_silent_install">· There is no in-app install. That would need the install-packages permission, and an app that holds your keys should not ask for it — the download and the install go through your browser and the system installer.</string>

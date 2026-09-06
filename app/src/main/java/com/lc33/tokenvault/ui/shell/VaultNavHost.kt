@@ -336,11 +336,21 @@ fun VaultNavHost(
             )
         }
         composable<UpdateRoute> {
+            val vm: UpdateViewModel = hiltViewModel()
+            val updateState by vm.state.collectAsStateWithLifecycle()
             UpdateScreen(
                 draft = settings,
                 onChange = { settings = it },
                 onBack = back,
-                onCheckNow = {},
+                updateState = updateState,
+                onCheckNow = vm::checkNow,
+                onOpenDownload = { url ->
+                    runCatching {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW, Uri.parse(url)),
+                        )
+                    }
+                },
             )
         }
 

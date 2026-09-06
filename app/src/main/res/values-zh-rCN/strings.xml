@@ -311,6 +311,13 @@
     <string name="update_auto_check_summary">默认关闭</string>
     <string name="update_section_honesty">这件事到底做了什么</string>
     <string name="update_check_now">立即检查</string>
+    <string name="update_checking">正在检查…</string>
+    <string name="update_up_to_date">已经是最新版本。</string>
+    <string name="update_available">有新版本 %1$s。</string>
+    <string name="update_published">发布于 %1$s</string>
+    <string name="update_open_download">去下载</string>
+    <string name="update_error_no_network">没有网络。检查一下连接再试。</string>
+    <string name="update_error_unreachable">打不开 GitHub。可在「探测 → HTTP 代理」里配一个代理。</string>
     <string name="update_honesty_default_off">· 自动检查默认关闭，除非你自己打开。</string>
     <string name="update_honesty_anonymous">· 一次检查就是向 GitHub 的 releases 接口发一个匿名请求。不带设备信息、不带任何标识、不带你库里的任何东西。</string>
     <string name="update_honesty_no_silent_install">· 没有应用内安装。那需要「安装未知应用」权限，而一个替你管密钥的应用不该去要这个权限——下载和安装交给你的浏览器和系统安装器。</string>
