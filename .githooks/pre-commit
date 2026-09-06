@@ -43,7 +43,10 @@ fi
 if [ -f 示例数据.md ]; then
     # 只看**新增**行。整个 diff 一起 grep 会把"这次提交正在删掉一处泄漏"也判成泄漏，
     # 于是修泄漏的那个提交永远提交不上去。
-    staged_added=$(git diff --cached -U0 | grep '^+' | grep -v '^+++')
+    # `grep` 没匹配到任何新增行（纯删除提交）会返回非零，在 `set -e` 下会让整个 hook
+    # 静默退出、纯删除提交永远过不了。所以这里显式吞掉 grep 的非零返回：空结果就是没有
+    # 新增内容，本就不该报错。
+    staged_added=$(git diff --cached -U0 | grep '^+' | grep -v '^+++' || true)
     if [ -n "$staged_added" ]; then
         known_secrets=$(
             awk '
