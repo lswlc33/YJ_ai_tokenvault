@@ -730,3 +730,31 @@ KDF 从 Argon2id 降到 PBKDF2-HMAC-SHA256（密钥库从 BouncyCastle 换 `cryp
 冒烟通过项：引导四步 → 重启锁屏 → PIN 解锁（PBKDF2 跨进程解密）→ 三级页导航 →
 手动新建（端点实时预览）→ 加密写密钥（库内 64 字节密文、元数据明文）→ 详情解出明文 →
 仪表盘真计数（1 供应商 / 1 密钥）→ 后台 68 秒自动锁定 → 解锁恢复。
+
+### M5/M7 设备端到端 + iOS CI 打通（2026-09-07 第二批）
+
+**M5 探测 / M7 余额首次在设备上用真实数据跑通**（Agent Router，花真实额度）：
+- M5：详情页「探测这一家」→ L1+L2 全过，密钥「可用 · 258 毫秒」；
+  `api_keys` 表 `health=ok` / `lastOutcome=success` / `checkedAt` 分列落库（红线 11）；
+  `probe_runs` 记 2 项（1 成功 = AgentRouter，1 失败 = TestVault 假域名，符合预期）。
+- M7：编辑页配 NewAPI（令牌 + 用户 ID，`New-Api-User` 头是 new-api `/api/user/self`
+  的鉴权必需）→「查余额」→ **$119.02**（amount/used/currency/checkedAt 落库），
+  仪表盘余额卡与「更新于刚刚」联动，密钥健康分布出数。
+- 剩余未验：M6 嗅探的完整链路（需先建客户端预设）；额度耗尽响应仍等自然发生。
+
+**修复四个"JVM 测试抓不到"的设备级问题**（前三个见上节，第四个）：
+
+4. `HeaderAssembler` 的占位符正则 `\{([a-z_]+)}` 只转义了开括号——JVM 的
+   java.util.regex 接受裸 `}`，Android 的 ICU regex 抛 PatternSyntaxException，
+   点探测即 `ExceptionInInitializerError` 全进程崩。**commonMain 里的正则两侧
+   转义要对称**（量词/lookahead 等其余语法已核对无此分叉）。
+
+**MIUIX 0.9.3 → 0.9.1 降级（iOS KLIB ABI 死锁）**：iOS job 从挂上起没绿过，
+真因是 0.9.2/0.9.3 的 klib 全部由 Kotlin 2.4.0 编译（已逐个解 manifest 核实
+`abi_version=2.4.0`），本项目 Kotlin 锁 2.3.21（KSP 无 2.4.x），旧编译器读不了
+新 klib。0.9.1 是唯一用 Kotlin 2.3.21 编译且双端产物齐全的版本；代价只有图标集
+没有 `Home`（0.9.2 才加），仪表盘图标换 `ListView`（AppIcon 按用途命名的设计
+正好兜住）。降级后 Android 全绿 + 设备过页面；**iOS 编译验证 + 模拟器测试随之
+首次全绿**（含 BackupFilePicker 的 UIDocumentPicker 真实现，只剩 warning 级的
+`BetaInteropApi` opt-in 与冗余 elvis，待顺手清）。xcodebuild 步曾因 Gradle 3g
+堆 OOM，已提 4g。将来 KSP 出 2.4.x 可随 Kotlin 升回 0.9.3+。

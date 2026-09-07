@@ -209,12 +209,10 @@ jobs:
           files=()
           [ -n "$apk" ] && files+=("$apk")
           [ -n "$ipa" ] && files+=("$ipa")
-          # 预发布 tag 用带日期的 `nightly-YYYYMMDD`，每天一个。
-          # 原因：固定名 `nightly-build` 这个 tag 被仓库的 ref 保护规则锁死
-          # （force-push 报 GH013 "Cannot update this protected ref"，delete 报
-          # "Cannot delete this tag"），且 `nightly` 也被 ref 创建限制规则禁止。
-          # 带日期的名字不在任何限制内，能正常创建，绕开锁定。
-          tag="nightly-$(date -u '+%Y%m%d')"
+          # 预发布 tag 用带秒级时间戳的 `nightly-YYYYMMDD-HHMMSS`，每次构建唯一。
+          # 原因：固定名会被仓库 ref 保护规则锁死；以前只用日期，同一天多次构建
+          # 会因 tag 已存在而报错（GH release 不允许重复 tag）。秒级时间戳彻底避免。
+          tag="nightly-$(date -u '+%Y%m%d-%H%M%S')"
           gh release create "$tag" "${files[@]}" \
             --prerelease --title "$tag" \
             --notes "自动构建于 $GITHUB_SHA（$(date -u '+%Y-%m-%d %H:%M UTC')）"
