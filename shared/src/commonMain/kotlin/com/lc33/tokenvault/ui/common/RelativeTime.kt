@@ -1,13 +1,14 @@
 package com.lc33.tokenvault.ui.common
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.ReadOnlyComposable
-import androidx.compose.ui.res.stringResource
-import com.lc33.tokenvault.R
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
+import org.jetbrains.compose.resources.stringResource
+import com.lc33.tokenvault.platform.absoluteDateLabel
+import tokenvault.shared.generated.resources.Res
+import tokenvault.shared.generated.resources.time_days_ago
+import tokenvault.shared.generated.resources.time_future
+import tokenvault.shared.generated.resources.time_hours_ago
+import tokenvault.shared.generated.resources.time_just_now
+import tokenvault.shared.generated.resources.time_minutes_ago
 
 /**
  * 相对时间的分档。
@@ -63,22 +64,21 @@ fun relativeBucketOf(nowMillis: Long, thenMillis: Long): RelativeBucket {
  * [absoluteLabel] 由调用方给（它才知道该用什么日期格式与时区）。
  */
 @Composable
-@ReadOnlyComposable
 fun relativeTimeLabel(bucket: RelativeBucket, absoluteLabel: String = ""): String = when (bucket) {
-    RelativeBucket.JustNow -> stringResource(R.string.time_just_now)
-    is RelativeBucket.Minutes -> stringResource(R.string.time_minutes_ago, bucket.value)
-    is RelativeBucket.Hours -> stringResource(R.string.time_hours_ago, bucket.value)
-    is RelativeBucket.Days -> stringResource(R.string.time_days_ago, bucket.value)
+    RelativeBucket.JustNow -> stringResource(Res.string.time_just_now)
+    is RelativeBucket.Minutes -> stringResource(Res.string.time_minutes_ago, bucket.value)
+    is RelativeBucket.Hours -> stringResource(Res.string.time_hours_ago, bucket.value)
+    is RelativeBucket.Days -> stringResource(Res.string.time_days_ago, bucket.value)
     RelativeBucket.Absolute -> absoluteLabel
-    RelativeBucket.Future -> stringResource(R.string.time_future)
+    RelativeBucket.Future -> stringResource(Res.string.time_future)
 }
 
 /**
  * 两个时间戳 → 一句现成的话。**每一个要显示相对时间的地方都该调这一个。**
  *
  * 它存在的理由是 `Absolute` 那一档：[relativeTimeLabel] 的 `absoluteLabel` 默认是空串，
- * 于是“超过 30 天”的时间会静静地渲染成**什么都没有**——那一行看起来就像从未探测过。
- * 日期格式交给 `ofLocalizedDate`：“用什么格式写日期”是语言与地区的事，不该写成字面量。
+ * 于是"超过 30 天"的时间会静静地渲染成**什么都没有**——那一行看起来就像从未探测过。
+ * 日期格式交给 [absoluteDateLabel]："用什么格式写日期"是语言与地区的事，不该写成字面量。
  */
 @Composable
 fun relativeLabel(nowMillis: Long, thenMillis: Long): String {
@@ -86,11 +86,6 @@ fun relativeLabel(nowMillis: Long, thenMillis: Long): String {
     val absolute = if (bucket == RelativeBucket.Absolute) absoluteDateLabel(thenMillis) else ""
     return relativeTimeLabel(bucket, absolute)
 }
-
-/** 本地化的短日期。时区用设备当前的：这一串是给人看的，不参与任何计算。 */
-private fun absoluteDateLabel(epochMillis: Long): String =
-    DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
-        .format(Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()))
 
 /**
  * 一段耗时（毫秒）→ 向上取整到秒的整数。

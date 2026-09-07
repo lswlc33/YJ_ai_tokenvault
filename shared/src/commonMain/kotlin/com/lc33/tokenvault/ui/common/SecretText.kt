@@ -13,8 +13,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
-import com.lc33.tokenvault.R
+import org.jetbrains.compose.resources.stringResource
 import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppIconButton
 import com.lc33.tokenvault.ui.miuix.AppText
@@ -22,6 +21,11 @@ import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
 import kotlinx.coroutines.delay
+import tokenvault.shared.generated.resources.Res
+import tokenvault.shared.generated.resources.secret_auto_conceal
+import tokenvault.shared.generated.resources.secret_conceal_cd
+import tokenvault.shared.generated.resources.secret_copy_cd
+import tokenvault.shared.generated.resources.secret_reveal_cd
 
 /** 明文展开后自动回遮的秒数（§7.5）。 */
 const val REVEAL_SECONDS = 30
@@ -77,7 +81,7 @@ fun SecretText(
                 AppIconButton(
                     icon = if (plaintext == null) AppIcon.Reveal else AppIcon.Conceal,
                     contentDescription = stringResource(
-                        if (plaintext == null) R.string.secret_reveal_cd else R.string.secret_conceal_cd,
+                        if (plaintext == null) Res.string.secret_reveal_cd else Res.string.secret_conceal_cd,
                     ),
                     onClick = { plaintext = if (plaintext == null) reveal() else null },
                 )
@@ -85,14 +89,14 @@ fun SecretText(
             if (onCopy != null) {
                 AppIconButton(
                     icon = AppIcon.Copy,
-                    contentDescription = stringResource(R.string.secret_copy_cd),
+                    contentDescription = stringResource(Res.string.secret_copy_cd),
                     onClick = onCopy,
                 )
             }
         }
         if (plaintext != null) {
             AppText(
-                text = stringResource(R.string.secret_auto_conceal, secondsLeft),
+                text = stringResource(Res.string.secret_auto_conceal, secondsLeft),
                 style = AppTextStyle.Footnote,
                 color = appSecondaryTextColor,
             )
