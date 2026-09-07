@@ -207,8 +207,11 @@ class ArchitectureRulesTest {
 
     /** 比每一份 strings.xml 里某个 `string-array` 的条目数与代码侧那张表的长度。 */
     private fun arrayItemCountMismatches(arrayName: String, expected: Int, codeSide: String): List<String> {
-        val resRoot = sequenceOf(File("src/main/res"), File("app/src/main/res"))
-            .firstOrNull { it.isDirectory } ?: error("找不到 res 目录")
+        // 阶段3：string-array 已随 UI 迁到 shared 的 composeResources，不再在 app res。
+        val resRoot = sequenceOf(
+            File("shared/src/commonMain/composeResources"),
+            File("../shared/src/commonMain/composeResources"),
+        ).firstOrNull { it.isDirectory } ?: error("找不到 composeResources 目录")
         val stringFiles = resRoot.listFiles()!!
             .filter { it.isDirectory && it.name.startsWith("values") }
             .map { it.resolve("strings.xml") }
