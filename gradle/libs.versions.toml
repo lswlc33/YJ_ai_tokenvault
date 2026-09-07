@@ -26,6 +26,10 @@ biometric = "1.1.0"
 # miuix-nav 只发到 0.9.4-rc01，本项目用 androidx.navigation，不需要它。
 miuix = "0.9.3"
 okhttp = "5.5.0"
+# Ktor 3.x：KMP HTTP client（阶段2 OkHttp→Ktor 迁移）。3.5.2 是 2025 年末稳定版。
+ktor = "3.5.2"
+# Koin 4.x：KMP DI（阶段2 Hilt→Koin 迁移）。4.2.2 是 maven central 最新稳定版。
+koin = "4.2.2"
 serializationJson = "1.11.0"
 datetime = "0.8.0"
 coroutines = "1.11.0"
@@ -104,6 +108,21 @@ androidx-work-testing = { module = "androidx.work:work-testing", version.ref = "
 # --- 网络（OkHttp，不用 Retrofit：要构造动态 URL / 动态头 / 原始 JSON body） ---
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 okhttp-mockwebserver = { module = "com.squareup.okhttp3:mockwebserver3-junit4", version.ref = "okhttp" }
+
+# --- 网络（Ktor Client，阶段2 迁移 OkHttp→Ktor） ---
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
+ktor-client-android = { module = "io.ktor:ktor-client-android", version.ref = "ktor" }
+ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
+ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
+ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
+ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
+
+# --- DI（Koin，阶段2 迁移 Hilt→Koin） ---
+koin-core = { module = "io.insert-koin:koin-core", version.ref = "koin" }
+koin-android = { module = "io.insert-koin:koin-android", version.ref = "koin" }
+koin-androidx-compose = { module = "io.insert-koin:koin-androidx-compose", version.ref = "koin" }
+koin-compose-viewmodel = { module = "io.insert-koin:koin-compose-viewmodel", version.ref = "koin" }
 
 # --- 序列化 / 时间 / 并发 ---
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serializationJson" }

@@ -50,25 +50,33 @@ kotlin {
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.coroutines.core)
+            // Ktor Client（阶段2 OkHttp→Ktor）：net/ 层的 HTTP 引擎。
+            // 用 `api` 而不是 `implementation`：HttpEngine / ProxyProvider 的公开构造签名里
+            // 有 io.ktor.client.HttpClient，:app 需要能看见它。
+            api(libs.ktor.client.core)
         }
 
         // Android 端用 JDK provider（JCA 实现，与现有行为一致）。
         androidMain.dependencies {
             implementation(libs.cryptography.provider.jdk)
+            implementation(libs.ktor.client.okhttp)
         }
 
         // iOS 端用 Apple provider（CryptoKit 原生）。
         iosMain.dependencies {
             implementation(libs.cryptography.provider.apple)
+            implementation(libs.ktor.client.darwin)
         }
 
         // JVM 单测也用 JDK provider，让测试能在本机跑。
         jvmMain.dependencies {
             implementation(libs.cryptography.provider.jdk)
+            implementation(libs.ktor.client.okhttp)
         }
 
         commonTest.dependencies {
             implementation(libs.kotlin.test)
+            implementation(libs.ktor.client.mock)
         }
     }
 }

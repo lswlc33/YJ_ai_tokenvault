@@ -13,7 +13,7 @@ import com.lc33.tokenvault.domain.repo.ApiKeyRepository
 import com.lc33.tokenvault.domain.repo.AuditLogRepository
 import com.lc33.tokenvault.domain.repo.ProviderRepository
 import com.lc33.tokenvault.endpoint.ProbeRequest
-import com.lc33.tokenvault.net.OkHttpEngine
+import com.lc33.tokenvault.net.HttpEngine
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -34,7 +34,7 @@ import javax.inject.Singleton
 class BalanceEngine @Inject constructor(
     private val providers: ProviderRepository,
     private val keys: ApiKeyRepository,
-    private val engine: OkHttpEngine,
+    private val engine: HttpEngine,
     private val audit: AuditLogRepository,
     @param:NowEpochMs private val now: () -> Long,
 ) {

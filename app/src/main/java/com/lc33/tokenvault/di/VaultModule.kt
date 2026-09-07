@@ -23,7 +23,8 @@ import com.lc33.tokenvault.data.dao.ProviderDao
 import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.engine.ProbeEngine
 import com.lc33.tokenvault.net.HostGate
-import com.lc33.tokenvault.net.OkHttpEngine
+import com.lc33.tokenvault.net.HttpEngine
+import com.lc33.tokenvault.net.ProxyProvider
 import com.lc33.tokenvault.platform.AndroidSecureClipboard
 import com.lc33.tokenvault.platform.AutoLocker
 import com.lc33.tokenvault.platform.BootStore
@@ -226,37 +227,39 @@ object VaultModule {
     /**
      * host 级最小间隔门闸（§8.1 末尾、红线 29）。**应用级单例**：间隔状态要跨轮、跨页面
      * 记住——撞过一次 429 的 host 在下一轮也不该立刻回到 800ms。
+     *
+     * 阶段2 迁移：`nowMillis` 必须显式注入（commonMain 拿不到 `System`，红线 20）。
      */
     @Provides
     @Singleton
-    fun provideHostGate(): HostGate = HostGate()
+    fun provideHostGate(): HostGate = HostGate(nowMillis = System::currentTimeMillis)
 
     /**
-     * 手动 HTTP 代理的运行时提供者（§7.5）。订阅设置、缓存解析后的 [java.net.Proxy]，
-     * [OkHttpEngine] 每次请求时读一次，改了就立刻生效。
+     * 手动 HTTP 代理的运行时提供者（§7.5）。订阅设置、缓存解析后的 [ProxyConfig]，
+     * 并在变化时重建 client。[HttpEngine] 从它拿当前 client。
      */
     @Provides
     @Singleton
-    fun provideProxyProvider(settings: com.lc33.tokenvault.domain.repo.SettingsRepository): com.lc33.tokenvault.net.ProxyProvider =
-        com.lc33.tokenvault.net.ProxyProvider(settings)
+    fun provideProxyProvider(settings: com.lc33.tokenvault.domain.repo.SettingsRepository): ProxyProvider =
+        ProxyProvider(settings)
 
     /**
-     * 探测引擎用的单个 OkHttpClient（§8.1）。超时与并发上限都在 [OkHttpEngine.buildDefaultClient]
-     * 里，这一层只负责单例化。手动代理由 [ProxyProvider] 在每次请求时动态套用。
+     * 探测引擎用的 HTTP 引擎（§8.1）。底层 client 由 [ProxyProvider] 按当前代理动态提供，
+     * host 门闸语义与超时/并发上限在 `shared` 的 `platformEngine` 里配好。
      */
     @Provides
     @Singleton
-    fun provideOkHttpEngine(hostGate: HostGate, proxy: com.lc33.tokenvault.net.ProxyProvider): OkHttpEngine =
-        OkHttpEngine(OkHttpEngine.buildDefaultClient(), hostGate, proxy::current)
+    fun provideHttpEngine(hostGate: HostGate, proxy: ProxyProvider): HttpEngine =
+        HttpEngine(client = proxy.client, hostGate = hostGate)
 
     /**
-     * 更新检查引擎（§13.4）。复用同一个 [OkHttpEngine]（UA 兜底 / 手动代理 / 超时都
+     * 更新检查引擎（§13.4）。复用同一个 [HttpEngine]（UA 兜底 / 手动代理 / 超时都
      * 一致），但语义独立：单次匿名 GET，不碰探测的 host 门闸与鉴权。
      * `currentVersionName` 来自 [BuildConfig]，`repoUrl` 是公开仓库的 Releases 端点。
      */
     @Provides
     @Singleton
-    fun provideUpdateEngine(engine: OkHttpEngine): com.lc33.tokenvault.engine.UpdateEngine =
+    fun provideUpdateEngine(engine: HttpEngine): com.lc33.tokenvault.engine.UpdateEngine =
         com.lc33.tokenvault.engine.UpdateEngine(
             engine = engine,
             currentVersionName = BuildConfig.VERSION_NAME,
@@ -281,7 +284,7 @@ object VaultModule {
         keyDao: ApiKeyDao,
         runDao: ProbeRunDao,
         session: VaultSession,
-        engine: OkHttpEngine,
+        engine: HttpEngine,
         audit: com.lc33.tokenvault.domain.repo.AuditLogRepository,
         settings: com.lc33.tokenvault.domain.repo.SettingsRepository,
         autoLocker: AutoLocker,

@@ -26,7 +26,7 @@ import com.lc33.tokenvault.endpoint.HeaderAssembler
 import com.lc33.tokenvault.endpoint.ProbeRequest
 import com.lc33.tokenvault.endpoint.ProbeRequestBuilder
 import com.lc33.tokenvault.endpoint.ProbeResponse
-import com.lc33.tokenvault.net.OkHttpEngine
+import com.lc33.tokenvault.net.HttpEngine
 import com.lc33.tokenvault.platform.AutoLocker
 import com.lc33.tokenvault.platform.VaultSession
 import com.lc33.tokenvault.probe.PlannedTask
@@ -80,7 +80,7 @@ class ProbeEngine @Inject constructor(
     private val keyDao: ApiKeyDao,
     private val runDao: ProbeRunDao,
     private val session: VaultSession,
-    private val engine: OkHttpEngine,
+    private val engine: HttpEngine,
     private val audit: AuditLogRepository,
     private val settings: SettingsRepository,
     private val autoLocker: AutoLocker,

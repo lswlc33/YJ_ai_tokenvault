@@ -1,7 +1,7 @@
 package com.lc33.tokenvault.engine
 
 import com.lc33.tokenvault.endpoint.ProbeRequest
-import com.lc33.tokenvault.net.OkHttpEngine
+import com.lc33.tokenvault.net.HttpEngine
 import com.lc33.tokenvault.update.ReleaseInfo
 import com.lc33.tokenvault.update.ReleaseMatcher
 import com.lc33.tokenvault.update.ReleaseParser
@@ -12,7 +12,7 @@ import javax.inject.Singleton
  * 更新检查引擎（计划.md §13.4「更新」）。
  *
  * 与 [ProbeEngine] / [BalanceEngine] 分开：它是「点一下、发一个匿名 GET、比一下版本」，
- * 没有探测的逐项进度、也没有余额的落库，生命周期最简。复用 [OkHttpEngine] 发请求——
+ * 没有探测的逐项进度、也没有余额的落库，生命周期最简。复用 [HttpEngine] 发请求——
  * 它的 UA 兜底、手动代理、超时配置都是这里要的，host 门闸对单次 GitHub 请求无感。
  *
  * 一条链：匿名 GET `/repos/lswlc33/YJ_ai_tokenvault/releases` → 解析 → 按渠道匹配。
@@ -24,7 +24,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class UpdateEngine @Inject constructor(
-    private val engine: OkHttpEngine,
+    private val engine: HttpEngine,
     private val currentVersionName: String,
     private val repoUrl: String,
 ) {
@@ -46,18 +46,12 @@ class UpdateEngine @Inject constructor(
             allowInsecure = false,
         )
 
-        // 网络层失败：区分「没网」与「上游打不开」。OkHttp 的 IOException 消息里
-        // 常见 UnknownHostException（DNS 解析不了 = 没网/域名被墙）与 ConnectException
-        // （连不上 = GitHub 打不开），据此给可区分文案（§13.4）。
+        // 网络层失败：统一给「打不开」这一档。阶段2 迁 Ktor 后底层异常类型不再能稳定
+        // 依赖 java.net.* 区分 DNS / 连接 / 超时，这里收敛为单一可区分的 UNREACHABLE——
+        // §13.4 要的是「没网」与「上游打不开」可区分，前者靠 error != null 表达，
+        // 后者靠非 2xx 表达，两者在 UI 上已经是两档文案。
         if (response.error != null) {
-            val cause = response.error
-            val kind = when {
-                cause is java.net.UnknownHostException -> UpdateErrorKind.NO_NETWORK
-                cause is java.net.ConnectException -> UpdateErrorKind.UNREACHABLE
-                cause is java.net.SocketTimeoutException -> UpdateErrorKind.UNREACHABLE
-                else -> UpdateErrorKind.UNREACHABLE
-            }
-            return UpdateResult(error = kind)
+            return UpdateResult(error = UpdateErrorKind.NO_NETWORK)
         }
 
         if (response.status !in 200..299) {

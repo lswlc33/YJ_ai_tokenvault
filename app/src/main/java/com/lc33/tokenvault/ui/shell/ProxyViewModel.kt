@@ -13,8 +13,8 @@ import kotlinx.coroutines.launch
 /**
  * 手动 HTTP 代理编辑（§7.5、§13.4 探测设置页的二级页）。
  *
- * 单个 `host:port` 字符串，空 = 走系统代理。解析成 [java.net.Proxy] 的动作在
- * [com.lc33.tokenvault.net.OkHttpEngine.parseProxy]（纯函数，net 层唯一一处），
+ * 单个 `host:port` 字符串，空 = 走系统代理。解析成 [com.lc33.tokenvault.net.ProxyConfig]
+ * 的动作在 net 层（纯函数 [com.lc33.tokenvault.net.parseProxy]，net 层唯一一处），
  * 这里只做校验 + 写库。
  */
 @HiltViewModel
@@ -42,7 +42,7 @@ class ProxyViewModel @Inject constructor(
 
     /** 粗略校验：至少是 `host:port` 或 `[ipv6]:port` 的形态，端口是数字或省略。 */
     private fun isValidHostPort(s: String): Boolean {
-        // 交给 OkHttpEngine.parseProxy 做权威解析，这里只做"明显不是"的拦截，
+        // 交给 net 层的 parseProxy 做权威解析，这里只做"明显不是"的拦截，
         // 避免把"http://..."这种整段 URL 塞进去。
         if (s.contains("://") || s.contains('/') || s.contains(' ')) return false
         return true
