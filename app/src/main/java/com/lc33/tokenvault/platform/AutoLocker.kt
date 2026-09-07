@@ -2,6 +2,7 @@ package com.lc33.tokenvault.platform
 
 import com.lc33.tokenvault.domain.AutoLockPolicy
 import com.lc33.tokenvault.domain.AutoLockTimeout
+import com.lc33.tokenvault.engine.IdleLockSuspender
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
@@ -33,7 +34,7 @@ class AutoLocker(
     /** 锁定发生时顺带通知（探测引擎要停，§7.4 / §8.5）。默认空，测试不传。 */
     private val onLock: () -> Unit = {},
     private val elapsedRealtimeMs: () -> Long,
-) {
+) : IdleLockSuspender {
 
     private val guard = Any()
 
@@ -156,7 +157,7 @@ class AutoLocker(
      * 一轮（预算 120 秒）期间必然自己锁掉自己。挂起之后计时清零，任务结束由
      * [resumeIdleLock] 重新起算。
      */
-    fun pauseIdleLock() {
+    override fun pauseIdleLock() {
         synchronized(guard) {
             idlePausedCount++
             cancelIdleLocked()
@@ -164,7 +165,7 @@ class AutoLocker(
     }
 
     /** 长任务结束，恢复前台空闲计时。没被挂起过时是幂等的空操作。 */
-    fun resumeIdleLock() {
+    override fun resumeIdleLock() {
         synchronized(guard) {
             if (idlePausedCount <= 0) return
             idlePausedCount--

@@ -60,4 +60,31 @@ interface ApiKeyRepository {
 
     /** 删除。删掉默认那张之后自动把 `sortOrder` 最小的启用 Key 顶上（红线 6.3）。 */
     suspend fun delete(id: Long)
+
+    /**
+     * 落库探测结果（红线 11 的第一条 SQL 对应物）。[health] 非 null 才改 `health` 列，
+     * 同时写 [lastOutcome] / 详情 / 时间戳与 [okAt]（成功时打点）。
+     */
+    suspend fun applyProbeResult(
+        id: Long,
+        health: String,
+        lastOutcome: String,
+        detail: String?,
+        httpStatus: Int?,
+        latencyMs: Long?,
+        checkedAt: Long,
+        okAt: Long?,
+    )
+
+    /**
+     * 只写瞬时结论（红线 11 的第二条 SQL 对应物）：`lastOutcome` / 详情 / 时间戳变，
+     * `health` 与 `okAt` 不动——瞬时结果不该改变累计健康状态。
+     */
+    suspend fun applyTransientOutcome(
+        id: Long,
+        lastOutcome: String,
+        detail: String?,
+        httpStatus: Int?,
+        checkedAt: Long,
+    )
 }

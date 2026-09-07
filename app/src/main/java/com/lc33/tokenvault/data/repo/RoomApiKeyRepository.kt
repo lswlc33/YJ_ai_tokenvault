@@ -98,6 +98,40 @@ class RoomApiKeyRepository constructor(
 
     override suspend fun delete(id: Long) = dao.delete(id, now())
 
+    override suspend fun applyProbeResult(
+        id: Long,
+        health: String,
+        lastOutcome: String,
+        detail: String?,
+        httpStatus: Int?,
+        latencyMs: Long?,
+        checkedAt: Long,
+        okAt: Long?,
+    ) = dao.applyProbeResult(
+        id = id,
+        health = health,
+        lastOutcome = lastOutcome,
+        detail = detail,
+        httpStatus = httpStatus,
+        latencyMs = latencyMs,
+        checkedAt = checkedAt,
+        okAt = okAt,
+    )
+
+    override suspend fun applyTransientOutcome(
+        id: Long,
+        lastOutcome: String,
+        detail: String?,
+        httpStatus: Int?,
+        checkedAt: Long,
+    ) = dao.applyTransientOutcome(
+        id = id,
+        lastOutcome = lastOutcome,
+        detail = detail,
+        httpStatus = httpStatus,
+        checkedAt = checkedAt,
+    )
+
     private fun aadFor(id: Long) = FieldAad.of(TABLE, id, COLUMN_SECRET)
 
     private companion object {

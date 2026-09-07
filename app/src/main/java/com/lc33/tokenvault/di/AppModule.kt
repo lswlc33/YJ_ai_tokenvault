@@ -30,6 +30,7 @@ import com.lc33.tokenvault.data.repo.RoomClientProfileRepository
 import com.lc33.tokenvault.data.repo.RoomGroupRepository
 import com.lc33.tokenvault.data.repo.RoomModelRepository
 import com.lc33.tokenvault.data.repo.RoomProviderAccountRepository
+import com.lc33.tokenvault.data.repo.RoomProbeRunRepository
 import com.lc33.tokenvault.data.repo.RoomProviderRepository
 import com.lc33.tokenvault.data.repo.RoomSettingsRepository
 import com.lc33.tokenvault.data.repo.RoomTransactionRunner
@@ -41,6 +42,7 @@ import com.lc33.tokenvault.domain.repo.ClientProfileRepository
 import com.lc33.tokenvault.domain.repo.GroupRepository
 import com.lc33.tokenvault.domain.repo.ModelRepository
 import com.lc33.tokenvault.domain.repo.ProviderAccountRepository
+import com.lc33.tokenvault.domain.repo.ProbeRunRepository
 import com.lc33.tokenvault.domain.repo.ProviderRepository
 import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.engine.BackupEngine
@@ -188,6 +190,7 @@ val appModule = module {
     single<ModelRepository> { RoomModelRepository(get(), get(named(Qualifiers.NOW))) }
     single<ClientProfileRepository> { RoomClientProfileRepository(get()) }
     single<AuditLogRepository> { RoomAuditLogRepository(get(), get(), get(named(Qualifiers.NOW))) }
+    single<ProbeRunRepository> { RoomProbeRunRepository(get()) }
 
     // ------------------------------------------------------------------ 网络与引擎
 
@@ -206,7 +209,7 @@ val appModule = module {
     single { BalanceEngine(get(), get(), get(), get(), get(named(Qualifiers.NOW))) }
     single {
         ProbeEngine(
-            providers = get(), keys = get(), clientProfiles = get(), keyDao = get(), runDao = get(),
+            providers = get(), keys = get(), clientProfiles = get(), runRepository = get(),
             session = get(), engine = get(), audit = get(), settings = get(), autoLocker = get(),
             redactor = get(), knownSecrets = get(), now = get(named(Qualifiers.NOW)),
             placeholders = get(named(Qualifiers.PLACEHOLDERS)),

@@ -4,9 +4,6 @@ import com.lc33.tokenvault.crypto.KnownSecrets
 import com.lc33.tokenvault.crypto.Redactor
 import com.lc33.tokenvault.crypto.VaultLockedException
 import com.lc33.tokenvault.crypto.zeroize
-import com.lc33.tokenvault.data.dao.ApiKeyDao
-import com.lc33.tokenvault.data.dao.ProbeRunDao
-import com.lc33.tokenvault.data.entity.ProbeRunEntity
 import com.lc33.tokenvault.domain.AuthStyle
 import com.lc33.tokenvault.domain.KeyHealth
 import com.lc33.tokenvault.domain.ProbeOutcome
@@ -18,6 +15,8 @@ import com.lc33.tokenvault.domain.model.Provider
 import com.lc33.tokenvault.domain.repo.ApiKeyRepository
 import com.lc33.tokenvault.domain.repo.AuditLogRepository
 import com.lc33.tokenvault.domain.repo.ClientProfileRepository
+import com.lc33.tokenvault.domain.repo.ProbeRun
+import com.lc33.tokenvault.domain.repo.ProbeRunRepository
 import com.lc33.tokenvault.domain.repo.ProviderRepository
 import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.endpoint.HeaderAssembler
@@ -25,8 +24,6 @@ import com.lc33.tokenvault.endpoint.ProbeRequest
 import com.lc33.tokenvault.endpoint.ProbeRequestBuilder
 import com.lc33.tokenvault.endpoint.ProbeResponse
 import com.lc33.tokenvault.net.HttpEngine
-import com.lc33.tokenvault.platform.AutoLocker
-import com.lc33.tokenvault.platform.VaultSession
 import com.lc33.tokenvault.probe.PlannedTask
 import com.lc33.tokenvault.probe.ProbeBudget
 import com.lc33.tokenvault.probe.ProbeClassifier
@@ -54,7 +51,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
- * 探测引擎宿主（计划.md §8.5）。**``，不是 ViewModel**——探测要能跨页面存活，
+ * 探测引擎宿主（计划.md §8.5）。**不是 ViewModel**——探测要能跨页面存活，
  * 用户在仪表盘点"开始探测"后切去管理页，引擎不能跟着 ViewModel 一起死。
  *
  * 四条设计决定：
@@ -72,20 +69,19 @@ class ProbeEngine constructor(
     private val providers: ProviderRepository,
     private val keys: ApiKeyRepository,
     private val clientProfiles: ClientProfileRepository,
-    private val keyDao: ApiKeyDao,
-    private val runDao: ProbeRunDao,
-    private val session: VaultSession,
+    private val runRepository: ProbeRunRepository,
+    private val session: ProbeSession,
     private val engine: HttpEngine,
     private val audit: AuditLogRepository,
     private val settings: SettingsRepository,
-    private val autoLocker: AutoLocker,
+    private val autoLocker: IdleLockSuspender,
     private val redactor: Redactor,
     private val knownSecrets: KnownSecrets,
     private val now: () -> Long,
     private val placeholders: Map<String, String>,
 ) {
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     private var currentJob: Job? = null
 
@@ -175,7 +171,7 @@ class ProbeEngine constructor(
         currentJob = null
     }
 
-    /** 锁定 / 退出时由 [VaultSession] 的持有方调用：停掉正在跑的探测。 */
+    /** 锁定 / 退出时由 [ProbeSession] 的持有方调用：停掉正在跑的探测。 */
     fun onLock() = cancel()
 
     // ------------------------------------------------------------------ 一轮
@@ -196,8 +192,8 @@ class ProbeEngine constructor(
     }
 
     private suspend fun runRoundInner(scope: String, filter: (PlannedTask) -> Boolean) {
-        val runId = runDao.insert(
-            ProbeRunEntity(scope = scope, startedAt = now(), total = 0, done = 0),
+        val runId = runRepository.insert(
+            ProbeRun(scope = scope, startedAt = now()),
         )
 
         // 新一轮：清空上一轮的累计快照，明细页随之刷新成"这一轮刚开始"。
@@ -317,8 +313,8 @@ class ProbeEngine constructor(
         fail: Int,
         cancelled: Boolean,
     ) {
-        runDao.update(
-            ProbeRunEntity(
+        runRepository.update(
+            ProbeRun(
                 id = runId,
                 scope = "all",
                 startedAt = now(),
@@ -492,14 +488,14 @@ class ProbeEngine constructor(
 
     /**
      * 逐项落库（红线 11）。[ProbeItemResult.health] 非 null 才改 `api_keys.health`，
-     * 否则只写瞬时结论——这与 `ApiKeyDao.applyProbeResult` / `applyTransientOutcome`
+     * 否则只写瞬时结论——这与 `ApiKeyRepository.applyProbeResult` / `applyTransientOutcome`
      * 的两条 SQL 一一对应。
      */
     private suspend fun persist(result: ProbeItemResult, stamp: Long) {
         val keyId = result.keyId ?: return
         val health = result.health
         if (health != null) {
-            keyDao.applyProbeResult(
+            keys.applyProbeResult(
                 id = keyId,
                 health = health.wireName,
                 lastOutcome = result.outcome.wireName,
@@ -510,7 +506,7 @@ class ProbeEngine constructor(
                 okAt = if (result.outcome == ProbeOutcome.SUCCESS) stamp else null,
             )
         } else {
-            keyDao.applyTransientOutcome(
+            keys.applyTransientOutcome(
                 id = keyId,
                 lastOutcome = result.outcome.wireName,
                 detail = result.detail,

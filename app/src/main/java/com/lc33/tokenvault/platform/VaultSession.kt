@@ -2,6 +2,7 @@ package com.lc33.tokenvault.platform
 
 import com.lc33.tokenvault.crypto.DekEnvelope
 import com.lc33.tokenvault.crypto.DekSlot
+import com.lc33.tokenvault.engine.ProbeSession
 import com.lc33.tokenvault.crypto.DecryptionFailedException
 import com.lc33.tokenvault.crypto.Hkdf
 import com.lc33.tokenvault.crypto.KdfParams
@@ -54,7 +55,7 @@ class VaultSession(
     private val random: RandomBytes = SecureRandomBytes,
     private val dekEnvelope: DekEnvelope = DekEnvelope(random = random),
     private val knownSecrets: KnownSecrets = KnownSecrets(),
-) {
+) : ProbeSession {
 
     private val guard = Any()
 
@@ -218,7 +219,7 @@ class VaultSession(
         phase = computePhase()
     }
 
-    val isUnlocked: Boolean get() = synchronized(guard) { dek != null }
+    override val isUnlocked: Boolean get() = synchronized(guard) { dek != null }
 
     /**
      * 借用字段级加密子密钥。
