@@ -6,6 +6,7 @@ import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.execSQL
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import com.lc33.tokenvault.data.VaultDatabase
+import kotlinx.cinterop.ExperimentalForeignApi
 import platform.Foundation.NSApplicationSupportDirectory
 import platform.Foundation.NSFileManager
 import platform.Foundation.NSSearchPathForDirectoriesInDomains
@@ -25,6 +26,7 @@ import platform.Foundation.NSUserDomainMask
  * （JVM 端有一份相同的实现——`Room.databaseBuilder(name)` 的 reified 入口
  * 只存在于 jvm/native 源集，Android target 没有，所以进不了 commonMain。）
  */
+@OptIn(ExperimentalForeignApi::class)
 fun createVaultDatabase(): VaultDatabase {
     val dir = NSSearchPathForDirectoriesInDomains(
         NSApplicationSupportDirectory,
@@ -32,9 +34,10 @@ fun createVaultDatabase(): VaultDatabase {
         true,
     ).firstOrNull() as? String
         ?: error("Application Support directory not found")
-    NSFileManager.defaultManager.createDirectoryAtPath(
-        dir, withIntermediateDirectories = true, attributes = null,
+    val created = NSFileManager.defaultManager.createDirectoryAtPath(
+        dir, withIntermediateDirectories = true, attributes = null, error = null,
     )
+    check(created) { "failed to create Application Support directory: $dir" }
 
     return Room.databaseBuilder<VaultDatabase>(name = "$dir/${VaultDatabase.FILE_NAME}")
         .setDriver(BundledSQLiteDriver())
