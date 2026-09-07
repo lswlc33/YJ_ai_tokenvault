@@ -4,11 +4,6 @@ import com.lc33.tokenvault.domain.KeyHealth
 import com.lc33.tokenvault.domain.ModelProbeState
 import com.lc33.tokenvault.domain.ProbeLevel
 import com.lc33.tokenvault.domain.ProbeOutcome
-import java.io.IOException
-import java.net.ConnectException
-import java.net.SocketTimeoutException
-import java.net.UnknownHostException
-import javax.net.ssl.SSLException
 
 /**
  * 一次探测请求的分类结果（计划.md §8.4）。
@@ -120,9 +115,10 @@ object ProbeClassifier {
         }
 
         // 第 2 行：网络类失败。都不许改写 health。
-        if (error is SocketTimeoutException || error is ConnectException ||
-            error is UnknownHostException || error is SSLException || error is IOException
-        ) {
+        // error 非空即网络层失败——net 层（OkHttpEngine）保证 error 只承载网络异常，
+        // 业务错误都体现在 status code 里。这里不 `is` 判断 JVM 的 IOException 族：
+        // 那是 JVM 专属类型，会挡住 iOS 端编译（阶段2 KMP 化），而它们本就都归同一个结果。
+        if (error != null) {
             return Classification(ProbeOutcome.NETWORK_ERROR, detail = error.message)
         }
 

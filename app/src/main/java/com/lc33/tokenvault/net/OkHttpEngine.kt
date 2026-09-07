@@ -132,12 +132,13 @@ class OkHttpEngine(
         if (!hasUserAgent) builder.header("User-Agent", DEFAULT_USER_AGENT)
         if (!hasHeader(request.headers, "Accept")) builder.header("Accept", "application/json")
 
+        val body = request.body
         when {
-            request.body != null -> {
+            body != null -> {
                 val mediaType = "application/json; charset=utf-8".toMediaType()
                 builder.method(
                     request.method,
-                    request.body.toRequestBody(mediaType),
+                    body.toRequestBody(mediaType),
                 )
             }
             request.method == "GET" -> builder.get()

@@ -62,28 +62,26 @@ class BalanceEngine @Inject constructor(
             val request = adapter.buildRequest(provider, defaultKey, token)
             val response = engine.execute(request, allowInsecure = provider.allowInsecure)
 
-            val snapshot = if (response.error != null) {
+            val snapshot = response.error?.let { err ->
                 // 网络层失败：落一条 error，而不是 amount=null 还当成功。
                 BalanceSnapshot(
                     amount = null,
                     currency = BalanceSnapshot.UNKNOWN_CURRENCY,
                     checkedAt = now(),
-                    error = response.error.message ?: "network error",
+                    error = err.message ?: "network error",
                 )
-            } else {
-                try {
-                    adapter.parse(response.status, response.body).copy(checkedAt = now())
-                } catch (e: BalanceParseException) {
-                    // 解析失败：落 error（红线 8 的邻居：不静默降级）。原始 body 只进 raw，
-                    // 不进 error 消息（红线 32）。
-                    BalanceSnapshot(
-                        amount = null,
-                        currency = BalanceSnapshot.UNKNOWN_CURRENCY,
-                        raw = response.body,
-                        checkedAt = now(),
-                        error = e.reason,
-                    )
-                }
+            } ?: try {
+                adapter.parse(response.status, response.body).copy(checkedAt = now())
+            } catch (e: BalanceParseException) {
+                // 解析失败：落 error（红线 8 的邻居：不静默降级）。原始 body 只进 raw，
+                // 不进 error 消息（红线 32）。
+                BalanceSnapshot(
+                    amount = null,
+                    currency = BalanceSnapshot.UNKNOWN_CURRENCY,
+                    raw = response.body,
+                    checkedAt = now(),
+                    error = e.reason,
+                )
             }
 
             providers.updateBalance(providerId, snapshot, calibrated)

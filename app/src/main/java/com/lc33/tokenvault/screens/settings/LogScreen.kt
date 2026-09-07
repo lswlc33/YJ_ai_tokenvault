@@ -105,9 +105,10 @@ private fun LogRow(
             style = AppTextStyle.Body,
             modifier = Modifier.padding(top = 6.dp),
         )
-        if (entry.detail != null) {
+        val detail = entry.detail
+        if (detail != null) {
             AppText(
-                text = entry.detail,
+                text = detail,
                 style = AppTextStyle.Footnote,
                 color = appSecondaryTextColor,
                 modifier = Modifier.padding(top = 3.dp),

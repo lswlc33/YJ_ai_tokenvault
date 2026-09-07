@@ -502,10 +502,11 @@ class ProbeEngine @Inject constructor(
      */
     private suspend fun persist(result: ProbeItemResult, stamp: Long) {
         val keyId = result.keyId ?: return
-        if (result.health != null) {
+        val health = result.health
+        if (health != null) {
             keyDao.applyProbeResult(
                 id = keyId,
-                health = result.health.wireName,
+                health = health.wireName,
                 lastOutcome = result.outcome.wireName,
                 detail = result.detail,
                 httpStatus = null,
