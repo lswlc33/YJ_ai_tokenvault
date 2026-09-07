@@ -114,10 +114,15 @@ jobs:
           path: app/build/outputs/apk/nightly/*.apk
           if-no-files-found: error
 
-  # iOS：在 macOS runner 上编译 shared.framework + 空壳 iosApp，产出未签名 .ipa。
+  # iOS：在 macOS runner 上编译 shared.framework + iosApp 壳，产出未签名 .ipa。
   # 未签名（CODE_SIGNING_ALLOWED=NO）——目的只是验证 iOS 构建链路，不装真机。
+  #
+  # macos-15（Xcode 16 系 SDK）：CMP 1.11.1 的 libCMPUIKitUtils.a 引用了
+  # UIViewLayoutRegion，Xcode 15.4（macos-14 默认）的 iPhoneOS SDK 没有这个符号；
+  # 阶段4 之前没暴露是因为空壳入口没人引用 Compose 的 UIKit 代码，破链接器死消除
+  # 兴幸漏网——换成真入口后必须用新 SDK。
   ios:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v5
         with:
