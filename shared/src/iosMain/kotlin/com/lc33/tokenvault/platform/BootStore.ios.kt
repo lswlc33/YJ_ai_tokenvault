@@ -9,6 +9,7 @@ import platform.Foundation.NSFileManager
 import platform.Foundation.NSSearchPathForDirectoriesInDomains
 import platform.Foundation.NSString
 import platform.Foundation.NSUTF8StringEncoding
+import platform.Foundation.NSUserDomainMask
 import platform.Foundation.create
 import platform.Foundation.dataWithContentsOfFile
 import platform.Foundation.writeToFile
@@ -41,8 +42,9 @@ class IosBootStore(
 
     override fun rawRead(): String? {
         val data = NSData.dataWithContentsOfFile(path) ?: return null
-        val text = NSString.create(data = data, encoding = NSUTF8StringEncoding)
-        // 存在却解不出 UTF-8：返回空串让它落 Corrupt（"boot file is empty"）而不是 Missing。
+        // NSString.create 的过载返回 Any（Kotlin/Native 的类型映射），显式转 String。
+        val text = NSString.create(data = data, encoding = NSUTF8StringEncoding) as? String
+        // 存在却解不出 UTF-8：返回空串让它落 Corrupt（“boot file is empty”）而不是 Missing。
         // 把它当全新安装的代价是整库永久解不开。
         return text ?: ""
     }

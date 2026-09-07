@@ -30,7 +30,7 @@ actual val platformModule: Module = module {
             "app_version" to APP_VERSION_NAME,
             // 模板键名是数据（BuiltinPresets），commonMain 不感知平台，所以键名沿用
             // "android_release"；iOS 端把值换成系统版本，模板渲染不缺角。
-            "android_release" to UIDevice.currentDevice.systemVersion,
+            "android_release" to UIDevice.Companion.currentDevice.systemVersion,
             "arch" to "arm64",
         )
     }

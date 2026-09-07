@@ -9,7 +9,6 @@ import kotlinx.coroutines.launch
 import platform.Foundation.NSNumber
 import platform.UIKit.UIPasteboard
 import platform.UIKit.UIPasteboardOptionLocalOnly
-
 /**
  * 系统剪贴板实现（iOS 端，阶段4）。接口语义与 Android 端的 AndroidSecureClipboard 逐条对齐。
  *
@@ -50,10 +49,10 @@ class IosSecureClipboard(
         }
 
         val text = value.concatToString()
-        UIPasteboard.general.setItems(
+        UIPasteboard.Companion.general.setItems(
             // setItems 是唯一能挂 localOnly 的入口；类型键用 UTF-8 文本的 UTI。
             listOf(mapOf("public.utf8-plain-text" to text)),
-            mapOf<Any?, Any?>(UIPasteboardOptionLocalOnly to NSNumber.numberWithBool(true)),
+            mapOf<Any?, Any?>(UIPasteboardOptionLocalOnly to NSNumber.Companion.numberWithBool(true)),
         )
 
         clearJob?.cancel()
@@ -62,16 +61,16 @@ class IosSecureClipboard(
         clearJob = scope.launch {
             delay(effectiveSeconds * 1000L)
             // 内容未变才清：变了说明用户复制了别的东西，不能吞掉它。
-            if (UIPasteboard.general.string == text) {
-                UIPasteboard.general.string = ""
+            if (UIPasteboard.Companion.general.string == text) {
+                UIPasteboard.Companion.general.string = ""
             }
         }
     }
 
     override fun clearNow() {
         clearJob?.cancel()
-        UIPasteboard.general.string = ""
+        UIPasteboard.Companion.general.string = ""
     }
 
-    override fun read(): String? = UIPasteboard.general.string
+    override fun read(): String? = UIPasteboard.Companion.general.string
 }
