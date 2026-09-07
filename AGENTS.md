@@ -36,7 +36,7 @@ git config core.hooksPath .githooks
 | Kotlin | 2.3.21 | 不升 2.4.x：KSP 最新版 2.3.11 是对着 Kotlin 2.3.20 编的 |
 | KSP | 2.3.11 | Room + Hilt 都走 KSP |
 | SDK | minSdk 33 / compileSdk 37 / targetSdk 37 | `miuix-blur` 要求 33 |
-| MIUIX | 0.9.3 | 实验期库，锁死版本 |
+| MIUIX | 0.9.1 | 实验期库，锁死版本。0.9.3 因 iOS KLIB ABI 降回 0.9.1（0.9.2+ 的 klib 是 Kotlin 2.4 编的，本项目锁 2.3.21），详见 `gradle/libs.versions.toml` 版本注 |
 
 版本全部写死在 `gradle/libs.versions.toml`，不用动态版本。升级 MIUIX 要单独开分支
 过一遍所有页面（它的 API 可能无预告变更）。

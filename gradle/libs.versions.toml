@@ -22,7 +22,13 @@ work = "2.11.2"
 biometric = "1.1.0"
 # 实验期库，锁死版本；升级时先在分支里过一遍所有页面（计划.md §15.18）。
 # miuix-nav 只发到 0.9.4-rc01，本项目用 androidx.navigation，不需要它。
-miuix = "0.9.3"
+#
+# 0.9.3 → 0.9.1 降级（2026-09-07）：iOS 编译被 KLIB ABI 卡死——0.9.2/0.9.3 的 klib
+# 是 Kotlin 2.4.0 编的（abi_version=2.4.0），0.9.4-rc01 是 2.4.10，而本项目 Kotlin
+# 锁在 2.3.21（KSP 无 2.4.x）。0.9.1 是唯一用 Kotlin 2.3.21 编译的版本。
+# 代价：图标集没有 Home（0.9.2 才加），仪表盘图标换成 ListView（AppIcon.kt 有注）。
+# 将来 KSP 出 2.4.x 后可随 Kotlin 一起升回 0.9.3+，并把仪表盘图标换回 Home。
+miuix = "0.9.1"
 okhttp = "5.5.0"
 # Ktor 3.x：KMP HTTP client（阶段2 OkHttp→Ktor 迁移）。3.5.2 是 2025 年末稳定版。
 ktor = "3.5.2"
@@ -41,7 +47,7 @@ androidxTestRunner = "1.7.0"
 # okio：KMP IO 库，backup/ 的 gzip 用（GzipSink/GzipSource 已 multiplatform，native 走 zlib）。
 okio = "3.18.1"
 # Compose Multiplatform（阶段3 UI 搬家）：1.11.1 是 2026 年稳定版，要求 Kotlin 2.3.10+（本项目 2.3.21）。
-# MIUIX 0.9.3 底层依赖 org.jetbrains.compose 1.11.0，与 1.11.1 同代兼容。
+# MIUIX（0.9.1）底层依赖 org.jetbrains.compose 同代版本，与 1.11.1 兼容。
 # 注意：CMP 1.11+ 移除了 iosX64 目标、最低 iOS 14.0，本项目只用 iosArm64/iosSimulatorArm64，不受影响。
 composeMultiplatform = "1.11.1"
 

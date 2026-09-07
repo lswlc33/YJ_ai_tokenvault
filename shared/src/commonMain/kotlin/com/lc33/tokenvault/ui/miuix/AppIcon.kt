@@ -14,10 +14,11 @@ import top.yukonga.miuix.kmp.icon.extended.Edit
 import top.yukonga.miuix.kmp.icon.extended.Filter
 import top.yukonga.miuix.kmp.icon.extended.GridView
 import top.yukonga.miuix.kmp.icon.extended.Hide
-import top.yukonga.miuix.kmp.icon.extended.Home
+import top.yukonga.miuix.kmp.icon.extended.Hide
 import top.yukonga.miuix.kmp.icon.extended.Info
 import top.yukonga.miuix.kmp.icon.extended.Layers
 import top.yukonga.miuix.kmp.icon.extended.Link
+import top.yukonga.miuix.kmp.icon.extended.ListView
 import top.yukonga.miuix.kmp.icon.extended.Lock
 import top.yukonga.miuix.kmp.icon.extended.More
 import top.yukonga.miuix.kmp.icon.extended.Ok
@@ -90,7 +91,11 @@ enum class AppIcon {
 }
 
 internal fun AppIcon.imageVector(): ImageVector = when (this) {
-    AppIcon.Dashboard -> MiuixIcons.Home
+    // 仪表盘用 ListView（概览列表）而不是 Home：MIUIX 0.9.1 的图标集没有 Home
+    // （0.9.2 才加），而 0.9.1 是唯一用 Kotlin 2.3.21 编译的版本（iOS klib ABI
+    // 要求，见 libs.versions.toml 的版本说明）。命名按用途的好处在这里兑现：
+    // 页面只写 AppIcon.Dashboard，图形换了不用改页面。
+    AppIcon.Dashboard -> MiuixIcons.ListView
     AppIcon.Manage -> MiuixIcons.GridView
     AppIcon.Settings -> MiuixIcons.Settings
 
