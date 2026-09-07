@@ -21,6 +21,11 @@ plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.kmp.library)
     alias(libs.plugins.kotlin.serialization)
+    // Compose Compiler：CMP 1.6.10+ 要求显式应用（与 :app 同一个插件）。
+    alias(libs.plugins.kotlin.compose)
+    // 阶段3：Compose Multiplatform —— commonMain 里用 org.jetbrains.compose.* 写 UI。
+    // 该插件同时负责 composeResources 资源的 Res 类生成（stringResource 等）。
+    alias(libs.plugins.compose.multiplatform)
 }
 
 kotlin {
@@ -67,6 +72,18 @@ kotlin {
             // 用 `api` 而不是 `implementation`：HttpEngine / ProxyProvider 的公开构造签名里
             // 有 io.ktor.client.HttpClient，:app 需要能看见它。
             api(libs.ktor.client.core)
+
+            // 阶段3：Compose Multiplatform 基础库（UI 搬进 commonMain 用 org.jetbrains.compose.*）。
+            api(libs.cmp.runtime)
+            api(libs.cmp.foundation)
+            api(libs.cmp.ui)
+            api(libs.cmp.animation)
+            implementation(libs.cmp.components.resources)
+            implementation(libs.cmp.ui.tooling.preview)
+            // multiplatform navigation / lifecycle（阶段3 替换 androidx.navigation.compose 等）。
+            api(libs.cmp.navigation.compose)
+            api(libs.cmp.lifecycle.runtime.compose)
+            api(libs.cmp.lifecycle.viewmodel.compose)
         }
 
         // Android 端用 JDK provider（JCA 实现，与现有行为一致）。
