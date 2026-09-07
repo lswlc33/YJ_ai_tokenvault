@@ -49,10 +49,12 @@ class IosSecureClipboard(
         }
 
         val text = value.concatToString()
-        UIPasteboard.Companion.general.setItems(
+        UIPasteboard.generalPasteboard.setItems(
             // setItems 是唯一能挂 localOnly 的入口；类型键用 UTF-8 文本的 UTI。
             listOf(mapOf("public.utf8-plain-text" to text)),
-            mapOf<Any?, Any?>(UIPasteboardOptionLocalOnly to NSNumber.Companion.numberWithBool(true)),
+            // ObjC 类方法 numberWithBool 在 Kotlin 侧不可见（NSNumber 类型映射特殊），
+            // 用构造器 NSNumber(bool = true) 造布尔值。
+            mapOf<Any?, Any?>(UIPasteboardOptionLocalOnly to NSNumber(bool = true)),
         )
 
         clearJob?.cancel()
@@ -61,16 +63,16 @@ class IosSecureClipboard(
         clearJob = scope.launch {
             delay(effectiveSeconds * 1000L)
             // 内容未变才清：变了说明用户复制了别的东西，不能吞掉它。
-            if (UIPasteboard.Companion.general.string == text) {
-                UIPasteboard.Companion.general.string = ""
+            if (UIPasteboard.generalPasteboard.string == text) {
+                UIPasteboard.generalPasteboard.string = ""
             }
         }
     }
 
     override fun clearNow() {
         clearJob?.cancel()
-        UIPasteboard.Companion.general.string = ""
+        UIPasteboard.generalPasteboard.string = ""
     }
 
-    override fun read(): String? = UIPasteboard.Companion.general.string
+    override fun read(): String? = UIPasteboard.generalPasteboard.string
 }
