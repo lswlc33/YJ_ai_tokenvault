@@ -28,6 +28,42 @@ plugins {
     alias(libs.plugins.compose.multiplatform)
 }
 
+// 版本号只在 gradle.properties 声明一处（计划.md §14.1）。阶段3 迁移后 screens 在
+// commonMain 里读不到 Android 的 BuildConfig，所以这里读同一份 gradle.properties，
+// 生成一个 commonMain 常量 `BuildInfo`，两端（Android/iOS）一致。
+val vaultVersionCode: Long = (
+    providers.environmentVariable("VAULT_VERSION_CODE").orNull
+        ?: providers.gradleProperty("vaultVersionCode").orNull
+        ?: "1"
+    ).toLong()
+val vaultVersionName: String = providers.environmentVariable("VAULT_VERSION_NAME").orNull
+    ?: providers.gradleProperty("vaultVersionName").orNull
+    ?: "0.1.0"
+
+val generateBuildInfo = tasks.register("generateBuildInfo") {
+    val dir = layout.buildDirectory.dir("generated/buildInfo/kotlin")
+    inputs.property("versionName", vaultVersionName)
+    inputs.property("versionCode", vaultVersionCode)
+    outputs.dir(dir)
+    doLast {
+        val out = dir.get().asFile
+        out.mkdirs()
+        val f = out.resolve("BuildInfo.kt")
+        f.writeText(
+            """
+            // 自动生成，勿手改。来源：shared/build.gradle.kts 的 generateBuildInfo。
+            package com.lc33.tokenvault.platform
+
+            /** 人类可读版本名，与 :app 的 BuildConfig.VERSION_NAME 同源（gradle.properties）。 */
+            const val APP_VERSION_NAME: String = "$vaultVersionName"
+
+            /** 整数版本号，与 :app 的 BuildConfig.VERSION_CODE 同源。 */
+            const val APP_VERSION_CODE: Long = ${vaultVersionCode}L
+            """.trimIndent() + "\n",
+        )
+    }
+}
+
 kotlin {
     // iOS 三件套：真机 + 模拟器。Kotlin/Native 的 iOS target 只能在 macOS 编译，
     // 本机 Windows 跑不到，但声明无害（阶段4 在 mac runner 上用）。
@@ -61,6 +97,10 @@ kotlin {
     // 各平台 source set 的依赖。cryptography-kotlin / kotlinx-serialization /
     // kotlinx-datetime / kotlinx-coroutines 都是 KMP 库，直接放 commonMain。
     sourceSets {
+        commonMain {
+            // 挂载 generateBuildInfo 生成的 BuildInfo.kt（版本号常量）。
+            kotlin.srcDir(generateBuildInfo)
+        }
         commonMain.dependencies {
             implementation(libs.cryptography.core)
             implementation(libs.kotlinx.serialization.json)

@@ -7,6 +7,7 @@ import com.lc33.tokenvault.importer.ParsedRecord
 import com.lc33.tokenvault.importer.TextImporter
 import com.lc33.tokenvault.platform.SecureClipboard
 import com.lc33.tokenvault.screens.manage.ImportPreview
+import com.lc33.tokenvault.ui.shell.hostOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
