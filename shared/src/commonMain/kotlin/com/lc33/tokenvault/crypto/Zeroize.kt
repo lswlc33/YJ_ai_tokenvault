@@ -10,7 +10,7 @@ package com.lc33.tokenvault.crypto
  * 副本，`String` 更是不可变、根本擦不掉——所以明文秘密一律用 [ByteArray] /
  * [CharArray] 传递，绝不落进 `String`（红线 1）。
  */
-internal fun ByteArray.zeroize() {
+fun ByteArray.zeroize() {
     fill(0)
 }
 
@@ -20,7 +20,7 @@ internal fun ByteArray.zeroize() {
  * 刻意写成 `Char(0)` 而不是把那个字符直接放进单引号里——后者虽然能编译，但会让
  * git 把整个文件判成二进制（diff 出不来、review 看不见），而且在编辑器里是隐形的。
  */
-internal fun CharArray.zeroize() {
+fun CharArray.zeroize() {
     fill(Char(0))
 }
 
@@ -30,7 +30,7 @@ internal fun CharArray.zeroize() {
  * `session.withFieldKey { … }` 那套借用模型（§7.4）的底座：调用方拿到的是引用，
  * 但引用的生命周期被这个函数框住，不会被存下来长期持有。
  */
-internal inline fun <R> ByteArray.borrow(block: (ByteArray) -> R): R = try {
+inline fun <R> ByteArray.borrow(block: (ByteArray) -> R): R = try {
     block(this)
 } finally {
     zeroize()
@@ -42,7 +42,7 @@ internal inline fun <R> ByteArray.borrow(block: (ByteArray) -> R): R = try {
  * 用在"校验值是否相等"的地方。`contentEquals` 会在第一个不同的字节处返回，
  * 于是比较耗时泄漏了前缀匹配了多少位。
  */
-internal fun ByteArray.constantTimeEquals(other: ByteArray): Boolean {
+fun ByteArray.constantTimeEquals(other: ByteArray): Boolean {
     if (size != other.size) return false
     var diff = 0
     for (i in indices) {

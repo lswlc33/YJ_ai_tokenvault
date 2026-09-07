@@ -22,3 +22,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "tokenvault"
 include(":app")
+include(":shared")

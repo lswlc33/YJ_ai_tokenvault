@@ -12,12 +12,11 @@ fun interface RandomBytes {
 }
 
 /**
- * `java.security.SecureRandom`。
+ * 密码学安全的随机字节源。
  *
- * 不带种子构造，也**不调用 `setSeed`**：在 Android 上那会把系统熵源替换掉。
+ * 平台各自提供加密安全随机（Android/JVM 用 `SecureRandom`，iOS 用系统 CSPRNG）。
+ * 用 `expect object` 声明，`actual` 在 androidMain / jvmMain / iosMain 里给实现。
+ *
+ * 不带种子构造，也**不调用** Android 上 `SecureRandom.setSeed`（那会替换系统熵源）。
  */
-object SecureRandomBytes : RandomBytes {
-    private val random = java.security.SecureRandom()
-
-    override fun nextBytes(size: Int): ByteArray = ByteArray(size).also(random::nextBytes)
-}
+expect object SecureRandomBytes : RandomBytes

@@ -6,6 +6,8 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 /**
  * `ByteArray` ↔ base64 字符串。
@@ -18,17 +20,18 @@ import kotlinx.serialization.encoding.Encoder
  * 放在 `crypto/` 而不是 `platform/`：[KdfParams] 的盐是第一个需要它的地方，而 KdfParams
  * 又会被 boot 存储和备份包 header 同时用到。放在更下层，两边都能引用。
  *
- * 用 `java.util.Base64` 而不是 `android.util.Base64`：后者是 Android 类型，会让
- * `crypto/` 违反"纯 Kotlin 层零 Android 依赖"，也就没法在 JVM 单测里覆盖。
+ * 用 `kotlin.io.encoding.Base64`（Kotlin 2.x 跨平台编解码）而不是 `java.util.Base64`：
+ * 后者是 JVM 专属，会挡住 iOS 端编译（阶段2 KMP 化）。
  */
+@OptIn(ExperimentalEncodingApi::class)
 object ByteArrayAsBase64 : KSerializer<ByteArray> {
     override val descriptor: SerialDescriptor =
         PrimitiveSerialDescriptor("ByteArrayAsBase64", PrimitiveKind.STRING)
 
     override fun serialize(encoder: Encoder, value: ByteArray) {
-        encoder.encodeString(java.util.Base64.getEncoder().encodeToString(value))
+        encoder.encodeString(Base64.encode(value))
     }
 
     override fun deserialize(decoder: Decoder): ByteArray =
-        java.util.Base64.getDecoder().decode(decoder.decodeString())
+        Base64.decode(decoder.decodeString())
 }
