@@ -28,6 +28,7 @@ import tokenvault.shared.generated.resources.probe_thresholds
 import tokenvault.shared.generated.resources.probe_thresholds_summary
 import com.lc33.tokenvault.ui.miuix.AppArrowRow
 import com.lc33.tokenvault.ui.miuix.AppCard
+import com.lc33.tokenvault.ui.miuix.AppPreferenceGroup
 import com.lc33.tokenvault.ui.miuix.AppSwitchRow
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppTextButton
@@ -74,68 +75,68 @@ fun ProbeSettingsScreen(
 
         item { SectionTitle(text = stringResource(Res.string.probe_section_defaults)) }
         item {
-            AppSwitchRow(
-                title = stringResource(Res.string.editor_probe_reachability),
-                checked = defaultProbeReachability,
-                onCheckedChange = onDefaultProbeReachabilityChange,
-            )
-        }
-        item {
-            AppSwitchRow(
-                title = stringResource(Res.string.editor_probe_keys),
-                checked = defaultProbeKeys,
-                onCheckedChange = onDefaultProbeKeysChange,
-            )
-        }
-        item {
-            AppSwitchRow(
-                title = stringResource(Res.string.editor_probe_balance),
-                checked = defaultProbeBalance,
-                onCheckedChange = onDefaultProbeBalanceChange,
-            )
-        }
-        item {
-            AppSwitchRow(
-                title = stringResource(Res.string.editor_probe_models),
-                summary = stringResource(Res.string.editor_probe_models_summary),
-                checked = defaultProbeModels,
-                onCheckedChange = onDefaultProbeModelsChange,
-            )
+            AppPreferenceGroup {
+                AppSwitchRow(
+                    title = stringResource(Res.string.editor_probe_reachability),
+                    checked = defaultProbeReachability,
+                    onCheckedChange = onDefaultProbeReachabilityChange,
+                )
+                AppSwitchRow(
+                    title = stringResource(Res.string.editor_probe_keys),
+                    checked = defaultProbeKeys,
+                    onCheckedChange = onDefaultProbeKeysChange,
+                )
+                AppSwitchRow(
+                    title = stringResource(Res.string.editor_probe_balance),
+                    checked = defaultProbeBalance,
+                    onCheckedChange = onDefaultProbeBalanceChange,
+                )
+                AppSwitchRow(
+                    title = stringResource(Res.string.editor_probe_models),
+                    summary = stringResource(Res.string.editor_probe_models_summary),
+                    checked = defaultProbeModels,
+                    onCheckedChange = onDefaultProbeModelsChange,
+                )
+            }
         }
 
         item { SectionTitle(text = stringResource(Res.string.probe_section_cost)) }
         item {
-            AppArrowRow(
-                title = stringResource(Res.string.probe_thresholds),
-                summary = stringResource(Res.string.probe_thresholds_summary),
-                onClick = onEditThresholds,
-            )
+            AppPreferenceGroup {
+                AppArrowRow(
+                    title = stringResource(Res.string.probe_thresholds),
+                    summary = stringResource(Res.string.probe_thresholds_summary),
+                    onClick = onEditThresholds,
+                )
+            }
         }
 
         item { SectionTitle(text = stringResource(Res.string.probe_section_client)) }
         item {
-            AppSwitchRow(
-                title = stringResource(Res.string.probe_sniff),
-                summary = stringResource(Res.string.probe_sniff_summary),
-                checked = sniffClientProfile,
-                onCheckedChange = onSniffClientProfileChange,
-            )
-        }
-        item {
-            AppArrowRow(
-                title = stringResource(Res.string.probe_keywords),
-                summary = stringResource(Res.string.probe_keywords_summary),
-                onClick = onEditKeywords,
-            )
+            AppPreferenceGroup {
+                AppSwitchRow(
+                    title = stringResource(Res.string.probe_sniff),
+                    summary = stringResource(Res.string.probe_sniff_summary),
+                    checked = sniffClientProfile,
+                    onCheckedChange = onSniffClientProfileChange,
+                )
+                AppArrowRow(
+                    title = stringResource(Res.string.probe_keywords),
+                    summary = stringResource(Res.string.probe_keywords_summary),
+                    onClick = onEditKeywords,
+                )
+            }
         }
 
         item { SectionTitle(text = stringResource(Res.string.probe_section_network)) }
         item {
-            AppArrowRow(
-                title = stringResource(Res.string.probe_proxy),
-                summary = stringResource(Res.string.probe_proxy_summary),
-                onClick = onEditProxy,
-            )
+            AppPreferenceGroup {
+                AppArrowRow(
+                    title = stringResource(Res.string.probe_proxy),
+                    summary = stringResource(Res.string.probe_proxy_summary),
+                    onClick = onEditProxy,
+                )
+            }
         }
     }
 }

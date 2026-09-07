@@ -22,6 +22,7 @@ import com.lc33.tokenvault.domain.model.ClientProfile
 import com.lc33.tokenvault.ui.miuix.AppArrowRow
 import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppChip
+import com.lc33.tokenvault.ui.miuix.AppPreferenceGroup
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.SectionTitle
@@ -62,11 +63,13 @@ fun ProfileListScreen(
 
         item { SectionTitle(text = stringResource(Res.string.profiles_section_add)) }
         item {
-            AppArrowRow(
-                title = stringResource(Res.string.profiles_from_curl),
-                summary = stringResource(Res.string.profiles_from_curl_summary),
-                onClick = onNewFromCurl,
-            )
+            AppPreferenceGroup {
+                AppArrowRow(
+                    title = stringResource(Res.string.profiles_from_curl),
+                    summary = stringResource(Res.string.profiles_from_curl_summary),
+                    onClick = onNewFromCurl,
+                )
+            }
         }
     }
 }

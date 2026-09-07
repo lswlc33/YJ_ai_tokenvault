@@ -22,6 +22,7 @@ import tokenvault.shared.generated.resources.security_section_lock
 import tokenvault.shared.generated.resources.security_title
 import com.lc33.tokenvault.ui.miuix.AppArrowRow
 import com.lc33.tokenvault.ui.miuix.AppDropdownRow
+import com.lc33.tokenvault.ui.miuix.AppPreferenceGroup
 import com.lc33.tokenvault.ui.miuix.AppSwitchRow
 import com.lc33.tokenvault.ui.miuix.SectionTitle
 
@@ -52,54 +53,54 @@ fun SecurityScreen(
     SettingsSubPage(titleRes = Res.string.security_title, onBack = onBack) {
         item { SectionTitle(text = stringResource(Res.string.security_section_credential)) }
         item {
-            AppArrowRow(
-                title = stringResource(Res.string.security_change_pin),
-                summary = stringResource(Res.string.security_change_pin_summary),
-                onClick = onChangePin,
-            )
+            AppPreferenceGroup {
+                AppArrowRow(
+                    title = stringResource(Res.string.security_change_pin),
+                    summary = stringResource(Res.string.security_change_pin_summary),
+                    onClick = onChangePin,
+                )
+            }
         }
 
         item { SectionTitle(text = stringResource(Res.string.security_section_lock)) }
         item {
-            AppArrowRow(
-                title = stringResource(Res.string.security_lock_now),
-                summary = stringResource(Res.string.security_lock_now_summary),
-                onClick = onLockNow,
-            )
-        }
-        item {
-            AppDropdownRow(
-                title = stringResource(Res.string.security_auto_lock),
-                items = stringArrayResource(Res.array.auto_lock_options).toList(),
-                selectedIndex = autoLockIndex,
-                onSelect = onAutoLockIndexChange,
-            )
-        }
-        item {
-            AppSwitchRow(
-                title = stringResource(Res.string.security_idle_lock),
-                summary = stringResource(Res.string.security_idle_lock_summary),
-                checked = idleLock,
-                onCheckedChange = onIdleLockChange,
-            )
-        }
-        item {
-            AppSwitchRow(
-                title = stringResource(Res.string.security_lock_on_screen_off),
-                checked = lockOnScreenOff,
-                onCheckedChange = onLockOnScreenOffChange,
-            )
+            AppPreferenceGroup {
+                AppArrowRow(
+                    title = stringResource(Res.string.security_lock_now),
+                    summary = stringResource(Res.string.security_lock_now_summary),
+                    onClick = onLockNow,
+                )
+                AppDropdownRow(
+                    title = stringResource(Res.string.security_auto_lock),
+                    items = stringArrayResource(Res.array.auto_lock_options).toList(),
+                    selectedIndex = autoLockIndex,
+                    onSelect = onAutoLockIndexChange,
+                )
+                AppSwitchRow(
+                    title = stringResource(Res.string.security_idle_lock),
+                    summary = stringResource(Res.string.security_idle_lock_summary),
+                    checked = idleLock,
+                    onCheckedChange = onIdleLockChange,
+                )
+                AppSwitchRow(
+                    title = stringResource(Res.string.security_lock_on_screen_off),
+                    checked = lockOnScreenOff,
+                    onCheckedChange = onLockOnScreenOffChange,
+                )
+            }
         }
 
         item { SectionTitle(text = stringResource(Res.string.security_section_leak)) }
         item {
-            AppDropdownRow(
-                title = stringResource(Res.string.security_clipboard_clear),
-                summary = stringResource(Res.string.security_clipboard_clear_summary),
-                items = stringArrayResource(Res.array.clipboard_clear_options).toList(),
-                selectedIndex = clipboardClearIndex,
-                onSelect = onClipboardClearIndexChange,
-            )
+            AppPreferenceGroup {
+                AppDropdownRow(
+                    title = stringResource(Res.string.security_clipboard_clear),
+                    summary = stringResource(Res.string.security_clipboard_clear_summary),
+                    items = stringArrayResource(Res.array.clipboard_clear_options).toList(),
+                    selectedIndex = clipboardClearIndex,
+                    onSelect = onClipboardClearIndexChange,
+                )
+            }
         }
     }
 }

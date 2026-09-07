@@ -20,6 +20,7 @@ import tokenvault.shared.generated.resources.sync_title
 import com.lc33.tokenvault.screens.model.BackupStatus
 import com.lc33.tokenvault.ui.miuix.AppArrowRow
 import com.lc33.tokenvault.ui.miuix.AppCard
+import com.lc33.tokenvault.ui.miuix.AppPreferenceGroup
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppTextButton
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
@@ -53,18 +54,18 @@ fun SyncScreen(
 
         item { SectionTitle(text = stringResource(Res.string.sync_section_local)) }
         item {
-            AppArrowRow(
-                title = stringResource(Res.string.sync_export),
-                summary = stringResource(Res.string.sync_export_summary),
-                onClick = onExport,
-            )
-        }
-        item {
-            AppArrowRow(
-                title = stringResource(Res.string.sync_import),
-                summary = stringResource(Res.string.sync_import_summary),
-                onClick = onImport,
-            )
+            AppPreferenceGroup {
+                AppArrowRow(
+                    title = stringResource(Res.string.sync_export),
+                    summary = stringResource(Res.string.sync_export_summary),
+                    onClick = onExport,
+                )
+                AppArrowRow(
+                    title = stringResource(Res.string.sync_import),
+                    summary = stringResource(Res.string.sync_import_summary),
+                    onClick = onImport,
+                )
+            }
         }
         item {
             // 备份口令默认沿用 PIN，导出/恢复时每次输入（可换任意长口令）。这里没有

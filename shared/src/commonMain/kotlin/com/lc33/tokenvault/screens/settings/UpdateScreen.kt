@@ -36,6 +36,7 @@ import com.lc33.tokenvault.engine.UpdateErrorKind
 import com.lc33.tokenvault.ui.common.relativeLabel
 import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppDropdownRow
+import com.lc33.tokenvault.ui.miuix.AppPreferenceGroup
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppTextButton
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
@@ -76,13 +77,15 @@ fun UpdateScreen(
 
         item { SectionTitle(text = stringResource(Res.string.update_section_channel)) }
         item {
-            AppDropdownRow(
-                title = stringResource(Res.string.update_channel),
-                summary = stringResource(Res.string.update_channel_summary),
-                items = stringArrayResource(Res.array.update_channels).toList(),
-                selectedIndex = updateChannel,
-                onSelect = onUpdateChannelChange,
-            )
+            AppPreferenceGroup {
+                AppDropdownRow(
+                    title = stringResource(Res.string.update_channel),
+                    summary = stringResource(Res.string.update_channel_summary),
+                    items = stringArrayResource(Res.array.update_channels).toList(),
+                    selectedIndex = updateChannel,
+                    onSelect = onUpdateChannelChange,
+                )
+            }
         }
 
         item { SectionTitle(text = stringResource(Res.string.update_section_honesty)) }

@@ -93,6 +93,7 @@ import com.lc33.tokenvault.ui.common.ColorSwatchRow
 import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppDialog
 import com.lc33.tokenvault.ui.miuix.AppDropdownRow
+import com.lc33.tokenvault.ui.miuix.AppPreferenceGroup
 import com.lc33.tokenvault.ui.miuix.AppFilterChip
 import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppIconButton
@@ -242,12 +243,14 @@ fun ProviderEditorScreen(
 
             item { SectionTitle(text = stringResource(Res.string.editor_section_look)) }
             item {
-                AppDropdownRow(
-                    title = stringResource(Res.string.editor_group),
-                    items = groupNames,
-                    selectedIndex = draft.groupIndex,
-                    onSelect = { onChange(draft.copy(groupIndex = it)) },
-                )
+                AppPreferenceGroup {
+                    AppDropdownRow(
+                        title = stringResource(Res.string.editor_group),
+                        items = groupNames,
+                        selectedIndex = draft.groupIndex,
+                        onSelect = { onChange(draft.copy(groupIndex = it)) },
+                    )
+                }
             }
             item {
                 Column(
@@ -268,11 +271,13 @@ fun ProviderEditorScreen(
                 }
             }
             item {
-                AppSwitchRow(
-                    title = stringResource(Res.string.editor_pinned),
-                    checked = draft.pinned,
-                    onCheckedChange = { onChange(draft.copy(pinned = it)) },
-                )
+                AppPreferenceGroup {
+                    AppSwitchRow(
+                        title = stringResource(Res.string.editor_pinned),
+                        checked = draft.pinned,
+                        onCheckedChange = { onChange(draft.copy(pinned = it)) },
+                    )
+                }
             }
 
             item { SectionTitle(text = stringResource(Res.string.editor_section_protocols)) }
@@ -280,24 +285,28 @@ fun ProviderEditorScreen(
 
             item { SectionTitle(text = stringResource(Res.string.editor_section_balance)) }
             item {
-                AppDropdownRow(
-                    title = stringResource(Res.string.editor_balance_kind),
-                    summary = stringResource(Res.string.editor_balance_kind_summary),
-                    items = stringArrayResource(Res.array.balance_kinds).toList(),
-                    selectedIndex = draft.balanceKindIndex,
-                    onSelect = { onChange(draft.copy(balanceKindIndex = it)) },
-                )
+                AppPreferenceGroup {
+                    AppDropdownRow(
+                        title = stringResource(Res.string.editor_balance_kind),
+                        summary = stringResource(Res.string.editor_balance_kind_summary),
+                        items = stringArrayResource(Res.array.balance_kinds).toList(),
+                        selectedIndex = draft.balanceKindIndex,
+                        onSelect = { onChange(draft.copy(balanceKindIndex = it)) },
+                    )
+                }
             }
             item { BalanceFields(draft, balanceToken, balanceUserId) }
 
             item { SectionTitle(text = stringResource(Res.string.editor_section_client)) }
             item {
-                AppDropdownRow(
-                    title = stringResource(Res.string.settings_profiles),
-                    items = profileNames,
-                    selectedIndex = draft.profileIndex,
-                    onSelect = { onChange(draft.copy(profileIndex = it)) },
-                )
+                AppPreferenceGroup {
+                    AppDropdownRow(
+                        title = stringResource(Res.string.settings_profiles),
+                        items = profileNames,
+                        selectedIndex = draft.profileIndex,
+                        onSelect = { onChange(draft.copy(profileIndex = it)) },
+                    )
+                }
             }
 
             item { SectionTitle(text = stringResource(Res.string.editor_section_probe)) }
@@ -489,24 +498,13 @@ private fun BalanceFields(
 private fun ProbeBlock(draft: ProviderDraft, onChange: (ProviderDraft) -> Unit) {
     val tokens = LocalAppTokens.current
     val palette = LocalStatusPalette.current
-    Column {
+    AppPreferenceGroup {
         AppSwitchRow(
             title = stringResource(Res.string.editor_probe_enabled),
             summary = stringResource(Res.string.editor_probe_enabled_summary),
             checked = draft.probeEnabled,
             onCheckedChange = { onChange(draft.copy(probeEnabled = it)) },
         )
-        if (!draft.probeEnabled) {
-            AppText(
-                text = stringResource(Res.string.editor_probe_disabled_note),
-                style = AppTextStyle.Footnote,
-                color = palette.warn,
-                modifier = Modifier.padding(
-                    horizontal = tokens.screenPadding,
-                    vertical = tokens.itemSpacing,
-                ),
-            )
-        }
         AppSwitchRow(
             title = stringResource(Res.string.editor_probe_reachability),
             summary = stringResource(Res.string.editor_probe_reachability_summary),
@@ -535,6 +533,17 @@ private fun ProbeBlock(draft: ProviderDraft, onChange: (ProviderDraft) -> Unit) 
             checked = draft.probeModels,
             onCheckedChange = { onChange(draft.copy(probeModels = it)) },
             enabled = draft.probeEnabled,
+        )
+    }
+    if (!draft.probeEnabled) {
+        AppText(
+            text = stringResource(Res.string.editor_probe_disabled_note),
+            style = AppTextStyle.Footnote,
+            color = palette.warn,
+            modifier = Modifier.padding(
+                horizontal = tokens.screenPadding,
+                vertical = tokens.itemSpacing,
+            ),
         )
     }
 }
@@ -570,12 +579,14 @@ private fun AdvancedBlock(draft: ProviderDraft, onChange: (ProviderDraft) -> Uni
                 supportingText = stringResource(Res.string.editor_timeout_hint),
             )
         }
-        AppDropdownRow(
-            title = stringResource(Res.string.editor_auth_style),
-            summary = stringResource(Res.string.editor_auth_style_summary),
-            items = stringArrayResource(Res.array.auth_styles).toList(),
-            selectedIndex = draft.authStyleIndex,
-            onSelect = { onChange(draft.copy(authStyleIndex = it)) },
-        )
+        AppPreferenceGroup {
+            AppDropdownRow(
+                title = stringResource(Res.string.editor_auth_style),
+                summary = stringResource(Res.string.editor_auth_style_summary),
+                items = stringArrayResource(Res.array.auth_styles).toList(),
+                selectedIndex = draft.authStyleIndex,
+                onSelect = { onChange(draft.copy(authStyleIndex = it)) },
+            )
+        }
     }
 }

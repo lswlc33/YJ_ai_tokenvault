@@ -35,7 +35,6 @@ import tokenvault.shared.generated.resources.onboarding_welcome_subtitle
 import tokenvault.shared.generated.resources.onboarding_welcome_title
 import tokenvault.shared.generated.resources.onboarding_welcome_what
 import com.lc33.tokenvault.ui.miuix.AppLinearProgress
-import com.lc33.tokenvault.ui.miuix.AppPrimaryButton
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppTextButton
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
@@ -122,11 +121,12 @@ private fun WelcomeStep(onNext: () -> Unit, enabled: Boolean) {
         BulletLine(stringResource(Res.string.onboarding_welcome_local))
     }
     Spacer(Modifier.height(tokens.sectionSpacing))
-    AppPrimaryButton(
+    AppTextButton(
         text = stringResource(Res.string.onboarding_start),
         onClick = onNext,
         modifier = Modifier.fillMaxWidth(),
         enabled = enabled,
+        primary = true,
     )
 }
 

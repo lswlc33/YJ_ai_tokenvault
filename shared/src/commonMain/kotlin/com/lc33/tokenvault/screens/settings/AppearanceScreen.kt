@@ -15,6 +15,7 @@ import tokenvault.shared.generated.resources.appearance_title
 import tokenvault.shared.generated.resources.color_scheme_modes
 import com.lc33.tokenvault.ui.miuix.AppArrowRow
 import com.lc33.tokenvault.ui.miuix.AppDropdownRow
+import com.lc33.tokenvault.ui.miuix.AppPreferenceGroup
 import com.lc33.tokenvault.ui.miuix.AppSwitchRow
 import com.lc33.tokenvault.ui.miuix.SectionTitle
 import com.lc33.tokenvault.ui.theme.AppColorSchemeMode
@@ -43,29 +44,31 @@ fun AppearanceScreen(
     SettingsSubPage(titleRes = Res.string.appearance_title, onBack = onBack) {
         item { SectionTitle(text = stringResource(Res.string.appearance_section_theme)) }
         item {
-            AppDropdownRow(
-                title = stringResource(Res.string.appearance_color_scheme),
-                items = stringArrayResource(Res.array.color_scheme_modes).toList(),
-                selectedIndex = colorScheme.ordinal,
-                onSelect = { onColorSchemeChange(AppColorSchemeMode.entries[it]) },
-            )
-        }
-        item {
-            AppSwitchRow(
-                title = stringResource(Res.string.appearance_blur),
-                summary = stringResource(Res.string.appearance_blur_summary),
-                checked = blurNavBar,
-                onCheckedChange = onBlurNavBarChange,
-            )
+            AppPreferenceGroup {
+                AppDropdownRow(
+                    title = stringResource(Res.string.appearance_color_scheme),
+                    items = stringArrayResource(Res.array.color_scheme_modes).toList(),
+                    selectedIndex = colorScheme.ordinal,
+                    onSelect = { onColorSchemeChange(AppColorSchemeMode.entries[it]) },
+                )
+                AppSwitchRow(
+                    title = stringResource(Res.string.appearance_blur),
+                    summary = stringResource(Res.string.appearance_blur_summary),
+                    checked = blurNavBar,
+                    onCheckedChange = onBlurNavBarChange,
+                )
+            }
         }
 
         item { SectionTitle(text = stringResource(Res.string.appearance_section_language)) }
         item {
-            AppArrowRow(
-                title = stringResource(Res.string.appearance_language),
-                summary = stringResource(Res.string.appearance_language_summary),
-                onClick = onOpenSystemLocaleSettings,
-            )
+            AppPreferenceGroup {
+                AppArrowRow(
+                    title = stringResource(Res.string.appearance_language),
+                    summary = stringResource(Res.string.appearance_language_summary),
+                    onClick = onOpenSystemLocaleSettings,
+                )
+            }
         }
     }
 }

@@ -29,6 +29,7 @@ import tokenvault.shared.generated.resources.settings_title
 import tokenvault.shared.generated.resources.settings_update_row
 import tokenvault.shared.generated.resources.settings_update_row_summary
 import com.lc33.tokenvault.ui.miuix.AppArrowRow
+import com.lc33.tokenvault.ui.miuix.AppPreferenceGroup
 import com.lc33.tokenvault.ui.miuix.AppScaffold
 import com.lc33.tokenvault.ui.miuix.AppTopBar
 import com.lc33.tokenvault.ui.miuix.SectionTitle
@@ -69,69 +70,69 @@ fun SettingsScreen(
         ) {
             item { SectionTitle(text = stringResource(Res.string.settings_group_settings)) }
             item {
-                AppArrowRow(
-                    title = stringResource(Res.string.settings_appearance),
-                    summary = stringResource(Res.string.settings_appearance_summary),
-                    onClick = onOpenAppearance,
-                )
-            }
-            item {
-                AppArrowRow(
-                    title = stringResource(Res.string.settings_security),
-                    summary = stringResource(Res.string.settings_security_summary),
-                    onClick = onOpenSecurity,
-                )
-            }
-            item {
-                AppArrowRow(
-                    title = stringResource(Res.string.settings_probe),
-                    summary = stringResource(Res.string.settings_probe_summary),
-                    onClick = onOpenProbeSettings,
-                )
-            }
-            item {
-                AppArrowRow(
-                    title = stringResource(Res.string.settings_profiles),
-                    summary = stringResource(Res.string.settings_profiles_summary),
-                    onClick = onOpenProfiles,
-                )
-            }
-            item {
-                AppArrowRow(
-                    title = stringResource(Res.string.settings_data),
-                    summary = stringResource(Res.string.settings_data_summary),
-                    onClick = onOpenData,
-                )
+                AppPreferenceGroup {
+                    AppArrowRow(
+                        title = stringResource(Res.string.settings_appearance),
+                        summary = stringResource(Res.string.settings_appearance_summary),
+                        onClick = onOpenAppearance,
+                    )
+                    AppArrowRow(
+                        title = stringResource(Res.string.settings_security),
+                        summary = stringResource(Res.string.settings_security_summary),
+                        onClick = onOpenSecurity,
+                    )
+                    AppArrowRow(
+                        title = stringResource(Res.string.settings_probe),
+                        summary = stringResource(Res.string.settings_probe_summary),
+                        onClick = onOpenProbeSettings,
+                    )
+                    AppArrowRow(
+                        title = stringResource(Res.string.settings_profiles),
+                        summary = stringResource(Res.string.settings_profiles_summary),
+                        onClick = onOpenProfiles,
+                    )
+                    AppArrowRow(
+                        title = stringResource(Res.string.settings_data),
+                        summary = stringResource(Res.string.settings_data_summary),
+                        onClick = onOpenData,
+                    )
+                }
             }
 
             item { SectionTitle(text = stringResource(Res.string.settings_group_sync)) }
             item {
-                AppArrowRow(
-                    title = stringResource(Res.string.settings_sync_row),
-                    summary = stringResource(Res.string.settings_sync_row_summary),
-                    onClick = onOpenSync,
-                )
+                AppPreferenceGroup {
+                    AppArrowRow(
+                        title = stringResource(Res.string.settings_sync_row),
+                        summary = stringResource(Res.string.settings_sync_row_summary),
+                        onClick = onOpenSync,
+                    )
+                }
             }
 
             item { SectionTitle(text = stringResource(Res.string.settings_group_about)) }
             item {
-                AppArrowRow(
-                    title = stringResource(Res.string.settings_about_row),
-                    summary = stringResource(Res.string.settings_about_row_summary),
-                    onClick = onOpenAbout,
-                )
+                AppPreferenceGroup {
+                    AppArrowRow(
+                        title = stringResource(Res.string.settings_about_row),
+                        summary = stringResource(Res.string.settings_about_row_summary),
+                        onClick = onOpenAbout,
+                    )
+                }
             }
 
             item { SectionTitle(text = stringResource(Res.string.settings_group_update)) }
             item {
-                AppArrowRow(
-                    title = stringResource(Res.string.settings_update_row),
-                    summary = stringResource(
-                        Res.string.settings_update_row_summary,
-                        APP_VERSION_NAME,
-                    ),
-                    onClick = onOpenUpdate,
-                )
+                AppPreferenceGroup {
+                    AppArrowRow(
+                        title = stringResource(Res.string.settings_update_row),
+                        summary = stringResource(
+                            Res.string.settings_update_row_summary,
+                            APP_VERSION_NAME,
+                        ),
+                        onClick = onOpenUpdate,
+                    )
+                }
             }
         }
     }

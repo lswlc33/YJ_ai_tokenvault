@@ -14,8 +14,6 @@ import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import top.yukonga.miuix.kmp.basic.Button
-import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Checkbox
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Surface
@@ -28,61 +26,11 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
  * 单独一个文件而不是塞进 [AppText] 那一批里：M0.8 包的是"页面骨架要用的"，
  * 这一批是"引导与解锁要用的"，两批的改动节奏不一样，混在一个 500 行的文件里
  * 每次都要整份重读。
- */
-
-/**
- * 主动作按钮。一屏里最多一个——引导的「继续」、BootCorrupt 页的「从备份恢复」。
  *
- * 用 MIUIX 的 `Button` + `buttonColorsPrimary()`，不是自己拼 `Surface`：
- * 按下态、禁用态的配色都由库给，换主题时不会漏。
+ * 阶段3 UI 规范整改：删掉 `AppPrimaryButton` / `AppSecondaryButton` 两个长方形实心按钮
+ * 封装——MIUIX 的实心 `Button` 只允许出现在弹窗/对话框里，页面主体一律用文本按钮
+ * （见 AppComponents.kt 的 [AppTextButton]，`primary` 区分主动作/次动作）。
  */
-@Composable
-fun AppPrimaryButton(
-    text: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-) {
-    Button(
-        onClick = onClick,
-        modifier = modifier,
-        enabled = enabled,
-        colors = ButtonDefaults.buttonColorsPrimary(),
-    ) {
-        Text(
-            text = text,
-            color = if (enabled) {
-                MiuixTheme.colorScheme.onPrimary
-            } else {
-                MiuixTheme.colorScheme.disabledOnPrimaryButton
-            },
-            style = MiuixTheme.textStyles.button,
-            maxLines = 1,
-        )
-    }
-}
-
-/** 次要动作按钮。与 [AppPrimaryButton] 同形不同色，用在"清空重来"这类不该抢眼的出口上。 */
-@Composable
-fun AppSecondaryButton(
-    text: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-) {
-    Button(
-        onClick = onClick,
-        modifier = modifier,
-        enabled = enabled,
-    ) {
-        Text(
-            text = text,
-            color = MiuixTheme.colorScheme.onSurface,
-            style = MiuixTheme.textStyles.button,
-            maxLines = 1,
-        )
-    }
-}
 
 /**
  * 数字键盘上的一个键。

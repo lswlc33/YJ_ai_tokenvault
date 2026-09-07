@@ -25,6 +25,7 @@ import tokenvault.shared.generated.resources.data_title
 import tokenvault.shared.generated.resources.groups_title
 import com.lc33.tokenvault.ui.miuix.AppArrowRow
 import com.lc33.tokenvault.ui.miuix.AppDialog
+import com.lc33.tokenvault.ui.miuix.AppPreferenceGroup
 import com.lc33.tokenvault.ui.miuix.SectionTitle
 
 /**
@@ -49,36 +50,40 @@ fun DataScreen(
     SettingsSubPage(titleRes = Res.string.data_title, onBack = onBack) {
         item { SectionTitle(text = stringResource(Res.string.data_section_organize)) }
         item {
-            AppArrowRow(
-                title = stringResource(Res.string.groups_title),
-                summary = stringResource(Res.string.data_groups_summary),
-                onClick = onOpenGroups,
-            )
+            AppPreferenceGroup {
+                AppArrowRow(
+                    title = stringResource(Res.string.groups_title),
+                    summary = stringResource(Res.string.data_groups_summary),
+                    onClick = onOpenGroups,
+                )
+            }
         }
 
         item { SectionTitle(text = stringResource(Res.string.data_section_log)) }
         item {
-            AppArrowRow(
-                title = stringResource(Res.string.data_log),
-                summary = stringResource(Res.string.data_log_summary),
-                onClick = onOpenLog,
-            )
+            AppPreferenceGroup {
+                AppArrowRow(
+                    title = stringResource(Res.string.data_log),
+                    summary = stringResource(Res.string.data_log_summary),
+                    onClick = onOpenLog,
+                )
+            }
         }
 
         item { SectionTitle(text = stringResource(Res.string.data_section_danger)) }
         item {
-            AppArrowRow(
-                title = stringResource(Res.string.data_clear_probe),
-                summary = stringResource(Res.string.data_clear_probe_summary),
-                onClick = { confirmProbe = true },
-            )
-        }
-        item {
-            AppArrowRow(
-                title = stringResource(Res.string.data_clear_log),
-                summary = stringResource(Res.string.data_clear_log_summary),
-                onClick = { confirmLog = true },
-            )
+            AppPreferenceGroup {
+                AppArrowRow(
+                    title = stringResource(Res.string.data_clear_probe),
+                    summary = stringResource(Res.string.data_clear_probe_summary),
+                    onClick = { confirmProbe = true },
+                )
+                AppArrowRow(
+                    title = stringResource(Res.string.data_clear_log),
+                    summary = stringResource(Res.string.data_clear_log_summary),
+                    onClick = { confirmLog = true },
+                )
+            }
         }
     }
 

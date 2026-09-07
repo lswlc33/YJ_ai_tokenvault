@@ -30,6 +30,7 @@ import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppDialog
 import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppIconButton
+import com.lc33.tokenvault.ui.miuix.AppPreferenceGroup
 import com.lc33.tokenvault.ui.miuix.AppScaffold
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
@@ -96,17 +97,17 @@ fun AboutScreen(onBack: () -> Unit) {
                 }
             }
             item {
-                AppArrowRow(
-                    title = stringResource(Res.string.about_encryption_row),
-                    summary = stringResource(Res.string.about_encryption_row_summary),
-                    onClick = { showEncryptionDialog = true },
-                )
-            }
-            item {
-                AppArrowRow(
-                    title = stringResource(Res.string.about_not_password_manager_row),
-                    summary = stringResource(Res.string.about_not_password_manager_summary),
-                )
+                AppPreferenceGroup {
+                    AppArrowRow(
+                        title = stringResource(Res.string.about_encryption_row),
+                        summary = stringResource(Res.string.about_encryption_row_summary),
+                        onClick = { showEncryptionDialog = true },
+                    )
+                    AppArrowRow(
+                        title = stringResource(Res.string.about_not_password_manager_row),
+                        summary = stringResource(Res.string.about_not_password_manager_summary),
+                    )
+                }
             }
         }
     }

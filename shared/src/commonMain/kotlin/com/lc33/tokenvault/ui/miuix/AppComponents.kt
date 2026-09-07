@@ -37,6 +37,7 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.PullToRefresh
 import top.yukonga.miuix.kmp.basic.SmallTitle
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.TabRow
 import top.yukonga.miuix.kmp.basic.Text
@@ -133,6 +134,28 @@ fun AppCard(
     )
 }
 
+/**
+ * 一组 preference 项的容器（"分组"）。
+ *
+ * MIUIX 的 preference 组件（ArrowPreference / SwitchPreference / OverlayDropdownPreference…）
+ * 底层是 [BasicComponent]，**不带背景**，只是 56dp 高的一行。HyperOS 设置页里它们总是
+ * 包在一个圆角卡片里成组（红线：项目必须包含在 group 中）——这个组件就是那个卡片。
+ *
+ * 与 [AppCard] 的区别：内边距为 0。preference 项自己已经带了 16dp 的
+ * [BasicComponentDefaults.InsideMargin]，外面再叠 16dp 就会变成 32dp、行明显过胖。
+ */
+@Composable
+fun AppPreferenceGroup(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    AppCard(
+        modifier = modifier,
+        insideMargin = PaddingValues(0.dp),
+        content = content,
+    )
+}
+
 @Composable
 fun SectionTitle(text: String, modifier: Modifier = Modifier) {
     SmallTitle(text = text, modifier = modifier)
@@ -156,18 +179,30 @@ fun AppArrowRow(
     )
 }
 
+/**
+ * 文本按钮。页面主体与弹窗里唯一的"按钮"形态（红线：MIUIX 长方形实心按钮不进页面主体）。
+ *
+ * [primary] 控制强调级别：主动作（"开始"、"确认"、"从备份恢复"）用主色实底
+ * （`textButtonColorsPrimary`），次动作/危险出口（"取消"、"清空重来"）用默认浅色。
+ */
 @Composable
 fun AppTextButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    primary: Boolean = false,
 ) {
     TextButton(
         text = text,
         onClick = onClick,
         modifier = modifier,
         enabled = enabled,
+        colors = if (primary) {
+            ButtonDefaults.textButtonColorsPrimary()
+        } else {
+            ButtonDefaults.textButtonColors()
+        },
     )
 }
 
