@@ -695,3 +695,38 @@ FAB 换删除、底部"改分组"条；批量删除二次确认（文案写清�
    还差 `FLAG_SECURE` 的 connectedTest（功能上已验证——M4 详情页明文弹层截屏全黑）、
    Room 迁移测试（当前只有 v1，升 v2 时补）。
 5. M8 的 WorkManager 拉取（可砍）。
+
+## 双端迁移（2026-09-07 起，见 `迁移计划.md`）
+
+**安全模型已按迁移计划阶段1 降级为「记事本级」**：数据不重要、不追求高强度防护。据此
+**删除**了：生物识别、恢复密钥、独立备份口令、`FLAG_SECURE`（`SecureFlag` 整个类）；
+KDF 从 Argon2id 降到 PBKDF2-HMAC-SHA256（密钥库从 BouncyCastle 换 `cryptography-kotlin`）。
+**下文（含 36 条红线与 M0–M10 段落）凡涉及这四样的叙述都是迁移前的历史，以本节为准**：
+明文弹层截图不再全黑（设备已实测）、备份口令即 PIN、改 PIN 仍是 O(1) 重包裹。
+`detail_key_secret_hint` 等承诺「截不了图」的文案已同步删句（2026-09-07）。
+
+- **阶段1–3 已完成**：`:shared` 模块（commonMain 收八个纯 Kotlin 包 + engine/backup/screens/ui），
+  Hilt→Koin、OkHttp→Ktor、Room 仍留 `:app`（Android 专属），485 键字符串迁 `composeResources`，
+  MIUIX 走 KMP 坐标。Android 每阶段独立构建全绿。
+- **阶段4 进行中**：CI macOS runner 挂了 `:shared:compileKotlinIosArm64` + 模拟器测试 +
+  未签名 IPA；`iosApp` 是验证构建链路的空壳（SwiftUI 占位页，真正的 iOS UI 未挂）。
+  **iosMain 只能在 CI 上编译验证**（本机 Windows 编不了 iOS）。
+
+### 迁移后设备冒烟（2026-09-07，Android 15 @ 127.0.0.1:7555）
+
+发现并修复三个启动级回归（都是「单测绿但设备起不来/进不去」）：
+
+1. **composeResources 根本没进 APK**：AGP 9 KMP 库插件 × CMP 1.11.1 的 assets 挂接断裂
+   （`copyAndroidMainComposeResourcesToAndroidAssets` 的 `outputDirectory` 无人赋值，
+   `addGeneratedSourceDirectory(wiredWith)` 旧签名失效）。中文系统启动即
+   `MissingResourceException`。修复：shared 侧反射补输出目录 + app 侧自建
+   `CopySharedComposeAssetsTask` 接进各 variant 的 assets（两个 build.gradle.kts 里有
+   同名注释块，改模块名/包名时注意同步）。
+2. **Koin 漏接口绑定**：阶段2 抽出的 `ProbeSession` / `IdleLockSuspender` 没写
+   `single<接口>`，引导完成进金库即 `NoDefinitionFoundException`。Hilt 的 `@Binds`
+   在 Koin 里必须显式写绑定，`get()` 不查子类型。
+3. **`detail_key_secret_hint` 撑谎**（见上）。
+
+冒烟通过项：引导四步 → 重启锁屏 → PIN 解锁（PBKDF2 跨进程解密）→ 三级页导航 →
+手动新建（端点实时预览）→ 加密写密钥（库内 64 字节密文、元数据明文）→ 详情解出明文 →
+仪表盘真计数（1 供应商 / 1 密钥）→ 后台 68 秒自动锁定 → 解锁恢复。
