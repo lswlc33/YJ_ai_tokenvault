@@ -11,8 +11,6 @@ import androidx.compose.runtime.Composable
  *
  * 导出：用户选目标文件后，平台调用 [onExportPicked] 回调，传入「写字节」的 suspend 函数；
  * 导入：用户选源文件后，平台读字节并调用 [onImportPicked] 回调。
- *
- * iOS 端（阶段4 在 mac CI 补 UIDocumentPicker 实现）暂为 no-op。
  */
 @Composable
 expect fun rememberBackupFilePicker(
