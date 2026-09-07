@@ -424,8 +424,9 @@ private fun HeaderCard(
             .fillMaxWidth()
             .padding(horizontal = tokens.screenPadding),
     ) {
-        if (provider.note != null) {
-            AppText(text = provider.note, style = AppTextStyle.Body)
+        val note = provider.note
+        if (note != null) {
+            AppText(text = note, style = AppTextStyle.Body)
         }
         AppText(
             text = provider.host,
@@ -440,10 +441,11 @@ private fun HeaderCard(
             provider.protocols.forEach { protocol -> AppChip(text = protocol) }
         }
         // 余额：三种状态要可区分（§9.3）——有金额 / 查询失败 / 没配置。
+        val balance = provider.balance
         when {
-            provider.balance != null -> {
+            balance != null -> {
                 AppText(
-                    text = provider.balance.toDisplay(),
+                    text = balance.toDisplay(),
                     style = AppTextStyle.Title,
                     modifier = Modifier.padding(top = tokens.itemSpacing),
                 )

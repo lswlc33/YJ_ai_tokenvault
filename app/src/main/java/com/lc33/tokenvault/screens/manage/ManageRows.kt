@@ -105,9 +105,10 @@ internal fun ProviderRow(
                     )
                     if (row.pinned) AppChip(text = stringResource(R.string.manage_pinned))
                 }
-                if (row.note != null) {
+                val note = row.note
+                if (note != null) {
                     AppText(
-                        text = row.note,
+                        text = note,
                         style = AppTextStyle.Footnote,
                         color = appSecondaryTextColor,
                         maxLines = 1,
@@ -121,9 +122,10 @@ internal fun ProviderRow(
                 )
             }
             Column(horizontalAlignment = Alignment.End) {
-                if (row.balance != null) {
+                val balance = row.balance
+                if (balance != null) {
                     AppText(
-                        text = "${row.balance.currency} ${row.balance.amount}",
+                        text = "${balance.currency} ${balance.amount}",
                         style = AppTextStyle.Body,
                         maxLines = 1,
                     )
@@ -228,17 +230,19 @@ internal fun KeyRow(
             }
             Column(horizontalAlignment = Alignment.End) {
                 StatusDot(color = colorOf(row.health), label = labelOf(row.health))
-                if (row.latencyMs != null) {
+                val latencyMs = row.latencyMs
+                if (latencyMs != null) {
                     AppText(
-                        text = stringResource(R.string.manage_latency, row.latencyMs),
+                        text = stringResource(R.string.manage_latency, latencyMs),
                         style = AppTextStyle.Footnote,
                         color = appSecondaryTextColor,
                     )
                 }
-                if (row.checkedAt != null) {
+                val checkedAt = row.checkedAt
+                if (checkedAt != null) {
                     // 分档是纯函数、文案在资源里，所以"算"在这里而不是在 ViewModel（它拿不到资源）
                     AppText(
-                        text = relativeLabel(nowMs, row.checkedAt),
+                        text = relativeLabel(nowMs, checkedAt),
                         style = AppTextStyle.Footnote,
                         color = appSecondaryTextColor,
                     )
@@ -282,9 +286,10 @@ internal fun ModelRow(row: UiModelRow, onClick: (() -> Unit)? = null) {
             }
             Column(horizontalAlignment = Alignment.End) {
                 StatusDot(color = colorOf(row.health), label = labelOf(row.health))
-                if (row.contextLabel != null) {
+                val contextLabel = row.contextLabel
+                if (contextLabel != null) {
                     AppText(
-                        text = stringResource(R.string.manage_context, row.contextLabel),
+                        text = stringResource(R.string.manage_context, contextLabel),
                         style = AppTextStyle.Footnote,
                         color = appSecondaryTextColor,
                     )

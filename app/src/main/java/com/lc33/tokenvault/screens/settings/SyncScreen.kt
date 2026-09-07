@@ -80,7 +80,8 @@ private fun StatusCard(backup: BackupStatus, onExport: () -> Unit) {
             .padding(horizontal = tokens.screenPadding, vertical = tokens.itemSpacing),
     ) {
         AppText(text = stringResource(R.string.dashboard_backup_title), style = AppTextStyle.Subtitle)
-        if (backup.lastBackupAgo == null) {
+        val lastBackupAgo = backup.lastBackupAgo
+        if (lastBackupAgo == null) {
             AppText(
                 text = stringResource(R.string.dashboard_backup_never),
                 style = AppTextStyle.Secondary,
@@ -91,7 +92,7 @@ private fun StatusCard(backup: BackupStatus, onExport: () -> Unit) {
             AppText(
                 text = stringResource(
                     R.string.dashboard_backup_last,
-                    backup.lastBackupAgo,
+                    lastBackupAgo,
                     backup.targetLabel ?: "",
                 ),
                 style = AppTextStyle.Secondary,

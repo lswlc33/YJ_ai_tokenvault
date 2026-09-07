@@ -69,13 +69,14 @@ internal fun BalanceCard(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 CardTitle(stringResource(R.string.dashboard_balance_title))
-                if (balance.updatedAt != null) {
+                val updatedAt = balance.updatedAt
+                if (updatedAt != null) {
                     // 分档在纯函数里、文案在资源里（RelativeTime.kt 就是为此拆开的），
                     // 所以 ViewModel 给的是时间戳而不是一句“12 分钟前”
                     AppText(
                         text = stringResource(
                             R.string.dashboard_balance_updated,
-                            relativeLabel(nowMs, balance.updatedAt),
+                            relativeLabel(nowMs, updatedAt),
                         ),
                         style = AppTextStyle.Footnote,
                         color = appSecondaryTextColor,
@@ -320,7 +321,8 @@ internal fun BackupCard(backup: BackupStatus, onOpenSync: () -> Unit) {
     val palette = LocalStatusPalette.current
     AppCard(modifier = cardModifier()) {
         CardTitle(stringResource(R.string.dashboard_backup_title))
-        if (backup.lastBackupAgo == null) {
+        val lastBackupAgo = backup.lastBackupAgo
+        if (lastBackupAgo == null) {
             AppText(
                 text = stringResource(R.string.dashboard_backup_never),
                 style = AppTextStyle.Secondary,
@@ -331,7 +333,7 @@ internal fun BackupCard(backup: BackupStatus, onOpenSync: () -> Unit) {
             AppText(
                 text = stringResource(
                     R.string.dashboard_backup_last,
-                    backup.lastBackupAgo,
+                    lastBackupAgo,
                     backup.targetLabel ?: "",
                 ),
                 style = AppTextStyle.Secondary,
