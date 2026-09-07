@@ -102,11 +102,12 @@ kotlin {
     // 各平台 source set 的依赖。cryptography-kotlin / kotlinx-serialization /
     // kotlinx-datetime / kotlinx-coroutines 都是 KMP 库，直接放 commonMain。
     sourceSets {
-        // android 与 jvm 共享的源集：FileBootStore 这类“java.io.File 原子写”的代码
-        // 只写一份（阶段4；iOS 用 NSFileManager 的独立实现）。
-        val jvmAndroid by creating { dependsOn(commonMain.get()) }
-        androidMain { dependsOn(jvmAndroid) }
-        jvmMain { dependsOn(jvmAndroid) }
+        // 注意：**不要**用 creating + dependsOn 自建中间源集（比如 jvmAndroid）——那会让
+        // 默认层级模板整体失效，iosMain 从 iOS target 上脱落，expect/actual 全断（阶段4
+        // 踩过）。共享代码用 srcDir：同一目录被两个 target 各编一次，依赖图不动。
+        // src/jvmAndroid/ 装 FileBootStore（java.io.File 原子写，Android 与 JVM 同一份）。
+        androidMain { kotlin.srcDir("src/jvmAndroid/kotlin") }
+        jvmMain { kotlin.srcDir("src/jvmAndroid/kotlin") }
 
         commonMain {
             // 挂载 generateBuildInfo 生成的 BuildInfo.kt（版本号常量）。
