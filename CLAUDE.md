@@ -708,9 +708,36 @@ KDF 从 Argon2id 降到 PBKDF2-HMAC-SHA256（密钥库从 BouncyCastle 换 `cryp
 - **阶段1–3 已完成**：`:shared` 模块（commonMain 收八个纯 Kotlin 包 + engine/backup/screens/ui），
   Hilt→Koin、OkHttp→Ktor、Room 仍留 `:app`（Android 专属），485 键字符串迁 `composeResources`，
   MIUIX 走 KMP 坐标。Android 每阶段独立构建全绿。
-- **阶段4 进行中**：CI macOS runner 挂了 `:shared:compileKotlinIosArm64` + 模拟器测试 +
-  未签名 IPA；`iosApp` 是验证构建链路的空壳（SwiftUI 占位页，真正的 iOS UI 未挂）。
-  **iosMain 只能在 CI 上编译验证**（本机 Windows 编不了 iOS）。
+- **阶段4 已完成（2026-09-07，待真机验收）**：Room 数据层整体迁 commonMain（Room KMP，
+  `@ConstructedBy` + 逐 target KSP；schema 基线随迁 `shared/schemas`）；Koin 拆成
+  coreModule/viewModelModule（跨平台）+ platformModule（expect/actual：Android 走框架
+  SupportSQLite 路径保持既有库文件行为不变，iOS 走 BundledSQLiteDriver + Callback
+  （外键 PRAGMA 与手写索引的时机与 Android 对齐），JVM 同 iOS）；iOS 平台件全套
+  （BaseBootStore 把解析/损坏判定收成 commonMain 一份，iOS 原子写走 NSFileManager；
+  剪贴板 UIPasteboard localOnly + 未变才清）；`MainViewController()` 挂真实 Compose
+  入口，Swift 壳只剩 UIViewControllerRepresentable。**未签名 IPA 已是完整应用**，
+  签名即可装。
+  CI 要点：macos-26 + 最新稳定版 Xcode（CMP 的 libCMPUIKitUtils.a 引用私有
+  UIUtilities 的 `UIViewLayoutRegion`，Xcode ≤16.4 设备 SDK 无此符号）；K/N 链接要 6g
+  堆（用户级 gradle.properties，只影响 ios job）。
+  已知能力边界：前台空闲锁定与屏幕关闭即锁定在 iOS 无公开 API，用进后台兑底；
+  boot 原子写不 fsync（NSData atomically），撕裂不会发生、断电可能回退一版。
+
+### 阶段4 踩坑记录（改 iosMain / shared 构建前先看）
+
+1. **自建中间源集会让默认层级模板整体失效**：`creating + dependsOn` 建 jvmAndroid
+   会让 iosMain 从 iOS target 上脱落，expect/actual 全断。共享代码用 `srcDir` 同目录
+   双挂，不动依赖图（shared/build.gradle.kts 有同名注释）。
+2. **iosArm64/iosSimulatorArm64 的 klib 编译在 Windows 本机就能跑**（编译不需 Mac，
+   链接才需要）：改 iosMain 先本地 `:shared:compileKotlinIosArm64` 再推 CI，别拿
+   12 分钟一轮的 CI 当编译器。
+3. **ObjC API 的 Kotlin 形态**：类属性/类方法要 `X.Companion.y` 或直接 `X.y`
+   （`UIPasteboard.general` 是 Swift overlay 名，klib 里叫 `generalPasteboard`）；
+   `NSString.create` 过载返回 `Any` 要显式转型；`NSNumber` 的类工厂方法不可见，
+   用构造器 `NSNumber(bool = true)`；Foundation 的 `error:` 参数要
+   `@OptIn(ExperimentalForeignApi::class)`。
+4. **CMP 1.11+ 的 iOS 设备框架必须用 Xcode 26 SDK 链**（见上），否则
+   `_OBJC_CLASS_$_UIViewLayoutRegion` 未定义。
 
 ### 迁移后设备冒烟（2026-09-07，Android 15 @ 127.0.0.1:7555）
 
