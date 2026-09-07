@@ -17,32 +17,6 @@ import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
 import com.lc33.tokenvault.ui.theme.LocalStatusPalette
 
-/** 改 PIN 的三步。顺序即流程。 */
-enum class ChangePinStep {
-    Current,
-    New,
-    Confirm,
-}
-
-/**
- * 改 PIN（红线 2、§7.1）。
- *
- * 和 [OnboardingUiState] 一样：**不放明文**，只放位数与上一次错在哪。
- *
- * @param backoff 验旧 PIN 那一步的退避状态。**这一步必须和解锁页一样受退避约束**——
- *   否则拿到已解锁手机的人可以在这一页无限次试旧 PIN，改 PIN 页就成了绕开 §7.2 的入口。
- *   后端的 `VaultSession.unlockWithPin` 本来就会计次，界面这边把倒计时画出来即可。
- */
-@Immutable
-data class ChangePinUiState(
-    val step: ChangePinStep = ChangePinStep.Current,
-    val pinLength: Int = 0,
-    val pinSlots: Int = 6,
-    val error: PinError? = null,
-    val busy: Boolean = false,
-    val backoff: UnlockBackoff = UnlockBackoff(),
-)
-
 /**
  * 改 PIN（设置 → 安全 → 修改 PIN）。
  *
@@ -103,12 +77,14 @@ fun ChangePinScreen(
             )
             Spacer(Modifier.height(tokens.itemSpacing))
         } else if (state.error != null) {
-            AppText(
-                text = stringResource(pinErrorRes(state.error)),
-                style = AppTextStyle.Body,
-                color = LocalStatusPalette.current.error,
-                textAlign = TextAlign.Center,
-            )
+            state.error?.let { error ->
+                AppText(
+                    text = stringResource(pinErrorRes(error)),
+                    style = AppTextStyle.Body,
+                    color = LocalStatusPalette.current.error,
+                    textAlign = TextAlign.Center,
+                )
+            }
             Spacer(Modifier.height(tokens.itemSpacing))
         }
 

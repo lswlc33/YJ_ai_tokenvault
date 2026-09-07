@@ -155,12 +155,14 @@ private fun PinStep(state: OnboardingUiState, callbacks: LockCallbacks) {
     PinDots(filled = state.pinLength, slots = state.pinSlots, isError = state.error != null)
     Spacer(Modifier.height(tokens.itemSpacing))
     if (state.error != null) {
-        AppText(
-            text = stringResource(pinErrorRes(state.error)),
-            style = AppTextStyle.Body,
-            color = LocalStatusPalette.current.error,
-            textAlign = TextAlign.Center,
-        )
+        state.error?.let { error ->
+            AppText(
+                text = stringResource(pinErrorRes(error)),
+                style = AppTextStyle.Body,
+                color = LocalStatusPalette.current.error,
+                textAlign = TextAlign.Center,
+            )
+        }
         Spacer(Modifier.height(tokens.itemSpacing))
     }
     PinKeypad(

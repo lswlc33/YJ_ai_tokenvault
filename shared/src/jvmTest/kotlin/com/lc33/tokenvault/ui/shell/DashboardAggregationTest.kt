@@ -8,10 +8,10 @@ import com.lc33.tokenvault.domain.model.ProviderSummary
 import com.lc33.tokenvault.screens.model.AttentionKind
 import com.lc33.tokenvault.screens.model.UiHealth
 import com.lc33.tokenvault.screens.model.UiMoney
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
-import org.junit.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * 仪表盘那六块卡上的数字（§13.4）。

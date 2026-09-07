@@ -7,8 +7,8 @@ import com.lc33.tokenvault.domain.model.AiModel
 import com.lc33.tokenvault.domain.model.ProviderAccount
 import com.lc33.tokenvault.screens.model.UiHealth
 import com.lc33.tokenvault.screens.model.UiModelSource
-import org.junit.Assert.assertEquals
-import org.junit.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
 /**
  * 详情页模型行与账号行的映射（§13.4）。

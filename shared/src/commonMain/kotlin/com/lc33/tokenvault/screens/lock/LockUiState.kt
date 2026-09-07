@@ -1,6 +1,7 @@
 package com.lc33.tokenvault.screens.lock
 
 import androidx.compose.runtime.Immutable
+import com.lc33.tokenvault.domain.UnlockBackoff
 
 /**
  * 锁屏与引导这几页的 UI 状态（计划.md §7.1–7.4、§13.1）。
@@ -42,6 +43,32 @@ enum class PinError {
     /** PIN 不对（解锁）。 */
     Wrong,
 }
+
+/** 改 PIN 的三步。顺序即流程。 */
+enum class ChangePinStep {
+    Current,
+    New,
+    Confirm,
+}
+
+/**
+ * 改 PIN（红线 2、§7.1）。
+ *
+ * 和 [OnboardingUiState] 一样：**不放明文**，只放位数与上一次错在哪。
+ *
+ * @param backoff 验旧 PIN 那一步的退避状态。**这一步必须和解锁页一样受退避约束**——
+ *   否则拿到已解锁手机的人可以在这一页无限次试旧 PIN，改 PIN 页就成了绕开 §7.2 的入口。
+ *   后端的 `VaultSession.unlockWithPin` 本来就会计次，界面这边把倒计时画出来即可。
+ */
+@Immutable
+data class ChangePinUiState(
+    val step: ChangePinStep = ChangePinStep.Current,
+    val pinLength: Int = 0,
+    val pinSlots: Int = 6,
+    val error: PinError? = null,
+    val busy: Boolean = false,
+    val backoff: UnlockBackoff = UnlockBackoff(),
+)
 
 /**
  * 引导页。

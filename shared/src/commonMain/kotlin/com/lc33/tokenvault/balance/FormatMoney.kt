@@ -18,11 +18,27 @@ package com.lc33.tokenvault.balance
 object FormatMoney {
 
     /** 定点舍入到 2 位小数（"分"）。所有展示与求和前的唯一入口。 */
-    fun roundedCents(amount: Double): Long =
-        // Math.round 是跨平台的四舍五入（HALF_UP 对正数等价）；对负数，金额场景不出现，
-        // 且 HALF_UP 语义是"远离零"，Math.round 是"向上取整"，负数时会差一分，
-        // 但余额不会为负，这里不额外处理。
-        kotlin.math.round(amount * 100.0).toLong()
+    fun roundedCents(amount: Double): Long {
+        // 等价 BigDecimal.valueOf(amount).setScale(2, HALF_UP)。关键在**不能用浮点乘法**
+        // （round(x * 100) 会把 0.005 算成 0，因为 0.005*100 = 0.4999...）：
+        // BigDecimal.valueOf 内部用 Double.toString 拿到**最短精确十进制表示**再精确舍入，
+        // 这里同样基于字符串做十进制 HALF_UP 舍入到 2 位。
+        val s = amount.toString() // 如 "0.005"、"42.099999999999994"、"358.0"、"-3.0"
+        val negative = s.startsWith("-")
+        val body = if (negative) s.substring(1) else s
+        val dot = body.indexOf('.')
+        val intPart = if (dot < 0) body else body.substring(0, dot)
+        val fracPart = if (dot < 0) "" else body.substring(dot + 1)
+
+        // 小数补齐到 3 位：前两位是"分"，第三位决定 HALF_UP 进位。
+        val frac = fracPart.padEnd(3, '0')
+        val whole = intPart.toLong()
+        val cents = frac.substring(0, 2).toInt()
+        val roundUp = frac[2] >= '5'
+
+        val total = whole * 100 + cents + (if (roundUp) 1 else 0)
+        return if (negative) -total else total
+    }
 
     /** 两个金额相加（先各自舍入再相加），返回"分"。 */
     fun addCents(a: Double, b: Double): Long = roundedCents(a) + roundedCents(b)
