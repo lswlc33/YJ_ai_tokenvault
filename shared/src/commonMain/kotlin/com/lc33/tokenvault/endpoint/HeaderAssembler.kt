@@ -101,8 +101,11 @@ object HeaderAssembler {
         return out
     }
 
-    private val PLACEHOLDER_REGEX = Regex("""\{([a-z_]+)}""")
-    private val RANDOM_HEX_REGEX = Regex("""\{random_hex:(\d+)}""")
+    // 两边的 `}` 都必须转义：JVM 的 java.util.regex 接受未转义的 `}`，但 Android 的
+    // ICU regex 拒绝（PatternSyntaxException）——阶段2 迁入 commonMain 后单测跑在 JVM
+    // 上抓不到这个分叉，设备上探测一跑就 ExceptionInInitializerError。
+    private val PLACEHOLDER_REGEX = Regex("""\{([a-z_]+)\}""")
+    private val RANDOM_HEX_REGEX = Regex("""\{random_hex:(\d+)\}""")
 
     private fun defaultRandomHex(n: Int): String {
         val chars = "0123456789abcdef"
