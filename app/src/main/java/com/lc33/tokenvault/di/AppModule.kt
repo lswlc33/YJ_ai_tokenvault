@@ -49,8 +49,10 @@ import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.domain.repo.TransactionRunner
 import com.lc33.tokenvault.engine.BackupEngine
 import com.lc33.tokenvault.engine.BalanceEngine
+import com.lc33.tokenvault.engine.IdleLockSuspender
 import com.lc33.tokenvault.engine.ProbeEngine
 import com.lc33.tokenvault.engine.UpdateEngine
+import com.lc33.tokenvault.engine.ProbeSession
 import com.lc33.tokenvault.net.HostGate
 import com.lc33.tokenvault.net.HttpEngine
 import com.lc33.tokenvault.net.ProxyProvider
@@ -137,6 +139,12 @@ val appModule = module {
     }
 
     single { VaultSession(bootStore = get(), nowEpochMs = System::currentTimeMillis, random = get(), knownSecrets = get()) }
+
+    // 阶段2 抽出的引擎侧接口。Hilt 的 @Binds 迁到 Koin 后必须显式写绑定：
+    // get() 只按精确类型解析、不查子类型，漏了这两个定义时启动即
+    // NoDefinitionFoundException（ProbeEngine/BackupEngine 构造不出来）。
+    single<ProbeSession> { get<VaultSession>() }
+    single<IdleLockSuspender> { get<AutoLocker>() }
 
     single {
         AutoLocker(
