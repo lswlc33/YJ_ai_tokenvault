@@ -26,5 +26,13 @@ captures/
 .DS_Store
 Thumbs.db
 
+# iOS / Xcode（iosApp 空壳工程，阶段4）
+iosApp/build/
+iosApp/iosApp.xcodeproj/xcuserdata/
+iosApp/iosApp.xcodeproj/project.xcworkspace/xcuserdata/
+*.ipa
+*.xcarchive
+DerivedData/
+
 # WorkBuddy 项目数据（本地工作记忆，不入库）
 .workbuddy/

@@ -29,6 +29,17 @@ kotlin {
     iosArm64()
     iosSimulatorArm64()
 
+    // 给 iOS 产出的 framework 命名。默认会按 project 名 `shared` 产 `Shared.framework`，
+    // 这里显式写死 baseName，让 iosApp 的 Xcode 工程能稳定引用 `Shared`。
+    // 用 dynamic framework（默认），这样 `embedAndSignAppleFrameworkForXcode` 任务会被注册，
+    // Xcode 的 build phase 脚本能调用它完成 embed；未签名构建时（CODE_SIGNING_ALLOWED=NO）
+    // 它只 embed 不签名。
+    listOf(iosArm64(), iosSimulatorArm64()).forEach { target ->
+        target.binaries.framework {
+            baseName = "Shared"
+        }
+    }
+
     // JVM 目标：让纯 Kotlin 包在 JVM 上跑单测（本机无 Mac 也能验证逻辑）。
     jvm()
 

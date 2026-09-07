@@ -110,23 +110,86 @@ jobs:
           path: app/build/outputs/apk/nightly/*.apk
           if-no-files-found: error
 
-      # 只有签过名的包才值得挂到预发布上：未签名的 APK 装不上，
-      # 放上去只会让人下到一个不能用的文件。
-      - name: 刷新 nightly 预发布
-        if: github.ref == 'refs/heads/master' && env.signed == 'true'
+  # iOS：在 macOS runner 上编译 shared.framework + 空壳 iosApp，产出未签名 .ipa。
+  # 未签名（CODE_SIGNING_ALLOWED=NO）——目的只是验证 iOS 构建链路，不装真机。
+  ios:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: xcodebuild 无签名构建（含 shared.framework）
+        run: |
+          set -eu
+          cd iosApp
+          xcodebuild \
+            -project iosApp.xcodeproj \
+            -scheme iosApp \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            -archivePath build/iosApp.xcarchive \
+            archive
+
+      - name: 打包未签名 .ipa
+        run: |
+          set -eu
+          APP=iosApp/build/iosApp.xcarchive/Products/Applications/iosApp.app
+          mkdir -p iosApp/build/ipa/Payload
+          cp -R "$APP" iosApp/build/ipa/Payload/
+          cd iosApp/build/ipa
+          zip -r -y ../TokenVault-unsigned.ipa Payload
+          echo "产出：iosApp/build/TokenVault-unsigned.ipa"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightly-ipa
+          path: iosApp/build/TokenVault-unsigned.ipa
+          if-no-files-found: error
+
+  # 汇总 APK + IPA，一起挂到 nightly-build 预发布。
+  release:
+    needs: [build, ios]
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: 刷新 nightly 预发布（APK + IPA）
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -eu
-          apk=$(find app/build/outputs/apk/nightly -name '*.apk' | head -n 1)
+          apk=$(find artifacts/nightly-apk -name '*.apk' | head -n 1)
+          ipa=$(find artifacts/nightly-ipa -name '*.ipa' | head -n 1)
+          files=()
+          [ -n "$apk" ] && files+=("$apk")
+          [ -n "$ipa" ] && files+=("$ipa")
           # 预发布 tag 用 nightly-build：仓库有一条「ref 创建限制」规则禁止创建名为
           # `nightly` 的 tag（GH013 "Cannot create ref due to creations being
           # restricted"），换名绕开。GITHUB_TOKEN 也不能通过 release API 隐式建 tag，
           # 所以先显式 git push 更新 tag，再对已存在的 tag 建 release。
           git push origin "$GITHUB_SHA:refs/tags/nightly-build" --force
           gh release delete nightly-build --yes > /dev/null 2>&1 || true
-          # tag 已显式创建，这里不传 --target（--target 只接受分支/SHA，不接受 tag 名，
-          # 传了会报 "Release.target_commitish is invalid"）。
-          gh release create nightly-build "$apk" \
+          gh release create nightly-build "${files[@]}" \
             --prerelease --title "nightly-build" \
             --notes "自动构建于 $GITHUB_SHA（$(date -u '+%Y-%m-%d %H:%M UTC')）"
