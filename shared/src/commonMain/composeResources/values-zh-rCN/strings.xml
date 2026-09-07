@@ -529,7 +529,7 @@
     <string name="detail_key_label">标签</string>
     <string name="detail_key_label_hint">用来区分同一家的几把密钥，可以留空。</string>
     <string name="detail_key_secret">密钥</string>
-    <string name="detail_key_secret_hint">粘贴进来就好。它在进库之前就已经加密，这一屏也截不了图。</string>
+    <string name="detail_key_secret_hint">粘贴进来就好。它在进库之前就已经加密。</string>
     <string name="detail_key_sheet_title">这把密钥</string>
     <string name="detail_key_set_default">设为默认</string>
     <string name="detail_key_delete_title">删掉这把密钥？</string>

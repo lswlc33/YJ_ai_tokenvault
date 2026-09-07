@@ -534,7 +534,7 @@
     <string name="detail_key_label">Label</string>
     <string name="detail_key_label_hint">Tells apart several keys of the same provider. Can be left empty.</string>
     <string name="detail_key_secret">Key</string>
-    <string name="detail_key_secret_hint">Paste it in. It is encrypted before it reaches the database, and this screen cannot be captured.</string>
+    <string name="detail_key_secret_hint">Paste it in. It is encrypted before it reaches the database.</string>
     <string name="detail_key_sheet_title">This key</string>
     <string name="detail_key_set_default">Set as default</string>
     <string name="detail_key_delete_title">Delete this key?</string>
