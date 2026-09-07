@@ -26,6 +26,7 @@ import com.lc33.tokenvault.data.repo.FieldCipher
 import com.lc33.tokenvault.data.repo.ImportWriter
 import com.lc33.tokenvault.data.repo.RoomApiKeyRepository
 import com.lc33.tokenvault.data.repo.RoomAuditLogRepository
+import com.lc33.tokenvault.data.repo.RoomBackupStore
 import com.lc33.tokenvault.data.repo.RoomClientProfileRepository
 import com.lc33.tokenvault.data.repo.RoomGroupRepository
 import com.lc33.tokenvault.data.repo.RoomModelRepository
@@ -36,6 +37,7 @@ import com.lc33.tokenvault.data.repo.RoomSettingsRepository
 import com.lc33.tokenvault.data.repo.RoomTransactionRunner
 import com.lc33.tokenvault.data.repo.TransactionRunner
 import com.lc33.tokenvault.data.seed.ProfileSeeder
+import com.lc33.tokenvault.backup.BackupStore
 import com.lc33.tokenvault.domain.repo.ApiKeyRepository
 import com.lc33.tokenvault.domain.repo.AuditLogRepository
 import com.lc33.tokenvault.domain.repo.ClientProfileRepository
@@ -198,12 +200,17 @@ val appModule = module {
     single { ProxyProvider(get()) }
     single { HttpEngine(client = get<ProxyProvider>().client, hostGate = get()) }
     single { com.lc33.tokenvault.backup.BackupCodec(get()) }
-    single {
-        BackupEngine(
+    single<BackupStore> {
+        RoomBackupStore(
             groupDao = get(), providerDao = get(), keyDao = get(), accountDao = get(),
             profileDao = get(), modelDao = get(), probeRunDao = get(), appSettingDao = get(),
-            cipher = get(), transactions = get(), bootStore = get(), codec = get(),
-            random = get(), audit = get(), autoLocker = get(), now = get(named(Qualifiers.NOW)),
+            cipher = get(), transactions = get(), bootStore = get(), now = get(named(Qualifiers.NOW)),
+        )
+    }
+    single {
+        BackupEngine(
+            store = get(), codec = get(), random = get(), audit = get(),
+            autoLocker = get(), now = get(named(Qualifiers.NOW)),
         )
     }
     single { BalanceEngine(get(), get(), get(), get(), get(named(Qualifiers.NOW))) }
