@@ -117,16 +117,25 @@ jobs:
   # iOS：在 macOS runner 上编译 shared.framework + iosApp 壳，产出未签名 .ipa。
   # 未签名（CODE_SIGNING_ALLOWED=NO）——目的只是验证 iOS 构建链路，不装真机。
   #
-  # macos-15（Xcode 16 系 SDK）：CMP 1.11.1 的 libCMPUIKitUtils.a 引用了
-  # UIViewLayoutRegion，Xcode 15.4（macos-14 默认）的 iPhoneOS SDK 没有这个符号；
-  # 阶段4 之前没暴露是因为空壳入口没人引用 Compose 的 UIKit 代码，破链接器死消除
-  # 兴幸漏网——换成真入口后必须用新 SDK。
+  # macos-26（Xcode 26 系 SDK）：CMP 1.11/1.12 的 libCMPUIKitUtils.a 引用了
+  # UIViewLayoutRegion（私有 UIUtilities 框架），Xcode 15.4/16.4 的 iPhoneOS SDK
+  # 都没导出这个符号；阶段4 之前空壳入口没人引用 Compose 的 UIKit 代码，靠链接器
+  # 死消除兴幸没炸——换成真入口后必须用新 SDK。镜像默认可能不是最新，这里显式选
+  # 最新的稳定版 Xcode（跳过 beta）。
   ios:
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+
+      - name: 选最新稳定版 Xcode
+        run: |
+          set -eu
+          XCODE=$(ls -d /Applications/Xcode*.app | grep -vi beta | sort -V | tail -1)
+          echo "使用 $XCODE"
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
 
       - uses: actions/setup-java@v5
         with:
