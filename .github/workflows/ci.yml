@@ -174,7 +174,7 @@ jobs:
         with:
           path: artifacts
 
-      - name: 刷新 nightly 预发布（APK + IPA）
+      - name: 发布 nightly 预发布（APK + IPA）
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -184,12 +184,12 @@ jobs:
           files=()
           [ -n "$apk" ] && files+=("$apk")
           [ -n "$ipa" ] && files+=("$ipa")
-          # 预发布 tag 用 nightly-build：仓库有一条「ref 创建限制」规则禁止创建名为
-          # `nightly` 的 tag（GH013 "Cannot create ref due to creations being
-          # restricted"），换名绕开。GITHUB_TOKEN 也不能通过 release API 隐式建 tag，
-          # 所以先显式 git push 更新 tag，再对已存在的 tag 建 release。
-          git push origin "$GITHUB_SHA:refs/tags/nightly-build" --force
-          gh release delete nightly-build --yes > /dev/null 2>&1 || true
-          gh release create nightly-build "${files[@]}" \
-            --prerelease --title "nightly-build" \
+          # 预发布 tag 用带日期的 `nightly-YYYYMMDD`，每天一个。
+          # 原因：固定名 `nightly-build` 这个 tag 被仓库的 ref 保护规则锁死
+          # （force-push 报 GH013 "Cannot update this protected ref"，delete 报
+          # "Cannot delete this tag"），且 `nightly` 也被 ref 创建限制规则禁止。
+          # 带日期的名字不在任何限制内，能正常创建，绕开锁定。
+          tag="nightly-$(date -u '+%Y%m%d')"
+          gh release create "$tag" "${files[@]}" \
+            --prerelease --title "$tag" \
             --notes "自动构建于 $GITHUB_SHA（$(date -u '+%Y-%m-%d %H:%M UTC')）"
