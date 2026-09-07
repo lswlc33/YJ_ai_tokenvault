@@ -29,6 +29,9 @@ jobs:
           set -u
           fail=0
           src=app/src/main/java/com/lc33/tokenvault
+          # 阶段2 起纯 Kotlin 包迁到 shared/src/commonMain，规则 1 要同时扫两处，
+          # 否则"纯 Kotlin 层不依赖平台"这条 grep 防线就空转了。
+          shared_src=shared/src/commonMain/kotlin/com/lc33/tokenvault
           check() { # check <说明> <命中即失败的命令>
             if eval "$2" > /tmp/hit 2>/dev/null && [ -s /tmp/hit ]; then
               echo "::error::$1"; sed 's/^/    /' /tmp/hit; fail=1
@@ -37,8 +40,9 @@ jobs:
 
           # 1. 八个纯 Kotlin 包：零 Android / 零 AndroidX / 零 OkHttp，且不许直接读当前时间
           pure="$src/domain $src/endpoint $src/probe $src/balance $src/catalog $src/importer $src/backup $src/crypto"
+          pure_shared="$shared_src/domain $shared_src/endpoint $shared_src/probe $shared_src/balance $shared_src/catalog $shared_src/importer $shared_src/backup $shared_src/crypto"
           existing=""
-          for d in $pure; do [ -d "$d" ] && existing="$existing $d"; done
+          for d in $pure $pure_shared; do [ -d "$d" ] && existing="$existing $d"; done
           if [ -n "$existing" ]; then
             check "纯 Kotlin 层出现了平台依赖（计划.md 红线 20）" \
               "grep -rnE 'import (android|androidx)\.|import okhttp3\.|Clock\.System' $existing --include='*.kt'"
@@ -124,7 +128,28 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      # Kotlin/Native 编译器与依赖缓存（~/.konan）：首次要下载 1GB+，缓存后快一大截。
+      # 迁移计划 §4.1 明确要求缓存，否则每次 20 分钟起步。
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.konan
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ios-${{ runner.os }}-${{ hashFiles('gradle/libs.versions.toml', 'shared/build.gradle.kts') }}
+          restore-keys: |
+            ios-${{ runner.os }}-
+
       - uses: gradle/actions/setup-gradle@v4
+
+      # 4.1 编译验证：先确认 shared 能编过 iOS（arm64 真机 + 模拟器），
+      # 再跑模拟器测试（不需要签名）。这一步尽早暴露 iOS 侧编译问题，
+      # 别等 xcodebuild archive 那一步才发现。
+      - name: iOS 编译验证 + 模拟器测试
+        run: |
+          set -eu
+          ./gradlew :shared:compileKotlinIosArm64 :shared:compileKotlinIosSimulatorArm64 --console=plain
+          ./gradlew :shared:iosSimulatorArm64Test --console=plain
 
       - name: xcodebuild 无签名构建（含 shared.framework）
         run: |

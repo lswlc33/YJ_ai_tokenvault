@@ -1,10 +1,10 @@
 package com.lc33.tokenvault.backup
 
 import com.lc33.tokenvault.crypto.KdfParams
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
-import org.junit.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /**
  * 备份包编解码（§12.1）纯函数测试（测试 11 的核心）。

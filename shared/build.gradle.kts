@@ -61,6 +61,8 @@ kotlin {
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.coroutines.core)
+            // backup/ 的 gzip（GzipSink/GzipSource 全 KMP，native 走 zlib）。
+            implementation(libs.okio)
             // Ktor Client（阶段2 OkHttp→Ktor）：net/ 层的 HTTP 引擎。
             // 用 `api` 而不是 `implementation`：HttpEngine / ProxyProvider 的公开构造签名里
             // 有 io.ktor.client.HttpClient，:app 需要能看见它。

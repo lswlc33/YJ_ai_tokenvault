@@ -400,9 +400,10 @@ class BackupEngine constructor(
     private suspend fun resolveProfiles(profiles: List<BackupProfile>): Map<String, Long> {
         val result = mutableMapOf<String, Long>()
         for (profile in profiles) {
-            val key = profile.builtinKey ?: profile.name
-            val existing = if (profile.builtinKey != null) {
-                profileDao.findByBuiltinKey(profile.builtinKey)
+            val builtinKey = profile.builtinKey
+            val key = builtinKey ?: profile.name
+            val existing = if (builtinKey != null) {
+                profileDao.findByBuiltinKey(builtinKey)
             } else {
                 profileDao.findAll().firstOrNull { it.name == profile.name && it.builtinKey == null }
             }

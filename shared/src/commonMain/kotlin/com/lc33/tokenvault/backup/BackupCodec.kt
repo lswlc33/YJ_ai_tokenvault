@@ -9,7 +9,6 @@ import dev.whyoleg.cryptography.BinarySize.Companion.bits
 import dev.whyoleg.cryptography.DelicateCryptographyApi
 import dev.whyoleg.cryptography.algorithms.AES
 import kotlinx.serialization.json.Json
-import java.nio.ByteBuffer
 
 /**
  * 备份包的编解码（§12.1）。纯 Kotlin，零 Android 依赖，JVM 单测全覆盖。
@@ -32,6 +31,9 @@ import java.nio.ByteBuffer
  *
  * **阶段1 迁移**：口令派生从 Argon2id 换成 PBKDF2，AES-GCM 从 BouncyCastle 换成
  * cryptography-kotlin。备份口令默认沿用 PIN（不再有独立备份口令）。
+ *
+ * **阶段2 迁移**：`java.nio.ByteBuffer` 换成手写大端字节操作（跨平台，iOS 无 java.nio）。
+ * 布局字节与旧实现逐字节一致（magic + 4 字节 BE 长度 + header + body）。
  */
 class BackupCodec(private val random: RandomBytes = SecureRandomBytes) {
 
@@ -66,12 +68,13 @@ class BackupCodec(private val random: RandomBytes = SecureRandomBytes) {
             // `密文‖tag`（不带 nonce），我们自己拼进包
             val body = sealWith(cipher, nonce, payload, headerBytes)
 
-            val out = ByteBuffer.allocate(MAGIC.size + 4 + headerBytes.size + body.size)
-            out.put(MAGIC)
-            out.putInt(headerBytes.size)
-            out.put(headerBytes)
-            out.put(body)
-            out.array()
+            // 手写拼接（替代 ByteBuffer）：magic + 4 字节 BE headerLen + header + body
+            val out = ByteArray(MAGIC.size + 4 + headerBytes.size + body.size)
+            MAGIC.copyInto(out, 0)
+            writeIntBE(out, MAGIC.size, headerBytes.size)
+            headerBytes.copyInto(out, MAGIC.size + 4)
+            body.copyInto(out, MAGIC.size + 4 + headerBytes.size)
+            out
         } finally {
             key.zeroize()
             nonce.zeroize()
@@ -89,7 +92,7 @@ class BackupCodec(private val random: RandomBytes = SecureRandomBytes) {
         if (!bytes.copyOfRange(0, MAGIC.size).contentEquals(MAGIC)) {
             throw BackupCorruptException("bad magic")
         }
-        val headerLen = ByteBuffer.wrap(bytes, MAGIC.size, 4).int
+        val headerLen = readIntBE(bytes, MAGIC.size)
         if (headerLen <= 0 || headerLen > bytes.size - MAGIC.size - 4) {
             throw BackupCorruptException("bad header length $headerLen")
         }
@@ -142,6 +145,21 @@ class BackupCodec(private val random: RandomBytes = SecureRandomBytes) {
     private companion object {
         val MAGIC = "YJVAULT1".encodeToByteArray()
         const val TAG_BITS = 128
+
+        /** 往 [out] 的 [offset] 处写 4 字节大端 int（替代 ByteBuffer.putInt）。 */
+        fun writeIntBE(out: ByteArray, offset: Int, value: Int) {
+            out[offset] = (value ushr 24).toByte()
+            out[offset + 1] = (value ushr 16).toByte()
+            out[offset + 2] = (value ushr 8).toByte()
+            out[offset + 3] = value.toByte()
+        }
+
+        /** 从 [bytes] 的 [offset] 处读 4 字节大端 int（替代 ByteBuffer.wrap(...).int）。 */
+        fun readIntBE(bytes: ByteArray, offset: Int): Int =
+            ((bytes[offset].toInt() and 0xff) shl 24) or
+                ((bytes[offset + 1].toInt() and 0xff) shl 16) or
+                ((bytes[offset + 2].toInt() and 0xff) shl 8) or
+                (bytes[offset + 3].toInt() and 0xff)
     }
 }
 

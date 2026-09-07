@@ -32,21 +32,39 @@ class ArchitectureRulesTest {
         "crypto",
     )
 
-    private val sourceRoot: File = sequenceOf(
+    // 两个源码根：app 是 Android 工程（UI 还在 app），shared 是阶段2 抽出的纯 Kotlin 层。
+    // 纯 Kotlin 包（domain/endpoint/probe/balance/catalog/importer/backup/crypto）迁到
+    // shared/src/commonMain 后，架构规则必须改扫 shared，否则"纯 Kotlin 层不依赖平台"
+    // 这条防线就空转了（app 里这些包已是空目录）。
+    private val appSourceRoot: File = sequenceOf(
         File("src/main/java/com/lc33/tokenvault"),
         File("app/src/main/java/com/lc33/tokenvault"),
-    ).firstOrNull { it.isDirectory } ?: error("找不到主源码目录")
+    ).firstOrNull { it.isDirectory } ?: error("找不到 app 主源码目录")
 
-    private fun kotlinFilesUnder(vararg relativePaths: String): List<File> =
+    private val sharedSourceRoot: File = sequenceOf(
+        File("shared/src/commonMain/kotlin/com/lc33/tokenvault"),
+        File("../shared/src/commonMain/kotlin/com/lc33/tokenvault"),
+    ).firstOrNull { it.isDirectory } ?: error("找不到 shared 主源码目录")
+
+    private fun kotlinFilesUnder(root: File, vararg relativePaths: String): List<File> =
         relativePaths
-            .map { sourceRoot.resolve(it) }
+            .map { root.resolve(it) }
             .filter { it.isDirectory }
             .flatMap { dir -> dir.walkTopDown().filter { it.isFile && it.extension == "kt" }.toList() }
 
-    private val allKotlinFiles: List<File>
-        get() = sourceRoot.walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
+    private fun allKotlinFiles(root: File): List<File> =
+        root.walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
 
-    private fun File.relative(): String = relativeTo(sourceRoot).path.replace('\\', '/')
+    private fun File.relPathOf(root: File): String = relativeTo(root).path.replace('\\', '/')
+
+    /** 两个根混扫时，按所属根算出带前缀的相对路径，便于定位违规文件。 */
+    private fun File.displayPath(): String {
+        return if (absolutePath.startsWith(sharedSourceRoot.absolutePath)) {
+            "shared/" + relativeTo(sharedSourceRoot).path.replace('\\', '/')
+        } else {
+            relativeTo(appSourceRoot).path.replace('\\', '/')
+        }
+    }
 
     private fun fail(rule: String, violations: List<String>) {
         assertTrue(
@@ -69,11 +87,15 @@ class ArchitectureRulesTest {
             "Clock.System" to "直接读当前时间（必须注入 Clock，否则测试变成时间敏感的）",
         )
         val violations = mutableListOf<String>()
-        for (file in kotlinFilesUnder(*pureKotlinPackages.toTypedArray())) {
-            val text = file.readText()
-            for ((needle, why) in banned) {
-                if (text.contains(needle)) {
-                    violations += "${file.relative()} 出现 $needle —— $why"
+        // 纯 Kotlin 包在阶段2 已迁到 shared/src/commonMain，这里扫 shared；同时扫 app 兜底，
+        // 防止有人把平台依赖塞回 app 里残留的同名包。
+        for (root in listOf(appSourceRoot, sharedSourceRoot)) {
+            for (file in kotlinFilesUnder(root, *pureKotlinPackages.toTypedArray())) {
+                val text = file.readText()
+                for ((needle, why) in banned) {
+                    if (text.contains(needle)) {
+                        violations += "${file.relPathOf(root)} 出现 $needle —— $why"
+                    }
                 }
             }
         }
@@ -82,10 +104,10 @@ class ArchitectureRulesTest {
 
     @Test
     fun `只有 ui-miuix 能 import MIUIX`() {
-        val violations = allKotlinFiles
-            .filter { !it.relative().startsWith("ui/miuix/") }
+        val violations = allKotlinFiles(appSourceRoot)
+            .filter { !it.relPathOf(appSourceRoot).startsWith("ui/miuix/") }
             .filter { it.readText().contains("import top.yukonga.miuix") }
-            .map { "${it.relative()} 直接 import 了 MIUIX" }
+            .map { "${it.relPathOf(appSourceRoot)} 直接 import 了 MIUIX" }
         fail(
             "MIUIX 是实验期库，API 可能无预告变更，所以只允许 ui/miuix/ 这一层直接引用它" +
                 "（计划.md §4.3）：",
@@ -98,9 +120,9 @@ class ArchitectureRulesTest {
         // 用正则拼出被禁的名字，这样本文件里不出现那些字面量，仓库级 grep 不会自己撞上自己。
         val bannedWindowComponents =
             Regex("""\bWindow(?:Dialog|BottomSheet|[A-Za-z]*Popup|[A-Za-z]*Menu|[A-Za-z]*Preference)\b""")
-        val violations = allKotlinFiles
+        val violations = allKotlinFiles(appSourceRoot)
             .mapNotNull { file ->
-                bannedWindowComponents.find(file.readText())?.let { "${file.relative()} 用了 ${it.value}" }
+                bannedWindowComponents.find(file.readText())?.let { "${file.relPathOf(appSourceRoot)} 用了 ${it.value}" }
             }
         fail(
             "那一族是独立系统窗口、与页面组合树脱钩；弹层统一用 Overlay*" +
@@ -113,11 +135,11 @@ class ArchitectureRulesTest {
     fun `screens 里不出现 SQL 与 HTTP 构造`() {
         val sqlKeywords = Regex("""\b(SELECT\s|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM|CREATE\s+TABLE)""")
         val violations = mutableListOf<String>()
-        for (file in kotlinFilesUnder("screens")) {
+        for (file in kotlinFilesUnder(appSourceRoot, "screens")) {
             val text = file.readText()
-            sqlKeywords.find(text)?.let { violations += "${file.relative()} 出现 SQL：${it.value.trim()}" }
+            sqlKeywords.find(text)?.let { violations += "${file.relPathOf(appSourceRoot)} 出现 SQL：${it.value.trim()}" }
             if (text.contains("Request.Builder")) {
-                violations += "${file.relative()} 直接构造 HTTP 请求"
+                violations += "${file.relPathOf(appSourceRoot)} 直接构造 HTTP 请求"
             }
         }
         fail("页面层不碰 SQL，也不构造 HTTP 请求（计划.md §4.3）：", violations)
@@ -126,9 +148,9 @@ class ArchitectureRulesTest {
     @Test
     fun `仓库里不出现真实密钥形态的字面量`() {
         val keyShaped = Regex("""sk-[A-Za-z0-9]{20,}""")
-        val violations = allKotlinFiles
+        val violations = (allKotlinFiles(appSourceRoot) + allKotlinFiles(sharedSourceRoot))
             .mapNotNull { file ->
-                keyShaped.find(file.readText())?.let { "${file.relative()} 出现疑似真实密钥" }
+                keyShaped.find(file.readText())?.let { "${file.displayPath()} 出现疑似真实密钥" }
             }
         fail("真实凭据永不入库（计划.md §0、§14.2）：", violations)
     }
@@ -136,10 +158,10 @@ class ArchitectureRulesTest {
     @Test
     fun `Compose 代码里没有中文字面量`() {
         val violations = mutableListOf<String>()
-        for (file in allKotlinFiles) {
+        for (file in allKotlinFiles(appSourceRoot) + allKotlinFiles(sharedSourceRoot)) {
             val offenders = chineseStringLiteralsIn(file.readText())
             if (offenders.isNotEmpty()) {
-                violations += "${file.relative()}: " + offenders.joinToString(", ") { "\"$it\"" }
+                violations += "${file.displayPath()}: " + offenders.joinToString(", ") { "\"$it\"" }
             }
         }
         fail(

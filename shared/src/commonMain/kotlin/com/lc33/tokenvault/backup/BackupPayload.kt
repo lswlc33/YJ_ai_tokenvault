@@ -1,10 +1,10 @@
 package com.lc33.tokenvault.backup
 
 import kotlinx.serialization.Serializable
-import java.io.ByteArrayInputStream
-import java.io.ByteArrayOutputStream
-import java.util.zip.GZIPInputStream
-import java.util.zip.GZIPOutputStream
+import okio.Buffer
+import okio.GzipSink
+import okio.GzipSource
+import okio.buffer
 
 /**
  * 备份包的 payload（§12.1）。纯 Kotlin，零 Android 依赖。
@@ -25,6 +25,9 @@ import java.util.zip.GZIPOutputStream
  *    `ProfileSeeder` 生成。
  *
  * 所有枚举字段存 wireName 字符串（`domain/Kinds.kt` 的统一立场：枚举改名不改数据含义）。
+ *
+ * **阶段2 迁移**：gzip 从 `java.util.zip` 换成 okio 的 [GzipSink] / [GzipSource]（全 KMP，
+ * native 走 zlib）。两者都产标准 gzip（RFC 1952），字节与旧实现互相兼容。
  */
 
 // ------------------------------------------------------------------ 条目 DTO
@@ -161,16 +164,15 @@ data class BackupPayload(
 
 /** payload JSON → gzip 字节。 */
 fun gzip(bytes: ByteArray): ByteArray {
-    val out = ByteArrayOutputStream()
-    GZIPOutputStream(out).use { it.write(bytes) }
-    return out.toByteArray()
+    val buffer = Buffer()
+    GzipSink(buffer).buffer().use { sink -> sink.write(bytes) }
+    return buffer.readByteArray()
 }
 
 /** gzip 字节 → payload JSON。损坏抛 [BackupCorruptException]（红线 8，不返回 null）。 */
 fun gunzip(bytes: ByteArray): ByteArray = try {
-    val input = ByteArrayInputStream(bytes)
-    val gzip = GZIPInputStream(input)
-    gzip.use { it.readBytes() }
+    val buffer = Buffer().write(bytes)
+    GzipSource(buffer).buffer().use { it.readByteArray() }
 } catch (t: Throwable) {
     throw BackupCorruptException("bad gzip payload")
 }

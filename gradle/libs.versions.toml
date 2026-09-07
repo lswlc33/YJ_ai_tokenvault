@@ -38,6 +38,8 @@ junit = "4.13.2"
 turbine = "1.2.1"
 androidxTestExtJunit = "1.3.0"
 androidxTestRunner = "1.7.0"
+# okio：KMP IO 库，backup/ 的 gzip 用（GzipSink/GzipSource 已 multiplatform，native 走 zlib）。
+okio = "3.18.1"
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -119,6 +121,7 @@ kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutine
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 # KMP 单测框架（commonTest 用）
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
+okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
 
 # --- 加密 ---
 # cryptography-kotlin：KMP 密码库，PBKDF2 / HKDF / AES-GCM / HMAC-SHA256 全支持。

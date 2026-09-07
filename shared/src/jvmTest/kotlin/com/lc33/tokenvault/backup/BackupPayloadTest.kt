@@ -1,9 +1,9 @@
 package com.lc33.tokenvault.backup
 
 import kotlinx.serialization.json.Json
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
-import org.junit.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * BackupPayload 序列化与 gzip（§12.1）纯函数测试。
