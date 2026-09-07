@@ -1,6 +1,6 @@
 package com.lc33.tokenvault
 
-import org.jetbrains.compose.ui.window.ComposeUIViewController
+import androidx.compose.ui.window.ComposeUIViewController
 import com.lc33.tokenvault.data.seed.ProfileSeeder
 import com.lc33.tokenvault.di.Qualifiers
 import com.lc33.tokenvault.di.coreModule
@@ -11,7 +11,7 @@ import com.lc33.tokenvault.platform.AutoLocker
 import com.lc33.tokenvault.ui.shell.AppRoot
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import org.koin.core.context.GlobalContext
+import org.koin.core.Koin
 import org.koin.core.context.startKoin
 import org.koin.core.qualifier.named
 import platform.Foundation.NSNotificationCenter
@@ -43,10 +43,9 @@ fun MainViewController(): UIViewController {
 }
 
 private fun initIosApp() {
-    startKoin {
+    val koin: Koin = startKoin {
         modules(platformModule, coreModule, viewModelModule)
-    }
-    val koin = GlobalContext.get()
+    }.koin
     val autoLocker = koin.get<AutoLocker>()
     val settings = koin.get<SettingsRepository>()
     val appScope = koin.get<CoroutineScope>(named(Qualifiers.APP_SCOPE))
