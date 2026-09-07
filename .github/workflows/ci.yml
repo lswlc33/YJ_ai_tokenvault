@@ -156,6 +156,14 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # K/N 链 Release 框架（整个 Compose UI + Room + miuix）比仓库级 4g 堆吃得还多。
+      # 用户级 gradle.properties 优先于仓库级，且只影响本 job（ubuntu 的 build job 不受牵连）。
+      - name: 拾高 Gradle 堆（iOS 链接需要）
+        run: |
+          mkdir -p ~/.gradle
+          printf 'org.gradle.jvmargs=-Xmx6g -Dfile.encoding=UTF-8\n' > ~/.gradle/gradle.properties
+          cat ~/.gradle/gradle.properties
+
       # 4.1 编译验证：先确认 shared 能编过 iOS（arm64 真机 + 模拟器），
       # 再跑模拟器测试（不需要签名）。这一步尽早暴露 iOS 侧编译问题，
       # 别等 xcodebuild archive 那一步才发现。
