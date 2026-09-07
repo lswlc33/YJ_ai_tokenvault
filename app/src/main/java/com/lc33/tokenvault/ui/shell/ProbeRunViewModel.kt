@@ -8,8 +8,6 @@ import com.lc33.tokenvault.engine.ProbeEngine
 import com.lc33.tokenvault.probe.ProbeItemResult
 import com.lc33.tokenvault.screens.model.ProbeRunSummary
 import com.lc33.tokenvault.screens.probe.ProbeItemRow
-import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -25,8 +23,7 @@ import kotlinx.coroutines.flow.stateIn
  * 分组规则（§13.4）：失败项、本轮未探测项、成功项三组分开——未探测不是失败（红线 11），
  * 混在一起会让用户以为有 N 个东西坏了而其实只坏了 M 个。
  */
-@HiltViewModel
-class ProbeRunViewModel @Inject constructor(
+class ProbeRunViewModel constructor(
     private val probeEngine: ProbeEngine,
     probeRunDao: ProbeRunDao,
 ) : ViewModel() {

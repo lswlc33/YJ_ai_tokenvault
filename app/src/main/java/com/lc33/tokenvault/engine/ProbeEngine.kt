@@ -7,8 +7,6 @@ import com.lc33.tokenvault.crypto.zeroize
 import com.lc33.tokenvault.data.dao.ApiKeyDao
 import com.lc33.tokenvault.data.dao.ProbeRunDao
 import com.lc33.tokenvault.data.entity.ProbeRunEntity
-import com.lc33.tokenvault.di.AppPlaceholders
-import com.lc33.tokenvault.di.NowEpochMs
 import com.lc33.tokenvault.domain.AuthStyle
 import com.lc33.tokenvault.domain.KeyHealth
 import com.lc33.tokenvault.domain.ProbeOutcome
@@ -41,8 +39,6 @@ import com.lc33.tokenvault.probe.ProbeTask
 import com.lc33.tokenvault.probe.ProbeTransport
 import com.lc33.tokenvault.probe.SniffAttempt
 import com.lc33.tokenvault.probe.SniffPlanBuilder
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -58,7 +54,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
- * 探测引擎宿主（计划.md §8.5）。**`@Singleton`，不是 ViewModel**——探测要能跨页面存活，
+ * 探测引擎宿主（计划.md §8.5）。**``，不是 ViewModel**——探测要能跨页面存活，
  * 用户在仪表盘点"开始探测"后切去管理页，引擎不能跟着 ViewModel 一起死。
  *
  * 四条设计决定：
@@ -72,8 +68,7 @@ import kotlinx.coroutines.launch
  * 4. **客户端伪装是数据不是代码**（红线 22）。请求头一律经 [HeaderAssembler] 从
  *    `client_profiles` 表组装，UA / 特征头在这里没有一处硬编码。
  */
-@Singleton
-class ProbeEngine @Inject constructor(
+class ProbeEngine constructor(
     private val providers: ProviderRepository,
     private val keys: ApiKeyRepository,
     private val clientProfiles: ClientProfileRepository,
@@ -86,8 +81,8 @@ class ProbeEngine @Inject constructor(
     private val autoLocker: AutoLocker,
     private val redactor: Redactor,
     private val knownSecrets: KnownSecrets,
-    @NowEpochMs private val now: () -> Long,
-    @AppPlaceholders private val placeholders: Map<String, String>,
+    private val now: () -> Long,
+    private val placeholders: Map<String, String>,
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

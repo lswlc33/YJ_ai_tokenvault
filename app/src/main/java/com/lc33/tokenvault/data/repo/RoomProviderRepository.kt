@@ -7,13 +7,10 @@ import com.lc33.tokenvault.crypto.zeroize
 import com.lc33.tokenvault.data.dao.ProviderDao
 import com.lc33.tokenvault.data.mapper.toDomain
 import com.lc33.tokenvault.data.mapper.toEntity
-import com.lc33.tokenvault.di.NowEpochMs
 import com.lc33.tokenvault.domain.model.BalanceSnapshot
 import com.lc33.tokenvault.domain.model.Provider
 import com.lc33.tokenvault.domain.model.ProviderSummary
 import com.lc33.tokenvault.domain.repo.ProviderRepository
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -23,12 +20,11 @@ import kotlinx.coroutines.flow.map
  * 除了 `balanceTokenEnc` 那一列，这张表全是明文（见 CLAUDE.md 的加密边界表），
  * 所以读路径完全不碰 DEK——列表页在锁定瞬间也不会从 `Flow` 内部抛异常（§6.1 推论 3）。
  */
-@Singleton
-class RoomProviderRepository @Inject constructor(
+class RoomProviderRepository constructor(
     private val dao: ProviderDao,
     private val cipher: FieldCipher,
     private val transactions: TransactionRunner,
-    @param:NowEpochMs private val now: () -> Long,
+    private val now: () -> Long,
 ) : ProviderRepository {
 
     override fun observeSummaries(): Flow<List<ProviderSummary>> =

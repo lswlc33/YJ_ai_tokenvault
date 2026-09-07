@@ -6,8 +6,6 @@ import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.platform.BootState
 import com.lc33.tokenvault.platform.BootStore
 import com.lc33.tokenvault.ui.theme.AppColorSchemeMode
-import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -26,8 +24,7 @@ import kotlinx.coroutines.launch
  * 于是**两处拿到的是两个实例**。如果各记一份内存状态，在外观页里改配色就只有那一页会变，
  * 整棵树的主题不动——而这正是这个类唯一要做的事。派生自单例 store 之后，实例有几个都一样。
  */
-@HiltViewModel
-class AppearanceViewModel @Inject constructor(
+class AppearanceViewModel constructor(
     private val bootStore: BootStore,
     private val settings: SettingsRepository,
 ) : ViewModel() {

@@ -3,8 +3,6 @@ package com.lc33.tokenvault.ui.shell
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lc33.tokenvault.domain.repo.SettingsRepository
-import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -21,8 +19,7 @@ import kotlinx.coroutines.launch
  * `toDoubleOrNull()` 失败就被当成非法、也不会因为 `Double` 的精度在输入过程中反复
  * 抖动。只在保存时做一次解析与校验。
  */
-@HiltViewModel
-class BalanceThresholdsViewModel @Inject constructor(
+class BalanceThresholdsViewModel constructor(
     private val settings: SettingsRepository,
 ) : ViewModel() {
 

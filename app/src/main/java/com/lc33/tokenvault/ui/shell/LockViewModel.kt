@@ -13,8 +13,6 @@ import com.lc33.tokenvault.screens.lock.LockUiState
 import com.lc33.tokenvault.screens.lock.OnboardingStep
 import com.lc33.tokenvault.screens.lock.PinError
 import com.lc33.tokenvault.screens.lock.UnlockUiState
-import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -37,8 +35,7 @@ import kotlinx.coroutines.withContext
  *
  * **阶段1 迁移**：删掉生物识别与恢复密钥两条路，只剩 PIN 解锁与 PIN 引导。
  */
-@HiltViewModel
-class LockViewModel @Inject constructor(
+class LockViewModel constructor(
     private val session: VaultSession,
     private val bootStore: BootStore,
     private val autoLocker: AutoLocker,

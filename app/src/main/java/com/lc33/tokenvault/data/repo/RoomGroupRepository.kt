@@ -5,16 +5,13 @@ import com.lc33.tokenvault.data.mapper.toDomain
 import com.lc33.tokenvault.data.mapper.toEntity
 import com.lc33.tokenvault.domain.model.Group
 import com.lc33.tokenvault.domain.repo.GroupRepository
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 /**
  * 分组。这一张表里没有任何秘密，所以整个类不碰 DEK，锁定态也能读（§6.1 推论 2）。
  */
-@Singleton
-class RoomGroupRepository @Inject constructor(
+class RoomGroupRepository constructor(
     private val dao: GroupDao,
 ) : GroupRepository {
 

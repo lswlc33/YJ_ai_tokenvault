@@ -15,8 +15,6 @@ import com.lc33.tokenvault.screens.model.BackupStatus
 import com.lc33.tokenvault.screens.model.DashboardUiState
 import com.lc33.tokenvault.screens.model.ProbeRunSummary
 import com.lc33.tokenvault.screens.model.UiProviderRow
-import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -42,8 +40,7 @@ import kotlinx.coroutines.launch
  * 4. **不解密**（§6.1 推论 3）：这一页只读 `health` 这类明文列，所以它在锁定态也活得下去
  *    ——虽然锁定时 `LockGate` 会把整棵树换掉，但这条订阅不会在 Flow 内部抛异常。
  */
-@HiltViewModel
-class DashboardViewModel @Inject constructor(
+class DashboardViewModel constructor(
     providers: ProviderRepository,
     keys: ApiKeyRepository,
     settings: SettingsRepository,

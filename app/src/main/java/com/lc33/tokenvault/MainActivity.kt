@@ -10,8 +10,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.fragment.app.FragmentActivity
 import com.lc33.tokenvault.platform.AutoLocker
 import com.lc33.tokenvault.ui.shell.AppRoot
-import dagger.hilt.android.AndroidEntryPoint
-import javax.inject.Inject
+import org.koin.android.ext.android.inject
 
 /**
  * 前台空闲锁定与屏幕关闭即锁定（§7.4）在这里接：
@@ -19,11 +18,9 @@ import javax.inject.Inject
  *   都会回调它，而且不是 androidx 的受限 API）；
  * - 屏幕关闭通过系统广播 `ACTION_SCREEN_OFF` 收，因为进程里没有对应生命周期回调。
  */
-@AndroidEntryPoint
 class MainActivity : FragmentActivity() {
 
-    @Inject
-    lateinit var autoLocker: AutoLocker
+    private val autoLocker: AutoLocker by inject()
 
     /** 屏幕关闭广播。只在 onCreate 里注册一次，随 Activity 生命周期注销。 */
     private val screenOffReceiver = object : BroadcastReceiver() {

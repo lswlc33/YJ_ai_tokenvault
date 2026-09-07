@@ -7,8 +7,6 @@ import com.lc33.tokenvault.domain.repo.GroupRepository
 import com.lc33.tokenvault.domain.repo.ProviderRepository
 import com.lc33.tokenvault.screens.model.ManageUiState
 import com.lc33.tokenvault.screens.model.ProviderSort
-import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -29,8 +27,7 @@ import kotlinx.coroutines.launch
  *    一条**：按家订阅是 N+1，而且新增一家时那一整组 Flow 要重建，列表会闪一下。
  *    这一步不解密（§6.1 推论 3）：health 是明文列，锁定态也读得到。
  */
-@HiltViewModel
-class ManageViewModel @Inject constructor(
+class ManageViewModel constructor(
     private val providers: ProviderRepository,
     private val groups: GroupRepository,
     private val keys: ApiKeyRepository,

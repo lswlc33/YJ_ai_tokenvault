@@ -3,8 +3,6 @@ package com.lc33.tokenvault.ui.shell
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lc33.tokenvault.domain.repo.SettingsRepository
-import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -18,8 +16,7 @@ import kotlinx.coroutines.launch
  * 也避免了每删一个词就写一次库（红线 16 要求每个持久化字段有明确的产生与消费路径，
  * 而「逐字写库」等于把用户还没确认的中间态持久化了）。
  */
-@HiltViewModel
-class ClientKeywordsViewModel @Inject constructor(
+class ClientKeywordsViewModel constructor(
     private val settings: SettingsRepository,
 ) : ViewModel() {
 

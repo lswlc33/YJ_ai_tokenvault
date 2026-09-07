@@ -7,7 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -41,7 +41,7 @@ fun VaultShell() {
 
     // 底栏模糊开关。权威 `app_settings.blurNavBar`，由 AppearanceViewModel 派生——
     // 这里另取一个实例没关系，它派生自单例仓库（同 AppRoot 里配色模式的取法）。
-    val appearance: AppearanceViewModel = hiltViewModel()
+    val appearance: AppearanceViewModel = koinViewModel()
     val blurNavBar by appearance.blurNavBar.collectAsStateWithLifecycle()
 
     // 底栏模糊：backdrop 捕获内容区，NavigationBar 挂 textureBlur。开关关掉时

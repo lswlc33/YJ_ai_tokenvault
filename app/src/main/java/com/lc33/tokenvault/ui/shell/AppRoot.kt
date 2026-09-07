@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import com.lc33.tokenvault.screens.lock.LockCallbacks
 import com.lc33.tokenvault.ui.miuix.AppTheme
 
@@ -21,11 +21,11 @@ import com.lc33.tokenvault.ui.miuix.AppTheme
  */
 @Composable
 fun AppRoot() {
-    val vm: LockViewModel = hiltViewModel()
+    val vm: LockViewModel = koinViewModel()
     val phase by vm.phase.collectAsStateWithLifecycle()
     val uiState by vm.uiState.collectAsStateWithLifecycle()
 
-    val appearance: AppearanceViewModel = hiltViewModel()
+    val appearance: AppearanceViewModel = koinViewModel()
     val colorScheme by appearance.colorScheme.collectAsStateWithLifecycle()
 
     // LockCallbacks 必须 remember 一次：它是 @Immutable，但 Compose 比的是实例相等，

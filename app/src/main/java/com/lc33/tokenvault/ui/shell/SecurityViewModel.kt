@@ -13,8 +13,6 @@ import com.lc33.tokenvault.platform.VaultSession
 import com.lc33.tokenvault.screens.lock.ChangePinStep
 import com.lc33.tokenvault.screens.lock.ChangePinUiState
 import com.lc33.tokenvault.screens.lock.PinError
-import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -42,8 +40,7 @@ import kotlinx.coroutines.withContext
  *
  * **阶段1 迁移**：删掉生物识别与恢复密钥两行。
  */
-@HiltViewModel
-class SecurityViewModel @Inject constructor(
+class SecurityViewModel constructor(
     private val session: VaultSession,
     private val autoLocker: AutoLocker,
     private val settings: SettingsRepository,

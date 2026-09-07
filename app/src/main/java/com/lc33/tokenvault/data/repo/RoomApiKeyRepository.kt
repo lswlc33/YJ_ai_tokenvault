@@ -7,11 +7,8 @@ import com.lc33.tokenvault.crypto.zeroize
 import com.lc33.tokenvault.data.dao.ApiKeyDao
 import com.lc33.tokenvault.data.entity.ApiKeyEntity
 import com.lc33.tokenvault.data.mapper.toDomain
-import com.lc33.tokenvault.di.NowEpochMs
 import com.lc33.tokenvault.domain.model.ApiKey
 import com.lc33.tokenvault.domain.repo.ApiKeyRepository
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -25,14 +22,13 @@ import kotlinx.coroutines.flow.map
  * 所以 [add] 必须**插入 → 加密 → 回填**三步走，并且包在一个事务里：
  * 中间那一瞬间密文列是空的，事务保证没人看得见，也保证崩溃后库里不留半成品。
  */
-@Singleton
-class RoomApiKeyRepository @Inject constructor(
+class RoomApiKeyRepository constructor(
     private val dao: ApiKeyDao,
     private val cipher: FieldCipher,
     private val transactions: TransactionRunner,
     // @param: 是显式声明"这个限定符注在构造参数上"。Kotlin 2.3 起不写会告警，
     // 因为将来默认会同时注到属性上，而属性上的限定符对 Dagger 没有意义
-    @param:NowEpochMs private val now: () -> Long,
+    private val now: () -> Long,
 ) : ApiKeyRepository {
 
     override fun observeByProvider(providerId: Long): Flow<List<ApiKey>> =

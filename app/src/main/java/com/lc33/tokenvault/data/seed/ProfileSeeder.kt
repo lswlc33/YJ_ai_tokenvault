@@ -2,8 +2,6 @@ package com.lc33.tokenvault.data.seed
 
 import com.lc33.tokenvault.data.dao.ClientProfileDao
 import com.lc33.tokenvault.data.mapper.toEntity
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * 种入 8 个内置客户端伪装预设（M2 遗留项，计划.md §8.2）。
@@ -14,8 +12,7 @@ import javax.inject.Singleton
  *
  * 只碰公开数据（预设里没有秘密），所以锁定态也能跑（§6.1 推论 2）。
  */
-@Singleton
-class ProfileSeeder @Inject constructor(
+class ProfileSeeder constructor(
     private val dao: ClientProfileDao,
 ) {
 

@@ -20,8 +20,6 @@ import com.lc33.tokenvault.screens.model.ProviderDetailUiState
 import com.lc33.tokenvault.screens.model.UiHealth
 import com.lc33.tokenvault.screens.model.UiKeyRow
 import com.lc33.tokenvault.screens.model.UiProviderRow
-import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -47,8 +45,7 @@ import kotlinx.coroutines.withContext
  * 解密跑在 [Dispatchers.Default]：单次 AES-GCM 很快，但一家十几把密钥就是十几次
  * GCM 初始化，放主线程上是一次可见的卡顿。
  */
-@HiltViewModel
-class ProviderDetailViewModel @Inject constructor(
+class ProviderDetailViewModel constructor(
     private val providers: ProviderRepository,
     private val keys: ApiKeyRepository,
     private val models: ModelRepository,

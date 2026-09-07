@@ -7,8 +7,6 @@ import com.lc33.tokenvault.importer.ParsedRecord
 import com.lc33.tokenvault.importer.TextImporter
 import com.lc33.tokenvault.platform.SecureClipboard
 import com.lc33.tokenvault.screens.manage.ImportPreview
-import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,8 +26,7 @@ import kotlinx.coroutines.withContext
  * - 剪贴板读出来的整段文本是 `String`（框架接口只给 String），那是"用户粘进来的那一份"，
  *   我们不去复制它。
  */
-@HiltViewModel
-class ImportViewModel @Inject constructor(
+class ImportViewModel constructor(
     private val writer: ImportWriter,
     private val clipboard: SecureClipboard,
 ) : ViewModel() {

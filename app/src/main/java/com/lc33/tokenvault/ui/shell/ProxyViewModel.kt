@@ -3,8 +3,6 @@ package com.lc33.tokenvault.ui.shell
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lc33.tokenvault.domain.repo.SettingsRepository
-import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -17,8 +15,7 @@ import kotlinx.coroutines.launch
  * 的动作在 net 层（纯函数 [com.lc33.tokenvault.net.parseProxy]，net 层唯一一处），
  * 这里只做校验 + 写库。
  */
-@HiltViewModel
-class ProxyViewModel @Inject constructor(
+class ProxyViewModel constructor(
     private val settings: SettingsRepository,
 ) : ViewModel() {
 

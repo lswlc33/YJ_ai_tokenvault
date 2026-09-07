@@ -9,8 +9,6 @@ agp = "9.3.2"
 # Kotlin 2.4.x 目前没有对应的 KSP，所以 Kotlin 停在 2.3 线的最后一个补丁版。
 kotlin = "2.3.21"
 ksp = "2.3.11"
-hilt = "2.60.1"
-androidxHilt = "1.4.0"
 room = "2.8.4"
 composeBom = "2026.08.00"
 activity = "1.13.0"
@@ -52,7 +50,6 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 # KMP 多平台插件（阶段2 抽 :shared）。版本与 kotlin 对齐。
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
-hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 # Room Gradle 插件，用来声明 schema 目录（不用 ksp arg，见 计划.md §15.9）
 room = { id = "androidx.room", version.ref = "room" }
 
@@ -91,15 +88,11 @@ room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
 room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 room-testing = { module = "androidx.room:room-testing", version.ref = "room" }
 
-# --- DI ---
-hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
-hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }
-hilt-android-testing = { module = "com.google.dagger:hilt-android-testing", version.ref = "hilt" }
-# HiltWorker（自动备份、定时探测）
-androidx-hilt-work = { module = "androidx.hilt:hilt-work", version.ref = "androidxHilt" }
-# hiltViewModel()：Compose 里取带 Hilt 注入的 ViewModel（AppRoot 的锁闸要用）
-androidx-hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", version.ref = "androidxHilt" }
-androidx-hilt-compiler = { module = "androidx.hilt:hilt-compiler", version.ref = "androidxHilt" }
+# --- DI（Koin，阶段2 迁移 Hilt→Koin） ---
+koin-core = { module = "io.insert-koin:koin-core", version.ref = "koin" }
+koin-android = { module = "io.insert-koin:koin-android", version.ref = "koin" }
+koin-androidx-compose = { module = "io.insert-koin:koin-androidx-compose", version.ref = "koin" }
+koin-compose-viewmodel = { module = "io.insert-koin:koin-compose-viewmodel", version.ref = "koin" }
 
 # --- 后台任务 ---
 androidx-work-runtime = { module = "androidx.work:work-runtime-ktx", version.ref = "work" }
@@ -117,12 +110,6 @@ ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "kto
 ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
 ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
-
-# --- DI（Koin，阶段2 迁移 Hilt→Koin） ---
-koin-core = { module = "io.insert-koin:koin-core", version.ref = "koin" }
-koin-android = { module = "io.insert-koin:koin-android", version.ref = "koin" }
-koin-androidx-compose = { module = "io.insert-koin:koin-androidx-compose", version.ref = "koin" }
-koin-compose-viewmodel = { module = "io.insert-koin:koin-compose-viewmodel", version.ref = "koin" }
 
 # --- 序列化 / 时间 / 并发 ---
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serializationJson" }

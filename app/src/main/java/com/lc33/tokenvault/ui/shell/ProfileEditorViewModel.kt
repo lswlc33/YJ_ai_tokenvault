@@ -6,8 +6,6 @@ import androidx.lifecycle.viewModelScope
 import com.lc33.tokenvault.domain.model.ClientProfile
 import com.lc33.tokenvault.domain.repo.ClientProfileRepository
 import com.lc33.tokenvault.screens.model.ProfileEditorDraft
-import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,8 +29,7 @@ import kotlinx.coroutines.launch
  * 3. **新建的自定义预设 `builtinKey` 是 null**，`sortOrder` 排在所有内置之后（`max + 1`），
  *    这样列表页"内置在前、自定义在后"的顺序稳定。
  */
-@HiltViewModel
-class ProfileEditorViewModel @Inject constructor(
+class ProfileEditorViewModel constructor(
     private val profiles: ClientProfileRepository,
     savedState: SavedStateHandle,
 ) : ViewModel() {

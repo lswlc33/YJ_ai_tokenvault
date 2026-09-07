@@ -6,8 +6,6 @@ import com.lc33.tokenvault.crypto.SecretBox
 import com.lc33.tokenvault.crypto.SecretFingerprint
 import com.lc33.tokenvault.data.VaultDatabase
 import com.lc33.tokenvault.platform.VaultSession
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * 事务边界。
@@ -24,8 +22,7 @@ interface TransactionRunner {
     suspend fun <R> inTransaction(block: suspend () -> R): R
 }
 
-@Singleton
-class RoomTransactionRunner @Inject constructor(
+class RoomTransactionRunner constructor(
     private val db: VaultDatabase,
 ) : TransactionRunner {
     override suspend fun <R> inTransaction(block: suspend () -> R): R = db.withTransaction { block() }
@@ -39,8 +36,7 @@ class RoomTransactionRunner @Inject constructor(
  * 把 `withFieldKey` 的三个用法收在这里，是为了让"忘了绑 AAD"没有藏身处——
  * 这个类的每个方法都强制要求一个 [FieldAad]（红线 24）。
  */
-@Singleton
-class FieldCipher @Inject constructor(
+class FieldCipher constructor(
     private val session: VaultSession,
     private val box: SecretBox,
 ) {

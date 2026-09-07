@@ -4,13 +4,10 @@ import com.lc33.tokenvault.crypto.Redactor
 import com.lc33.tokenvault.data.dao.AuditLogDao
 import com.lc33.tokenvault.data.entity.AuditLogEntity
 import com.lc33.tokenvault.data.mapper.toDomain
-import com.lc33.tokenvault.di.NowEpochMs
 import com.lc33.tokenvault.domain.model.AuditEntry
 import com.lc33.tokenvault.domain.model.LogCategory
 import com.lc33.tokenvault.domain.model.LogLevel
 import com.lc33.tokenvault.domain.repo.AuditLogRepository
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -24,11 +21,10 @@ import kotlinx.coroutines.flow.map
  * [Redactor] 的"已知明文秘密"第一道由 [com.lc33.tokenvault.crypto.KnownSecrets] 提供
  * （探测 reveal / 用户展开明文时登记，锁定时清空），正则只作兜底。
  */
-@Singleton
-class RoomAuditLogRepository @Inject constructor(
+class RoomAuditLogRepository constructor(
     private val dao: AuditLogDao,
     private val redactor: Redactor,
-    @param:NowEpochMs private val now: () -> Long,
+    private val now: () -> Long,
 ) : AuditLogRepository {
 
     override suspend fun record(

@@ -7,8 +7,6 @@ import com.lc33.tokenvault.engine.UpdateEngine
 import com.lc33.tokenvault.engine.UpdateErrorKind
 import com.lc33.tokenvault.engine.UpdateResult
 import com.lc33.tokenvault.update.ReleaseInfo
-import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -25,8 +23,7 @@ import kotlinx.coroutines.launch
  * nightly 就该一直跟进 nightly，杀进程不该悄悄回到正式版），权威是
  * `app_settings.updateChannel`（红线 31），从同一条流派生。
  */
-@HiltViewModel
-class UpdateViewModel @Inject constructor(
+class UpdateViewModel constructor(
     private val updateEngine: UpdateEngine,
     private val settings: SettingsRepository,
 ) : ViewModel() {

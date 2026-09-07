@@ -9,8 +9,6 @@ import com.lc33.tokenvault.domain.DefaultProbeSettings
 import com.lc33.tokenvault.domain.model.BalanceSnapshot
 import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.probe.ProbeClassifier
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -38,8 +36,7 @@ import kotlinx.serialization.json.jsonPrimitive
  *   `AutoLocker` 就被重设一次时限（同一个值，但那是巧合而不是保证）。
  * - **值存 `value`（TEXT）而不是 `valueBlob`**：秒数不是秘密，而 blob 是给加密项留的。
  */
-@Singleton
-class RoomSettingsRepository @Inject constructor(
+class RoomSettingsRepository constructor(
     private val dao: AppSettingDao,
 ) : SettingsRepository {
 

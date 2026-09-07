@@ -4,8 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lc33.tokenvault.domain.model.ClientProfile
 import com.lc33.tokenvault.domain.repo.ClientProfileRepository
-import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -17,8 +15,7 @@ import kotlinx.coroutines.flow.stateIn
  * `default` 要本地化）由页面层用 `displayName` + `stringResource` 现算，ViewModel 不碰资源
  * （红线 19）。
  */
-@HiltViewModel
-class ProfileListViewModel @Inject constructor(
+class ProfileListViewModel constructor(
     profiles: ClientProfileRepository,
 ) : ViewModel() {
 

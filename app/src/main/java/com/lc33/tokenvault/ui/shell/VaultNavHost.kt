@@ -16,7 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.fragment.app.FragmentActivity
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -84,7 +84,7 @@ fun VaultNavHost(
         modifier = modifier,
     ) {
         composable<DashboardRoute> {
-            val vm: DashboardViewModel = hiltViewModel()
+            val vm: DashboardViewModel = koinViewModel()
             val dashboard by vm.state.collectAsStateWithLifecycle()
             DashboardScreen(
                 state = dashboard,
@@ -100,7 +100,7 @@ fun VaultNavHost(
         }
 
         composable<ManageRoute> {
-            val vm: ManageViewModel = hiltViewModel()
+            val vm: ManageViewModel = koinViewModel()
             val manage by vm.state.collectAsStateWithLifecycle()
             // 「全部」那一枚 chip 的文案在资源里，而 ViewModel 读不到资源（红线 19）
             val allLabel = stringResource(R.string.group_all)
@@ -142,7 +142,7 @@ fun VaultNavHost(
 
         composable<ProviderDetailRoute> { entry ->
             val route = entry.toRoute<ProviderDetailRoute>()
-            val vm: ProviderDetailViewModel = hiltViewModel()
+            val vm: ProviderDetailViewModel = koinViewModel()
             val detail by vm.state.collectAsStateWithLifecycle()
             val revealed by vm.revealed.collectAsStateWithLifecycle()
             val revealedAccount by vm.revealedAccount.collectAsStateWithLifecycle()
@@ -175,7 +175,7 @@ fun VaultNavHost(
         }
 
         composable<AppearanceRoute> {
-            val vm: AppearanceViewModel = hiltViewModel()
+            val vm: AppearanceViewModel = koinViewModel()
             val colorScheme by vm.colorScheme.collectAsStateWithLifecycle()
             val blurNavBar by vm.blurNavBar.collectAsStateWithLifecycle()
             AppearanceScreen(
@@ -188,7 +188,7 @@ fun VaultNavHost(
             )
         }
         composable<SecurityRoute> {
-            val vm: SecurityViewModel = hiltViewModel()
+            val vm: SecurityViewModel = koinViewModel()
             val autoLockIndex by vm.autoLockIndex.collectAsStateWithLifecycle()
             val idleLock by vm.idleLock.collectAsStateWithLifecycle()
             val lockOnScreenOff by vm.lockOnScreenOff.collectAsStateWithLifecycle()
@@ -208,7 +208,7 @@ fun VaultNavHost(
             )
         }
         composable<ChangePinRoute> {
-            val vm: SecurityViewModel = hiltViewModel()
+            val vm: SecurityViewModel = koinViewModel()
             val state by vm.changePin.collectAsStateWithLifecycle()
             // 改完就退出去。用一次性事件而不是状态里的标志：标志会在重组时重放，
             // 于是这一页会在下一次进来时立刻自己弹回去。
@@ -224,7 +224,7 @@ fun VaultNavHost(
             )
         }
         composable<ProbeSettingsRoute> {
-            val vm: ProbeSettingsViewModel = hiltViewModel()
+            val vm: ProbeSettingsViewModel = koinViewModel()
             val sniffClientProfile by vm.sniffClientProfile.collectAsStateWithLifecycle()
             val defaultProbeReachability by vm.defaultProbeReachability.collectAsStateWithLifecycle()
             val defaultProbeKeys by vm.defaultProbeKeys.collectAsStateWithLifecycle()
@@ -249,28 +249,28 @@ fun VaultNavHost(
             )
         }
         composable<BalanceThresholdsRoute> {
-            val vm: BalanceThresholdsViewModel = hiltViewModel()
+            val vm: BalanceThresholdsViewModel = koinViewModel()
             BalanceThresholdsScreen(
                 viewModel = vm,
                 onBack = back,
             )
         }
         composable<ClientKeywordsRoute> {
-            val vm: ClientKeywordsViewModel = hiltViewModel()
+            val vm: ClientKeywordsViewModel = koinViewModel()
             ClientKeywordsScreen(
                 viewModel = vm,
                 onBack = back,
             )
         }
         composable<ProxyRoute> {
-            val vm: ProxyViewModel = hiltViewModel()
+            val vm: ProxyViewModel = koinViewModel()
             ProxyScreen(
                 viewModel = vm,
                 onBack = back,
             )
         }
         composable<ProfileListRoute> {
-            val vm: ProfileListViewModel = hiltViewModel()
+            val vm: ProfileListViewModel = koinViewModel()
             val profiles by vm.profiles.collectAsStateWithLifecycle()
             val defaultName = stringResource(R.string.profile_name_default)
             ProfileListScreen(
@@ -283,7 +283,7 @@ fun VaultNavHost(
         }
         composable<ProfileEditorRoute> { entry ->
             val route = entry.toRoute<ProfileEditorRoute>()
-            val vm: ProfileEditorViewModel = hiltViewModel()
+            val vm: ProfileEditorViewModel = koinViewModel()
             val loaded by vm.loaded.collectAsStateWithLifecycle()
             val profile by vm.profile.collectAsStateWithLifecycle()
             LaunchedEffect(vm) { vm.saved.collect { back() } }
@@ -298,7 +298,7 @@ fun VaultNavHost(
             }
         }
         composable<DataRoute> {
-            val vm: DataViewModel = hiltViewModel()
+            val vm: DataViewModel = koinViewModel()
             DataScreen(
                 onBack = back,
                 onOpenGroups = { nav.navigate(GroupsRoute) },
@@ -308,7 +308,7 @@ fun VaultNavHost(
             )
         }
         composable<LogRoute> {
-            val vm: LogViewModel = hiltViewModel()
+            val vm: LogViewModel = koinViewModel()
             val entries by vm.entries.collectAsStateWithLifecycle()
             LogScreen(
                 entries = entries,
@@ -316,14 +316,14 @@ fun VaultNavHost(
             )
         }
         composable<SyncRoute> {
-            val vm: SyncViewModel = hiltViewModel()
+            val vm: SyncViewModel = koinViewModel()
             SyncRouteContent(
                 onBack = back,
                 vm = vm,
             )
         }
         composable<UpdateRoute> {
-            val vm: UpdateViewModel = hiltViewModel()
+            val vm: UpdateViewModel = koinViewModel()
             val updateState by vm.state.collectAsStateWithLifecycle()
             val updateChannel by vm.updateChannel.collectAsStateWithLifecycle()
             UpdateScreen(
@@ -344,7 +344,7 @@ fun VaultNavHost(
 
         // 剩下这几个还是 M0.8 立起来的空壳，内容各归各的里程碑（见 §16）
         composable<ProviderEditorRoute> {
-            val vm: ProviderEditorViewModel = hiltViewModel()
+            val vm: ProviderEditorViewModel = koinViewModel()
             val draft by vm.draft.collectAsStateWithLifecycle()
             val groups by vm.groups.collectAsStateWithLifecycle()
             val profiles by vm.profiles.collectAsStateWithLifecycle()
@@ -369,7 +369,7 @@ fun VaultNavHost(
             }
         }
         composable<ImportRoute> {
-            val vm: ImportViewModel = hiltViewModel()
+            val vm: ImportViewModel = koinViewModel()
             val previews by vm.previews.collectAsStateWithLifecycle()
             val parseErrors by vm.parseErrorCount.collectAsStateWithLifecycle()
             val importing by vm.importing.collectAsStateWithLifecycle()
@@ -385,7 +385,7 @@ fun VaultNavHost(
             )
         }
         composable<GroupsRoute> {
-            val vm: ManageViewModel = hiltViewModel()
+            val vm: ManageViewModel = koinViewModel()
             val manage by vm.state.collectAsStateWithLifecycle()
             GroupsScreen(
                 // 「全部」那一枚由页面自己过滤掉（它不入库，也就没有重命名这种操作）
@@ -399,7 +399,7 @@ fun VaultNavHost(
         // 探测明细。入口在仪表盘的"查看明细"（有过一轮探测才画）。这一页只读：
         // 看上一轮结果、重试失败项。
         composable<ProbeRunRoute> {
-            val vm: ProbeRunViewModel = hiltViewModel()
+            val vm: ProbeRunViewModel = koinViewModel()
             val run by vm.state.collectAsStateWithLifecycle()
             ProbeRunScreen(
                 lastRun = run.lastRun,
@@ -413,7 +413,7 @@ fun VaultNavHost(
             )
         }
         composable<BalanceBreakdownRoute> {
-            val vm: DashboardViewModel = hiltViewModel()
+            val vm: DashboardViewModel = koinViewModel()
             val rows by vm.providerRows.collectAsStateWithLifecycle()
             BalanceBreakdownScreen(
                 // 失败与成功分两组，而“压根没配置余额查询”的一组都不进（§9.3 的三种状态）。

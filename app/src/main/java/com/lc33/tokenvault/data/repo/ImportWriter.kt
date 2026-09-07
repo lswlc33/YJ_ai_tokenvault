@@ -6,8 +6,6 @@ import com.lc33.tokenvault.domain.repo.ProviderAccountRepository
 import com.lc33.tokenvault.domain.repo.ProviderRepository
 import com.lc33.tokenvault.importer.ParsedRecord
 import com.lc33.tokenvault.importer.toProvider
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * 文本导入的落库编排（§11.2：确认后在**单个事务**里写入）。
@@ -23,8 +21,7 @@ import javax.inject.Singleton
  * （Room 的 `withTransaction` 支持嵌套），所以"半批成功"这个状态不会被观察到，
  * 也不会在崩溃后留在库里。
  */
-@Singleton
-class ImportWriter @Inject constructor(
+class ImportWriter constructor(
     private val providers: ProviderRepository,
     private val keys: ApiKeyRepository,
     private val accounts: ProviderAccountRepository,

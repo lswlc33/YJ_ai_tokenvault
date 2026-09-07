@@ -5,8 +5,6 @@ import com.lc33.tokenvault.net.HttpEngine
 import com.lc33.tokenvault.update.ReleaseInfo
 import com.lc33.tokenvault.update.ReleaseMatcher
 import com.lc33.tokenvault.update.ReleaseParser
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * 更新检查引擎（计划.md §13.4「更新」）。
@@ -22,8 +20,7 @@ import javax.inject.Singleton
  * 安全约束：这是匿名请求，不带任何身份、不带设备信息、不带金库内容（红线 32 的
  * 邻居——响应体也不落日志、不进 error 消息）。
  */
-@Singleton
-class UpdateEngine @Inject constructor(
+class UpdateEngine constructor(
     private val engine: HttpEngine,
     private val currentVersionName: String,
     private val repoUrl: String,

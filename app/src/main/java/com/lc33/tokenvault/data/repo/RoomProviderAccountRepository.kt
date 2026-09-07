@@ -7,11 +7,8 @@ import com.lc33.tokenvault.crypto.zeroize
 import com.lc33.tokenvault.data.dao.ProviderAccountDao
 import com.lc33.tokenvault.data.entity.ProviderAccountEntity
 import com.lc33.tokenvault.data.mapper.toDomain
-import com.lc33.tokenvault.di.NowEpochMs
 import com.lc33.tokenvault.domain.model.ProviderAccount
 import com.lc33.tokenvault.domain.repo.ProviderAccountRepository
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -24,12 +21,11 @@ import kotlinx.coroutines.flow.map
  * 和密钥表同一个理由，新增是**两步写**（红线 24）：`usernameEnc` / `passwordEnc` 的 AAD
  * 绑主键，而主键是插入时才分配的。先插入拿到 id，再用真 AAD 加密回填，包在事务里。
  */
-@Singleton
-class RoomProviderAccountRepository @Inject constructor(
+class RoomProviderAccountRepository constructor(
     private val dao: ProviderAccountDao,
     private val cipher: FieldCipher,
     private val transactions: TransactionRunner,
-    @param:NowEpochMs private val now: () -> Long,
+    private val now: () -> Long,
 ) : ProviderAccountRepository {
 
     override fun observeByProvider(providerId: Long): Flow<List<ProviderAccount>> =

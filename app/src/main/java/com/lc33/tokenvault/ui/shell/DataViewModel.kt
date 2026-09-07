@@ -8,8 +8,6 @@ import com.lc33.tokenvault.data.repo.TransactionRunner
 import com.lc33.tokenvault.domain.model.LogCategory
 import com.lc33.tokenvault.domain.model.LogLevel
 import com.lc33.tokenvault.domain.repo.AuditLogRepository
-import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.launch
 
 /**
@@ -18,8 +16,7 @@ import kotlinx.coroutines.launch
  * 这一页只有两个会改数据的东西：清空探测结果、清空日志。它们都是「不可撤销」，
  * 所以确认对话框在页面层弹，这里只负责真动手。
  */
-@HiltViewModel
-class DataViewModel @Inject constructor(
+class DataViewModel constructor(
     private val keyDao: ApiKeyDao,
     private val probeRunDao: ProbeRunDao,
     private val audit: AuditLogRepository,

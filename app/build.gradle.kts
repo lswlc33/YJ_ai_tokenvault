@@ -6,7 +6,6 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
-    alias(libs.plugins.hilt)
     alias(libs.plugins.room)
 }
 
@@ -55,8 +54,8 @@ android {
         targetSdk = 37
         versionCode = appVersionCode
         versionName = appVersionName
-        // hilt-android-testing 需要一个会创建 HiltTestApplication 的 Runner
-        testInstrumentationRunner = "com.lc33.tokenvault.HiltTestRunner"
+        // 阶段2 迁移 Koin 后不再需要 HiltTestApplication，用标准 runner。
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
@@ -163,12 +162,10 @@ dependencies {
     implementation(libs.room.runtime)
     ksp(libs.room.compiler)
 
-    // DI
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.compiler)
-    implementation(libs.androidx.hilt.work)
-    implementation(libs.androidx.hilt.navigation.compose)
-    ksp(libs.androidx.hilt.compiler)
+    // DI（阶段2 迁移 Hilt→Koin）
+    implementation(libs.koin.android)
+    implementation(libs.koin.androidx.compose)
+    implementation(libs.koin.compose.viewmodel)
 
     // 后台任务
     implementation(libs.androidx.work.runtime)
@@ -200,6 +197,4 @@ dependencies {
     debugImplementation(libs.compose.ui.test.manifest)
     androidTestImplementation(libs.room.testing)
     androidTestImplementation(libs.androidx.work.testing)
-    androidTestImplementation(libs.hilt.android.testing)
-    kspAndroidTest(libs.hilt.compiler)
 }

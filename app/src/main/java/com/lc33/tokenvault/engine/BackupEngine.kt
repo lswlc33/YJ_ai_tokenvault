@@ -43,7 +43,6 @@ import com.lc33.tokenvault.data.mapper.toPathOverrides
 import com.lc33.tokenvault.data.mapper.toProtocolSet
 import com.lc33.tokenvault.data.repo.FieldCipher
 import com.lc33.tokenvault.data.repo.TransactionRunner
-import com.lc33.tokenvault.di.NowEpochMs
 import com.lc33.tokenvault.domain.Protocol
 import com.lc33.tokenvault.domain.model.LogCategory
 import com.lc33.tokenvault.domain.model.LogLevel
@@ -52,8 +51,6 @@ import com.lc33.tokenvault.platform.AutoLocker
 import com.lc33.tokenvault.platform.BootState
 import com.lc33.tokenvault.platform.BootStore
 import kotlinx.serialization.json.Json
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * 备份与恢复的编排（§12.1）。
@@ -72,8 +69,7 @@ import javax.inject.Singleton
  *
  * 恢复三种模式（§12.1）：覆盖（清空后导入）/ 合并（按自然键去重）/ 仅新增。默认合并。
  */
-@Singleton
-class BackupEngine @Inject constructor(
+class BackupEngine constructor(
     private val groupDao: GroupDao,
     private val providerDao: ProviderDao,
     private val keyDao: ApiKeyDao,
@@ -89,7 +85,7 @@ class BackupEngine @Inject constructor(
     private val random: RandomBytes,
     private val audit: AuditLogRepository,
     private val autoLocker: AutoLocker,
-    @param:NowEpochMs private val now: () -> Long,
+    private val now: () -> Long,
 ) {
 
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }

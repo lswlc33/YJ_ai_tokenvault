@@ -15,8 +15,6 @@ import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.endpoint.NormalizeResult
 import com.lc33.tokenvault.endpoint.normalizeBaseUrl
 import com.lc33.tokenvault.screens.model.ProviderDraft
-import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,8 +41,7 @@ import kotlinx.coroutines.launch
  * 3. **分组用下标而不是 id**（界面那个下拉的 API 就是 `selectedIndex`），所以 0 固定是
  *    「未分组」，其余按 [groups] 的顺序对齐。两边必须用同一份列表，否则会存错组。
  */
-@HiltViewModel
-class ProviderEditorViewModel @Inject constructor(
+class ProviderEditorViewModel constructor(
     private val providers: ProviderRepository,
     private val groupRepository: GroupRepository,
     private val clientProfiles: ClientProfileRepository,

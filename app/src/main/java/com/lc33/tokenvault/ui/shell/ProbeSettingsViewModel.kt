@@ -4,8 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lc33.tokenvault.domain.DefaultProbeSettings
 import com.lc33.tokenvault.domain.repo.SettingsRepository
-import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -19,8 +17,7 @@ import kotlinx.coroutines.launch
  * 四个开关（权威 `app_settings.defaultProbe`，红线 31）。后者不是总开关——只在新供应商
  * 落进编辑页草稿那一刻被读一次，之后每家独立（红线 36）。
  */
-@HiltViewModel
-class ProbeSettingsViewModel @Inject constructor(
+class ProbeSettingsViewModel constructor(
     private val settings: SettingsRepository,
 ) : ViewModel() {
 

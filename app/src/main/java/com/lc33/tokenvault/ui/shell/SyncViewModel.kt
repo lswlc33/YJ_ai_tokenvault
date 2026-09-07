@@ -6,8 +6,6 @@ import com.lc33.tokenvault.engine.BackupEngine
 import com.lc33.tokenvault.engine.RestoreMode
 import com.lc33.tokenvault.platform.VaultSession
 import com.lc33.tokenvault.screens.model.BackupStatus
-import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,8 +27,7 @@ import kotlinx.coroutines.launch
  * 备份口令**不缓存**：默认沿用 PIN，但 PIN 在解锁后就不在内存里了（红线 1），
  * 所以口令由调用方每次传入、用完即擦。
  */
-@HiltViewModel
-class SyncViewModel @Inject constructor(
+class SyncViewModel constructor(
     private val engine: BackupEngine,
     private val session: VaultSession,
 ) : ViewModel() {

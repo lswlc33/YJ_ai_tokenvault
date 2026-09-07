@@ -4,7 +4,6 @@ import com.lc33.tokenvault.balance.BalanceParseException
 import com.lc33.tokenvault.balance.BalanceRegistry
 import com.lc33.tokenvault.balance.NewApiAdapter
 import com.lc33.tokenvault.crypto.zeroize
-import com.lc33.tokenvault.di.NowEpochMs
 import com.lc33.tokenvault.domain.model.BalanceSnapshot
 import com.lc33.tokenvault.domain.model.LogCategory
 import com.lc33.tokenvault.domain.model.LogLevel
@@ -15,8 +14,6 @@ import com.lc33.tokenvault.domain.repo.ProviderRepository
 import com.lc33.tokenvault.endpoint.ProbeRequest
 import com.lc33.tokenvault.net.HttpEngine
 import kotlinx.coroutines.flow.first
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * 余额查询引擎（§9）。
@@ -30,13 +27,12 @@ import javax.inject.Singleton
  * newapi 的特殊之处：解析前先试 `/api/status` 校准 `quotaPerUnit`。校准失败不致命——
  * 用默认 500000 继续，但 `quotaCalibrated` 保持 0，UI 据此标"换算比未校准"（§9.2）。
  */
-@Singleton
-class BalanceEngine @Inject constructor(
+class BalanceEngine constructor(
     private val providers: ProviderRepository,
     private val keys: ApiKeyRepository,
     private val engine: HttpEngine,
     private val audit: AuditLogRepository,
-    @param:NowEpochMs private val now: () -> Long,
+    private val now: () -> Long,
 ) {
 
     /** 查一家。返回落库后的快照；`balanceKind = none` 返回 null（不是错误）。 */
