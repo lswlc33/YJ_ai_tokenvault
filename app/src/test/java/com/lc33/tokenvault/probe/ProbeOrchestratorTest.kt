@@ -50,7 +50,7 @@ class ProbeOrchestratorTest {
 
     @Test
     fun `逐项推流且顺序正确`() = runTest {
-        val orchestrator = ProbeOrchestrator(transport = ProbeTransport { _, _ -> okResponse() })
+        val orchestrator = ProbeOrchestrator(transport = ProbeTransport { _, _ -> okResponse() }, nowMillis = { 0L })
         val results = orchestrator.run(listOf(task("a"), task("b"), task("c"))).toList()
         assertEquals(listOf("a", "b", "c"), results.map { it.taskId })
         assertEquals(ProbeOutcome.SUCCESS, results.first().outcome)
@@ -69,6 +69,7 @@ class ProbeOrchestratorTest {
                 kotlinx.coroutines.awaitCancellation()
                 okResponse()
             },
+            nowMillis = { 0L },
         )
 
         val job = launch {
@@ -117,6 +118,7 @@ class ProbeOrchestratorTest {
                 okResponse()
             },
             budget = ProbeBudget(totalBudgetMs = 10_000, perHostBase = 2),
+            nowMillis = { 0L },
         )
 
         val results = orchestrator.run(
@@ -138,6 +140,7 @@ class ProbeOrchestratorTest {
                 else okResponse()
             },
             budget = ProbeBudget(totalBudgetMs = 10_000),
+            nowMillis = { 0L },
         )
 
         val results = orchestrator.run((1..5).map { task("t$it") }).toList()
@@ -179,6 +182,7 @@ class ProbeOrchestratorTest {
                 okResponse()
             },
             budget = ProbeBudget(totalBudgetMs = 10_000, perHostBase = 1),
+            nowMillis = { 0L },
         )
 
         val tasks = listOf(
@@ -199,7 +203,7 @@ class ProbeOrchestratorTest {
         val orchestrator = ProbeOrchestrator(transport = ProbeTransport { _, _ ->
             callCount++
             okResponse()
-        })
+        }, nowMillis = { 0L })
         val results = orchestrator.run(emptyList()).toList()
         assertTrue(results.isEmpty())
         assertEquals(0, callCount)

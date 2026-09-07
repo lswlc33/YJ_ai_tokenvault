@@ -19,4 +19,6 @@ fun interface RandomBytes {
  *
  * 不带种子构造，也**不调用** Android 上 `SecureRandom.setSeed`（那会替换系统熵源）。
  */
-expect object SecureRandomBytes : RandomBytes
+expect object SecureRandomBytes : RandomBytes {
+    override fun nextBytes(size: Int): ByteArray
+}

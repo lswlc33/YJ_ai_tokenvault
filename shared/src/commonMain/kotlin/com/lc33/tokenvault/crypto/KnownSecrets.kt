@@ -1,5 +1,7 @@
 package com.lc33.tokenvault.crypto
 
+import kotlin.concurrent.Volatile
+
 /**
  * 会话级「已知明文秘密」追踪器（红线 32 的第一道）。
  *
@@ -24,31 +26,31 @@ package com.lc33.tokenvault.crypto
  */
 class KnownSecrets {
 
-    private val guard = Any()
-
     /** 副本一份份持有，`add` 后调用方擦自己那份不影响这里。 */
-    private val secrets = mutableListOf<CharArray>()
+    @Volatile
+    private var secrets: List<CharArray> = emptyList()
 
     /**
      * 登记一份已知明文。
      *
      * 存的是**副本**：调用方（ViewModel）随后会 zeroize 自己那一份，这里得留得住。
+     *
+     * 并发策略：不用 `synchronized`（JVM 专属，会挡住 iOS 编译），而是每次修改都
+     * 用不可变列表快照替换 [secrets]，配合 `@Volatile` 保证跨线程可见性。
+     * 这里只有「append」和「整表清空」两种操作，没有读-改-写竞争，快照替换足够。
      */
     fun add(secret: CharArray) {
         if (secret.isEmpty()) return
-        synchronized(guard) {
-            // 去重：同一把密钥可能被反复展开，重复登记只会让脱敏多做几轮无用替换。
-            val already = secrets.any { it.contentEquals(secret) }
-            if (!already) secrets += secret.copyOf()
-        }
+        // 去重：同一把密钥可能被反复展开，重复登记只会让脱敏多做几轮无用替换。
+        if (secrets.any { it.contentEquals(secret) }) return
+        secrets = secrets + secret.copyOf()
     }
 
     /** 清空并逐一置零。锁定（[VaultSession.lock]）时调用。 */
     fun clear() {
-        synchronized(guard) {
-            secrets.forEach { it.zeroize() }
-            secrets.clear()
-        }
+        val old = secrets
+        secrets = emptyList()
+        old.forEach { it.zeroize() }
     }
 
     /**
@@ -56,7 +58,5 @@ class KnownSecrets {
      * [Redactor.knownSecrets] 参数"做成 lambda 而非集合"的意图一致：
      * 清单会随用户继续展开而增长，脱敏器不该持有一份过期副本。
      */
-    fun snapshot(): List<String> = synchronized(guard) {
-        secrets.map { String(it) }
-    }
+    fun snapshot(): List<String> = secrets.map { it.concatToString() }
 }

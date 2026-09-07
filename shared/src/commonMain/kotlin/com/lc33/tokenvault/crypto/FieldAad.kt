@@ -1,5 +1,7 @@
 package com.lc33.tokenvault.crypto
 
+import kotlin.jvm.JvmInline
+
 /**
  * 字段级密文的绑定信息（AAD）。
  *

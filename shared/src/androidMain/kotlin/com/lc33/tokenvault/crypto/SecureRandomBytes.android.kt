@@ -10,5 +10,5 @@ import java.security.SecureRandom
 actual object SecureRandomBytes : RandomBytes {
     private val random = SecureRandom()
 
-    override fun nextBytes(size: Int): ByteArray = ByteArray(size).also(random::nextBytes)
+    actual override fun nextBytes(size: Int): ByteArray = ByteArray(size).also(random::nextBytes)
 }

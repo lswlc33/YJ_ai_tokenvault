@@ -84,7 +84,7 @@ object ProbeRequestBuilder {
      * ANTHROPIC 无论哪种风格都带上它。
      */
     fun authHeaders(protocol: Protocol, apiKey: CharArray?, style: AuthStyle? = null): List<Pair<String, String>> {
-        val token = apiKey?.let { String(it) } ?: INVALID_PROBE_TOKEN
+        val token = apiKey?.let { it.concatToString() } ?: INVALID_PROBE_TOKEN
         val effective = when (style) {
             AuthStyle.BEARER, AuthStyle.X_API_KEY -> style
             else -> protocol.defaultAuthStyle

@@ -51,7 +51,7 @@ data class ProbeBudget(
  */
 class ProbeOrchestrator(
     private val transport: ProbeTransport,
-    private val nowMillis: () -> Long = System::currentTimeMillis,
+    private val nowMillis: () -> Long,
     private val hostIntervalMs: (String) -> Long = { 0L },
     private val onRateLimited: (String) -> Unit = {},
     private val budget: ProbeBudget = ProbeBudget(),
