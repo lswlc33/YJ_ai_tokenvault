@@ -361,7 +361,7 @@ fun VaultNavHost(
                     draft = draft,
                     groupNames = listOf(ungrouped) + groups.map { it.name },
                     profileNames = listOf(editorProfileDefault) +
-                        profiles.map { it.displayName(profileDefaultLabel) },
+                        profiles.map { if (it.builtinKey == "default") profileDefaultLabel else it.name },
                     onChange = vm::onChange,
                     onBack = back,
                     onSave = vm::onSave,
