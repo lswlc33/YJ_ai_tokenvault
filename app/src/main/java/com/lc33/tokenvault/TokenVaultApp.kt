@@ -6,7 +6,8 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.lc33.tokenvault.data.seed.ProfileSeeder
 import com.lc33.tokenvault.di.Qualifiers
-import com.lc33.tokenvault.di.appModule
+import com.lc33.tokenvault.di.coreModule
+import com.lc33.tokenvault.di.platformModule
 import com.lc33.tokenvault.di.viewModelModule
 import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.platform.AutoLocker
@@ -19,7 +20,7 @@ import org.koin.core.context.startKoin
 import org.koin.core.qualifier.named
 
 /**
- * Koin 入口（阶段2 迁移 Hilt→Koin）。
+ * Koin 入口（阶段2 迁移 Hilt→Koin；阶段4 起模块本体住在 :shared，两端共用）。
  *
  * 这里挂**进程级**生命周期观察者来驱动自动锁定（§7.4）。用 `ProcessLifecycleOwner`
  * 而不是 Activity 的生命周期：后者在 Activity 之间跳转、转屏、弹系统权限框时都会走
@@ -40,7 +41,7 @@ class TokenVaultApp : Application() {
         startKoin {
             androidLogger()
             androidContext(this@TokenVaultApp)
-            modules(appModule, viewModelModule)
+            modules(platformModule, coreModule, viewModelModule)
         }
         ProcessLifecycleOwner.get().lifecycle.addObserver(
             object : DefaultLifecycleObserver {

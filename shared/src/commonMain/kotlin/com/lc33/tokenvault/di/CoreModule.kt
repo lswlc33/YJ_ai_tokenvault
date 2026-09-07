@@ -1,27 +1,11 @@
 package com.lc33.tokenvault.di
 
-import android.content.Context
-import android.os.Build
-import android.os.SystemClock
-import androidx.room.Room
-import androidx.sqlite.db.SupportSQLiteDatabase
-import com.lc33.tokenvault.BuildConfig
 import com.lc33.tokenvault.crypto.KnownSecrets
 import com.lc33.tokenvault.crypto.RandomBytes
 import com.lc33.tokenvault.crypto.Redactor
 import com.lc33.tokenvault.crypto.SecretBox
 import com.lc33.tokenvault.crypto.SecureRandomBytes
 import com.lc33.tokenvault.data.VaultDatabase
-import com.lc33.tokenvault.data.dao.ApiKeyDao
-import com.lc33.tokenvault.data.dao.AppSettingDao
-import com.lc33.tokenvault.data.dao.AuditLogDao
-import com.lc33.tokenvault.data.dao.ClientProfileDao
-import com.lc33.tokenvault.data.dao.GroupDao
-import com.lc33.tokenvault.data.dao.ModelCatalogDao
-import com.lc33.tokenvault.data.dao.ModelDao
-import com.lc33.tokenvault.data.dao.ProbeRunDao
-import com.lc33.tokenvault.data.dao.ProviderAccountDao
-import com.lc33.tokenvault.data.dao.ProviderDao
 import com.lc33.tokenvault.data.repo.FieldCipher
 import com.lc33.tokenvault.data.repo.RoomApiKeyRepository
 import com.lc33.tokenvault.data.repo.RoomAuditLogRepository
@@ -51,18 +35,16 @@ import com.lc33.tokenvault.engine.BackupEngine
 import com.lc33.tokenvault.engine.BalanceEngine
 import com.lc33.tokenvault.engine.IdleLockSuspender
 import com.lc33.tokenvault.engine.ProbeEngine
-import com.lc33.tokenvault.engine.UpdateEngine
 import com.lc33.tokenvault.engine.ProbeSession
+import com.lc33.tokenvault.engine.UpdateEngine
 import com.lc33.tokenvault.net.HostGate
 import com.lc33.tokenvault.net.HttpEngine
 import com.lc33.tokenvault.net.ProxyProvider
-import com.lc33.tokenvault.platform.AndroidSecureClipboard
+import com.lc33.tokenvault.platform.APP_VERSION_NAME
 import com.lc33.tokenvault.platform.AutoLocker
-import com.lc33.tokenvault.platform.BootStore
-import com.lc33.tokenvault.platform.FileBootStore
-import com.lc33.tokenvault.platform.SecureClipboard
 import com.lc33.tokenvault.platform.VaultSession
-import com.lc33.tokenvault.platform.applyHandWrittenSchema
+import com.lc33.tokenvault.platform.monotonicNanoTime
+import com.lc33.tokenvault.platform.nowMillis
 import com.lc33.tokenvault.ui.shell.AppearanceViewModel
 import com.lc33.tokenvault.ui.shell.BalanceThresholdsViewModel
 import com.lc33.tokenvault.ui.shell.ClientKeywordsViewModel
@@ -82,24 +64,26 @@ import com.lc33.tokenvault.ui.shell.ProxyViewModel
 import com.lc33.tokenvault.ui.shell.SecurityViewModel
 import com.lc33.tokenvault.ui.shell.SyncViewModel
 import com.lc33.tokenvault.ui.shell.UpdateViewModel
-import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import org.koin.androidx.viewmodel.dsl.viewModelOf
 import org.koin.core.module.dsl.singleOf
+import org.koin.core.module.Module
+import org.koin.core.module.dsl.viewModelOf
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
 /**
- * Koin 模块（阶段2 迁移 Hilt→Koin）。
+ * Koin 跨平台模块（阶段4：从 :app 的 AppModule 拆出，平台无关的部分全部搬进 commonMain）。
  *
  * 三个 named 限定符对应原来 Hilt 的三个 `@Qualifier`：
- * - `named("now")`        → 原 `@NowEpochMs` 的墙上时间 lambda（红线 20：注入而非直接读）。
- * - `named("placeholders")` → 原 `@AppPlaceholders` 的客户端占位符 Map（红线 20）。
- * - `named("appScope")`   → 原 `@AppScope` 的应用级协程作用域。
+ * - [Qualifiers.NOW]          → 原 `@NowEpochMs` 的墙上时间 lambda（红线 20：注入而非直接读）。
+ * - [Qualifiers.PLACEHOLDERS] → 原 `@AppPlaceholders` 的客户端占位符 Map（红线 20）。
+ * - [Qualifiers.APP_SCOPE]    → 原 `@AppScope` 的应用级协程作用域。
  *
- * 仓库用 `@Binds` 绑到 `domain/repo/` 接口，与原来一致：ViewModel 只依赖接口。
+ * 墙上时间与单调时钟都走 platform/TimeNow 的 expect/actual，Android 与 iOS 各有 actual，
+ * commonMain 里只拿函数引用。平台相关的东西（数据库、boot 存储、剪贴板、占位符值）
+ * 全部住在 [platformModule] 的各平台 actual 里。
  */
 object Qualifiers {
     const val NOW = "now"
@@ -107,7 +91,7 @@ object Qualifiers {
     const val APP_SCOPE = "appScope"
 }
 
-val appModule = module {
+val coreModule = module {
 
     // ------------------------------------------------------------------ 基础能力
 
@@ -118,31 +102,18 @@ val appModule = module {
     single<RandomBytes> { SecureRandomBytes }
 
     single(named(Qualifiers.NOW)) {
-        System::currentTimeMillis as () -> Long
-    }
-
-    single(named(Qualifiers.PLACEHOLDERS)) {
-        mapOf(
-            "app_version" to BuildConfig.VERSION_NAME,
-            "android_release" to Build.VERSION.RELEASE,
-            "arch" to (Build.SUPPORTED_ABIS.firstOrNull() ?: "generic"),
-        )
+        ::nowMillis
     }
 
     single { SecretBox(get()) }
     single { KnownSecrets() }
     single { Redactor(knownSecrets = get<KnownSecrets>()::snapshot) }
 
-    // ------------------------------------------------------------------ 平台
+    // ------------------------------------------------------------------ 会话与自动锁定
 
-    single<BootStore> {
-        FileBootStore(File(get<Context>().filesDir, FileBootStore.FILE_NAME))
-    }
+    single { VaultSession(bootStore = get(), nowEpochMs = ::nowMillis, random = get(), knownSecrets = get()) }
 
-    single { VaultSession(bootStore = get(), nowEpochMs = System::currentTimeMillis, random = get(), knownSecrets = get()) }
-
-    // 阶段2 抽出的引擎侧接口。Hilt 的 @Binds 迁到 Koin 后必须显式写绑定：
-    // get() 只按精确类型解析、不查子类型，漏了这两个定义时启动即
+    // 阶段2 抽出的引擎侧接口。get() 只按精确类型解析、不查子类型，漏了这两个定义时启动即
     // NoDefinitionFoundException（ProbeEngine/BackupEngine 构造不出来）。
     single<ProbeSession> { get<VaultSession>() }
     single<IdleLockSuspender> { get<AutoLocker>() }
@@ -151,31 +122,12 @@ val appModule = module {
         AutoLocker(
             session = get(),
             scope = get(named(Qualifiers.APP_SCOPE)),
-            elapsedRealtimeMs = SystemClock::elapsedRealtime,
+            elapsedRealtimeMs = { monotonicNanoTime() / 1_000_000 },
             onLock = { get<ProbeEngine>().onLock() },
         )
     }
 
-    single<SecureClipboard> {
-        AndroidSecureClipboard(get(), get(named(Qualifiers.APP_SCOPE)), get())
-    }
-
     // ------------------------------------------------------------------ 数据库与 DAO
-
-    single {
-        Room.databaseBuilder(get<Context>(), VaultDatabase::class.java, VaultDatabase.FILE_NAME)
-            .addCallback(
-                object : androidx.room.RoomDatabase.Callback() {
-                    override fun onOpen(db: SupportSQLiteDatabase) {
-                        db.execSQL("PRAGMA foreign_keys = ON")
-                        // 外键 PRAGMA 留在这里（Android 走框架 SupportSQLite 路径），
-                        // 手写索引的 DDL 已随数据层迁入 shared 的 androidMain 扩展。
-                        db.applyHandWrittenSchema()
-                    }
-                },
-            )
-            .build()
-    }
 
     single { get<VaultDatabase>().groupDao() }
     single { get<VaultDatabase>().providerDao() }
@@ -207,7 +159,7 @@ val appModule = module {
 
     // ------------------------------------------------------------------ 网络与引擎
 
-    single { HostGate(nowMillis = System::currentTimeMillis) }
+    single { HostGate(nowMillis = ::nowMillis) }
     single { ProxyProvider(get()) }
     single { HttpEngine(client = get<ProxyProvider>().client, hostGate = get()) }
     single { com.lc33.tokenvault.backup.BackupCodec(get()) }
@@ -236,13 +188,16 @@ val appModule = module {
     single {
         UpdateEngine(
             engine = get(),
-            currentVersionName = BuildConfig.VERSION_NAME,
+            // 版本号从 shared 生成的 BuildInfo 拿（与 :app 的 BuildConfig 同源于
+            // gradle.properties），commonMain 读不到 Android 的 BuildConfig。
+            currentVersionName = APP_VERSION_NAME,
             repoUrl = UpdateEngine.RELEASES_URL,
         )
     }
 }
 
 // ViewModel 统一用 viewModelOf 注册（Koin 反射解析构造参数，SavedStateHandle 自动注入）。
+// 用 koin-compose-viewmodel 的 DSL（org.koin.viewmodel.dsl），Android/iOS 通用。
 val viewModelModule = module {
     viewModelOf(::AppearanceViewModel)
     viewModelOf(::BalanceThresholdsViewModel)
