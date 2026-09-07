@@ -62,6 +62,7 @@ import com.lc33.tokenvault.platform.BootStore
 import com.lc33.tokenvault.platform.FileBootStore
 import com.lc33.tokenvault.platform.SecureClipboard
 import com.lc33.tokenvault.platform.VaultSession
+import com.lc33.tokenvault.platform.applyHandWrittenSchema
 import com.lc33.tokenvault.ui.shell.AppearanceViewModel
 import com.lc33.tokenvault.ui.shell.BalanceThresholdsViewModel
 import com.lc33.tokenvault.ui.shell.ClientKeywordsViewModel
@@ -167,7 +168,9 @@ val appModule = module {
                 object : androidx.room.RoomDatabase.Callback() {
                     override fun onOpen(db: SupportSQLiteDatabase) {
                         db.execSQL("PRAGMA foreign_keys = ON")
-                        VaultDatabase.applyHandWrittenSchema(db)
+                        // 外键 PRAGMA 留在这里（Android 走框架 SupportSQLite 路径），
+                        // 手写索引的 DDL 已随数据层迁入 shared 的 androidMain 扩展。
+                        db.applyHandWrittenSchema()
                     }
                 },
             )

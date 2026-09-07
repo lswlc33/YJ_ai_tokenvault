@@ -1,6 +1,7 @@
 package com.lc33.tokenvault.data.repo
 
-import androidx.room.withTransaction
+import androidx.room.Transactor
+import androidx.room.useWriterConnection
 import com.lc33.tokenvault.crypto.FieldAad
 import com.lc33.tokenvault.crypto.SecretBox
 import com.lc33.tokenvault.crypto.SecretFingerprint
@@ -11,12 +12,20 @@ import com.lc33.tokenvault.platform.VaultSession
 /**
  * 事务边界（接口在 shared 的 domain/repo/TransactionRunner.kt）。
  *
- * Room 实现依赖 `db.withTransaction`，所以留在这里（data 层）。
+ * Room KMP 的 commonMain 没有 room-ktx 那个顶层 `db.withTransaction`，等价物是
+ * `useWriterConnection { it.withTransaction { … } }`：拿一条写连接，在上面开事务。
+ * 块内的 DAO 挂起调用通过协程上下文自动汇入同一条连接，与 room-ktx 的线程局部
+ * 事务语义等价。事务类型用 IMMEDIATE：业务里的事务都是"读一遭再写"，DEFERRED
+ * 在读后升级写锁时可能撞 SQLITE_BUSY；和 Android 版 room-ktx 的行为对齐
+ * （它内部也是 IMMEDIATE）。
  */
 class RoomTransactionRunner constructor(
     private val db: VaultDatabase,
 ) : TransactionRunner {
-    override suspend fun <R> inTransaction(block: suspend () -> R): R = db.withTransaction { block() }
+    override suspend fun <R> inTransaction(block: suspend () -> R): R =
+        db.useWriterConnection {
+            it.withTransaction(Transactor.SQLiteTransactionType.IMMEDIATE) { block() }
+        }
 }
 
 /**

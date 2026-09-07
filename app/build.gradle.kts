@@ -11,8 +11,6 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.ksp)
-    alias(libs.plugins.room)
 }
 
 // 发布签名是本机的：keystore 与口令都不进仓库。四个值来自环境变量（CI 从 secret 注入），
@@ -190,11 +188,6 @@ tasks.withType<Test>().configureEach {
     }
 }
 
-// 用 Room Gradle 插件声明 schema 目录，不用 ksp arg（计划.md §15.9）。
-// schemas/*.json 提交进仓库，否则迁移测试没有基线。
-room {
-    schemaDirectory("$projectDir/schemas")
-}
 
 dependencies {
     // 跨平台共享模块（阶段2）：纯 Kotlin 包都移到这里
@@ -223,9 +216,8 @@ dependencies {
     implementation(libs.androidx.lifecycle.process)
     implementation(libs.androidx.navigation.compose)
 
-    // 数据层
-    implementation(libs.room.runtime)
-    ksp(libs.room.compiler)
+    // 数据层已迁入 :shared（Room KMP，阶段4）。room-runtime 由 shared 的 api 传递，
+    // schema 基线与 KSP 编译器都住在 shared/build.gradle.kts。
 
     // DI（阶段2 迁移 Hilt→Koin）
     implementation(libs.koin.android)

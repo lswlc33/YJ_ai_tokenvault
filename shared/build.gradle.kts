@@ -26,6 +26,11 @@ plugins {
     // 阶段3：Compose Multiplatform —— commonMain 里用 org.jetbrains.compose.* 写 UI。
     // 该插件同时负责 composeResources 资源的 Res 类生成（stringResource 等）。
     alias(libs.plugins.compose.multiplatform)
+    // KSP：Room 编译器逐 target 挂（见下方 dependencies 块）
+    alias(libs.plugins.ksp)
+    // 阶段4：Room KMP。数据层（实体/DAO/VaultDatabase）从 :app 迁入 commonMain，
+    // KSP 在每个 target 生成 _Impl 与 VaultDatabaseConstructor 的 actual。
+    alias(libs.plugins.room)
 }
 
 // 版本号只在 gradle.properties 声明一处（计划.md §14.1）。阶段3 迁移后 screens 在
@@ -136,6 +141,10 @@ kotlin {
             api(libs.miuix.preference)
             api(libs.miuix.icons)
             api(libs.miuix.blur.kmp)
+
+            // Room KMP（阶段4：数据层迁入）。用 `api`：VaultDatabase / DAO 出现在
+            // 仓库实现的公开构造签名里，:app 的 DI 与 androidTest 要能看见这些类型。
+            api(libs.room.runtime)
         }
 
         // Android 端用 JDK provider（JCA 实现，与现有行为一致）。
@@ -148,12 +157,17 @@ kotlin {
         iosMain.dependencies {
             implementation(libs.cryptography.provider.apple)
             implementation(libs.ktor.client.darwin)
+            // iOS 没有系统 SQLite 的 androidx 驱动，只能用内置 SQLite 的 BundledSQLiteDriver。
+            implementation(libs.sqlite.bundled)
         }
 
         // JVM 单测也用 JDK provider，让测试能在本机跑。
         jvmMain.dependencies {
             implementation(libs.cryptography.provider.jdk)
             implementation(libs.ktor.client.okhttp)
+            // JVM 上 Room 同样只有 BundledSQLiteDriver 可用（app 的单测都是 FakeDao，
+            // 不真开库，但 commonMain 的数据层要能在 jvm target 编过并保留运行可能性）。
+            implementation(libs.sqlite.bundled)
         }
 
         commonTest.dependencies {
@@ -161,6 +175,20 @@ kotlin {
             implementation(libs.ktor.client.mock)
         }
     }
+}
+
+// Room 编译器：KSP 在 KMP 里没有统一的 common 入口，要逐 target 挂。
+// 漏掉哪个 target，那个 target 就缺 VaultDatabase_Impl / VaultDatabaseConstructor 的 actual。
+dependencies {
+    add("kspAndroid", libs.room.compiler)
+    add("kspJvm", libs.room.compiler)
+    add("kspIosArm64", libs.room.compiler)
+    add("kspIosSimulatorArm64", libs.room.compiler)
+}
+
+// schema 目录跟着数据层一起从 app/schemas 迁到 shared/schemas（基线 1.json 已搬）。
+room {
+    schemaDirectory("$projectDir/schemas")
 }
 
 // ---------------------------------------------------------------- 修复：composeResources 进不了 Android APK

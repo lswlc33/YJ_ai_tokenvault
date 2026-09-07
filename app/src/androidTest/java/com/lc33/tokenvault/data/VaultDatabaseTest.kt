@@ -12,6 +12,7 @@ import com.lc33.tokenvault.data.entity.ClientProfileEntity
 import com.lc33.tokenvault.data.entity.GroupEntity
 import com.lc33.tokenvault.data.entity.ProviderAccountEntity
 import com.lc33.tokenvault.data.entity.ProviderEntity
+import com.lc33.tokenvault.platform.applyHandWrittenSchema
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -50,7 +51,7 @@ class VaultDatabaseTest {
                         // 与 VaultModule.provideDatabase 保持一致：外键约束必须显式开，否则
                         // CASCADE/SET_NULL 全是摆设。测试就是要锁住"生产环境开了"这件事。
                         database.execSQL("PRAGMA foreign_keys = ON")
-                        VaultDatabase.applyHandWrittenSchema(database)
+                        database.applyHandWrittenSchema()
                     }
                 },
             )

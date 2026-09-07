@@ -1,8 +1,9 @@
 package com.lc33.tokenvault.data
 
+import androidx.room.ConstructedBy
 import androidx.room.Database
 import androidx.room.RoomDatabase
-import androidx.sqlite.db.SupportSQLiteDatabase
+import androidx.room.RoomDatabaseConstructor
 import com.lc33.tokenvault.data.dao.ApiKeyDao
 import com.lc33.tokenvault.data.dao.AppSettingDao
 import com.lc33.tokenvault.data.dao.AuditLogDao
@@ -36,6 +37,12 @@ import com.lc33.tokenvault.data.entity.ProviderEntity
  *
  * `exportSchema = true` + Room Gradle 插件把 schema JSON 提交进仓库：没有基线，
  * 迁移测试就无从写起。
+ *
+ * **阶段4 KMP 化**：实体与 DAO 零平台依赖，整个数据层进 commonMain。
+ * 跨平台的 `Room.databaseBuilder<T>()` 不能反射拿 `VaultDatabase_Impl`，要靠
+ * `@ConstructedBy` + expect object 由 KSP 在**每个 target** 生成 actual
+ * （Room KMP 的官方模式，见 room-kmp 文档）。Android 端仍走
+ * `Room.databaseBuilder(Context, ...)` 的老路径，不经过这个构造器对象。
  */
 @Database(
     entities = [
@@ -53,6 +60,7 @@ import com.lc33.tokenvault.data.entity.ProviderEntity
     version = VaultDatabase.VERSION,
     exportSchema = true,
 )
+@ConstructedBy(VaultDatabaseConstructor::class)
 abstract class VaultDatabase : RoomDatabase() {
 
     abstract fun groupDao(): GroupDao
@@ -80,20 +88,20 @@ abstract class VaultDatabase : RoomDatabase() {
          * 为什么值得费这个劲：应用层的"设默认时清掉其它的"是在一个事务里做的，但如果
          * 将来某处漏了一句 `clearDefault`，两张默认会**静默**共存，而余额适配器会随机拿到
          * 其中一张。有了这条索引，那个 bug 会在写入时立刻炸出来。
+         *
+         * 手写 DDL 的执行时机归各平台：Android 在 `RoomDatabase.Callback.onOpen`
+         * 里跑（见 shared androidMain 的 applyHandWrittenSchema 扩展），iOS 包在
+         * SQLiteDriver 包装层里跑——commonMain 摸不到平台的连接对象。
          */
         const val PARTIAL_INDEX_KEYS_DEFAULT =
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_keys_default " +
                 "ON api_keys(providerId) WHERE isDefault = 1"
-
-        /**
-         * 在 `onOpen` 而不是只在 `onCreate` 里建索引。
-         *
-         * `IF NOT EXISTS` 让它幂等，代价是每次开库多一条 DDL（几乎为零）。收益是：
-         * 万一某个版本的 `onCreate` 漏了它，用户升级上来时会自动补上，
-         * 而不是带着一个缺索引的库一直跑下去。
-         */
-        fun applyHandWrittenSchema(db: SupportSQLiteDatabase) {
-            db.execSQL(PARTIAL_INDEX_KEYS_DEFAULT)
-        }
     }
 }
+
+/**
+ * Room KMP 的构造器桥。KSP 会在每个 target 的生成代码里补上 actual；
+ * common 编译时还没有 actual，靠 suppress 放行（Room 官方模式）。
+ */
+@Suppress("NO_ACTUAL_FOR_EXPECT")
+expect object VaultDatabaseConstructor : RoomDatabaseConstructor<VaultDatabase>

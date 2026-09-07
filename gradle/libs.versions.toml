@@ -10,6 +10,8 @@ agp = "9.3.2"
 kotlin = "2.3.21"
 ksp = "2.3.11"
 room = "2.8.4"
+# Room 2.8.4 传递依赖 androidx.sqlite 2.6.2（gradle 缓存里核过）；bundled driver 用同版本
+androidxSqlite = "2.6.2"
 composeBom = "2026.08.00"
 activity = "1.13.0"
 fragment = "1.9.0"
@@ -123,6 +125,8 @@ androidx-navigation-compose = { module = "androidx.navigation:navigation-compose
 room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
 room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 room-testing = { module = "androidx.room:room-testing", version.ref = "room" }
+# Room 2.8.4 传递依赖的 androidx.sqlite 同版本；iOS/JVM 端的 BundledSQLiteDriver 用它
+sqlite-bundled = { module = "androidx.sqlite:sqlite-bundled", version.ref = "androidxSqlite" }
 
 # --- DI（Koin，阶段2 迁移 Hilt→Koin） ---
 koin-core = { module = "io.insert-koin:koin-core", version.ref = "koin" }
