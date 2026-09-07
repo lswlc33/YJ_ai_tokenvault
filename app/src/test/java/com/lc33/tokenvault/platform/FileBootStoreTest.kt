@@ -31,12 +31,9 @@ class FileBootStoreTest {
         deviceId = "device-under-test",
         onboarded = true,
         pinKdf = KdfParams(salt = ByteArray(KdfParams.SALT_BYTES) { 1 }),
-        recoveryKdf = KdfParams(salt = ByteArray(KdfParams.SALT_BYTES) { 2 }),
         dekWrappedByPin = ByteArray(60) { it.toByte() },
-        dekWrappedByRecovery = ByteArray(60) { (it + 1).toByte() },
         pinFailCount = 3,
         pinLockUntil = 1_700_000_000_000L,
-        biometricEnabled = false,
         themeMode = "Dark",
         localeTag = "zh-CN",
     )
@@ -73,7 +70,7 @@ class FileBootStoreTest {
     @Test
     fun `不打印密文与盐到 toString`() {
         val text = sampleRecord().toString()
-        assertTrue(text.contains("wraps=[pin/recovery]"))
+        assertTrue(text.contains("wraps=[pin]"))
         assertFalse("盐不该进日志", text.contains("salt"))
         assertFalse("密文不该进日志", text.contains("dekWrappedByPin="))
     }
@@ -202,27 +199,9 @@ class FileBootStoreTest {
     // ---------------------------------------------------------------- 派生判断
 
     @Test
-    fun `生物识别开关与密文都在才算能用`() {
-        val record = sampleRecord()
-        assertFalse("开关关着就不算能用（红线 5）", record.biometricUsable)
-        assertFalse(record.copy(biometricEnabled = true).biometricUsable)
-        assertTrue(
-            record.copy(biometricEnabled = true, dekWrappedByBiometric = ByteArray(60)).biometricUsable,
-        )
-    }
-
-    @Test
-    fun `恢复密钥那条路的存在性`() {
-        assertTrue(sampleRecord().hasRecoveryWrap)
-        assertFalse(sampleRecord().copy(dekWrappedByRecovery = null).hasRecoveryWrap)
-    }
-
-    @Test
     fun `KDF 参数原样读回、不被常量纠正`() {
         val custom = KdfParams(
-            memoryKib = KdfParams.MIN_MEMORY_KIB,
-            iterations = 1,
-            parallelism = 1,
+            iterations = KdfParams.MIN_ITERATIONS,
             salt = ByteArray(KdfParams.SALT_BYTES) { 7 },
         )
         store.write(sampleRecord().copy(pinKdf = custom))

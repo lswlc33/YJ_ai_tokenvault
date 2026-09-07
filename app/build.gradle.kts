@@ -133,6 +133,9 @@ room {
 }
 
 dependencies {
+    // 跨平台共享模块（阶段2）：纯 Kotlin 包都移到这里
+    implementation(project(":shared"))
+
     // MIUIX —— 只允许 ui/miuix/ 直接 import
     implementation(libs.miuix.ui)
     implementation(libs.miuix.preference)
@@ -178,8 +181,9 @@ dependencies {
     implementation(libs.kotlinx.datetime)
     implementation(libs.kotlinx.coroutines.android)
 
-    // 加密
-    implementation(libs.bouncycastle)
+    // 加密：cryptography-kotlin（PBKDF2 / HKDF / AES-GCM / HMAC），替代 BouncyCastle
+    implementation(libs.cryptography.core)
+    implementation(libs.cryptography.provider.jdk)
     implementation(libs.androidx.biometric)
 
     // JVM 单测（主力）

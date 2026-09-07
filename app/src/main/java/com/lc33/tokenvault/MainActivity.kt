@@ -14,9 +14,6 @@ import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
 /**
- * 必须继承 `FragmentActivity`：`androidx.biometric.BiometricPrompt` 的构造函数要求它，
- * `ComponentActivity` 不够（计划.md §15.1）。
- *
  * 前台空闲锁定与屏幕关闭即锁定（§7.4）在这里接：
  * - 触屏 / 按键重置空闲计时走 [onUserInteraction]（`Activity` 的规范钩子，触屏与按键
  *   都会回调它，而且不是 androidx 的受限 API）；
@@ -38,8 +35,6 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        // 任务切换器里不留应用截图（计划.md §7.5）
-        setRecentsScreenshotEnabled(false)
         registerReceiver(screenOffReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF))
         setContent { AppRoot() }
     }

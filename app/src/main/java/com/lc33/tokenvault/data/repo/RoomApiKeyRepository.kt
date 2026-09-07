@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.map
  * API 密钥。
  *
  * 明文在这个类里活得尽可能短：转成 UTF-8 字节 → 算指纹 → 加密 → **立刻擦掉那份字节**。
- * 入参那份 `CharArray` 不擦（生命周期归调用方，和 `Argon2idKdf.derive` 同一个约定）。
+ * 入参那份 `CharArray` 不擦（生命周期归调用方，和 `Pbkdf2Kdf.derive` 同一个约定）。
  *
  * `secretEnc` 的 AAD 是 `api_keys:{id}:secretEnc`（红线 24），而 id 是插入时才分配的，
  * 所以 [add] 必须**插入 → 加密 → 回填**三步走，并且包在一个事务里：

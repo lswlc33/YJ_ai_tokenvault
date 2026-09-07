@@ -27,7 +27,6 @@ import com.lc33.tokenvault.engine.RestoreMode
 import com.lc33.tokenvault.screens.dashboard.BalanceBreakdownScreen
 import com.lc33.tokenvault.screens.dashboard.DashboardScreen
 import com.lc33.tokenvault.screens.lock.ChangePinScreen
-import com.lc33.tokenvault.screens.lock.RecoveryKeyScreen
 import com.lc33.tokenvault.screens.manage.GroupsScreen
 import com.lc33.tokenvault.screens.manage.ImportScreen
 import com.lc33.tokenvault.screens.manage.ManageScreen
@@ -190,34 +189,21 @@ fun VaultNavHost(
         }
         composable<SecurityRoute> {
             val vm: SecurityViewModel = hiltViewModel()
-            val biometric by vm.biometric.collectAsStateWithLifecycle()
             val autoLockIndex by vm.autoLockIndex.collectAsStateWithLifecycle()
             val idleLock by vm.idleLock.collectAsStateWithLifecycle()
             val lockOnScreenOff by vm.lockOnScreenOff.collectAsStateWithLifecycle()
             val clipboardClearIndex by vm.clipboardClearIndex.collectAsStateWithLifecycle()
-            // 系统弹框的文案由系统画，所以要在这里取好传下去（ViewModel 读不到资源）。
-            val enableTitle = stringResource(R.string.biometric_prompt_enable_title)
-            val enableSubtitle = stringResource(R.string.biometric_prompt_enable_subtitle)
-            val promptCancel = stringResource(R.string.biometric_prompt_cancel)
-            val activity = context as? FragmentActivity
             SecurityScreen(
-                biometric = biometric,
                 autoLockIndex = autoLockIndex,
                 idleLock = idleLock,
                 lockOnScreenOff = lockOnScreenOff,
                 clipboardClearIndex = clipboardClearIndex,
-                onBiometricChange = { wanted ->
-                    activity?.let {
-                        vm.onBiometricChange(wanted, it, enableTitle, enableSubtitle, promptCancel)
-                    }
-                },
                 onAutoLockIndexChange = vm::onAutoLockIndexChange,
                 onIdleLockChange = vm::onIdleLockChange,
                 onLockOnScreenOffChange = vm::onLockOnScreenOffChange,
                 onClipboardClearIndexChange = vm::onClipboardClearIndexChange,
                 onBack = back,
                 onChangePin = { nav.navigate(ChangePinRoute) },
-                onRecoveryKey = { nav.navigate(RecoveryKeyRoute) },
                 onLockNow = vm::onLockNow,
             )
         }
@@ -233,22 +219,6 @@ fun VaultNavHost(
                 onBackspace = vm::onPinBackspace,
                 onBack = {
                     vm.onChangePinExit()
-                    back()
-                },
-            )
-        }
-        composable<RecoveryKeyRoute> {
-            val vm: SecurityViewModel = hiltViewModel()
-            val state by vm.recoveryKey.collectAsStateWithLifecycle()
-            val clipboardLabel = stringResource(R.string.clipboard_label_recovery_key)
-            RecoveryKeyScreen(
-                state = state,
-                onRotate = vm::onRotateRecoveryKey,
-                onCopy = { vm.onCopyRecoveryKey(clipboardLabel) },
-                onSavedChange = vm::onRecoveryKeySavedChange,
-                onBack = {
-                    // 退出时擦掉明文并丢掉展示串：它是明文，不该在返回之后还留在状态里
-                    vm.onRecoveryKeyExit()
                     back()
                 },
             )

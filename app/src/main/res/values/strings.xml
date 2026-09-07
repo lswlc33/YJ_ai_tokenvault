@@ -97,7 +97,7 @@
     <string name="settings_appearance">Appearance</string>
     <string name="settings_appearance_summary">Color scheme, corner style, language</string>
     <string name="settings_security">Security</string>
-    <string name="settings_security_summary">PIN, biometrics, auto-lock, clipboard</string>
+    <string name="settings_security_summary">PIN, auto-lock, clipboard</string>
     <string name="settings_probe">Probe</string>
     <string name="settings_probe_summary">Levels, timing, rate limits, balance thresholds</string>
     <string name="settings_profiles">Client profiles</string>
@@ -178,10 +178,6 @@
     <string name="security_section_credential">Credentials</string>
     <string name="security_change_pin">Change PIN or use a passphrase</string>
     <string name="security_change_pin_summary">Only re-wraps the data key, so it is instant and touches no records</string>
-    <string name="security_recovery_key">Recovery key</string>
-    <string name="security_recovery_key_summary">The only way back in if you forget the PIN. Write it down somewhere else.</string>
-    <string name="security_biometric">Unlock with biometrics</string>
-    <string name="security_biometric_summary">Another path to the same data key, not a second lock. Re-enrolling a fingerprint invalidates it.</string>
     <string name="security_section_lock">Auto-lock</string>
     <string name="security_lock_now">Lock now</string>
     <string name="security_lock_now_summary">Clears the data key from memory and returns to the lock screen. Nothing is deleted.</string>
@@ -471,7 +467,7 @@
     <string name="probe_defaults_notice">The switches below are only the defaults used when you add a provider. Each provider keeps its own copy afterwards, because every gateway is different — some forbid automated checks in their terms, some rate-limit after three requests. Changing a default here does not touch providers you already have.</string>
     <string name="probe_defaults_goto_manage">Review them provider by provider</string>
 
-    <!-- ==================== M1 lock gate: onboarding, unlock, recovery key ==================== -->
+    <!-- ==================== M1 lock gate: onboarding, unlock ==================== -->
     <string name="dialog_cancel">Cancel</string>
 
     <!-- PIN entry -->
@@ -480,17 +476,6 @@
     <string name="pin_error_wrong">That PIN is not right</string>
     <string name="pin_error_mismatch">The two entries do not match</string>
     <string name="pin_error_too_simple">Too easy to guess. Avoid runs like 123456 and repeats like 111111.</string>
-    <string name="pin_error_recovery_malformed">A recovery key is 32 characters, digits and a to f</string>
-    <string name="pin_error_recovery_wrong">That recovery key does not open this vault</string>
-
-    <!-- Biometric availability. Seven cases, none merged: three of them the user can fix. -->
-    <string name="biometric_state_no_hardware">This device has no biometric hardware</string>
-    <string name="biometric_state_hardware_unavailable">The biometric sensor is busy right now. Try again in a moment.</string>
-    <string name="biometric_state_none_enrolled">No fingerprint or face is enrolled on this device yet</string>
-    <string name="biometric_state_security_update">Android needs a security update before biometrics can be used</string>
-    <string name="biometric_state_unsupported">This Android version does not support strong biometrics</string>
-    <string name="biometric_state_not_enabled">Biometric unlock is switched off for this app</string>
-    <string name="biometric_enroll_action">Enroll in system settings</string>
 
     <!-- Boot store unreadable -->
     <string name="boot_corrupt_title">The vault settings file could not be read</string>
@@ -513,22 +498,6 @@
         <item quantity="other">%1$d more wrong attempts before you have to wait</item>
     </plurals>
     <string name="unlock_next_waits">The next wrong attempt starts a waiting period</string>
-    <string name="unlock_biometric">Unlock with biometrics</string>
-    <string name="unlock_use_recovery">Use the recovery key instead</string>
-    <string name="unlock_recovery_title">Recovery key</string>
-    <string name="unlock_recovery_subtitle">The 32 characters you wrote down when you set this app up. This unwraps the same data key your PIN does.</string>
-    <string name="unlock_recovery_label">Recovery key</string>
-    <string name="unlock_recovery_hint">Spaces and dashes are fine, and case does not matter</string>
-    <string name="unlock_recovery_submit">Unlock</string>
-    <string name="unlock_recovery_back">Back to the PIN</string>
-
-    <!-- Recovery key display, shared by onboarding and settings -->
-    <string name="recovery_key_title">Your recovery key</string>
-    <string name="recovery_key_subtitle">Write it down before you continue. This screen cannot be screenshotted.</string>
-    <string name="recovery_key_why">If you forget your PIN, this is the only way back into your data. There is no reset, and no one can recover it for you.</string>
-    <string name="recovery_key_where">Keep it somewhere other than this phone — on paper, or in a password manager. Anyone holding it can open this vault.</string>
-    <string name="recovery_key_copy">Copy</string>
-    <string name="recovery_key_saved">I have saved it somewhere safe</string>
 
     <!-- Change PIN (settings, Security) -->
     <string name="change_pin_title">Change PIN</string>
@@ -540,19 +509,6 @@
     <string name="change_pin_confirm_subtitle">A typo here would lock you out on the next unlock.</string>
     <string name="change_pin_note">Changing the PIN re-wraps the data key and nothing else. None of your stored keys are re-encrypted, so this takes the same time whether you have three entries or three hundred.</string>
 
-    <!-- Recovery key (settings, Security) -->
-    <string name="recovery_key_settings_title">Recovery key</string>
-    <string name="recovery_key_present">This vault has a recovery key.</string>
-    <string name="recovery_key_absent">This vault has no recovery key.</string>
-    <string name="recovery_key_cannot_show">The existing key cannot be shown again. Only a wrapped copy of the data key is stored — the recovery key itself never touches storage. If you cannot find yours, generate a new one.</string>
-    <string name="recovery_key_missing_warning">Without one, forgetting your PIN means losing every key stored here. A backup would not save you either: its passphrase defaults to that same PIN.</string>
-    <string name="recovery_key_create">Generate a recovery key</string>
-    <string name="recovery_key_rotate">Generate a new recovery key</string>
-    <string name="recovery_key_rotate_confirm_title">Replace the recovery key?</string>
-    <string name="recovery_key_rotate_confirm_body">The old one stops working the moment the new one is created. If you wrote the old one down and can still find it, you do not need to do this.</string>
-    <string name="recovery_key_rotate_confirm">Replace</string>
-    <string name="recovery_key_finish">Done</string>
-
     <!-- Onboarding -->
     <string name="onboarding_step_of">Step %1$d of %2$d</string>
     <string name="onboarding_next">Continue</string>
@@ -562,7 +518,7 @@
     <string name="onboarding_welcome_subtitle">Three things worth knowing, because each one changes what you should store here.</string>
     <string name="onboarding_welcome_what">API keys, platform account passwords and access tokens are encrypted field by field with AES-256-GCM. Provider names, endpoints, model ids and balances are stored in the clear.</string>
     <string name="onboarding_welcome_limit">A six digit PIN does not stop someone who copies these files off the device and attacks them offline. So do not store a password here that you reuse elsewhere — the settings offer a long passphrase instead.</string>
-    <string name="onboarding_welcome_recovery">The last step gives you a recovery key. It is the only way back in if you forget your PIN, so have somewhere to write it down.</string>
+    <string name="onboarding_welcome_local">Everything stays on this device. There is no account, no server and no upload — the only way out is an encrypted backup file you export yourself.</string>
     <string name="onboarding_pin_title">Choose a 6 digit PIN</string>
     <string name="onboarding_pin_subtitle">The PIN only wraps the real data key, so changing it later re-wraps one small value and never re-encrypts your data.</string>
     <string name="onboarding_pin_confirm_title">Enter it again</string>
@@ -571,18 +527,6 @@
     <string name="onboarding_calibrating_title">Calibrating</string>
     <string name="onboarding_calibrating_subtitle">Measuring how long one key derivation takes on this device, so unlocking stays quick without weakening the settings.</string>
     <string name="onboarding_calibrating_note">This runs once, and cannot be cancelled. There is no progress to show: the derivation has no intermediate steps to report.</string>
-    <string name="onboarding_biometric_title">Biometric unlock</string>
-    <string name="onboarding_biometric_subtitle">Optional. You can turn it on or off later in Settings, Security.</string>
-    <string name="onboarding_biometric_checking">Checking what this device supports…</string>
-    <string name="onboarding_biometric_switch">Unlock with biometrics</string>
-    <string name="onboarding_biometric_switch_summary">This is a second way to unwrap the same data key, not a second lock. The key sits in hardware and requires an authentication every time; adding or removing a fingerprint invalidates it and unlock falls back to the PIN.</string>
-    <!-- System biometric prompt. Shown by the OS, not by us, so the wording has to stand alone. -->
-    <string name="biometric_prompt_unlock_title">Unlock YuanJi</string>
-    <string name="biometric_prompt_unlock_subtitle">Confirm it is you to unwrap the data key</string>
-    <string name="biometric_prompt_enable_title">Enable biometric unlock</string>
-    <string name="biometric_prompt_enable_subtitle">Confirm it is you to bind this device to your vault</string>
-    <string name="biometric_prompt_cancel">Use PIN instead</string>
-    <string name="clipboard_label_recovery_key">YuanJi</string>
 
     <!-- M3: key management on the provider detail page. -->
     <string name="detail_keys_empty">No key yet. A provider without a key cannot be probed and its balance cannot be read.</string>

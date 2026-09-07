@@ -1,8 +1,8 @@
 package com.lc33.tokenvault.crypto
 
-import org.bouncycastle.crypto.digests.SHA256Digest
-import org.bouncycastle.crypto.generators.HKDFBytesGenerator
-import org.bouncycastle.crypto.params.HKDFParameters
+import dev.whyoleg.cryptography.BinarySize.Companion.bytes
+import dev.whyoleg.cryptography.algorithms.HKDF
+import dev.whyoleg.cryptography.algorithms.SHA256
 
 /**
  * 子密钥派生（§7.1 的密钥层次）。
@@ -13,6 +13,7 @@ import org.bouncycastle.crypto.params.HKDFParameters
  *
  * 用 `info` 而不是 `salt` 区分用途：HKDF 的 salt 是可选的、且在 extract 阶段生效，
  * 而 info 是 expand 阶段的域分隔符，正是"同一个主密钥派生多个用途"该用的那个参数。
+ * 所以这里 salt 恒为 `null`，只传 `info`。
  */
 object Hkdf {
 
@@ -29,12 +30,9 @@ object Hkdf {
      */
     fun derive(masterKey: ByteArray, info: String, length: Int = 32): ByteArray {
         require(length in 16..64) { "subkey length must be 16..64 bytes, got $length" }
-        val generator = HKDFBytesGenerator(SHA256Digest()).apply {
-            init(HKDFParameters(masterKey, null, info.encodeToByteArray()))
-        }
-        val out = ByteArray(length)
-        generator.generateBytes(out, 0, length)
-        return out
+        val hkdf = CryptoProvider.provider.get(HKDF)
+        val derivation = hkdf.secretDerivation(SHA256, outputSize = length.bytes, salt = null, info = info.encodeToByteArray())
+        return derivation.deriveSecretToByteArrayBlocking(masterKey)
     }
 
     fun fieldKey(dek: ByteArray): ByteArray = derive(dek, INFO_FIELD)

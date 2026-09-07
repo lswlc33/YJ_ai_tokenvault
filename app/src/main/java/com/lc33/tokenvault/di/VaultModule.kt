@@ -20,19 +20,14 @@ import com.lc33.tokenvault.data.dao.ModelDao
 import com.lc33.tokenvault.data.dao.ProbeRunDao
 import com.lc33.tokenvault.data.dao.ProviderAccountDao
 import com.lc33.tokenvault.data.dao.ProviderDao
-import com.lc33.tokenvault.domain.BiometricAvailability
 import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.engine.ProbeEngine
 import com.lc33.tokenvault.net.HostGate
 import com.lc33.tokenvault.net.OkHttpEngine
 import com.lc33.tokenvault.platform.AndroidSecureClipboard
 import com.lc33.tokenvault.platform.AutoLocker
-import com.lc33.tokenvault.platform.BiometricCapability
-import com.lc33.tokenvault.platform.BiometricKeyStore
-import com.lc33.tokenvault.platform.BiometricUnlocker
 import com.lc33.tokenvault.platform.BootStore
 import com.lc33.tokenvault.platform.FileBootStore
-import com.lc33.tokenvault.platform.KeystoreBiometricUnlocker
 import com.lc33.tokenvault.platform.SecureClipboard
 import com.lc33.tokenvault.platform.VaultSession
 import dagger.Module
@@ -135,36 +130,17 @@ object VaultModule {
 
     @Provides
     @Singleton
-    fun provideBiometricCapability(@ApplicationContext context: Context): BiometricCapability =
-        BiometricCapability(context)
-
-    @Provides
-    @Singleton
-    fun provideBiometricKeyStore(): BiometricKeyStore = BiometricKeyStore()
-
-    @Provides
-    @Singleton
     fun provideVaultSession(
         bootStore: BootStore,
         random: RandomBytes,
-        capability: BiometricCapability,
         knownSecrets: com.lc33.tokenvault.crypto.KnownSecrets,
     ): VaultSession = VaultSession(
         bootStore = bootStore,
         // 当前时间是平台能力，必须注入（红线 20）——纯 Kotlin 层与会话逻辑都不直接读它
         nowEpochMs = System::currentTimeMillis,
         random = random,
-        biometricAvailability = capability::current,
         knownSecrets = knownSecrets,
     )
-
-    @Provides
-    @Singleton
-    fun provideBiometricUnlocker(
-        keyStore: BiometricKeyStore,
-        bootStore: BootStore,
-        session: VaultSession,
-    ): BiometricUnlocker = KeystoreBiometricUnlocker(keyStore, bootStore, session)
 
     /**
      * 自动锁定（§7.4）。用 `elapsedRealtime` 而不是墙上时间：改系统时间不该影响
@@ -329,14 +305,4 @@ object VaultModule {
         now = now,
         placeholders = placeholders,
     )
-}
-
-/** 让 `BiometricAvailability` 也能被直接注入（设置页要显示当前档位）。 */
-@Module
-@InstallIn(SingletonComponent::class)
-object BiometricAvailabilityModule {
-
-    @Provides
-    fun provideCurrentAvailability(capability: BiometricCapability): BiometricAvailability =
-        capability.current()
 }

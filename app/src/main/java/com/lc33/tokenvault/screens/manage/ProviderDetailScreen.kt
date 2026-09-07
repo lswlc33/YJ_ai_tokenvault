@@ -19,7 +19,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.lc33.tokenvault.R
 import com.lc33.tokenvault.screens.model.ProviderDetailUiState
-import com.lc33.tokenvault.ui.common.SecureScreen
 import com.lc33.tokenvault.ui.miuix.AppBottomSheet
 import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppChip
@@ -49,7 +48,7 @@ import com.lc33.tokenvault.ui.theme.LocalStatusPalette
  * 管理页只列供应商，所以"这是谁的 key"这个问题在进到这一页时就已经答完了：
  * 页内的每一行都不必再带"所属供应商"那一列。
  *
- * **这是全应用唯一显示密钥明文的页面**（§6.1 推论 3），所以它挂 [SecureScreen]：
+ * **这是全应用唯一显示密钥明文的页面**（§6.1 推论 3）：
  * 遮蔽串是解密后现算的，展开那一层还会显示完整明文。列表页拿不到明文，想画也画不出来。
  *
  * 新增密钥那一层的输入框用 `rememberSecretTextFieldState`（不进 saved instance state）
@@ -77,7 +76,6 @@ fun ProviderDetailScreen(
     onCopyRevealedAccount: (String) -> Unit,
     onCloseAccountReveal: () -> Unit,
 ) {
-    SecureScreen()
     val scrollState = rememberAppTopBarScrollState()
     val tokens = LocalAppTokens.current
     val provider = state.provider
@@ -300,8 +298,8 @@ private fun AddKeySheet(
 /**
  * 展开一把密钥。
  *
- * [text] 非空就显示这一层。它是**擦不掉的 `String`**（红线 1），所以整页挂了
- * `SecureScreen()`，而且关掉这一层时 ViewModel 会擦掉它背后那份 `CharArray`。
+ * [text] 非空就显示这一层。它是**擦不掉的 `String`**（红线 1），
+ * 关掉这一层时 ViewModel 会擦掉它背后那份 `CharArray`。
  */
 @Composable
 private fun RevealKeySheet(
@@ -354,8 +352,8 @@ private fun RevealKeySheet(
  * 展开一条平台账号（红线 21：账号密码与密钥同等对待，展开看明文、关闭回遮）。
  *
  * [account] 非空就显示这一层。用户名与密码两段都可能为 null（只记了一半，§11.2），
- * 为 null 的那段显示「（未记录）」而不是空串。明文是擦不掉的 `String`，所以整页
- * 挂了 `SecureScreen()`，关掉这一层时 ViewModel 擦掉背后那份 `CharArray`。
+ * 为 null 的那段显示「（未记录）」而不是空串。明文是擦不掉的 `String`，
+ * 关掉这一层时 ViewModel 擦掉背后那份 `CharArray`。
  */
 @Composable
 private fun RevealAccountSheet(

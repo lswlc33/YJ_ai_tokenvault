@@ -42,7 +42,7 @@ import kotlinx.coroutines.withContext
  *   就是这么来的。算完立刻擦明文，只留那一小段不敏感的产物。
  * - **完整明文**只有用户点了某一行才解（[onRevealKey]），拿到就展示或复制，
  *   关掉那一层就擦（[onCloseKeySheet]）。展示串是擦不掉的 `String`，
- *   所以显示它的那一层必须挂 `SecureScreen()`。
+ *   所以只在那一层存活、关掉即丢引用。
  *
  * 解密跑在 [Dispatchers.Default]：单次 AES-GCM 很快，但一家十几把密钥就是十几次
  * GCM 初始化，放主线程上是一次可见的卡顿。

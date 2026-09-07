@@ -72,13 +72,4 @@ class UnlockBackoffTest {
         assertTrue(backoff.isActive(now))
         assertEquals(30, backoff.remainingSeconds(now))
     }
-
-    @Test
-    fun `只有 AVAILABLE 算能用`() {
-        // 五种系统返回值 + 用户开关，都不能被合并成"不可用"——其中三种用户自己能解决
-        assertTrue(BiometricAvailability.AVAILABLE.usable)
-        BiometricAvailability.entries
-            .filter { it != BiometricAvailability.AVAILABLE }
-            .forEach { assertFalse("$it 不该算能用", it.usable) }
-    }
 }

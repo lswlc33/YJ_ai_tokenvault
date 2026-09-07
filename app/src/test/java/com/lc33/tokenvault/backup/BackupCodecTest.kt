@@ -15,10 +15,8 @@ import org.junit.Test
 class BackupCodecTest {
 
     private fun params(): KdfParams = KdfParams(
-        memoryKib = 8 * 1024, // 测试用最小档，避免单测太慢
-        iterations = 1,
-        parallelism = 1,
-        salt = ByteArray(16) { it.toByte() },
+        iterations = KdfParams.MIN_ITERATIONS, // 测试用最小档，避免单测太慢
+        salt = ByteArray(KdfParams.SALT_BYTES) { it.toByte() },
     )
 
     private fun header() = BackupHeader(

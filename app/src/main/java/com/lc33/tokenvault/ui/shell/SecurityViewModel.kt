@@ -1,29 +1,18 @@
 package com.lc33.tokenvault.ui.shell
 
-import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.lc33.tokenvault.crypto.RecoveryKey
 import com.lc33.tokenvault.crypto.zeroize
 import com.lc33.tokenvault.domain.AutoLockPolicy
-import com.lc33.tokenvault.domain.BiometricAvailability
 import com.lc33.tokenvault.domain.ClipboardClearPolicy
 import com.lc33.tokenvault.domain.PinPolicy
 import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.platform.AutoLocker
-import com.lc33.tokenvault.platform.BiometricCapability
-import com.lc33.tokenvault.platform.BiometricOutcome
-import com.lc33.tokenvault.platform.BiometricUnlocker
-import com.lc33.tokenvault.platform.BootState
-import com.lc33.tokenvault.platform.BootStore
-import com.lc33.tokenvault.platform.SecureClipboard
 import com.lc33.tokenvault.platform.UnlockResult
 import com.lc33.tokenvault.platform.VaultSession
 import com.lc33.tokenvault.screens.lock.ChangePinStep
 import com.lc33.tokenvault.screens.lock.ChangePinUiState
 import com.lc33.tokenvault.screens.lock.PinError
-import com.lc33.tokenvault.screens.lock.RecoveryKeyUiState
-import com.lc33.tokenvault.screens.settings.BiometricRowState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
@@ -42,31 +31,26 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * 设置 → 安全 里那两页真正干活的地方：改 PIN 与轮换恢复密钥。
+ * 设置 → 安全 里真正干活的地方：改 PIN。
  *
  * 和 [LockViewModel] 同一套规矩：明文只活在私有 `CharArray` 里、不进 UiState（红线 1），
- * Argon2 一律跑 [Dispatchers.Default]。
+ * PBKDF2 一律跑 [Dispatchers.Default]。
  *
  * **验旧 PIN 走 `unlockWithPin` 而不是另做一个不计次的 `verifyPin`**：后者等于给改 PIN 页
  * 开一个绕过失败退避（§7.2）的入口——捡到已解锁手机的人可以在这一页无限次试旧 PIN。
  * 代价是这一页也会吃到退避倒计时，那正是想要的。
+ *
+ * **阶段1 迁移**：删掉生物识别与恢复密钥两行。
  */
 @HiltViewModel
 class SecurityViewModel @Inject constructor(
     private val session: VaultSession,
-    private val bootStore: BootStore,
-    private val clipboard: SecureClipboard,
     private val autoLocker: AutoLocker,
-    private val biometricUnlocker: BiometricUnlocker,
-    private val capability: BiometricCapability,
     private val settings: SettingsRepository,
 ) : ViewModel() {
 
     private val _changePin = MutableStateFlow(ChangePinUiState())
     val changePin: StateFlow<ChangePinUiState> = _changePin.asStateFlow()
-
-    private val _recoveryKey = MutableStateFlow(RecoveryKeyUiState(hasKey = hasRecoveryWrap()))
-    val recoveryKey: StateFlow<RecoveryKeyUiState> = _recoveryKey.asStateFlow()
 
     /** 改完 PIN 之后让导航退出去。用一次性事件而不是 UiState 里的 `done` 标志：后者会重放。 */
     private val _pinChanged = MutableSharedFlow<Unit>(
@@ -80,63 +64,6 @@ class SecurityViewModel @Inject constructor(
 
     /** 第二步输入的新 PIN，等第三步比对。比对完立刻擦。 */
     private var newPin: CharArray? = null
-
-    /** 刚轮换出来的恢复密钥明文。离开那一页就擦。 */
-    private var rotatedPlain: CharArray? = null
-
-    /** 轮换正在跑。Argon2 要几百毫秒，期间用户会以为没反应而再点一下。 */
-    private var rotating = false
-
-    /**
-     * 生物识别那一行。
-     *
-     * **权威是 `boot.biometricEnabled`**（红线 5），所以这里从 [BootStore.revision] 派生而不是
-     * 自己记一份布尔值：`BiometricUnlocker` 在失效时会自己把开关关掉（`invalidate()`），
-     * 而那条路不经过这个 ViewModel。自己记一份的话，"指纹已失效、开关已被清掉"之后
-     * 这一页还画着"已开启"，用户会以为下次能用指纹解锁。
-     *
-     * `availability` 每次重算：用户可能刚从系统设置里录了指纹再切回来。
-     */
-    val biometric: StateFlow<BiometricRowState> = bootStore.revision
-        .map { readBiometricRow() }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, readBiometricRow())
-
-    private fun readBiometricRow(): BiometricRowState {
-        val record = (bootStore.read() as? BootState.Ok)?.record
-        val enabled = record?.biometricEnabled == true
-        return BiometricRowState(
-            enabled = enabled,
-            // 已经开着的时候不问系统"能不能用"——问了也只会得到 AVAILABLE，
-            // 而没开时要用它决定这一行能不能点、以及给出哪一句解释。
-            availability = if (enabled) BiometricAvailability.AVAILABLE else capability.current(),
-        )
-    }
-
-    /**
-     * 翻生物识别开关。
-     *
-     * 开：必须**当场验一次**（`BiometricUnlocker.enable` 会弹系统框，成功后用会话里的 DEK
-     * 加密一份存进 boot）。没验成功就什么都不写——所以这一行的状态不需要"正在等用户"这一档，
-     * boot 没变、派生出来的开关就还是关着。
-     *
-     * 关：删 Keystore 别名 + 清包裹 + 关开关，三件事一起做（红线 5）。
-     */
-    fun onBiometricChange(
-        wanted: Boolean,
-        activity: FragmentActivity,
-        title: String,
-        subtitle: String,
-        negative: String,
-    ) {
-        if (!wanted) {
-            biometricUnlocker.disable()
-            return
-        }
-        viewModelScope.launch { biometricUnlocker.enable(activity, title, subtitle, negative) }
-    }
-
-    private fun hasRecoveryWrap(): Boolean =
-        (bootStore.read() as? BootState.Ok)?.record?.hasRecoveryWrap ?: false
 
     // ------------------------------------------------------------------ 改 PIN
 
@@ -236,53 +163,13 @@ class SecurityViewModel @Inject constructor(
         }
     }
 
-    /** 退出改 PIN 页：把三个缓冲都擦掉，状态回到初始。 */
+    /** 退出改 PIN 页：把两个缓冲都擦掉，状态回到初始。 */
     fun onChangePinExit() {
         pinBuffer.zeroize()
         pinLength = 0
         newPin?.zeroize()
         newPin = null
         _changePin.value = ChangePinUiState()
-    }
-
-    // ------------------------------------------------------------------ 恢复密钥
-
-    /**
-     * 轮换。**旧的立刻失效**（§7.1）：包裹被覆盖，抄在纸上的那一把从此解不开。
-     *
-     * 重入保护是必要的：这条路要跑一次 Argon2（几百毫秒），期间用户会以为没反应而再点一下。
-     */
-    fun onRotateRecoveryKey() {
-        if (rotating) return
-        rotating = true
-        viewModelScope.launch {
-            val key = withContext(Dispatchers.Default) { session.regenerateRecoveryKey() }
-            rotatedPlain?.zeroize()
-            rotatedPlain = key
-            _recoveryKey.value = RecoveryKeyUiState(
-                hasKey = true,
-                // 展示串是擦不掉的 String，所以只在这一刻生成，离开那一页就丢引用
-                generated = RecoveryKey.formatForDisplay(key),
-                saved = false,
-            )
-            rotating = false
-        }
-    }
-
-    fun onCopyRecoveryKey(label: String) {
-        val key = rotatedPlain ?: return
-        clipboard.copy(label, key, SecureClipboard.DEFAULT_AUTO_CLEAR_SECONDS)
-    }
-
-    fun onRecoveryKeySavedChange(saved: Boolean) {
-        _recoveryKey.update { it.copy(saved = saved) }
-    }
-
-    /** 退出恢复密钥页：擦明文、丢展示串，只留"有没有这条路"这一个事实。 */
-    fun onRecoveryKeyExit() {
-        rotatedPlain?.zeroize()
-        rotatedPlain = null
-        _recoveryKey.value = RecoveryKeyUiState(hasKey = hasRecoveryWrap())
     }
 
     // ------------------------------------------------------------------ 立即锁定
@@ -356,7 +243,6 @@ class SecurityViewModel @Inject constructor(
     override fun onCleared() {
         pinBuffer.zeroize()
         newPin?.zeroize()
-        rotatedPlain?.zeroize()
     }
 
     private companion object {

@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Argon2id 的参数，**随密文一起存**（红线 3）。
+ * PBKDF2-HMAC-SHA256 的参数，**随密文一起存**（红线 3）。
  *
  * 这一条是本项目最容易埋定时炸弹的地方，所以把理由写在类型上：解锁时**一律读存储值**，
  * 绝不拿编译期常量去"纠正"它。一旦某个版本发现存储值与常量不一致就改写存储值，
@@ -15,21 +15,21 @@ import kotlinx.serialization.Serializable
  * 无论参数调多高），而是"在不拖慢解锁体验的前提下顺手把成本抬一点"。取舍写在 §7.2
  * 与"关于"页里，不假装能防。
  *
- * @param memoryKib 内存，单位 KiB。
- * @param iterations 迭代次数（Argon2 的 t）。
- * @param parallelism 并行度（Argon2 的 p）。
- * @param salt 16 字节随机盐。PIN 与恢复密钥各有一份自己的盐。
+ * **阶段1 迁移**：从 Argon2id 降级到 PBKDF2-HMAC-SHA256。PBKDF2 只有 `iterations` 一个
+ * 可调参数（没有 Argon2 的 memory/parallelism），参数面更简单。`cryptography-kotlin`
+ * 的 JDK provider 对 PBKDF2 原生支持，Android 与 iOS 两端行为一致（阶段2 的前提）。
+ *
+ * @param iterations 迭代次数。默认 210_000（OWASP 对 PBKDF2-HMAC-SHA256 的 2023 建议值）。
+ * @param salt 16 字节随机盐。
  */
 @Serializable
 data class KdfParams(
-    @SerialName("algo") val algorithm: String = ALGORITHM_ARGON2ID,
-    @SerialName("m") val memoryKib: Int = DEFAULT_MEMORY_KIB,
-    @SerialName("t") val iterations: Int = DEFAULT_ITERATIONS,
-    @SerialName("p") val parallelism: Int = DEFAULT_PARALLELISM,
+    @SerialName("algo") val algorithm: String = ALGORITHM_PBKDF2,
+    @SerialName("iter") val iterations: Int = DEFAULT_ITERATIONS,
     @SerialName("salt") @Serializable(with = ByteArrayAsBase64::class) val salt: ByteArray,
 ) {
     init {
-        require(algorithm == ALGORITHM_ARGON2ID) { "only argon2id is supported, got $algorithm" }
+        require(algorithm == ALGORITHM_PBKDF2) { "only pbkdf2 is supported, got $algorithm" }
         require(salt.size == SALT_BYTES) { "salt must be $SALT_BYTES bytes, got ${salt.size}" }
     }
 
@@ -41,15 +41,13 @@ data class KdfParams(
      * 所以封顶不是性能优化，是可恢复性的保证。
      */
     fun withinCap(): Boolean =
-        memoryKib in MIN_MEMORY_KIB..MAX_MEMORY_KIB &&
-            iterations in MIN_ITERATIONS..MAX_ITERATIONS &&
-            parallelism in 1..MAX_PARALLELISM
+        iterations in MIN_ITERATIONS..MAX_ITERATIONS
 
     fun requireWithinCap() {
         if (!withinCap()) {
             throw InvalidKdfParamsException(
-                "KDF params out of range: m=$memoryKib t=$iterations p=$parallelism; " +
-                    "cap is m=$MAX_MEMORY_KIB t=$MAX_ITERATIONS p=$MAX_PARALLELISM",
+                "KDF params out of range: iterations=$iterations; " +
+                    "cap is $MIN_ITERATIONS..$MAX_ITERATIONS",
             )
         }
     }
@@ -60,43 +58,34 @@ data class KdfParams(
         if (this === other) return true
         if (other !is KdfParams) return false
         return algorithm == other.algorithm &&
-            memoryKib == other.memoryKib &&
             iterations == other.iterations &&
-            parallelism == other.parallelism &&
             salt.contentEquals(other.salt)
     }
 
     override fun hashCode(): Int {
         var result = algorithm.hashCode()
-        result = 31 * result + memoryKib
         result = 31 * result + iterations
-        result = 31 * result + parallelism
         result = 31 * result + salt.contentHashCode()
         return result
     }
 
     /** 刻意不打印盐。参数会进日志与错误消息，盐不该跟着出去。 */
     override fun toString(): String =
-        "KdfParams(algo=$algorithm, m=$memoryKib, t=$iterations, p=$parallelism, salt=<${salt.size}B>)"
+        "KdfParams(algo=$algorithm, iterations=$iterations, salt=<${salt.size}B>)"
 
     companion object {
-        const val ALGORITHM_ARGON2ID = "argon2id"
+        const val ALGORITHM_PBKDF2 = "pbkdf2"
 
-        /** 16 MiB。纯 Java 实现一次性分配，低端机也不至于 OOM（§7.2）。 */
-        const val DEFAULT_MEMORY_KIB = 16 * 1024
-        const val DEFAULT_ITERATIONS = 2
-        const val DEFAULT_PARALLELISM = 2
+        /** OWASP 2023 对 PBKDF2-HMAC-SHA256 的建议迭代次数。 */
+        const val DEFAULT_ITERATIONS = 210_000
 
         const val SALT_BYTES = 16
         const val DERIVED_KEY_BYTES = 32
 
         /** 降档下限：基准超过 500ms 时用（§7.2）。 */
-        const val MIN_MEMORY_KIB = 8 * 1024
-        const val MIN_ITERATIONS = 1
+        const val MIN_ITERATIONS = 100_000
 
         /** 升档上限。与备份包的封顶一致（§12.1），不允许更高。 */
-        const val MAX_MEMORY_KIB = 32 * 1024
-        const val MAX_ITERATIONS = 3
-        const val MAX_PARALLELISM = 4
+        const val MAX_ITERATIONS = 600_000
     }
 }

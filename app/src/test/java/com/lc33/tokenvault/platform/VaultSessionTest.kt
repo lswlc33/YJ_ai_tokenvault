@@ -3,7 +3,6 @@
 import com.lc33.tokenvault.crypto.FieldAad
 import com.lc33.tokenvault.crypto.SecretBox
 import com.lc33.tokenvault.crypto.VaultLockedException
-import com.lc33.tokenvault.domain.BiometricAvailability
 import com.lc33.tokenvault.domain.LockPhase
 import com.lc33.tokenvault.domain.UnlockBackoff
 import java.io.File
@@ -22,7 +21,7 @@ import org.junit.rules.TemporaryFolder
  * 会话（§14.3 测试 6 的会话那一半）。
  *
  * 用**真的** [FileBootStore] 而不是假的：这一层最要紧的行为都是"boot 里到底写了什么"，
- * 用假 store 就把要测的东西替换掉了。Argon2 参数取下限，否则十几次派生会让套件慢好几秒。
+ * 用假 store 就把要测的东西替换掉了。PBKDF2 参数取下限，否则十几次派生会让套件慢好几秒。
  */
 class VaultSessionTest {
 
@@ -48,20 +47,13 @@ class VaultSessionTest {
         session = VaultSession(
             bootStore = store,
             nowEpochMs = { now },
-            biometricAvailability = { BiometricAvailability.AVAILABLE },
         )
     }
 
-    /**
-     * 走**完整**一条引导：`onboard` 之后还要 `completeOnboarding`。
-     *
-     * 两步分开是产品行为的一部分（用户得先抄下恢复密钥），所以这个辅助函数代表"引导真的走完了"，
-     * 下面那几个用例才是专门测中间那个窗口的。
-     */
-    private fun onboard(): CharArray {
-        val key = session.onboard(pin.copyOf(), slowClock()).recoveryKey
+    /** 走**完整**一条引导：`onboard` 之后还要 `completeOnboarding`。 */
+    private fun onboard() {
+        session.onboard(pin.copyOf(), slowClock())
         session.completeOnboarding()
-        return key
     }
 
     // ------------------------------------------------------------------ 阶段
@@ -86,17 +78,6 @@ class VaultSessionTest {
         assertTrue(session.isUnlocked)
     }
 
-    // ---- 引导的最后一步：恢复密钥还没被确认的那个窗口
-
-    @Test
-    fun `恢复密钥还没确认时留在引导阶段，但 DEK 已经可用`() {
-        session.onboard(pin.copyOf(), slowClock())
-        // 报 Unlocked 的后果很具体：恢复密钥那一页会被跳过去，而那串明文只活在 ViewModel 里
-        assertEquals(LockPhase.Onboarding, session.currentPhase())
-        // 同时 DEK 必须已经在内存里——"重新轮换一把恢复密钥"这条补救路要用它
-        assertTrue(session.isUnlocked)
-    }
-
     @Test
     fun `确认之后 onboarded 才落盘`() {
         session.onboard(pin.copyOf(), slowClock())
@@ -110,23 +91,9 @@ class VaultSessionTest {
     fun `引导没走完就杀进程，重启回到引导而不是锁屏`() {
         session.onboard(pin.copyOf(), slowClock())
         // 换一个全新实例 = 杀进程。boot 里已经有 PIN 包裹了，但引导没走完，
-        // 所以这里必须是引导而不是"输 PIN 解锁"——用户手上还没有恢复密钥。
+        // 所以这里必须是引导而不是"输 PIN 解锁"。
         val restarted = VaultSession(bootStore = store, nowEpochMs = { now })
         assertEquals(LockPhase.Onboarding, restarted.refresh())
-    }
-
-    @Test
-    fun `引导没走完时能轮换出新的恢复密钥，旧的立刻失效`() {
-        val first = session.onboard(pin.copyOf(), slowClock()).recoveryKey
-        // Activity 被销毁后那串明文没了，但会话还解锁着，所以能换一把新的接着展示
-        val second = session.regenerateRecoveryKey()
-        assertFalse(first.contentEquals(second))
-        session.completeOnboarding()
-
-        session.lock()
-        assertEquals(UnlockResult.Success, session.unlockWithRecoveryKey(second.copyOf()))
-        session.lock()
-        assertTrue(session.unlockWithRecoveryKey(first.copyOf()) is UnlockResult.WrongCredential)
     }
 
     @Test
@@ -136,16 +103,13 @@ class VaultSessionTest {
     }
 
     @Test
-    fun `锁定之后回到 Locked 并带上退避与生物识别信息`() {
+    fun `锁定之后回到 Locked 并带上退避信息`() {
         onboard()
         session.lock()
         val phase = session.currentPhase()
         assertTrue("$phase", phase is LockPhase.Locked)
         phase as LockPhase.Locked
-        assertTrue("引导时生成了恢复密钥包裹", phase.hasRecoveryKey)
         assertEquals(0, phase.backoff.failedAttempts)
-        // 红线 5：引导阶段没开生物识别，所以这里不该报"系统可用"
-        assertEquals(BiometricAvailability.NOT_ENABLED_BY_USER, phase.biometric)
     }
 
     // ------------------------------------------------------------------ 解锁
@@ -223,31 +187,6 @@ class VaultSessionTest {
     }
 
     @Test
-    fun `恢复密钥能解锁`() {
-        val recovery = onboard()
-        session.lock()
-        assertEquals(UnlockResult.Success, session.unlockWithRecoveryKey(recovery.copyOf()))
-    }
-
-    @Test
-    fun `恢复密钥带空格与短横线也能解锁`() {
-        val recovery = onboard()
-        session.lock()
-        // 用户照着每 4 位一组抄下来，回填时几乎一定带分隔符
-        val typed = com.lc33.tokenvault.crypto.RecoveryKey.formatForDisplay(recovery).toCharArray()
-        assertEquals(UnlockResult.Success, session.unlockWithRecoveryKey(typed))
-    }
-
-    @Test
-    fun `格式不对的恢复密钥照样累加计数`() {
-        onboard()
-        session.lock()
-        val result = session.unlockWithRecoveryKey("not-a-key".toCharArray())
-        // 不累加的话它就成了一条不受退避约束的探测通道
-        assertEquals(1, (result as UnlockResult.WrongCredential).backoff.failedAttempts)
-    }
-
-    @Test
     fun `没有 boot 记录时解锁给出 Unavailable 而不是罚用户`() {
         val result = session.unlockWithPin(pin.copyOf())
         assertTrue("$result", result is UnlockResult.Unavailable)
@@ -287,7 +226,7 @@ class VaultSessionTest {
         assertTrue("红线 6：锁定时置零所有子密钥", borrowed.all { it == 0.toByte() })
     }
 
-    // ------------------------------------------------------------------ 改 PIN 与恢复密钥
+    // ------------------------------------------------------------------ 改 PIN
 
     /** 红线 2：改 PIN 只产生一次 boot 写入，业务数据零改动。 */
     @Test
@@ -323,30 +262,9 @@ class VaultSessionTest {
     }
 
     @Test
-    fun `重新生成恢复密钥让旧的立刻失效`() {
-        val old = onboard()
-        val new = session.regenerateRecoveryKey()
-        assertFalse(old.concatToString() == new.concatToString())
-
-        session.lock()
-        assertTrue(session.unlockWithRecoveryKey(old.copyOf()) is UnlockResult.WrongCredential)
-        // 上一步罚了一次，但还在免费额度内，所以新密钥应当仍能解
-        assertEquals(UnlockResult.Success, session.unlockWithRecoveryKey(new.copyOf()))
-    }
-
-    @Test
     fun `锁定态不允许改 PIN`() {
         onboard()
         session.lock()
         assertThrows(VaultLockedException::class.java) { session.changePin(pin.copyOf()) }
-    }
-
-    @Test
-    fun `生物识别那条路交进来的 DEK 长度不对时被拒`() {
-        onboard()
-        session.lock()
-        val result = session.unlockWithDek(ByteArray(16))
-        assertTrue("$result", result is UnlockResult.Unavailable)
-        assertFalse(session.isUnlocked)
     }
 }

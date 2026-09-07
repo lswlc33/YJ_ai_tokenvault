@@ -187,10 +187,9 @@ fun AppIconButton(
 /**
  * 对话框。
  *
- * 只用 MIUIX 的 `Overlay*` 系列：它画在 `Scaffold` 内的同一个窗口里，
- * 所以会继承 `FLAG_SECURE`。`Window*` 系列是独立系统窗口、不继承，
- * 而本项目的弹层里就有展示明文密钥和密码的，所以那一族被 CI 禁掉
- * （计划.md §7.5、§13.2）。
+ * 只用 MIUIX 的 `Overlay*` 系列：它画在 `Scaffold` 内的同一个窗口里，与页面共享
+ * 生命周期与组合树。`Window*` 系列是独立系统窗口、行为与页面脱钩，所以那一族被
+ * CI 禁掉（计划.md §13.2）。
  */
 @Composable
 fun AppDialog(
@@ -230,8 +229,8 @@ fun AppDialog(
 }
 
 /**
- * 底部弹层。和 [AppDialog] 一样只用 `Overlay*`——`Window*` 那一族是独立系统窗口，
- * `FLAG_SECURE` 不继承，而快速复制面板里就是明文密钥。
+ * 底部弹层。和 [AppDialog] 一样只用 `Overlay*`——`Window*` 那一族是独立系统窗口、
+ * 行为与页面脱钩。
  */
 @Composable
 fun AppBottomSheet(
@@ -511,10 +510,9 @@ class AppTextFieldState internal constructor(internal val state: TextFieldState)
     /**
      * 不经过 `String` 的字符拷贝。
      *
-     * 明文秘密（恢复密钥、长口令）只允许活在能擦掉的 `CharArray` 里（红线 1），
+     * 明文秘密（长口令）只允许活在能擦掉的 `CharArray` 里（红线 1），
      * 而 [text] 会产出一个进了字符串常量池、再也擦不掉的 `String`。
-     * 输入框内部当然仍持有这段文本——这是文本框不可避免的代价，所以用它的那一页
-     * 必须挂 `SecureScreen()`，并且离开时调 [clear]。
+     * 输入框内部当然仍持有这段文本——这是文本框不可避免的代价，所以离开时调 [clear]。
      */
     val chars: CharArray get() = state.text.let { cs -> CharArray(cs.length) { cs[it] } }
 

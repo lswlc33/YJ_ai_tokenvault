@@ -1,29 +1,22 @@
 package com.lc33.tokenvault.crypto
 
 /**
- * DEK 的包裹槽位（§7.1 的三条路径）。
+ * DEK 的包裹槽位（阶段1 迁移后只剩 PIN 一条路）。
  *
- * 三条路径包的是**同一个 DEK**（红线 25），所以加一条只是多一次 wrap，业务数据零改动。
- * 这也是"改 PIN 必须 O(1)"（红线 2）的实现前提：改 PIN 只重新包裹一次 DEK，
- * 一次 boot 写入，业务表零 UPDATE。
+ * 阶段1 安全模型简化（迁移计划.md）：删掉生物识别与恢复密钥两条路，只保留 PIN。
+ * 包的是**同一个 DEK**（红线 25），所以改 PIN 只重新包裹一次 DEK、一次 boot 写入、
+ * 业务表零 UPDATE（红线 2 的 O(1)）。
  */
 enum class DekSlot(val storageKey: String) {
     /** PIN / 口令派生的 KEK 包裹。 */
     Pin("pin"),
-
-    /** Keystore 硬件密钥包裹（别名 `vault_bio`，`setUserAuthenticationRequired(true)`）。 */
-    Biometric("biometric"),
-
-    /** 恢复密钥派生的 KEK 包裹。解决"忘记 6 位 PIN 导致整库不可读"这个最可能真实发生的事故。 */
-    Recovery("recovery"),
 }
 
 /**
  * DEK 的生成与包裹。
  *
- * 这一层刻意**不知道 KEK 是怎么来的**：PIN 走 Argon2id、生物识别走 Keystore、
- * 恢复密钥走 Argon2id，三者在这里都只是"32 字节的 KEK"。分开的收益是
- * `crypto/` 完全不必碰 Keystore（那是 `platform/` 的事，也是 Android 依赖的来源）。
+ * 这一层刻意**不知道 KEK 是怎么来的**：PIN 走 PBKDF2，在这里只是"32 字节的 KEK"。
+ * 分开的收益是 `crypto/` 完全不必碰 Keystore（阶段1 已删除）。
  *
  * 不设 `dekVerifier`：`wrap` 出来的本身就是 AES-GCM，解包时的 tag 校验已经能判断
  * KEK 对不对，再存一个校验密文只是多一处要维护一致性的状态（§7.1）。

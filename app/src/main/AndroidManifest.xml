@@ -2,7 +2,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
     <!--
         allowBackup / fullBackupContent 关掉，dataExtractionRules 再显式排除
@@ -26,7 +25,7 @@
         android:theme="@style/Theme.TokenVault"
         android:usesCleartextTraffic="true">
 
-        <!-- MainActivity 继承 FragmentActivity：androidx.biometric.BiometricPrompt 的要求（计划.md §15.1） -->
+        <!-- MainActivity 继承 FragmentActivity：便于 edge-to-edge 与生命周期回调（计划.md §15.1） -->
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -1,8 +1,7 @@
 package com.lc33.tokenvault.crypto
 
-import org.bouncycastle.crypto.digests.SHA256Digest
-import org.bouncycastle.crypto.macs.HMac
-import org.bouncycastle.crypto.params.KeyParameter
+import dev.whyoleg.cryptography.algorithms.HMAC
+import dev.whyoleg.cryptography.algorithms.SHA256
 
 /**
  * 秘密值的**本机指纹**：`HMAC-SHA256(HKDF(DEK,"fp"), 明文)` 取前 32 个 hex 字符。
@@ -33,23 +32,20 @@ object SecretFingerprint {
      * @param fingerprintKey `Hkdf.fingerprintKey(dek)`，由 `VaultSession.withFingerprintKey` 借出。
      */
     fun of(plaintext: ByteArray, fingerprintKey: ByteArray): String {
-        val mac = HMac(SHA256Digest()).apply {
-            init(KeyParameter(fingerprintKey))
-            update(plaintext, 0, plaintext.size)
-        }
-        val out = ByteArray(mac.macSize)
-        mac.doFinal(out, 0)
+        val hmac = CryptoProvider.provider.get(HMAC)
+        val key = hmac.keyDecoder(SHA256).decodeFromByteArrayBlocking(HMAC.Key.Format.RAW, fingerprintKey)
+        val mac = key.signatureGenerator().generateSignatureBlocking(plaintext)
         return try {
             buildString(HEX_LENGTH) {
                 // 只取前 16 个字节：两个 hex 字符一个字节
                 for (i in 0 until HEX_LENGTH / 2) {
-                    val b = out[i].toInt() and 0xFF
+                    val b = mac[i].toInt() and 0xFF
                     append(HEX_DIGITS[b ushr 4])
                     append(HEX_DIGITS[b and 0x0F])
                 }
             }
         } finally {
-            out.zeroize()
+            mac.zeroize()
         }
     }
 }

@@ -15,8 +15,8 @@ import org.junit.Test
  * CI 里那几条 grep 保留，作为"有人绕过 hook"时的第二道闸。
  *
  * 这些规则违反了不会立刻崩，但会在某个时刻造成不可挽回的后果——
- * 比如 MIUIX 的 `Window*` 弹层是独立系统窗口、`FLAG_SECURE` 不继承，
- * 用它展示明文密钥就是能被截屏的。
+ * 比如 MIUIX 的 `Window*` 弹层是独立系统窗口、与页面组合树脱钩，
+ * 用它展示明文密钥会让弹层与页面的生命周期/状态不同步。
  */
 class ArchitectureRulesTest {
 
@@ -103,8 +103,8 @@ class ArchitectureRulesTest {
                 bannedWindowComponents.find(file.readText())?.let { "${file.relative()} 用了 ${it.value}" }
             }
         fail(
-            "那一族是独立系统窗口，FLAG_SECURE 不继承；展示明文密钥的弹层必须用 Overlay*" +
-                "（计划.md §7.5、§13.2）：",
+            "那一族是独立系统窗口、与页面组合树脱钩；弹层统一用 Overlay*" +
+                "（计划.md §13.2）：",
             violations,
         )
     }

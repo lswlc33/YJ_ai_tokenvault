@@ -1,44 +1,6 @@
 package com.lc33.tokenvault.domain
 
 /**
- * 生物识别可用性（§7.3）。
- *
- * `BiometricManager.canAuthenticate(BIOMETRIC_STRONG)` 的五种返回值**每一种都要有对应
- * 的 UI 文案**，所以这里一档不合并——合并成"不可用"的话，用户看到的就只有一句
- * "生物识别不可用"，而这五种情况里有三种是用户自己能解决的（去录指纹、去做安全更新、
- * 去开锁屏）。
- *
- * [NotEnabledByUser] 不是系统返回的，是本应用的开关（`boot.biometricEnabled`）。
- * 它必须与系统能力分开：红线 5 要求开关关掉后**任何解锁路径都不得悄悄打开它**，
- * 而"系统能用"与"用户允许用"混成一个值就无法表达这条。
- */
-enum class BiometricAvailability {
-    /** 硬件在、已录入、可以用。 */
-    AVAILABLE,
-
-    /** 这台设备没有生物识别硬件。 */
-    NO_HARDWARE,
-
-    /** 硬件暂时不可用（被占用 / 系统忙）。可以提示稍后再试。 */
-    HARDWARE_UNAVAILABLE,
-
-    /** 硬件在但没录入任何指纹 / 人脸。引导用户去系统设置录入。 */
-    NONE_ENROLLED,
-
-    /** 需要先做系统安全更新。 */
-    SECURITY_UPDATE_REQUIRED,
-
-    /** 这个 Android 版本不支持 `BIOMETRIC_STRONG`。 */
-    UNSUPPORTED,
-
-    /** 系统能用，但用户在本应用里关掉了。**不得被任何解锁路径自动打开**（红线 5）。 */
-    NOT_ENABLED_BY_USER,
-    ;
-
-    val usable: Boolean get() = this == AVAILABLE
-}
-
-/**
  * 解锁失败退避（§7.2）。
  *
  * 第 5 次起 30s → 1m → 5m → 15m → 1h，上限 1h，**杀进程不清零**（存在 boot 里）。
@@ -111,15 +73,11 @@ sealed interface LockPhase {
      *
      * @param backoff 退避状态。UI 按 [UnlockBackoff.remainingSeconds] 画倒计时，
      *   按 [UnlockBackoff.failedAttempts] 画"已失败 N 次"。
-     * @param biometric 生物识别当前能不能用。为 [BiometricAvailability.AVAILABLE]
-     *   时才显示那个入口。
-     * @param hasRecoveryKey 有没有恢复密钥的包裹。没有就不显示"用恢复密钥解锁"入口——
-     *   显示一个点进去发现用不了的入口，比不显示更糟。
+     *
+     * 阶段1 迁移后只有 PIN 一条解锁路，`biometric` 与 `hasRecoveryKey` 两个字段已删。
      */
     data class Locked(
         val backoff: UnlockBackoff = UnlockBackoff(),
-        val biometric: BiometricAvailability = BiometricAvailability.NOT_ENABLED_BY_USER,
-        val hasRecoveryKey: Boolean = false,
     ) : LockPhase
 
     /** DEK 在内存里，业务界面可用。 */

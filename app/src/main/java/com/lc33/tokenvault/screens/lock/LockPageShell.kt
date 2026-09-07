@@ -14,7 +14,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import com.lc33.tokenvault.R
-import com.lc33.tokenvault.ui.common.SecureScreen
 import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppIconButton
 import com.lc33.tokenvault.ui.miuix.AppIconTint
@@ -37,7 +36,7 @@ import com.lc33.tokenvault.ui.theme.LocalAppTokens
  * 内容可滚动：引导页在小屏加大字号时会超过一屏，而超出的那部分恰好是「继续」按钮。
  * 另外挂了 `imePadding`：`enableEdgeToEdge()` 之后 manifest 里的 `adjustResize` 不再生效，
  * 而 MIUIX `Scaffold` 的默认 insets 只含 systemBars 与 displayCutout——不加这一条，
- * 恢复密钥那一格连同它下面的「解锁」会被软键盘整个盖住，而且滚不出来。
+ * PIN 输入那几格会被软键盘整个盖住，而且滚不出来。
  *
  * **弹层要写在 [content] 里面**：MIUIX 的 `Overlay*` 画在最近一个 Scaffold 的 popupHost 里，
  * 而锁闸这几页没有外层 Shell 的 Scaffold 兜着（业务界面那一半还没建起来）。
@@ -66,11 +65,10 @@ fun LockPage(
 }
 
 /**
- * 凭据类**二级页**的外壳（改 PIN、重新生成恢复密钥）。
+ * 凭据类**二级页**的外壳（改 PIN）。
  *
  * 与 [LockPage] 的区别只有一处：它有 topBar 和返回键。这两页是从设置里进来的，
  * 用户必须能原路退出去——而锁闸那几页不能有返回（返回到哪去？树的另一半还没建起来）。
- * 同样挂 `SecureScreen()`：这两页上会出现 PIN 输入与明文恢复密钥。
  */
 @Composable
 fun CredentialPage(
@@ -78,7 +76,6 @@ fun CredentialPage(
     onBack: () -> Unit,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    SecureScreen()
     val tokens = LocalAppTokens.current
     val scrollState = rememberAppTopBarScrollState()
     AppScaffold(

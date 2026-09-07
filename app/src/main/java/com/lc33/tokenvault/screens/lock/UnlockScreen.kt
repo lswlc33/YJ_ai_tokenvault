@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
@@ -17,24 +16,16 @@ import com.lc33.tokenvault.R
 import com.lc33.tokenvault.domain.LockPhase
 import com.lc33.tokenvault.domain.UnlockBackoff
 import com.lc33.tokenvault.ui.miuix.AppLinearProgress
-import com.lc33.tokenvault.ui.miuix.AppPrimaryButton
-import com.lc33.tokenvault.ui.miuix.AppSecretTextField
 import com.lc33.tokenvault.ui.miuix.AppText
-import com.lc33.tokenvault.ui.miuix.AppTextButton
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
-import com.lc33.tokenvault.ui.miuix.rememberSecretTextFieldState
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
 import com.lc33.tokenvault.ui.theme.LocalStatusPalette
 
 /**
  * 解锁页（§7.2、§7.4）。
  *
- * 三件事必须同时成立，缺一个都会让人以为应用坏了：
- * - 退避倒计时是**活的**。`UnlockBackoff` 存的是绝对时刻，这里每秒重算剩余秒数，
- *   到 0 自动把键盘放开——不需要用户杀进程重进（那正是最容易发生的误解）。
- * - 生物识别入口**只在真能用时出现**（七档里只有 `AVAILABLE`）。
- * - 恢复密钥入口只在**确实有那份包裹**时出现。给一个点进去用不了的入口比不给更糟。
+ * 阶段1 迁移后只有 PIN 一条解锁路，生物识别与恢复密钥入口已删。
  *
  * 页面不持有明文 PIN：敲键只上报字符，满位由持有明文的那一侧自动提交（见 [UnlockUiState]）。
  */
@@ -47,78 +38,35 @@ fun UnlockScreen(
     val tokens = LocalAppTokens.current
     val remaining = rememberRemainingSeconds(locked.backoff)
     val inputEnabled = !state.busy && remaining == 0
-    // 只显示属于当前输入方式的那条错误。切换方式时不清错误的责任不该压在后端身上——
-    // 漏清一次的表现是"标题写着恢复密钥，下面写着 PIN 不对"。
-    val error = state.error?.takeIf { it.isRecoveryError == state.recoveryMode }
+    val error = state.error
 
     LockPage {
         LockPageHeader(
-            title = stringResource(
-                if (state.recoveryMode) R.string.unlock_recovery_title else R.string.unlock_title,
-            ),
-            subtitle = stringResource(
-                if (state.recoveryMode) R.string.unlock_recovery_subtitle else R.string.unlock_subtitle,
-            ),
+            title = stringResource(R.string.unlock_title),
+            subtitle = stringResource(R.string.unlock_subtitle),
         )
         Spacer(Modifier.height(tokens.sectionSpacing))
 
-        if (!state.recoveryMode) {
-            PinDots(
-                filled = state.pinLength,
-                slots = state.pinSlots,
-                isError = error != null,
-            )
-            Spacer(Modifier.height(tokens.itemSpacing))
-        }
+        PinDots(
+            filled = state.pinLength,
+            slots = state.pinSlots,
+            isError = error != null,
+        )
+        Spacer(Modifier.height(tokens.itemSpacing))
 
         UnlockStatus(
             busy = state.busy,
             error = error,
             backoff = locked.backoff,
             remainingSeconds = remaining,
-            // 退避罚的是 PIN 试错。恢复密钥是 128 位熵、穷举不现实，所以那条路不受退避限制——
-            // 于是倒计时与"还能错几次"在恢复模式下都不该出现：一边让人等，一边输入框是活的，
-            // 结果是被锁在门外的人干等着一件其实没挡住他的事。
-            pinMode = !state.recoveryMode,
         )
         Spacer(Modifier.height(tokens.itemSpacing))
 
-        if (state.recoveryMode) {
-            RecoveryKeyInput(
-                enabled = !state.busy,
-                onSubmit = callbacks.onRecoveryUnlock,
-                onCancel = callbacks.onExitRecoveryMode,
-            )
-        } else {
-            PinKeypad(
-                onDigit = callbacks.onPinDigit,
-                onBackspace = callbacks.onPinBackspace,
-                enabled = inputEnabled,
-            )
-            // 这里刻意只留一个 itemSpacing：加上错误行与"还能错几次"那行之后，
-            // 360dp 宽 / 640dp 高的屏上整页正好卡在临界点，而被挤下去的恰好是
-            // 「改用恢复密钥解锁」——被锁在门外的人唯一的出路（真机上撞过一次）。
-            Spacer(Modifier.height(tokens.itemSpacing))
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
-            ) {
-                if (locked.biometric.usable) {
-                    AppTextButton(
-                        text = stringResource(R.string.unlock_biometric),
-                        onClick = callbacks.onBiometricUnlock,
-                        enabled = inputEnabled,
-                    )
-                }
-                if (locked.hasRecoveryKey) {
-                    AppTextButton(
-                        text = stringResource(R.string.unlock_use_recovery),
-                        onClick = callbacks.onEnterRecoveryMode,
-                        enabled = !state.busy,
-                    )
-                }
-            }
-        }
+        PinKeypad(
+            onDigit = callbacks.onPinDigit,
+            onBackspace = callbacks.onPinBackspace,
+            enabled = inputEnabled,
+        )
     }
 }
 
@@ -135,7 +83,6 @@ private fun UnlockStatus(
     error: PinError?,
     backoff: UnlockBackoff,
     remainingSeconds: Int,
-    pinMode: Boolean,
 ) {
     val palette = LocalStatusPalette.current
     val freeLeft = UnlockBackoff.FREE_ATTEMPTS - backoff.failedAttempts
@@ -154,7 +101,7 @@ private fun UnlockStatus(
             )
         }
         when {
-            remainingSeconds > 0 && pinMode -> AppText(
+            remainingSeconds > 0 -> AppText(
                 text = stringResource(R.string.unlock_backoff, formatCountdown(remainingSeconds)),
                 style = AppTextStyle.Body,
                 color = palette.warn,
@@ -168,7 +115,7 @@ private fun UnlockStatus(
                 textAlign = TextAlign.Center,
             )
         }
-        if (pinMode && remainingSeconds == 0 && backoff.failedAttempts > 0) {
+        if (remainingSeconds == 0 && backoff.failedAttempts > 0) {
             AppText(
                 text = if (freeLeft > 0) {
                     pluralStringResource(R.plurals.unlock_free_left, freeLeft, freeLeft)
@@ -180,59 +127,5 @@ private fun UnlockStatus(
                 textAlign = TextAlign.Center,
             )
         }
-    }
-}
-
-/**
- * 恢复密钥的回填。
- *
- * 用输入框而不是把键盘扩成 hex 盘：恢复密钥的正常保管方式是抄在纸上或存在密码管理器里，
- * 不让人粘贴等于逼着他们手敲 32 个字符，而这是一条"忘记 PIN 之后的最后出路"，
- * 在这里制造摩擦的代价最高。
- *
- * 输入框状态用 [rememberSecretTextFieldState]（不可保存）：可保存的那个会把内容序列化进
- * Activity 的 saved instance state，转个屏就把能解开整个库的东西交给了系统进程（红线 1）。
- *
- * 空格、换行、短横线都不用管：规范化由 `crypto/RecoveryKey.normalize` 一手做完
- * （它跳掉所有 `isWhitespace()` 与 `-`）。界面这一侧**刻意不再自己过滤一遍**——
- * 同一条规则放在两层里，迟早有一层落后于另一层，而这一页最不能出现的就是
- * "我抄得没错但它说不对"。形状对不对由后端回一个 [PinError]（页面层不碰 `crypto/`）。
- */
-@Composable
-private fun RecoveryKeyInput(
-    enabled: Boolean,
-    onSubmit: (CharArray) -> Unit,
-    onCancel: () -> Unit,
-) {
-    val tokens = LocalAppTokens.current
-    val field = rememberSecretTextFieldState()
-    // 离开这一页立刻清空：明文恢复密钥不该在返回之后还留在输入框里（§7.5 的"离开页面立即回遮"同理）
-    DisposableEffect(Unit) {
-        onDispose { field.clear() }
-    }
-    // 交出去的 CharArray 由调用方擦（见 LockCallbacks.onRecoveryUnlock）
-    val submit = { onSubmit(field.chars) }
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
-    ) {
-        AppSecretTextField(
-            state = field,
-            label = stringResource(R.string.unlock_recovery_label),
-            singleLine = false,
-            supportingText = stringResource(R.string.unlock_recovery_hint),
-            onDone = submit,
-        )
-        AppPrimaryButton(
-            text = stringResource(R.string.unlock_recovery_submit),
-            onClick = submit,
-            modifier = Modifier.fillMaxWidth(),
-            enabled = enabled,
-        )
-        AppTextButton(
-            text = stringResource(R.string.unlock_recovery_back),
-            onClick = onCancel,
-            modifier = Modifier.fillMaxWidth(),
-        )
     }
 }

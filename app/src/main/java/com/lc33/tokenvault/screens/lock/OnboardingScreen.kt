@@ -21,7 +21,6 @@ import androidx.compose.ui.unit.dp
 import com.lc33.tokenvault.R
 import com.lc33.tokenvault.ui.miuix.AppLinearProgress
 import com.lc33.tokenvault.ui.miuix.AppPrimaryButton
-import com.lc33.tokenvault.ui.miuix.AppSwitchRow
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppTextButton
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
@@ -33,12 +32,14 @@ import com.lc33.tokenvault.ui.theme.LocalStatusPalette
 /**
  * 引导（§7.1、§7.2、§7.6）。
  *
- * 六步的顺序不是随便排的：**先把代价说清楚再让人设 PIN**。第一屏那三句话
- * （存什么、6 位 PIN 挡不住什么、最后会给一把恢复密钥）如果放到最后当"提示"，
+ * 四步的顺序不是随便排的：**先把代价说清楚再让人设 PIN**。第一屏那三句话
+ * （存什么、6 位 PIN 挡不住什么、数据只在本地）如果放到最后当"提示"，
  * 用户已经设完 PIN、心态是"赶紧进去用"，那三句话就等于没说——而它们恰好对应
- * 这个应用唯一两种真会发生的事故：忘记 PIN，以及以为元数据也是加密的。
+ * 这个应用唯一真会发生的事故：忘记 PIN，以及以为元数据也是加密的。
  *
  * 每一步都不允许绕过 [OnboardingUiState.busy]：派生密钥时整页不接受输入。
+ *
+ * **阶段1 迁移**：删掉生物识别与恢复密钥两步，引导简化为四步。
  */
 @Composable
 fun OnboardingScreen(
@@ -57,8 +58,6 @@ fun OnboardingScreen(
             )
             OnboardingStep.SetPin, OnboardingStep.ConfirmPin -> PinStep(state = state, callbacks = callbacks)
             OnboardingStep.Calibrating -> CalibratingStep()
-            OnboardingStep.Biometric -> BiometricStep(state = state, callbacks = callbacks)
-            OnboardingStep.RecoveryKey -> RecoveryKeyStep(state = state, callbacks = callbacks)
         }
     }
 }
@@ -105,7 +104,7 @@ private fun WelcomeStep(onNext: () -> Unit, enabled: Boolean) {
     ) {
         BulletLine(stringResource(R.string.onboarding_welcome_what))
         BulletLine(stringResource(R.string.onboarding_welcome_limit))
-        BulletLine(stringResource(R.string.onboarding_welcome_recovery))
+        BulletLine(stringResource(R.string.onboarding_welcome_local))
     }
     Spacer(Modifier.height(tokens.sectionSpacing))
     AppPrimaryButton(
@@ -180,12 +179,11 @@ private fun PinStep(state: OnboardingUiState, callbacks: LockCallbacks) {
 }
 
 /**
- * 跑 Argon2id 基准（§7.2）。
+ * 跑 PBKDF2 基准（§7.2）。
  *
- * **不可取消、也没有百分比**：BouncyCastle 的 `Argon2BytesGenerator` 不提供进度回调，
- * Argon2 本身也没有可分段的中间状态。给一个假的百分比条比给无限进度更糟——
- * 用户会按着自己的估算去判断"是不是卡死了"。所以这里给的是"这一步只做一次"这个信息，
- * 而不是一个编出来的进度。
+ * **不可取消、也没有百分比**：PBKDF2 没有可分段的中间状态。给一个假的百分比条比给无限进度
+ * 更糟——用户会按着自己的估算去判断"是不是卡死了"。所以这里给的是"这一步只做一次"这个
+ * 信息，而不是一个编出来的进度。
  */
 @Composable
 private fun CalibratingStep() {
@@ -204,100 +202,4 @@ private fun CalibratingStep() {
         color = appSecondaryTextColor,
         textAlign = TextAlign.Center,
     )
-}
-
-/**
- * 生物识别（§7.3、红线 4/5）。
- *
- * 可用时只给一个开关，副文案说清它**只是解 DEK 的另一条路**，不是第二道锁——
- * 不说清的话用户会以为开了它更安全，而实际上它换来的是方便。
- *
- * 不可用时逐档给出原因（七档一档不合并），并且只有"去录入"这一档给按钮
- * （见 [offersBiometricEnroll]）。还没问出系统能力时（`biometric == null`）画"正在检查"，
- * 不拿任何一档去冒充——冒充的那一句必然是假话。
- */
-@Composable
-private fun BiometricStep(state: OnboardingUiState, callbacks: LockCallbacks) {
-    val tokens = LocalAppTokens.current
-    val availability = state.biometric
-    val unavailableRes = availability?.let { biometricUnavailableRes(it) }
-    LockPageHeader(
-        title = stringResource(R.string.onboarding_biometric_title),
-        subtitle = stringResource(R.string.onboarding_biometric_subtitle),
-        icon = null,
-    )
-    Spacer(Modifier.height(tokens.sectionSpacing))
-
-    if (availability == null) {
-        AppLinearProgress(progress = null, modifier = Modifier.fillMaxWidth())
-        Spacer(Modifier.height(tokens.itemSpacing))
-        AppText(
-            text = stringResource(R.string.onboarding_biometric_checking),
-            style = AppTextStyle.Secondary,
-            color = appSecondaryTextColor,
-        )
-    } else if (availability.usable) {
-        AppSwitchRow(
-            title = stringResource(R.string.onboarding_biometric_switch),
-            summary = stringResource(R.string.onboarding_biometric_switch_summary),
-            checked = state.biometricOptIn,
-            onCheckedChange = callbacks.onBiometricOptIn,
-            enabled = !state.busy,
-        )
-    } else if (unavailableRes != null) {
-        AppText(
-            text = stringResource(unavailableRes),
-            style = AppTextStyle.Body,
-            color = LocalStatusPalette.current.neutral,
-            textAlign = TextAlign.Center,
-        )
-        if (offersBiometricEnroll(availability)) {
-            Spacer(Modifier.height(tokens.itemSpacing))
-            AppTextButton(
-                text = stringResource(R.string.biometric_enroll_action),
-                onClick = callbacks.onOpenBiometricEnroll,
-                enabled = !state.busy,
-            )
-        }
-    }
-
-    Spacer(Modifier.height(tokens.sectionSpacing))
-    AppPrimaryButton(
-        text = stringResource(R.string.onboarding_next),
-        onClick = callbacks.onOnboardingNext,
-        modifier = Modifier.fillMaxWidth(),
-        enabled = !state.busy,
-    )
-}
-
-/** 最后一步：生成并展示恢复密钥，勾了"我已保存"才能完成（§7.1）。 */
-@Composable
-private fun RecoveryKeyStep(state: OnboardingUiState, callbacks: LockCallbacks) {
-    val tokens = LocalAppTokens.current
-    LockPageHeader(
-        title = stringResource(R.string.recovery_key_title),
-        subtitle = stringResource(R.string.recovery_key_subtitle),
-        icon = null,
-    )
-    Spacer(Modifier.height(tokens.sectionSpacing))
-
-    if (state.recoveryKeyDisplay == null) {
-        // 还在生成 / 包裹。这一帧也要有内容，否则最后一步会闪一下空白。
-        AppLinearProgress(progress = null, modifier = Modifier.fillMaxWidth())
-    } else {
-        RecoveryKeyPanel(
-            display = state.recoveryKeyDisplay,
-            saved = state.recoveryKeySaved,
-            onSavedChange = callbacks.onRecoveryKeySavedChange,
-            onCopy = callbacks.onCopyRecoveryKey,
-            enabled = !state.busy,
-        )
-        Spacer(Modifier.height(tokens.sectionSpacing))
-        AppPrimaryButton(
-            text = stringResource(R.string.onboarding_finish),
-            onClick = callbacks.onOnboardingNext,
-            modifier = Modifier.fillMaxWidth(),
-            enabled = state.recoveryKeySaved && !state.busy,
-        )
-    }
 }

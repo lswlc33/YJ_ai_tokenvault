@@ -59,10 +59,6 @@ data object SecurityRoute
 @Serializable
 data object ChangePinRoute
 
-/** 恢复密钥：看状态、补一把或换一把。已有的那把看不到（它从不落盘）。 */
-@Serializable
-data object RecoveryKeyRoute
-
 @Serializable
 data object ProbeSettingsRoute
 

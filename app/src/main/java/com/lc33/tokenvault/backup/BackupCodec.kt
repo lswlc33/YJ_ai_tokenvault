@@ -1,14 +1,14 @@
 package com.lc33.tokenvault.backup
 
-import com.lc33.tokenvault.crypto.Argon2idKdf
+import com.lc33.tokenvault.crypto.CryptoProvider
+import com.lc33.tokenvault.crypto.Pbkdf2Kdf
 import com.lc33.tokenvault.crypto.RandomBytes
 import com.lc33.tokenvault.crypto.SecureRandomBytes
 import com.lc33.tokenvault.crypto.zeroize
+import dev.whyoleg.cryptography.BinarySize.Companion.bits
+import dev.whyoleg.cryptography.DelicateCryptographyApi
+import dev.whyoleg.cryptography.algorithms.AES
 import kotlinx.serialization.json.Json
-import org.bouncycastle.crypto.engines.AESEngine
-import org.bouncycastle.crypto.modes.GCMBlockCipher
-import org.bouncycastle.crypto.params.AEADParameters
-import org.bouncycastle.crypto.params.KeyParameter
 import java.nio.ByteBuffer
 
 /**
@@ -19,19 +19,25 @@ import java.nio.ByteBuffer
  * magic "YJVAULT1"(8) ‖ headerLen(4, BE) ‖ header(JSON, 明文) ‖ payload(密文)
  * ```
  *
- * payload 用 AES-256-GCM，key 由 [Argon2idKdf] 从备份口令派生（参数在 header 里），
+ * payload 用 AES-256-GCM，key 由 [Pbkdf2Kdf] 从备份口令派生（参数在 header 里），
  * **AAD = header 原始字节**——篡改 header（比如把内存参数改小）会在认证阶段失败（红线 24
  * 在包层面的同一套道理）。
  *
  * 这里**不复用** [com.lc33.tokenvault.crypto.SecretBox]：字段级封套带 format/algorithm 前缀、
  * AAD 是 [com.lc33.tokenvault.crypto.FieldAad]，而备份包的 header 是分离的明文、AAD 是
- * header 原始字节，布局不同。但用同一套 BouncyCastle GCM 原语，行为在 JVM 与 Android 一致。
+ * header 原始字节，布局不同。但用同一套 cryptography-kotlin 的 AES-GCM 原语（JDK provider），
+ * 行为在 JVM 与 Android 一致。
  *
  * 派生密钥、明文 payload、备份口令都只在函数作用域内短命，用完即擦（红线 1）。
+ *
+ * **阶段1 迁移**：口令派生从 Argon2id 换成 PBKDF2，AES-GCM 从 BouncyCastle 换成
+ * cryptography-kotlin。备份口令默认沿用 PIN（不再有独立备份口令）。
  */
 class BackupCodec(private val random: RandomBytes = SecureRandomBytes) {
 
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+
+    private val aes: AES.GCM = CryptoProvider.provider.get(AES.GCM)
 
     /**
      * 加密：header + payload → 完整包字节。
@@ -52,18 +58,13 @@ class BackupCodec(private val random: RandomBytes = SecureRandomBytes) {
             BackupHeader.serializer(),
             header.copy(nonce = nonce),
         ).encodeToByteArray()
-        val key = try {
-            Argon2idKdf.derive(password, header.kdf)
-        } finally {
-            // password 的生命周期归调用方，这里不擦
-        }
+        val key = Pbkdf2Kdf.derive(password, header.kdf)
 
         return try {
-            val cipher = newCipher(forEncryption = true, key = key, nonce = nonce, aad = headerBytes)
-            val ciphertext = ByteArray(cipher.getOutputSize(payload.size))
-            var written = cipher.processBytes(payload, 0, payload.size, ciphertext, 0)
-            written += cipher.doFinal(ciphertext, written)
-            val body = if (written == ciphertext.size) ciphertext else ciphertext.copyOf(written)
+            val cipher = aes.keyDecoder().decodeFromByteArrayBlocking(AES.Key.Format.RAW, key)
+                .cipher(TAG_BITS.bits)
+            // `密文‖tag`（不带 nonce），我们自己拼进包
+            val body = sealWith(cipher, nonce, payload, headerBytes)
 
             val out = ByteBuffer.allocate(MAGIC.size + 4 + headerBytes.size + body.size)
             out.put(MAGIC)
@@ -106,35 +107,37 @@ class BackupCodec(private val random: RandomBytes = SecureRandomBytes) {
         }
 
         val body = bytes.copyOfRange(MAGIC.size + 4 + headerLen, bytes.size)
-        val key = Argon2idKdf.derive(password, header.kdf)
+        val key = Pbkdf2Kdf.derive(password, header.kdf)
         return try {
-            val cipher = newCipher(forEncryption = false, key = key, nonce = header.nonce, aad = headerBytes)
-            val plain = ByteArray(cipher.getOutputSize(body.size))
-            val written = try {
-                var n = cipher.processBytes(body, 0, body.size, plain, 0)
-                n += cipher.doFinal(plain, n)
-                n
+            val cipher = aes.keyDecoder().decodeFromByteArrayBlocking(AES.Key.Format.RAW, key)
+                .cipher(TAG_BITS.bits)
+            val payload = try {
+                openWith(cipher, header.nonce, body, headerBytes)
             } catch (t: Throwable) {
-                plain.zeroize()
                 // 口令错 / AAD 不匹配 / 密文被改，三者刻意不区分（同 SecretBox 的理由）
                 throw BackupCorruptException("decrypt failed")
             }
-            val payload = if (written == plain.size) plain else plain.copyOf(written).also { plain.zeroize() }
             DecodedBackup(header = header, payload = payload)
         } finally {
             key.zeroize()
         }
     }
 
-    private fun newCipher(
-        forEncryption: Boolean,
-        key: ByteArray,
+    @OptIn(DelicateCryptographyApi::class)
+    private fun sealWith(
+        cipher: AES.IvAuthenticatedCipher,
         nonce: ByteArray,
+        plaintext: ByteArray,
         aad: ByteArray,
-    ): org.bouncycastle.crypto.modes.GCMModeCipher =
-        GCMBlockCipher.newInstance(AESEngine.newInstance()).apply {
-            init(forEncryption, AEADParameters(KeyParameter(key), TAG_BITS, nonce, aad))
-        }
+    ): ByteArray = cipher.encryptWithIvBlocking(nonce, plaintext, aad)
+
+    @OptIn(DelicateCryptographyApi::class)
+    private fun openWith(
+        cipher: AES.IvAuthenticatedCipher,
+        nonce: ByteArray,
+        ciphertext: ByteArray,
+        aad: ByteArray,
+    ): ByteArray = cipher.decryptWithIvBlocking(nonce, ciphertext, aad)
 
     private companion object {
         val MAGIC = "YJVAULT1".encodeToByteArray()
