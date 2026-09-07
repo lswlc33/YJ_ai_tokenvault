@@ -1,5 +1,7 @@
 package com.lc33.tokenvault.ui.shell
 
+import com.lc33.tokenvault.platform.nowMillis
+
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -150,7 +152,7 @@ class ProviderDetailViewModel constructor(
                 keys = keyRows,
                 models = modelRows,
                 accounts = accountRows,
-                nowMs = System.currentTimeMillis(),
+                nowMs = nowMillis(),
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
@@ -246,7 +248,7 @@ class ProviderDetailViewModel constructor(
             // 登记已知明文：这把密钥刚被用户看到，之后若它出现在探测错误 / 审计日志里，
             // 脱敏器（红线 32 第一道）要能认出它、擦掉它。
             knownSecrets.add(plain)
-            _revealed.value = RevealState(keyId, String(plain))
+            _revealed.value = RevealState(keyId, plain.concatToString())
         }
     }
 
@@ -279,8 +281,8 @@ class ProviderDetailViewModel constructor(
             _revealedAccount.value = AccountRevealState(
                 accountId = accountId,
                 label = state.value?.accounts?.firstOrNull { it.id == accountId }?.label.orEmpty(),
-                username = plain.username?.let(::String),
-                password = plain.password?.let(::String),
+                username = plain.username?.let { it.concatToString() },
+                password = plain.password?.let { it.concatToString() },
             )
         }
     }

@@ -1,5 +1,7 @@
 package com.lc33.tokenvault.data.repo
 
+import com.lc33.tokenvault.domain.repo.TransactionRunner
+
 import com.lc33.tokenvault.data.dao.ApiKeyDao
 import com.lc33.tokenvault.data.dao.AppSettingDao
 import com.lc33.tokenvault.data.dao.AuditLogDao

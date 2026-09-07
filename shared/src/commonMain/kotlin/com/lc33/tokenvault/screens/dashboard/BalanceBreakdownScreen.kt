@@ -62,7 +62,8 @@ fun BalanceBreakdownScreen(
     val byCurrency = providers
         .filter { it.balance != null }
         .groupBy { it.balance!!.currency }
-        .toSortedMap()
+        .toList()
+        .sortedBy { it.first }
 
     AppScaffold(
         topBar = {

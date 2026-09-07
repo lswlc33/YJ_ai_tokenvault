@@ -1,11 +1,5 @@
 ﻿package com.lc33.tokenvault.ui.shell
 
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
-import android.provider.Settings
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -13,17 +7,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
-import androidx.fragment.app.FragmentActivity
-import org.koin.androidx.compose.koinViewModel
+import org.jetbrains.compose.resources.getString
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.viewmodel.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
-import com.lc33.tokenvault.R
 import com.lc33.tokenvault.engine.RestoreMode
+import com.lc33.tokenvault.platform.openAppLocaleSettings
+import com.lc33.tokenvault.platform.openExternalUrl
+import com.lc33.tokenvault.platform.rememberBackupFilePicker
 import com.lc33.tokenvault.screens.dashboard.BalanceBreakdownScreen
 import com.lc33.tokenvault.screens.dashboard.DashboardScreen
 import com.lc33.tokenvault.screens.lock.ChangePinScreen
@@ -54,6 +49,24 @@ import com.lc33.tokenvault.ui.miuix.AppTextButton
 import com.lc33.tokenvault.ui.miuix.LocalAppSnackbar
 import com.lc33.tokenvault.ui.miuix.rememberSecretTextFieldState
 import kotlinx.coroutines.launch
+import tokenvault.shared.generated.resources.Res
+import tokenvault.shared.generated.resources.clipboard_label_account
+import tokenvault.shared.generated.resources.clipboard_label_api_key
+import tokenvault.shared.generated.resources.editor_group_none
+import tokenvault.shared.generated.resources.editor_profile_default
+import tokenvault.shared.generated.resources.group_all
+import tokenvault.shared.generated.resources.profile_name_default
+import tokenvault.shared.generated.resources.sync_cancel
+import tokenvault.shared.generated.resources.sync_confirm
+import tokenvault.shared.generated.resources.sync_mode_add_only
+import tokenvault.shared.generated.resources.sync_mode_merge
+import tokenvault.shared.generated.resources.sync_mode_overwrite
+import tokenvault.shared.generated.resources.sync_passphrase_hint
+import tokenvault.shared.generated.resources.sync_passphrase_prompt
+import tokenvault.shared.generated.resources.sync_restore_mode
+import tokenvault.shared.generated.resources.sync_result_exported
+import tokenvault.shared.generated.resources.sync_result_failed
+import tokenvault.shared.generated.resources.sync_result_restored
 
 /**
  * 导航图。
@@ -68,8 +81,6 @@ fun VaultNavHost(
     nav: NavHostController,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
-
     fun openManage() {
         nav.navigate(ManageRoute) {
             popUpTo<DashboardRoute> { saveState = true }
@@ -103,7 +114,7 @@ fun VaultNavHost(
             val vm: ManageViewModel = koinViewModel()
             val manage by vm.state.collectAsStateWithLifecycle()
             // 「全部」那一枚 chip 的文案在资源里，而 ViewModel 读不到资源（红线 19）
-            val allLabel = stringResource(R.string.group_all)
+            val allLabel = stringResource(Res.string.group_all)
             LaunchedEffect(allLabel) { vm.setAllGroupLabel(allLabel) }
             ManageScreen(
                 state = manage,
@@ -146,8 +157,8 @@ fun VaultNavHost(
             val detail by vm.state.collectAsStateWithLifecycle()
             val revealed by vm.revealed.collectAsStateWithLifecycle()
             val revealedAccount by vm.revealedAccount.collectAsStateWithLifecycle()
-            val clipboardLabel = stringResource(R.string.clipboard_label_api_key)
-            val accountClipboardLabel = stringResource(R.string.clipboard_label_account)
+            val clipboardLabel = stringResource(Res.string.clipboard_label_api_key)
+            val accountClipboardLabel = stringResource(Res.string.clipboard_label_account)
             // 这一家可能刚被删掉（详情页还在栈上）。detail 为 null 时什么都不画：
             // 画一个空壳会让用户以为数据丢了，而真相是这一行已经不存在
             detail?.let { state ->
@@ -184,7 +195,7 @@ fun VaultNavHost(
                 onColorSchemeChange = vm::onColorSchemeChange,
                 onBlurNavBarChange = vm::onBlurNavBarChange,
                 onBack = back,
-                onOpenSystemLocaleSettings = { openAppLocaleSettings(context) },
+                onOpenSystemLocaleSettings = { openAppLocaleSettings() },
             )
         }
         composable<SecurityRoute> {
@@ -272,7 +283,7 @@ fun VaultNavHost(
         composable<ProfileListRoute> {
             val vm: ProfileListViewModel = koinViewModel()
             val profiles by vm.profiles.collectAsStateWithLifecycle()
-            val defaultName = stringResource(R.string.profile_name_default)
+            val defaultName = stringResource(Res.string.profile_name_default)
             ProfileListScreen(
                 profiles = profiles,
                 defaultName = defaultName,
@@ -333,11 +344,7 @@ fun VaultNavHost(
                 onUpdateChannelChange = vm::onUpdateChannelChange,
                 onCheckNow = vm::checkNow,
                 onOpenDownload = { url ->
-                    runCatching {
-                        context.startActivity(
-                            Intent(Intent.ACTION_VIEW, Uri.parse(url)),
-                        )
-                    }
+                    openExternalUrl(url)
                 },
             )
         }
@@ -351,11 +358,11 @@ fun VaultNavHost(
             val loaded by vm.loaded.collectAsStateWithLifecycle()
             LaunchedEffect(vm) { vm.saved.collect { back() } }
             // 下标 0 固定是「未分组」，与 ProviderDraftMapping 里那张表对齐
-            val ungrouped = stringResource(R.string.editor_group_none)
+            val ungrouped = stringResource(Res.string.editor_group_none)
             // 客户端预设下拉：0 = 「默认（不伪装）」，其余按仓库返回的预设顺序对齐。
             // 内置 `default` 那一枚的显示名要本地化，其余品牌名 / 自定义名直接用。
-            val profileDefaultLabel = stringResource(R.string.profile_name_default)
-            val editorProfileDefault = stringResource(R.string.editor_profile_default)
+            val profileDefaultLabel = stringResource(Res.string.profile_name_default)
+            val editorProfileDefault = stringResource(Res.string.editor_profile_default)
             if (loaded) {
                 ProviderEditorScreen(
                     draft = draft,
@@ -429,21 +436,6 @@ fun VaultNavHost(
 }
 
 /**
- * 跳系统的「应用语言」页。
- *
- * 应用内不再做一份语言选择器：Android 13+ 有系统级的 per-app locale，自己再做一个
- * 就有两个权威（红线 31 的精神）。取不到那个页面时退回应用详情页，不静默失败。
- */
-private fun openAppLocaleSettings(context: Context) {
-    val locale = Intent(Settings.ACTION_APP_LOCALE_SETTINGS, Uri.fromParts("package", context.packageName, null))
-    val details = Intent(
-        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-        Uri.fromParts("package", context.packageName, null),
-    )
-    runCatching { context.startActivity(locale) }.onFailure { context.startActivity(details) }
-}
-
-/**
  * 同步页的 SAF 接线（§12.1）。
  *
  * SAF 文件读写（`CreateDocument` / `OpenDocument`）在这里而不是 ViewModel 里做：
@@ -459,16 +451,14 @@ private fun SyncRouteContent(
     onBack: () -> Unit,
     vm: SyncViewModel,
 ) {
-    val context = LocalContext.current
     val snackbar = LocalAppSnackbar.current
     val backup by vm.backup.collectAsStateWithLifecycle()
 
-    val passphrasePrompt = stringResource(R.string.sync_passphrase_prompt)
-    val passphraseHint = stringResource(R.string.sync_passphrase_hint)
-    val confirm = stringResource(R.string.sync_confirm)
-    val cancel = stringResource(R.string.sync_cancel)
-    val exported = stringResource(R.string.sync_result_exported)
-    val failedPrefix = stringResource(R.string.sync_result_failed)
+    val passphrasePrompt = stringResource(Res.string.sync_passphrase_prompt)
+    val passphraseHint = stringResource(Res.string.sync_passphrase_hint)
+    val confirm = stringResource(Res.string.sync_confirm)
+    val cancel = stringResource(Res.string.sync_cancel)
+    val exported = stringResource(Res.string.sync_result_exported)
 
     // 口令对话框：一段明文口令，只在提交那一刻活一次
     var pendingAction by remember { mutableStateOf<PendingSyncAction?>(null) }
@@ -484,44 +474,33 @@ private fun SyncRouteContent(
             when (event) {
                 is SyncEvent.ExportSucceeded -> snackbar?.show(exported)
                 is SyncEvent.ExportFailed ->
-                    snackbar?.show(failedPrefix.format(event.message ?: "?"))
+                    snackbar?.show(getString(Res.string.sync_result_failed, event.message ?: "?"))
                 is SyncEvent.RestoreSucceeded ->
                     snackbar?.show(
-                        context.resources.getString(R.string.sync_result_restored, event.importedProviders),
+                        getString(Res.string.sync_result_restored, event.importedProviders),
                     )
                 is SyncEvent.RestoreFailed ->
-                    snackbar?.show(failedPrefix.format(event.message ?: "?"))
+                    snackbar?.show(getString(Res.string.sync_result_failed, event.message ?: "?"))
             }
         }
     }
 
-    // 导出目标文件选择
-    val exportLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/octet-stream"),
-    ) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        val password = passphraseState.chars
-        vm.export(password) { bytes ->
-            context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
-                ?: throw java.io.IOException("cannot open output stream")
-        }
-        passphraseState.clear()
-        pendingAction = null
-    }
-
-    // 导入文件选择
-    val importLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument(),
-    ) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-            ?: return@rememberLauncherForActivityResult
-        val password = passphraseState.chars
-        pendingRestore = PendingRestore(bytes, password)
-        restoreModePicker = true
-        passphraseState.clear()
-        pendingAction = null
-    }
+    // 导出/导入文件选择（平台能力，见 BackupFilePicker.kt）
+    val filePicker = rememberBackupFilePicker(
+        onExportPicked = { writeBytes ->
+            val password = passphraseState.chars
+            vm.export(password) { bytes -> writeBytes(bytes) }
+            passphraseState.clear()
+            pendingAction = null
+        },
+        onImportPicked = { bytes ->
+            val password = passphraseState.chars
+            pendingRestore = PendingRestore(bytes, password)
+            restoreModePicker = true
+            passphraseState.clear()
+            pendingAction = null
+        },
+    )
 
     SyncScreen(
         backup = backup,
@@ -541,8 +520,8 @@ private fun SyncRouteContent(
         confirmText = confirm,
         onConfirm = {
             when (pendingAction) {
-                PendingSyncAction.Export -> exportLauncher.launch("yuanji-backup.yjv")
-                PendingSyncAction.Import -> importLauncher.launch(arrayOf("*/*"))
+                PendingSyncAction.Export -> filePicker.pickExport()
+                PendingSyncAction.Import -> filePicker.pickImport()
                 null -> Unit
             }
         },
@@ -562,18 +541,18 @@ private fun SyncRouteContent(
             pendingRestore = null
             restoreModePicker = false
         },
-        title = stringResource(R.string.sync_restore_mode),
+        title = stringResource(Res.string.sync_restore_mode),
         confirmText = null,
     ) {
-        AppTextButton(text = stringResource(R.string.sync_mode_merge), onClick = {
+        AppTextButton(text = stringResource(Res.string.sync_mode_merge), onClick = {
             pendingRestore?.let { vm.restore(it.bytes, it.password, RestoreMode.MERGE) }
             restoreModePicker = false
         })
-        AppTextButton(text = stringResource(R.string.sync_mode_overwrite), onClick = {
+        AppTextButton(text = stringResource(Res.string.sync_mode_overwrite), onClick = {
             pendingRestore?.let { vm.restore(it.bytes, it.password, RestoreMode.OVERWRITE) }
             restoreModePicker = false
         })
-        AppTextButton(text = stringResource(R.string.sync_mode_add_only), onClick = {
+        AppTextButton(text = stringResource(Res.string.sync_mode_add_only), onClick = {
             pendingRestore?.let { vm.restore(it.bytes, it.password, RestoreMode.ADD_ONLY) }
             restoreModePicker = false
         })

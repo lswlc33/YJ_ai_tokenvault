@@ -1,5 +1,7 @@
 package com.lc33.tokenvault.domain.repo
 
+import kotlinx.coroutines.flow.Flow
+
 /**
  * 一轮探测的运行记录。
  *
@@ -24,8 +26,8 @@ data class ProbeRun(
 /**
  * 探测运行的写入仓库。
  *
- * 只暴露探测引擎需要的两条写路径（[insert] / [update]）。读路径（如"上次探测摘要"用的
- * `observeLatest`）仍由 data 层的 `ProbeRunDao` 直接服务，不在这里重复抽象。
+ * 只暴露探测引擎需要的两条写路径（[insert] / [update]）与仪表盘/探测明细页需要的读路径
+ * （[observeLatest]）。读路径返回纯 Kotlin 的 [ProbeRun]，不泄漏 Room 实体。
  */
 interface ProbeRunRepository {
 
@@ -34,4 +36,10 @@ interface ProbeRunRepository {
 
     /** 更新一轮（结束时回填计数与时间）。 */
     suspend fun update(run: ProbeRun)
+
+    /** `probe_runs` 最新一行（"上次探测"摘要），没有跑过则为 null。 */
+    fun observeLatest(): Flow<ProbeRun?>
+
+    /** 清空 `probe_runs`（数据页"清空探测结果"）。 */
+    suspend fun clear()
 }

@@ -1,6 +1,7 @@
 package com.lc33.tokenvault.platform
 
 import com.lc33.tokenvault.crypto.DekEnvelope
+import kotlin.concurrent.Volatile
 import com.lc33.tokenvault.crypto.DekSlot
 import com.lc33.tokenvault.engine.ProbeSession
 import com.lc33.tokenvault.crypto.DecryptionFailedException
@@ -57,7 +58,7 @@ class VaultSession(
     private val knownSecrets: KnownSecrets = KnownSecrets(),
 ) : ProbeSession {
 
-    private val guard = Any()
+    private val guard = Lock()
 
     private var dek: ByteArray? = null
     private var fieldKey: ByteArray? = null
@@ -71,10 +72,10 @@ class VaultSession(
      * 刻意不在这一层做成 `StateFlow`：`platform/` 不该决定 UI 用什么订阅机制，
      * 而且这样这个类在 JVM 单测里不需要协程环境。`di/` 里的包装把它桥成 `StateFlow`。
      */
-    fun currentPhase(): LockPhase = synchronized(guard) { phase }
+    fun currentPhase(): LockPhase = guard.withLock { phase }
 
     /** 从 boot 存储重新计算阶段。冷启动与"清空重来"之后调用。 */
-    fun refresh(): LockPhase = synchronized(guard) {
+    fun refresh(): LockPhase = guard.withLock {
         phase = computePhase()
         phase
     }
@@ -115,7 +116,7 @@ class VaultSession(
      * **不擦 [pin]**：调用方通常还要用它做"两次输入一致"的比对，擦除时机只有调用方知道。
      */
     fun onboard(pin: CharArray, benchmarkNanoTime: () -> Long) {
-        synchronized(guard) {
+        guard.withLock {
             val baseline = KdfParams(salt = random.nextBytes(KdfParams.SALT_BYTES))
             val elapsed = Pbkdf2Kdf.benchmark(baseline, benchmarkNanoTime)
             val chosen = Pbkdf2Kdf.chooseParams(baseline, elapsed)
@@ -156,7 +157,7 @@ class VaultSession(
      * @throws VaultLockedException 未解锁。走到这一步必然是刚 [onboard] 完，所以真抛了
      *   说明调用顺序错了，而不是用户做了什么。
      */
-    fun completeOnboarding() = synchronized(guard) {
+    fun completeOnboarding() = guard.withLock {
         if (dek == null) throw VaultLockedException()
         bootStore.update { it.copy(onboarded = true) }
         phase = computePhase()
@@ -164,23 +165,23 @@ class VaultSession(
 
     // ------------------------------------------------------------------ 解锁
 
-    fun unlockWithPin(pin: CharArray): UnlockResult = synchronized(guard) {
+    fun unlockWithPin(pin: CharArray): UnlockResult = guard.withLock {
         val record = when (val state = bootStore.read()) {
             is BootState.Ok -> state.record
-            BootState.Missing -> return UnlockResult.Unavailable("no boot record")
-            is BootState.Corrupt -> return UnlockResult.Unavailable(state.reason)
+            BootState.Missing -> return@withLock UnlockResult.Unavailable("no boot record")
+            is BootState.Corrupt -> return@withLock UnlockResult.Unavailable(state.reason)
         }
         val backoff = record.backoff()
-        if (backoff.isActive(nowEpochMs())) return UnlockResult.InBackoff(backoff)
+        if (backoff.isActive(nowEpochMs())) return@withLock UnlockResult.InBackoff(backoff)
 
-        val params = record.pinKdf ?: return UnlockResult.Unavailable("no wrap for ${DekSlot.Pin.storageKey}")
-        val wrapped = record.dekWrappedByPin ?: return UnlockResult.Unavailable("no wrap for ${DekSlot.Pin.storageKey}")
+        val params = record.pinKdf ?: return@withLock UnlockResult.Unavailable("no wrap for ${DekSlot.Pin.storageKey}")
+        val wrapped = record.dekWrappedByPin ?: return@withLock UnlockResult.Unavailable("no wrap for ${DekSlot.Pin.storageKey}")
 
         val kek = Pbkdf2Kdf.derive(pin, params)
         val unwrapped = try {
             dekEnvelope.unwrap(wrapped, kek, DekSlot.Pin)
         } catch (_: DecryptionFailedException) {
-            return penalizeAndBuildResult()
+            return@withLock penalizeAndBuildResult()
         } finally {
             kek.zeroize()
         }
@@ -188,7 +189,7 @@ class VaultSession(
         bootStore.update { it.copy(pinFailCount = 0, pinLockUntil = null) }
         adoptDek(unwrapped)
         phase = LockPhase.Unlocked
-        return UnlockResult.Success
+        return@withLock UnlockResult.Success
     }
 
     private fun penalizeAndBuildResult(): UnlockResult {
@@ -206,7 +207,7 @@ class VaultSession(
     // ------------------------------------------------------------------ 锁定与借用
 
     /** 锁定：清零 DEK 与两个子密钥，**不关库**（§6.1 推论 1）。 */
-    fun lock() = synchronized(guard) {
+    fun lock() = guard.withLock {
         dek?.zeroize()
         fieldKey?.zeroize()
         fingerprintKey?.zeroize()
@@ -219,7 +220,7 @@ class VaultSession(
         phase = computePhase()
     }
 
-    override val isUnlocked: Boolean get() = synchronized(guard) { dek != null }
+    override val isUnlocked: Boolean get() = guard.withLock { dek != null }
 
     /**
      * 借用字段级加密子密钥。
@@ -227,11 +228,11 @@ class VaultSession(
      * 锁定态抛 [VaultLockedException]，而不是返回 null——红线 8 的同一条道理：
      * 一个返回 null 的 API 迟早被写成 `?: ""`。
      */
-    fun <R> withFieldKey(block: (ByteArray) -> R): R = synchronized(guard) {
+    fun <R> withFieldKey(block: (ByteArray) -> R): R = guard.withLock {
         block(fieldKey ?: throw VaultLockedException())
     }
 
-    fun <R> withFingerprintKey(block: (ByteArray) -> R): R = synchronized(guard) {
+    fun <R> withFingerprintKey(block: (ByteArray) -> R): R = guard.withLock {
         block(fingerprintKey ?: throw VaultLockedException())
     }
 
@@ -253,7 +254,7 @@ class VaultSession(
      *   （一个返回 false 的写操作迟早被写成 `if (!ok) {}`）。这两种情况在"已解锁"的前提下
      *   都不该发生，真发生了说明 boot 在解锁之后被改坏了，属于要让用户知道的事。
      */
-    fun changePin(newPin: CharArray) = synchronized(guard) {
+    fun changePin(newPin: CharArray) = guard.withLock {
         val currentDek = dek ?: throw VaultLockedException()
         val record = (bootStore.read() as? BootState.Ok)?.record
             ?: throw IllegalStateException("boot record unavailable while changing PIN")

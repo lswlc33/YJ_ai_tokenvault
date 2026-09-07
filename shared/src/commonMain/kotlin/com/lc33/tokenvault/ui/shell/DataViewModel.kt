@@ -2,12 +2,12 @@ package com.lc33.tokenvault.ui.shell
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.lc33.tokenvault.data.dao.ApiKeyDao
-import com.lc33.tokenvault.data.dao.ProbeRunDao
-import com.lc33.tokenvault.data.repo.TransactionRunner
 import com.lc33.tokenvault.domain.model.LogCategory
 import com.lc33.tokenvault.domain.model.LogLevel
+import com.lc33.tokenvault.domain.repo.ApiKeyRepository
 import com.lc33.tokenvault.domain.repo.AuditLogRepository
+import com.lc33.tokenvault.domain.repo.ProbeRunRepository
+import com.lc33.tokenvault.domain.repo.TransactionRunner
 import kotlinx.coroutines.launch
 
 /**
@@ -17,8 +17,8 @@ import kotlinx.coroutines.launch
  * 所以确认对话框在页面层弹，这里只负责真动手。
  */
 class DataViewModel constructor(
-    private val keyDao: ApiKeyDao,
-    private val probeRunDao: ProbeRunDao,
+    private val keys: ApiKeyRepository,
+    private val probeRuns: ProbeRunRepository,
     private val audit: AuditLogRepository,
     private val transactions: TransactionRunner,
 ) : ViewModel() {
@@ -27,8 +27,8 @@ class DataViewModel constructor(
     fun clearProbeResults() {
         viewModelScope.launch {
             transactions.inTransaction {
-                keyDao.resetProbeResults()
-                probeRunDao.clear()
+                keys.resetProbeResults()
+                probeRuns.clear()
             }
             audit.record(
                 level = LogLevel.INFO,

@@ -9,6 +9,7 @@ import com.lc33.tokenvault.platform.AutoLocker
 import com.lc33.tokenvault.platform.BootStore
 import com.lc33.tokenvault.platform.UnlockResult
 import com.lc33.tokenvault.platform.VaultSession
+import com.lc33.tokenvault.platform.monotonicNanoTime
 import com.lc33.tokenvault.screens.lock.LockUiState
 import com.lc33.tokenvault.screens.lock.OnboardingStep
 import com.lc33.tokenvault.screens.lock.PinError
@@ -229,7 +230,7 @@ class LockViewModel constructor(
         viewModelScope.launch {
             withContext(Dispatchers.Default) {
                 try {
-                    session.onboard(pin, System::nanoTime)
+                    session.onboard(pin, ::monotonicNanoTime)
                 } finally {
                     pin.zeroize()
                     firstPin = null
@@ -240,7 +241,7 @@ class LockViewModel constructor(
                 try {
                     session.completeOnboarding()
                     true
-                } catch (_: java.io.IOException) {
+                } catch (_: Exception) {
                     false
                 }
             }

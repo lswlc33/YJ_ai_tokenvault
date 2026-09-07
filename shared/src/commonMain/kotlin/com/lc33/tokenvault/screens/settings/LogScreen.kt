@@ -1,5 +1,7 @@
 package com.lc33.tokenvault.screens.settings
 
+import com.lc33.tokenvault.platform.nowMillis
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -60,7 +62,7 @@ fun LogScreen(
 ) {
     val tokens = LocalAppTokens.current
     // 相对时间的"现在"。页面组合时取一次快照即可；日志页不强调秒级精度。
-    val nowMs = remember { System.currentTimeMillis() }
+    val nowMs = remember { nowMillis() }
 
     SettingsSubPage(titleRes = Res.string.log_title, onBack = onBack) {
         if (entries.isEmpty()) {

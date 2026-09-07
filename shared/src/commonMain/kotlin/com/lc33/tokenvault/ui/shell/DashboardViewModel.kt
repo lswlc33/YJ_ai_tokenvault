@@ -2,14 +2,15 @@ package com.lc33.tokenvault.ui.shell
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.lc33.tokenvault.data.dao.ProbeRunDao
 import com.lc33.tokenvault.engine.BalanceEngine
 import com.lc33.tokenvault.engine.ProbeEngine
 import com.lc33.tokenvault.domain.model.ApiKey
 import com.lc33.tokenvault.domain.model.ProviderSummary
 import com.lc33.tokenvault.domain.repo.ApiKeyRepository
+import com.lc33.tokenvault.domain.repo.ProbeRunRepository
 import com.lc33.tokenvault.domain.repo.ProviderRepository
 import com.lc33.tokenvault.domain.repo.SettingsRepository
+import com.lc33.tokenvault.platform.nowMillis
 import com.lc33.tokenvault.probe.ProbeProgress
 import com.lc33.tokenvault.screens.model.BackupStatus
 import com.lc33.tokenvault.screens.model.DashboardUiState
@@ -46,7 +47,7 @@ class DashboardViewModel constructor(
     settings: SettingsRepository,
     private val probeEngine: ProbeEngine,
     private val balanceEngine: BalanceEngine,
-    probeRunDao: ProbeRunDao,
+    probeRunRepo: ProbeRunRepository,
 ) : ViewModel() {
 
     /** 一次取好的两份原始数据。分开 map 两次就要 combine 两次，那才会不同步。 */
@@ -61,7 +62,7 @@ class DashboardViewModel constructor(
         snapshot,
         settings.observeBalanceThresholds(),
         probeEngine.progress,
-        probeRunDao.observeLatest(),
+        probeRunRepo.observeLatest(),
     ) { snap, thresholds, progress, lastRun ->
         snap.toUiState(
             thresholds = thresholds,
@@ -129,7 +130,7 @@ class DashboardViewModel constructor(
         progress = progress,
         // 备份在 M9。空的 BackupStatus 会让那张卡画成 warn 色的"还没有备份"，这是真话
         backup = BackupStatus(),
-        nowMs = System.currentTimeMillis(),
+        nowMs = nowMillis(),
     )
 
     /** 引擎的进度（runId/running/done/total/currentHost）→ 仪表盘卡的进度。 */

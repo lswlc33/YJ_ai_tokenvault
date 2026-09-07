@@ -1,5 +1,7 @@
 package com.lc33.tokenvault.data.repo
 
+import com.lc33.tokenvault.domain.repo.TransactionRunner
+
 import com.lc33.tokenvault.crypto.FieldAad
 import com.lc33.tokenvault.crypto.toUtf8
 import com.lc33.tokenvault.crypto.utf8Chars
@@ -131,6 +133,8 @@ class RoomApiKeyRepository constructor(
         httpStatus = httpStatus,
         checkedAt = checkedAt,
     )
+
+    override suspend fun resetProbeResults() = dao.resetProbeResults()
 
     private fun aadFor(id: Long) = FieldAad.of(TABLE, id, COLUMN_SECRET)
 

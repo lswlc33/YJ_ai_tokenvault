@@ -87,4 +87,7 @@ interface ApiKeyRepository {
         httpStatus: Int?,
         checkedAt: Long,
     )
+
+    /** 重置所有密钥的探测字段（health/lastOutcome/详情/时间戳），密钥本身保留。 */
+    suspend fun resetProbeResults()
 }

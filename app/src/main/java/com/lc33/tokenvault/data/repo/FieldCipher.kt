@@ -5,23 +5,14 @@ import com.lc33.tokenvault.crypto.FieldAad
 import com.lc33.tokenvault.crypto.SecretBox
 import com.lc33.tokenvault.crypto.SecretFingerprint
 import com.lc33.tokenvault.data.VaultDatabase
+import com.lc33.tokenvault.domain.repo.TransactionRunner
 import com.lc33.tokenvault.platform.VaultSession
 
 /**
- * 事务边界。
+ * 事务边界（接口在 shared 的 domain/repo/TransactionRunner.kt）。
  *
- * 抽成接口而不是直接在仓库里用 `db.withTransaction {}`，是为了让仓库能在 **JVM 单测**里跑：
- * 本项目没有 Robolectric，Room 在 JVM 上起不来，所以测试里换一个"直接执行 block"的实现，
- * 用假 DAO 验仓库自己的逻辑（映射、AAD 绑对没绑对、两步写的顺序）。
- *
- * 这条取舍要说清代价：**SQL 层面的东西这么测不到**——外键 CASCADE、部分唯一索引
- * `idx_keys_default`、`(providerId, fingerprint)` 唯一约束，都只有真设备（或 Robolectric）
- * 才能验。§14.3 里那几项因此仍然挂在仪器测试上。
+ * Room 实现依赖 `db.withTransaction`，所以留在这里（data 层）。
  */
-interface TransactionRunner {
-    suspend fun <R> inTransaction(block: suspend () -> R): R
-}
-
 class RoomTransactionRunner constructor(
     private val db: VaultDatabase,
 ) : TransactionRunner {

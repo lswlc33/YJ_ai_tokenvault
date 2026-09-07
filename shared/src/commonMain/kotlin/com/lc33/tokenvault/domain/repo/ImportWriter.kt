@@ -1,9 +1,5 @@
-package com.lc33.tokenvault.data.repo
+package com.lc33.tokenvault.domain.repo
 
-import com.lc33.tokenvault.domain.repo.ApiKeyRepository
-import com.lc33.tokenvault.domain.repo.ModelRepository
-import com.lc33.tokenvault.domain.repo.ProviderAccountRepository
-import com.lc33.tokenvault.domain.repo.ProviderRepository
 import com.lc33.tokenvault.importer.ParsedRecord
 import com.lc33.tokenvault.importer.toProvider
 

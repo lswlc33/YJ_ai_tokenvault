@@ -125,6 +125,11 @@ kotlin {
             api(libs.cmp.lifecycle.runtime.compose)
             api(libs.cmp.lifecycle.viewmodel.compose)
 
+            // Koin（阶段3：screens/ui 迁 commonMain 后 koinViewModel 用 KMP 版）。
+            // koin-core + koin-compose-viewmodel 都是 KMP 库，提供 org.koin.compose.viewmodel.koinViewModel。
+            api(libs.koin.core)
+            api(libs.koin.compose.viewmodel)
+
             // MIUIX（阶段3：ui/miuix/ 迁入 commonMain）。这四个都是 KMP 库，有 iOS 产物。
             // miuix-blur 用跨平台版（不是 -android 版）。
             api(libs.miuix.ui)

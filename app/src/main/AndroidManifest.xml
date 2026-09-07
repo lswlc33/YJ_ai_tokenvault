@@ -35,6 +35,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- shared 侧平台能力（跳系统设置/打开链接/SAF 文件选择）自动注入 Application Context。 -->
+        <provider
+            android:name="com.lc33.tokenvault.platform.PlatformInitProvider"
+            android:authorities="${applicationId}.platforminit"
+            android:exported="false" />
     </application>
 
 </manifest>

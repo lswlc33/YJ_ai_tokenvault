@@ -2,9 +2,10 @@ package com.lc33.tokenvault.ui.shell
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.lc33.tokenvault.data.dao.ProbeRunDao
 import com.lc33.tokenvault.domain.ProbeOutcome
+import com.lc33.tokenvault.domain.repo.ProbeRunRepository
 import com.lc33.tokenvault.engine.ProbeEngine
+import com.lc33.tokenvault.platform.nowMillis
 import com.lc33.tokenvault.probe.ProbeItemResult
 import com.lc33.tokenvault.screens.model.ProbeRunSummary
 import com.lc33.tokenvault.screens.probe.ProbeItemRow
@@ -18,14 +19,14 @@ import kotlinx.coroutines.flow.stateIn
  *
  * 这一页只做两件事：看上一轮结果、重试。数据来自两个地方，都是只读：
  * - [ProbeEngine.lastRound]：最近一轮逐项结果的累计快照（§1418 的 `results`）；
- * - [ProbeRunDao.observeLatest]：`probe_runs` 最新一行，给"上次探测"摘要。
+ * - [ProbeRunRepository.observeLatest]：`probe_runs` 最新一行，给"上次探测"摘要。
  *
  * 分组规则（§13.4）：失败项、本轮未探测项、成功项三组分开——未探测不是失败（红线 11），
  * 混在一起会让用户以为有 N 个东西坏了而其实只坏了 M 个。
  */
 class ProbeRunViewModel constructor(
     private val probeEngine: ProbeEngine,
-    probeRunDao: ProbeRunDao,
+    probeRunRepo: ProbeRunRepository,
 ) : ViewModel() {
 
     data class UiState(
@@ -38,7 +39,7 @@ class ProbeRunViewModel constructor(
 
     val state: StateFlow<UiState> = combine(
         probeEngine.lastRound,
-        probeRunDao.observeLatest(),
+        probeRunRepo.observeLatest(),
     ) { results, lastRun ->
         UiState(
             lastRun = lastRun?.toSummary(),
@@ -46,7 +47,7 @@ class ProbeRunViewModel constructor(
             skipped = results.filter { it.outcome == ProbeOutcome.SKIPPED || it.outcome == ProbeOutcome.CANCELLED }
                 .map { it.toRow() },
             succeeded = results.filter { it.outcome == ProbeOutcome.SUCCESS }.map { it.toRow() },
-            nowMs = System.currentTimeMillis(),
+            nowMs = nowMillis(),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), UiState())
 

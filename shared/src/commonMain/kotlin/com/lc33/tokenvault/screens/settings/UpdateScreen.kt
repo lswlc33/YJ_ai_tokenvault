@@ -1,5 +1,7 @@
 package com.lc33.tokenvault.screens.settings
 
+import com.lc33.tokenvault.platform.nowMillis
+
 import com.lc33.tokenvault.platform.APP_VERSION_CODE
 import com.lc33.tokenvault.platform.APP_VERSION_NAME
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -170,7 +172,7 @@ private fun CheckResultCard(
 ) {
     val tokens = LocalAppTokens.current
     // 页面级时间快照（与 LogScreen 同款）：重组时不要重复读时钟，相对时间用同一基准。
-    val now = remember { System.currentTimeMillis() }
+    val now = remember { nowMillis() }
 
     // 最新版本号：正式版 tag 是 `v0.1.0`，剥掉 `v` 前缀展示；nightly 直接展示 tag。
     val versionLabel = com.lc33.tokenvault.update.ReleaseMatcher.versionNameFromTag(latest.tagName)

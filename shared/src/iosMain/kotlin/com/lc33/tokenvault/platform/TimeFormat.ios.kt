@@ -4,6 +4,7 @@ import platform.Foundation.NSDate
 import platform.Foundation.NSDateFormatter
 import platform.Foundation.NSDateFormatterMediumStyle
 import platform.Foundation.NSDateFormatterNoStyle
+import platform.Foundation.dateWithTimeIntervalSince1970
 
 /** iOS 端用 NSDateFormatter 做本地化 MEDIUM 短日期，设备当前时区。 */
 actual fun absoluteDateLabel(epochMillis: Long): String {

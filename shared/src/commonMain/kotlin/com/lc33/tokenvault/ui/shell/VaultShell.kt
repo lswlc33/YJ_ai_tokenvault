@@ -6,16 +6,19 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
-import org.koin.androidx.compose.koinViewModel
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.viewmodel.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.lc33.tokenvault.R
 import com.lc33.tokenvault.ui.miuix.AppIcon
+import tokenvault.shared.generated.resources.Res
+import tokenvault.shared.generated.resources.nav_dashboard
+import tokenvault.shared.generated.resources.nav_manage
+import tokenvault.shared.generated.resources.nav_settings
 import com.lc33.tokenvault.ui.miuix.AppNavBar
 import com.lc33.tokenvault.ui.miuix.AppNavBarItem
 import com.lc33.tokenvault.ui.miuix.AppScaffold
@@ -49,9 +52,9 @@ fun VaultShell() {
     val backdrop = rememberAppLayerBackdrop()
 
     val items = listOf(
-        AppNavBarItem(label = stringResource(R.string.nav_dashboard), icon = AppIcon.Dashboard),
-        AppNavBarItem(label = stringResource(R.string.nav_manage), icon = AppIcon.Manage),
-        AppNavBarItem(label = stringResource(R.string.nav_settings), icon = AppIcon.Settings),
+        AppNavBarItem(label = stringResource(Res.string.nav_dashboard), icon = AppIcon.Dashboard),
+        AppNavBarItem(label = stringResource(Res.string.nav_manage), icon = AppIcon.Manage),
+        AppNavBarItem(label = stringResource(Res.string.nav_settings), icon = AppIcon.Settings),
     )
     val selectedIndex = remember(entry) { topLevelIndexOf(entry?.destination) }
 

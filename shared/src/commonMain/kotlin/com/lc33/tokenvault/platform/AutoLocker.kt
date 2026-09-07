@@ -10,6 +10,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlin.concurrent.Volatile
 import kotlinx.coroutines.launch
 
 /**
@@ -36,7 +37,7 @@ class AutoLocker(
     private val elapsedRealtimeMs: () -> Long,
 ) : IdleLockSuspender {
 
-    private val guard = Any()
+    private val guard = Lock()
 
     /**
      * 切后台多久之后锁。
@@ -92,14 +93,14 @@ class AutoLocker(
      * 在后台期间把设置改回有限时限，回到前台那一下会拿着一个很旧的时间戳立刻锁掉。
      */
     fun onEnterBackground() {
-        synchronized(guard) {
-            if (!session.isUnlocked) return
-            val after = timeout as? AutoLockTimeout.After ?: return
+        guard.withLock {
+            if (!session.isUnlocked) return@withLock
+            val after = timeout as? AutoLockTimeout.After ?: return@withLock
             backgroundedAtMs = elapsedRealtimeMs()
             pending?.cancel()
             pending = scope.launch {
                 delay(after.seconds * MILLIS_PER_SECOND)
-                synchronized(guard) {
+                guard.withLock {
                     backgroundedAtMs = null
                     lockIfUnlocked()
                 }
@@ -109,19 +110,19 @@ class AutoLocker(
 
     /** 回到前台。 */
     fun onEnterForeground() {
-        synchronized(guard) {
+        guard.withLock {
             pending?.cancel()
             pending = null
-            val since = backgroundedAtMs ?: return
+            val since = backgroundedAtMs ?: return@withLock
             backgroundedAtMs = null
-            val after = timeout as? AutoLockTimeout.After ?: return
+            val after = timeout as? AutoLockTimeout.After ?: return@withLock
             if (elapsedRealtimeMs() - since >= after.seconds * MILLIS_PER_SECOND) lockIfUnlocked()
         }
     }
 
     /** 手动"立即锁定"。 */
     fun lockNow() {
-        synchronized(guard) {
+        guard.withLock {
             backgroundedAtMs = null
             pending?.cancel()
             pending = null
@@ -136,16 +137,16 @@ class AutoLocker(
      * 点击当成「解锁后的交互」。
      */
     fun onUserInteraction() {
-        synchronized(guard) {
-            if (!session.isUnlocked || !idleLock) return
+        guard.withLock {
+            if (!session.isUnlocked || !idleLock) return@withLock
             startIdleTimerLocked()
         }
     }
 
     /** 屏幕关闭（`ACTION_SCREEN_OFF`）。开开关就当场锁，否则什么都不做。 */
     fun onScreenOff() {
-        synchronized(guard) {
-            if (!lockOnScreenOff) return
+        guard.withLock {
+            if (!lockOnScreenOff) return@withLock
             lockIfUnlocked()
         }
     }
@@ -158,7 +159,7 @@ class AutoLocker(
      * [resumeIdleLock] 重新起算。
      */
     override fun pauseIdleLock() {
-        synchronized(guard) {
+        guard.withLock {
             idlePausedCount++
             cancelIdleLocked()
         }
@@ -166,8 +167,8 @@ class AutoLocker(
 
     /** 长任务结束，恢复前台空闲计时。没被挂起过时是幂等的空操作。 */
     override fun resumeIdleLock() {
-        synchronized(guard) {
-            if (idlePausedCount <= 0) return
+        guard.withLock {
+            if (idlePausedCount <= 0) return@withLock
             idlePausedCount--
             if (idlePausedCount == 0) startIdleTimerLocked()
         }
@@ -191,7 +192,7 @@ class AutoLocker(
         if (!idleLock || !session.isUnlocked || idlePausedCount > 0) return
         idleJob = scope.launch {
             delay(AutoLockPolicy.IDLE_LOCK_SECONDS * MILLIS_PER_SECOND)
-            synchronized(guard) {
+            guard.withLock {
                 lockIfUnlocked()
             }
         }

@@ -17,6 +17,7 @@ import com.lc33.tokenvault.domain.model.ProviderSummary
 import com.lc33.tokenvault.probe.ProbeItemResult
 import com.lc33.tokenvault.screens.model.AttentionItem
 import com.lc33.tokenvault.screens.model.AttentionKind
+import com.lc33.tokenvault.domain.repo.ProbeRun
 import com.lc33.tokenvault.screens.model.BalanceSummary
 import com.lc33.tokenvault.screens.model.ContentCounts
 import com.lc33.tokenvault.screens.model.HealthBreakdown
@@ -282,7 +283,8 @@ fun balanceSummaryOf(providers: List<Provider>): BalanceSummary {
     val perCurrency = snapshots
         .filter { !it.failed && it.amount != null }
         .groupBy { it.currency }
-        .toSortedMap()
+        .toList()
+        .sortedBy { it.first }
         .map { (currency, group) ->
             // 先各自舍入到"分"再相加，避免浮点误差（FormatMoney.roundedCents，§9.1）
             val totalCents = group.fold(0L) { acc, snapshot ->
@@ -433,3 +435,21 @@ fun sortProviders(rows: List<UiProviderRow>, sort: ProviderSort): List<UiProvide
 /** 余额金额的数值形式，用于排序。解析不出来的（理论上不会有）当 0。 */
 private fun balanceNumeric(money: UiMoney?): Double =
     money?.amount?.toDoubleOrNull() ?: 0.0
+
+/**
+ * `probe_runs` 最新一行 → "上次探测"摘要（时间戳，不碰资源，红线 19）。
+ *
+ * 仪表盘摘要卡与探测明细页共用这一个映射：同一个数字在两处各算一遍，迟早对不上
+ * （CLAUDE.md 的原话）。相对时间与耗时文案由页面用 `relativeLabel` / `durationSeconds` 现算。
+ *
+ * 阶段3：接收纯 Kotlin 的 [ProbeRun]（Room 实体的投影），随 data 层读路径一起迁 commonMain。
+ */
+fun ProbeRun.toSummary(): ProbeRunSummary = ProbeRunSummary(
+    finishedAtMs = finishedAt ?: startedAt,
+    durationMs = ((finishedAt ?: startedAt) - startedAt).coerceAtLeast(0),
+    total = total,
+    succeeded = okCount,
+    failed = failCount,
+    // 未探测 = total - done（§8.5：超预算 / 撞 host 预算 / 锁定被标 SKIPPED 的不算 done）。
+    skipped = total - done,
+)

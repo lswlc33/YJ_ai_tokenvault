@@ -1,5 +1,9 @@
 package com.lc33.tokenvault.data.repo
 
+import com.lc33.tokenvault.domain.repo.ImportWriter
+
+import com.lc33.tokenvault.domain.repo.TransactionRunner
+
 import com.lc33.tokenvault.crypto.FieldAad
 import com.lc33.tokenvault.crypto.SecretBox
 import com.lc33.tokenvault.domain.BalanceKind

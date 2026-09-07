@@ -1,20 +1,19 @@
 package com.lc33.tokenvault.ui.shell
 
-import com.lc33.tokenvault.data.entity.ProbeRunEntity
-import org.junit.Assert.assertEquals
-import org.junit.Test
+import com.lc33.tokenvault.domain.repo.ProbeRun
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
 /**
- * 探测明细页的 `ProbeRunEntity.toSummary` 映射（§13.4）。
+ * 探测明细页的 `ProbeRun.toSummary` 映射（§13.4）。
  *
- * 阶段3：`toUiHealth` 部分的测试已随映射迁入 shared（`ProbeItemResultMappingTest`），
- * 本文件只保留 `toSummary`——它接收 Room 实体，留在 app 侧。
+ * 阶段3：`toSummary` 随读路径迁 commonMain（接收纯 Kotlin 的 [ProbeRun]）。
  */
-class ProbeMappingTest {
+class ProbeRunSummaryMappingTest {
 
     @Test
     fun `摘要的未探测等于总数减已完成`() {
-        val run = ProbeRunEntity(
+        val run = ProbeRun(
             id = 1,
             scope = "all",
             startedAt = 1000,
@@ -25,7 +24,7 @@ class ProbeMappingTest {
             failCount = 2,
         )
         val summary = run.toSummary()
-        assertEquals(1000 + 2000, summary.finishedAtMs) // finishedAt
+        assertEquals(3000, summary.finishedAtMs) // finishedAt
         assertEquals(2000, summary.durationMs)
         assertEquals(10, summary.total)
         assertEquals(5, summary.succeeded)
@@ -35,7 +34,7 @@ class ProbeMappingTest {
 
     @Test
     fun `没结束的轮次用开始时间兜底，耗时不为负`() {
-        val run = ProbeRunEntity(
+        val run = ProbeRun(
             id = 1,
             scope = "all",
             startedAt = 5000,
