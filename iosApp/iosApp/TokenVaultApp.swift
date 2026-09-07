@@ -1,35 +1,23 @@
 import SwiftUI
 import Shared
 
-// 阶段4 的空壳入口：只负责把 shared.framework 链接进来，展示一个占位视图。
-// 真正的 iOS UI 要等 Compose Multiplatform 迁移后才填充（见计划.md 阶段4/5）。
-// 这个入口的目的：验证 iOS CI 链路能产 .app / .ipa，不伪装成已完成产品。
+// 阶段4 落地：真正的 UI 全在 shared 的 Compose Multiplatform 树里
+// （AppRoot → LockGate → VaultShell，与 Android 端同一份代码）。
+// Swift 这一层只做壳：把 Compose 的 UIViewController 包进 SwiftUI 的 WindowGroup。
+// 密钥/密码相关的弹层全部画在 Compose 的同一渲染树里，不走独立的 UIKit 窗口。
 @main
 struct TokenVaultApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ComposeView()
         }
     }
 }
 
-struct ContentView: View {
-    // 调用 shared.framework 里的真实代码，验证 framework 已成功编译并链接。
-    private let bridgeMessage = IosBridge.shared.sharedGreeting()
-
-    var body: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "lock.shield")
-                .font(.system(size: 56))
-                .foregroundColor(.accentColor)
-            Text("TokenVault")
-                .font(.largeTitle.bold())
-            Text(bridgeMessage)
-                .font(.footnote)
-                .foregroundColor(.secondary)
-            Text("iOS 端尚未实现（阶段4）")
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
+struct ComposeView: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> UIViewController {
+        MainViewControllerKt.MainViewController()
     }
+
+    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}
 }
