@@ -1,4 +1,10 @@
 import java.util.Properties
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.file.FileSystemOperations
+import org.gradle.api.file.ConfigurableFileCollection
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.TaskAction
+import javax.inject.Inject
 
 // AGP 9 自带 Kotlin 支持，所以这里没有 org.jetbrains.kotlin.android。
 plugins {
@@ -109,6 +115,65 @@ android {
 
     // 不做 ABI 分包：全项目零 native 库（BouncyCastle 纯 Java、不上 SQLCipher、不用 argon2kt），
     // 分出来的包内容完全一样。
+}
+
+// ---------------------------------------------------------------- 修复：把 shared 的 composeResources 接进 app assets
+//
+// AGP 9 的 KMP 库插件与 CMP 1.11.1 的 assets 挂接断裂（详见 shared/build.gradle.kts
+// 同名修复块），shared 侧把 copyAndroidMainComposeResourcesToAndroidAssets 修活了，
+// 但 AGP 的 addGeneratedSourceDirectory 挂接依然不生效——任务从不进 app 依赖图。
+// 只能在这里自己接线：把 shared 的 composeResources 源目录拷成 assets 需要的形状
+// （composeResources/<Res 包>/…，DefaultAndroidResourceReader 从 AssetManager 读），
+// 再经 androidComponents 挂进每个 variant 的 assets（这个 API 在传统 application
+// 插件上是好的）。
+//
+// 注意：`tokenvault.shared.generated.resources` 是 CMP 自动推导的 Res 包名
+// （见 shared/build/generated/…/commonResClass 下的实际目录），改名会静默崩，
+// 改 shared 模块名/包名时要同步改这里。
+// 把 shared 的 composeResources 拷成 assets 形状。自定义任务类而不是 Copy：
+// addGeneratedSourceDirectory 需要一个可引用的 @get:OutputDirectory 属性，
+// Gradle 9 的 Copy 任务上 destinationDirectory 在 Kotlin DSL 里解析不到。
+abstract class CopySharedComposeAssetsTask : DefaultTask() {
+    @get:InputFiles
+    abstract val sources: ConfigurableFileCollection
+
+    @get:OutputDirectory
+    abstract val output: DirectoryProperty
+
+    @get:Inject
+    protected abstract val fileSystem: FileSystemOperations
+
+    @TaskAction
+    fun action() {
+        // 先清空输出：避免残留旧文件（换源/改包名后的度产物不能跟着进 APK）。
+        fileSystem.delete { delete(output) }
+        fileSystem.copy {
+            from(sources)
+            into(output.dir("composeResources/tokenvault.shared.generated.resources"))
+            includeEmptyDirs = false
+        }
+    }
+}
+
+val copySharedComposeAssets by tasks.registering(CopySharedComposeAssetsTask::class) {
+    // 源不是源码目录而是 CMP 转换后的 prepared 产物（strings.xml → .cvr）。
+    // commonMain 在前、androidMain 在后：同名资源 androidMain 覆盖，与 CMP 的源集
+    // 语义一致（androidMain 目前没有自己的 composeResources，目录不存在时 from 静默跳过）。
+    dependsOn(
+        project(":shared").tasks.named("prepareComposeResourcesTaskForCommonMain"),
+        project(":shared").tasks.named("prepareComposeResourcesTaskForAndroidMain"),
+    )
+    sources.from(
+        project(":shared").layout.buildDirectory.dir("generated/compose/resourceGenerator/preparedResources/commonMain/composeResources"),
+        project(":shared").layout.buildDirectory.dir("generated/compose/resourceGenerator/preparedResources/androidMain/composeResources"),
+    )
+    output.set(layout.buildDirectory.dir("generated/composeAssets"))
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(copySharedComposeAssets, CopySharedComposeAssetsTask::output)
+    }
 }
 
 // 会真的联网、会消耗额度的本地探针（M0.5 的协议踩点、M7 的余额适配器实测）默认跳过：

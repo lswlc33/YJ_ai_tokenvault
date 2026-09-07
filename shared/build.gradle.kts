@@ -162,3 +162,21 @@ kotlin {
         }
     }
 }
+
+// ---------------------------------------------------------------- 修复：composeResources 进不了 Android APK
+//
+// AGP 9 的 KMP 库插件（com.android.kotlin.multiplatform.library）与 CMP 1.11.1 的
+// assets 挂接断裂：CopyResourcesToAndroidAssetsTask（把 composeResources 拷进 AAR
+// assets 的任务，Android 端 DefaultAndroidResourceReader 从 AssetManager 读）的
+// outputDirectory 无人赋值——CMP 用的是旧版 addGeneratedSourceDirectory(wiredWith)
+// 签名，AGP 9 不再代赋值。挂接静默失效，资源从不进 APK，中文系统上启动即崩：
+// MissingResourceException: composeResources/.../values-zh-rCN/strings.commonMain.cvr。
+// 上游修好前，这里手动补输出目录（任务类是 internal，只能反射拿属性，但
+// DirectoryProperty 本身是公开接口）。赋值后 AGP 的挂接就能成立。
+tasks.matching { it.name.endsWith("ComposeResourcesToAndroidAssets") }.configureEach {
+    val outputDirectory = javaClass.getMethod("getOutputDirectory").invoke(this)
+        as org.gradle.api.file.DirectoryProperty
+    outputDirectory.set(
+        layout.buildDirectory.dir("generated/compose/resourceGenerator/assetsForAndroid/${name}"),
+    )
+}
