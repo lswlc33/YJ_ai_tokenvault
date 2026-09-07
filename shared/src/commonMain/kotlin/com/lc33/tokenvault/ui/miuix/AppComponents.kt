@@ -48,6 +48,8 @@ import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
+import com.lc33.tokenvault.ui.theme.AppTokens
+import com.lc33.tokenvault.ui.theme.LocalAppTokens
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -149,8 +151,9 @@ fun AppPreferenceGroup(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val tokens = LocalAppTokens.current
     AppCard(
-        modifier = modifier,
+        modifier = modifier.padding(horizontal = tokens.screenPadding),
         insideMargin = PaddingValues(0.dp),
         content = content,
     )
