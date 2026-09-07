@@ -2,6 +2,7 @@ package com.lc33.tokenvault.net
 
 import com.lc33.tokenvault.domain.repo.SettingsRepository
 import io.ktor.client.HttpClient
+import kotlin.concurrent.Volatile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -21,7 +22,7 @@ import kotlinx.coroutines.launch
 class ProxyProvider(
     settings: SettingsRepository,
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     /** 当前 client；无代理时是默认 client。 */
     @Volatile
