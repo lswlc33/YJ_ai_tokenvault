@@ -68,7 +68,11 @@ miuix-ui = { module = "top.yukonga.miuix.kmp:miuix-ui", version.ref = "miuix" }
 miuix-preference = { module = "top.yukonga.miuix.kmp:miuix-preference", version.ref = "miuix" }
 miuix-icons = { module = "top.yukonga.miuix.kmp:miuix-icons", version.ref = "miuix" }
 # minSdk 33 才能用；低端机上是性能开销，做成可关（计划.md §15.17）
+# `-android` 版只给 :app（纯 Android 项目）。:shared 的 commonMain 用跨平台版（见下一个）。
 miuix-blur = { module = "top.yukonga.miuix.kmp:miuix-blur-android", version.ref = "miuix" }
+# KMP 版 miuix-blur（阶段3）：commonMain 里 ui/miuix/AppScaffold 的 LayerBackdrop/textureBlur 用它，
+# 有 iOS 产物（miuix-blur-iosarm64 / -iossimulatorarm64）。
+miuix-blur-kmp = { module = "top.yukonga.miuix.kmp:miuix-blur", version.ref = "miuix" }
 
 # --- Compose（不引入 material3，避免与 MIUIX 两套主题打架） ---
 compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }

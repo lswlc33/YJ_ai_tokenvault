@@ -165,14 +165,28 @@ data class BackupPayload(
 /** payload JSON → gzip 字节。 */
 fun gzip(bytes: ByteArray): ByteArray {
     val buffer = Buffer()
-    GzipSink(buffer).buffer().use { sink -> sink.write(bytes) }
+    // 不用 `use {}`：kotlin 2.3 的 stdlib `use` 约束是 AutoCloseable，而 okio 的 Sink 是 Closeable，
+    // CMP 引入后元数据编译期只剩 AutoCloseable 那个候选，报 receiver type mismatch。
+    // 改手写 try/finally，语义与原 `.buffer().use { it.write(bytes) }` 完全一致：
+    // 同一个 BufferedSink 上 write → close（close 会 flush 缓冲并写 gzip footer）。
+    val sink = GzipSink(buffer).buffer()
+    try {
+        sink.write(bytes)
+    } finally {
+        sink.close()
+    }
     return buffer.readByteArray()
 }
 
 /** gzip 字节 → payload JSON。损坏抛 [BackupCorruptException]（红线 8，不返回 null）。 */
 fun gunzip(bytes: ByteArray): ByteArray = try {
     val buffer = Buffer().write(bytes)
-    GzipSource(buffer).buffer().use { it.readByteArray() }
+    val source = GzipSource(buffer).buffer()
+    try {
+        source.readByteArray()
+    } finally {
+        source.close()
+    }
 } catch (t: Throwable) {
     throw BackupCorruptException("bad gzip payload")
 }

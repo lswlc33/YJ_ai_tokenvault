@@ -104,10 +104,12 @@ class ArchitectureRulesTest {
 
     @Test
     fun `只有 ui-miuix 能 import MIUIX`() {
-        val violations = allKotlinFiles(appSourceRoot)
-            .filter { !it.relPathOf(appSourceRoot).startsWith("ui/miuix/") }
+        val violations = (allKotlinFiles(appSourceRoot) + allKotlinFiles(sharedSourceRoot))
+            // displayPath() 对 shared 里的文件返回 "shared/ui/miuix/xxx.kt"，对 app 返回 "ui/miuix/xxx.kt"，
+            // 都统一以 "ui/miuix/" 结尾段为界，用 contains("/ui/miuix/") 或 startsWith("ui/miuix/") 判断。
+            .filter { !it.displayPath().let { p -> p.startsWith("ui/miuix/") || p.endsWith("/ui/miuix/") || p.contains("/ui/miuix/") } }
             .filter { it.readText().contains("import top.yukonga.miuix") }
-            .map { "${it.relPathOf(appSourceRoot)} 直接 import 了 MIUIX" }
+            .map { "${it.displayPath()} 直接 import 了 MIUIX" }
         fail(
             "MIUIX 是实验期库，API 可能无预告变更，所以只允许 ui/miuix/ 这一层直接引用它" +
                 "（计划.md §4.3）：",
@@ -120,9 +122,9 @@ class ArchitectureRulesTest {
         // 用正则拼出被禁的名字，这样本文件里不出现那些字面量，仓库级 grep 不会自己撞上自己。
         val bannedWindowComponents =
             Regex("""\bWindow(?:Dialog|BottomSheet|[A-Za-z]*Popup|[A-Za-z]*Menu|[A-Za-z]*Preference)\b""")
-        val violations = allKotlinFiles(appSourceRoot)
+        val violations = (allKotlinFiles(appSourceRoot) + allKotlinFiles(sharedSourceRoot))
             .mapNotNull { file ->
-                bannedWindowComponents.find(file.readText())?.let { "${file.relPathOf(appSourceRoot)} 用了 ${it.value}" }
+                bannedWindowComponents.find(file.readText())?.let { "${file.displayPath()} 用了 ${it.value}" }
             }
         fail(
             "那一族是独立系统窗口、与页面组合树脱钩；弹层统一用 Overlay*" +

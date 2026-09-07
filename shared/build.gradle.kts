@@ -84,6 +84,13 @@ kotlin {
             api(libs.cmp.navigation.compose)
             api(libs.cmp.lifecycle.runtime.compose)
             api(libs.cmp.lifecycle.viewmodel.compose)
+
+            // MIUIX（阶段3：ui/miuix/ 迁入 commonMain）。这四个都是 KMP 库，有 iOS 产物。
+            // miuix-blur 用跨平台版（不是 -android 版）。
+            api(libs.miuix.ui)
+            api(libs.miuix.preference)
+            api(libs.miuix.icons)
+            api(libs.miuix.blur.kmp)
         }
 
         // Android 端用 JDK provider（JCA 实现，与现有行为一致）。
