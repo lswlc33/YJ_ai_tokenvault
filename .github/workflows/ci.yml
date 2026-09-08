@@ -265,7 +265,8 @@ jobs:
           # + log show（本来就有，不依赖 console-pty）。
           LAUNCH_OUT=$(xcrun simctl launch "$UDID" com.lc33.tokenvault)
           echo "$LAUNCH_OUT"
-          PID=$(printf '%s\n' "$LAUNCH_OUT" | grep -oE '[0-9]+' | head -1 || true)
+          # 只取冒号后的 PID；bundle id 本身含有数字（lc33），不能对整行取第一个数字。
+          PID=$(printf '%s\n' "$LAUNCH_OUT" | sed -nE 's/.*: ([0-9]+)[[:space:]]*$/\1/p')
           echo "启动 pid: $PID"
           if [ -z "${PID:-}" ]; then
             echo "::error::launch 没返回 pid（bundle id 错了？）"
