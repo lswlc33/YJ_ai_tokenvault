@@ -180,16 +180,20 @@ jobs:
       # 启动后 25 秒进程还在 → 存活；否则抓崩溃报告并直接红。
       - name: 模拟器 UI 冒烟（启动 + 存活检查）
         run: |
-          set -eu
+          set -euo pipefail
           cd iosApp
-          xcodebuild \
+          # 全量日志落盘：管道 tail 会吃掉 xcodebuild 的退出码，上次就把真错误藏了
+          if ! xcodebuild \
             -project iosApp.xcodeproj \
             -scheme iosApp \
             -configuration Debug \
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath build/SimDerivedData \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
-            build 2>&1 | tail -5
+            build > build/sim-build.log 2>&1; then
+            tail -100 build/sim-build.log
+            exit 1
+          fi
           APP=build/SimDerivedData/Build/Products/Debug-iphonesimulator/iosApp.app
           UDID=$(xcrun simctl list devices available | grep -E 'iPhone' | head -1 | grep -oE '[0-9A-Fa-f]{8}(-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}')
           echo "模拟器 UDID: $UDID"
