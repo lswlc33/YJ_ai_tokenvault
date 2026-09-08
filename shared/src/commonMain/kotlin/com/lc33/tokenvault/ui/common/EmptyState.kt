@@ -16,6 +16,9 @@ import com.lc33.tokenvault.ui.theme.LocalAppTokens
 
 /**
  * 空态。计划.md §13.4 要求空态给可点的 CTA，所以 [actionText] 存在时必须给 [onAction]。
+ *
+ * [secondaryActionText] 非空时画第二个次级 CTA（如「粘贴导入」），两个动作并排，
+ * 让空态本身就能完成最常见的起步动作，而不是把人逼到别处。
  */
 @Composable
 fun EmptyState(
@@ -24,6 +27,8 @@ fun EmptyState(
     modifier: Modifier = Modifier,
     actionText: String? = null,
     onAction: (() -> Unit)? = null,
+    secondaryActionText: String? = null,
+    onSecondaryAction: (() -> Unit)? = null,
 ) {
     val tokens = LocalAppTokens.current
     Column(
@@ -42,6 +47,9 @@ fun EmptyState(
         )
         if (actionText != null && onAction != null) {
             AppTextButton(text = actionText, onClick = onAction)
+        }
+        if (secondaryActionText != null && onSecondaryAction != null) {
+            AppTextButton(text = secondaryActionText, onClick = onSecondaryAction)
         }
     }
 }

@@ -167,7 +167,13 @@ okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
 cryptography-core = { module = "dev.whyoleg.cryptography:cryptography-core", version.ref = "cryptography" }
 cryptography-provider-jdk = { module = "dev.whyoleg.cryptography:cryptography-provider-jdk", version.ref = "cryptography" }
 # iOS/native 端走 CryptoKit 原生实现（阶段4 iOS 构建用）。
+# 0.5.0 的 Apple 与 CryptoKit 是**两个互补的** provider，缺一不可：
+#   Apple（CommonCrypto/Security）：PBKDF2 / HKDF / HMAC / SHA + AES-CBC/CTR/ECB，但没有 AES-GCM
+#   CryptoKit（0.5.0 新增）：AES-GCM / HKDF / ECDH，但没有 PBKDF2
+# iOS 启动闪退的根因就是只用了 Apple —— SecretBox 取 AES.GCM 时抛
+# "Algorithm not found"。所以两端都要依赖，并由 CryptoProvider.ios.kt 组合。
 cryptography-provider-apple = { module = "dev.whyoleg.cryptography:cryptography-provider-apple", version.ref = "cryptography" }
+cryptography-provider-cryptokit = { module = "dev.whyoleg.cryptography:cryptography-provider-cryptokit", version.ref = "cryptography" }
 androidx-biometric = { module = "androidx.biometric:biometric", version.ref = "biometric" }
 
 # --- 测试 ---

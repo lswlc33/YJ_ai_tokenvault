@@ -161,8 +161,11 @@ kotlin {
         }
 
         // iOS 端用 Apple provider（CryptoKit 原生）。
+        // **两个 provider 都要**：CryptoKit 有 AES-GCM 但没有 PBKDF2，Apple 有 PBKDF2
+        // 但没有 AES-GCM（详见 libs.versions.toml 的注释与 CryptoProvider.ios.kt）。
         iosMain.dependencies {
             implementation(libs.cryptography.provider.apple)
+            implementation(libs.cryptography.provider.cryptokit)
             implementation(libs.ktor.client.darwin)
             // iOS 没有系统 SQLite 的 androidx 驱动，只能用内置 SQLite 的 BundledSQLiteDriver。
             implementation(libs.sqlite.bundled)

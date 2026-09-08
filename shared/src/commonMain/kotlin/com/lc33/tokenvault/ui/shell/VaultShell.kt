@@ -1,5 +1,10 @@
 package com.lc33.tokenvault.ui.shell
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -15,6 +20,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.lc33.tokenvault.ui.miuix.AppIcon
+import com.lc33.tokenvault.platform.Haptics
 import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.nav_dashboard
 import tokenvault.shared.generated.resources.nav_manage
@@ -60,11 +66,23 @@ fun VaultShell() {
 
     AppScaffold(
         bottomBar = {
-            if (selectedIndex >= 0) {
+            // 底栏用 AnimatedVisibility 平滑退场：直接 `if (selectedIndex >= 0)` 会在
+            // 跳到二级页（如设置→检查更新）时让底栏瞬间消失、内容区一帧高度塌陷，
+            // 表现为「底栏先闪一下再跳下一页」。滑出动画把这一帧填成过渡。
+            AnimatedVisibility(
+                visible = selectedIndex >= 0,
+                enter = slideInVertically { it } + fadeIn(),
+                exit = slideOutVertically { it } + fadeOut(),
+            ) {
                 AppNavBar(
                     items = items,
                     selectedIndex = selectedIndex,
-                    onSelect = { index -> nav.navigateTopLevel(index) },
+                    onSelect = { index ->
+                        // 切 tab 给轻触反馈（问题 5）。只在本页已经在底栏可见时触发，
+                        // 否则首屏加载也会震一下。
+                        if (selectedIndex >= 0) Haptics.tap()
+                        nav.navigateTopLevel(index)
+                    },
                     blur = blurNavBar,
                     blurBackdrop = backdrop,
                 )

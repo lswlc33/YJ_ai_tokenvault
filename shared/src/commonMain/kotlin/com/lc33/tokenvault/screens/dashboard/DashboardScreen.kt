@@ -16,6 +16,7 @@ import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.unit.dp
 import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.dashboard_empty_desc
+import tokenvault.shared.generated.resources.dashboard_empty_import
 import tokenvault.shared.generated.resources.dashboard_empty_new
 import tokenvault.shared.generated.resources.dashboard_empty_title
 import tokenvault.shared.generated.resources.dashboard_title
@@ -42,6 +43,7 @@ fun DashboardScreen(
     state: DashboardUiState,
     onOpenProvider: (Long) -> Unit,
     onOpenManage: () -> Unit,
+    onOpenImport: () -> Unit,
     onOpenProbeRun: () -> Unit,
     onOpenSync: () -> Unit,
     onOpenBalanceBreakdown: () -> Unit,
@@ -66,6 +68,8 @@ fun DashboardScreen(
                 description = stringResource(Res.string.dashboard_empty_desc),
                 actionText = stringResource(Res.string.dashboard_empty_new),
                 onAction = onOpenManage,
+                secondaryActionText = stringResource(Res.string.dashboard_empty_import),
+                onSecondaryAction = onOpenImport,
                 modifier = Modifier.padding(padding),
             )
             return@AppScaffold

@@ -4,6 +4,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import com.lc33.tokenvault.platform.PlatformStatusBarAppearance
 import com.lc33.tokenvault.ui.theme.AppColorSchemeMode
 import com.lc33.tokenvault.ui.theme.AppTokens
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
@@ -38,6 +39,8 @@ fun AppTheme(
     }
     val statusPalette = remember(dark) { statusPaletteFor(dark) }
     val providerPalette = remember(dark) { providerPaletteFor(dark) }
+    // 状态栏图标明暗随主题走：浅色主题要深色图标，否则白底白字看不清（问题 4）。
+    PlatformStatusBarAppearance(dark = dark)
     MiuixTheme(controller = controller) {
         CompositionLocalProvider(
             LocalAppTokens provides DefaultTokens,

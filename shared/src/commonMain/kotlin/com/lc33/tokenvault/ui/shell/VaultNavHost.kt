@@ -1,5 +1,13 @@
 ﻿package com.lc33.tokenvault.ui.shell
 
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -11,6 +19,7 @@ import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -93,6 +102,10 @@ fun VaultNavHost(
         navController = nav,
         startDestination = DashboardRoute,
         modifier = modifier,
+        enterTransition = { horizontalSlideIn() },
+        exitTransition = { horizontalFadeOut() },
+        popEnterTransition = { horizontalSlideInFromLeft() },
+        popExitTransition = { horizontalSlideOut() },
     ) {
         composable<DashboardRoute> {
             val vm: DashboardViewModel = koinViewModel()
@@ -101,6 +114,7 @@ fun VaultNavHost(
                 state = dashboard,
                 onOpenProvider = { id -> nav.navigate(ProviderDetailRoute(id)) },
                 onOpenManage = ::openManage,
+                onOpenImport = { nav.navigate(ImportRoute) },
                 onOpenProbeRun = { nav.navigate(ProbeRunRoute) },
                 onOpenSync = { nav.navigate(SyncRoute) },
                 onOpenBalanceBreakdown = { nav.navigate(BalanceBreakdownRoute) },
@@ -564,4 +578,36 @@ private enum class PendingSyncAction { Export, Import }
 
 /** 待恢复的包字节 + 口令（口令用完必须擦）。 */
 private class PendingRestore(val bytes: ByteArray, val password: CharArray)
+
+// ---------------------------------------------------------------------------
+// 转场动画（计划.md §13.1 补丁：NavHost 未配动画导致切换/返回无动效、预测式返回异常）。
+// 约定：进入二级页 = 从右滑入 + 淡入；返回 = 反向滑出。时长 300ms，
+// 预测式返回（Android 13+）需要标准的水平滑动动画才能正确跟手。
+// ---------------------------------------------------------------------------
+
+private const val TransitionDurationMs = 300
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.horizontalSlideIn(): EnterTransition =
+    slideInHorizontally(
+        animationSpec = tween(TransitionDurationMs),
+        initialOffsetX = { it },
+    ) + fadeIn(animationSpec = tween(TransitionDurationMs))
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.horizontalSlideInFromLeft(): EnterTransition =
+    slideInHorizontally(
+        animationSpec = tween(TransitionDurationMs),
+        initialOffsetX = { -it / 4 },
+    ) + fadeIn(animationSpec = tween(TransitionDurationMs))
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.horizontalSlideOut(): ExitTransition =
+    slideOutHorizontally(
+        animationSpec = tween(TransitionDurationMs),
+        targetOffsetX = { it },
+    ) + fadeOut(animationSpec = tween(TransitionDurationMs))
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.horizontalFadeOut(): ExitTransition =
+    slideOutHorizontally(
+        animationSpec = tween(TransitionDurationMs),
+        targetOffsetX = { -it / 4 },
+    ) + fadeOut(animationSpec = tween(TransitionDurationMs))
 

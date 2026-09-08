@@ -48,6 +48,7 @@ import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
+import com.lc33.tokenvault.platform.Haptics
 import com.lc33.tokenvault.ui.theme.AppTokens
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -178,7 +179,10 @@ fun AppArrowRow(
         modifier = modifier,
         summary = summary,
         enabled = enabled,
-        onClick = onClick,
+        onClick = {
+            Haptics.tap()
+            onClick?.invoke()
+        },
     )
 }
 
@@ -446,7 +450,10 @@ fun AppSwitchRow(
 ) {
     SwitchPreference(
         checked = checked,
-        onCheckedChange = onCheckedChange,
+        onCheckedChange = { value ->
+            Haptics.impact()
+            onCheckedChange(value)
+        },
         title = title,
         modifier = modifier,
         summary = summary,
