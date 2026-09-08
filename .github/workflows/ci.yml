@@ -190,7 +190,7 @@ jobs:
             -derivedDataPath build/SimDerivedData \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
             build 2>&1 | tail -5
-          APP=iosApp/build/SimDerivedData/Build/Products/Debug-iphonesimulator/iosApp.app
+          APP=build/SimDerivedData/Build/Products/Debug-iphonesimulator/iosApp.app
           UDID=$(xcrun simctl list devices available | grep -E 'iPhone' | head -1 | grep -oE '[0-9A-Fa-f]{8}(-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}')
           echo "模拟器 UDID: $UDID"
           xcrun simctl boot "$UDID" || true
