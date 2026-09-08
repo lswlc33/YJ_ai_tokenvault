@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="oG1OnTVtMBN4pi5f5DrJhe">
+<head data-page-node-id="Xr8e49UynT2S8ktY2HBuLA">
+<meta charset="utf-8" data-page-node-id="5WSDHqPVggKD0raRUx7wOu">
+<meta name="viewport" content="width=device-width, initial-scale=1" data-page-node-id="K7O6GdXPCi14kgkIeEYqr9">
+<title>元记 · AI Token Vault — 词元站点记录</title>
+<meta name="description" content="开源、本地优先的 AI API 密钥保险库。一站式管理所有 AI 站点的密钥、模型与账号，一键探测可用性、查询余额，数据只存在你自己的设备上。" data-page-node-id="Dd4GjFDmiRuyeGbSqA5jzy">
+<meta name="theme-color" content="#ffffff" data-page-node-id="8xK4QZWKDE3Iys8NnAJ0q7">
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-soft: #f6f7fb;
+    --card: #ffffff;
+    --border: #e6e8f0;
+    --text: #141722;
+    --text-soft: #5b6178;
+    --brand: #4f46e5;
+    --brand-2: #7c5cff;
+    --brand-soft: #eef0ff;
+    --ok: #12a150;
+    --warn: #d98800;
+    --err: #d64545;
+    --shadow: 0 1px 2px rgba(20, 23, 34, .04), 0 12px 32px rgba(20, 23, 34, .06);
+    --radius: 18px;
+    --maxw: 1120px;
+  }
+  html[data-theme="dark"] {
+    --bg: #0b0d15;
+    --bg-soft: #11141f;
+    --card: #151826;
+    --border: #262b3d;
+    --text: #e9ebf5;
+    --text-soft: #9aa1b9;
+    --brand: #8b80ff;
+    --brand-2: #a78bfa;
+    --brand-soft: #1d1b33;
+    --ok: #34d399;
+    --warn: #fbbf24;
+    --err: #f87171;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 16px 40px rgba(0, 0, 0, .35);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 76px; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+    font-size: 16px;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; text-decoration: none; }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+
+  /* ---------- 导航 ---------- */
+  .nav {
+    position: sticky; top: 0; z-index: 50;
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    backdrop-filter: saturate(180%) blur(14px);
+    border-bottom: 1px solid transparent;
+    transition: border-color .2s, background .2s;
+  }
+  .nav.scrolled { border-bottom-color: var(--border); }
+  .nav-inner { display: flex; align-items: center; gap: 28px; height: 64px; }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; letter-spacing: .2px; }
+  .logo .mark {
+    width: 30px; height: 30px; border-radius: 9px;
+    background: linear-gradient(135deg, var(--brand), var(--brand-2));
+    display: grid; place-items: center; color: #fff;
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--brand) 35%, transparent);
+  }
+  .logo small { font-weight: 500; color: var(--text-soft); font-size: 12px; letter-spacing: 0; }
+  .nav-links { display: flex; gap: 26px; margin-left: auto; font-size: 15px; color: var(--text-soft); }
+  .nav-links a:hover { color: var(--text); }
+  .nav-actions { display: flex; align-items: center; gap: 10px; margin-left: 8px; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 10px 18px; border-radius: 12px; font-size: 15px; font-weight: 600;
+    border: 1px solid var(--border); background: var(--card); color: var(--text);
+    transition: transform .15s, box-shadow .2s, background .2s, border-color .2s;
+  }
+  .btn:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--brand), var(--brand-2));
+    border-color: transparent; color: #fff;
+    box-shadow: 0 8px 22px color-mix(in srgb, var(--brand) 32%, transparent);
+  }
+  .btn-lg { padding: 14px 26px; font-size: 16px; border-radius: 14px; }
+  .icon-btn { width: 38px; height: 38px; padding: 0; border-radius: 11px; }
+
+  /* ---------- Hero ---------- */
+  .hero { position: relative; overflow: hidden; padding: 84px 0 96px; }
+  .hero::before {
+    content: ""; position: absolute; inset: -30% -20% auto -20%; height: 620px;
+    background:
+      radial-gradient(720px 340px at 18% 20%, color-mix(in srgb, var(--brand) 26%, transparent), transparent 70%),
+      radial-gradient(620px 320px at 82% 8%, color-mix(in srgb, var(--brand-2) 22%, transparent), transparent 70%);
+    filter: blur(6px); pointer-events: none;
+  }
+  .hero-inner { position: relative; display: grid; grid-template-columns: 1.05fr .95fr; gap: 56px; align-items: center; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px 6px 8px;
+    border: 1px solid var(--border); background: var(--card); border-radius: 999px;
+    font-size: 13px; color: var(--text-soft); box-shadow: var(--shadow);
+  }
+  .badge b { color: var(--text); font-weight: 600; }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); margin-left: 4px; }
+  h1 { font-size: clamp(38px, 5.4vw, 60px); line-height: 1.14; margin: 22px 0 0; letter-spacing: -.5px; font-weight: 800; }
+  h1 .grad {
+    background: linear-gradient(120deg, var(--brand), var(--brand-2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .sub { margin: 20px 0 0; font-size: 18px; color: var(--text-soft); max-width: 30em; }
+  .slogan { margin: 12px 0 0; font-size: 17px; color: var(--text); font-weight: 600; }
+  .hero-cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
+  .hero-meta { display: flex; gap: 22px; margin-top: 26px; font-size: 14px; color: var(--text-soft); }
+  .hero-meta span { display: inline-flex; align-items: center; gap: 7px; }
+
+  /* ---------- 手机 mockup ---------- */
+  .phone-stage { display: grid; place-items: center; }
+  .phone {
+    width: 300px; border-radius: 40px; padding: 12px;
+    background: linear-gradient(160deg, color-mix(in srgb, var(--brand) 18%, var(--card)), var(--card));
+    border: 1px solid var(--border); box-shadow: var(--shadow);
+  }
+  .phone-screen {
+    background: var(--bg-soft); border-radius: 30px; padding: 16px 14px 10px; overflow: hidden;
+  }
+  .p-bar { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-soft); padding: 0 4px 12px; }
+  .p-title { font-size: 15px; font-weight: 700; padding: 0 4px 12px; }
+  .p-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; margin-bottom: 10px; }
+  .p-card .label { font-size: 11px; color: var(--text-soft); }
+  .p-card .value { font-size: 24px; font-weight: 700; letter-spacing: -.4px; }
+  .p-card .value em { font-size: 13px; font-style: normal; font-weight: 600; color: var(--text-soft); margin-left: 4px; }
+  .p-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
+  .p-tile { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 10px 8px; text-align: center; }
+  .p-tile b { display: block; font-size: 17px; }
+  .p-tile span { font-size: 10px; color: var(--text-soft); }
+  .p-health { display: flex; height: 8px; border-radius: 999px; overflow: hidden; margin: 8px 0 6px; }
+  .p-health i { display: block; height: 100%; }
+  .p-legend { display: flex; gap: 12px; font-size: 10px; color: var(--text-soft); }
+  .p-legend i { display: inline-block; width: 7px; height: 7px; border-radius: 2px; margin-right: 4px; }
+  .p-btn {
+    margin-top: 12px; text-align: center; padding: 10px; border-radius: 12px; font-size: 13px; font-weight: 600;
+    color: #fff; background: linear-gradient(135deg, var(--brand), var(--brand-2));
+  }
+  .p-tabs { display: flex; justify-content: space-around; padding: 12px 6px 4px; font-size: 10px; color: var(--text-soft); }
+  .p-tabs b { display: block; font-size: 12px; color: var(--text); font-weight: 600; }
+  .p-tabs .on { color: var(--brand); }
+
+  /* ---------- 通用区块 ---------- */
+  section { padding: 84px 0; }
+  .section-head { max-width: 640px; margin: 0 auto 48px; text-align: center; }
+  .kicker { font-size: 13px; font-weight: 700; letter-spacing: 2px; color: var(--brand); text-transform: uppercase; }
+  h2 { font-size: clamp(26px, 3.4vw, 36px); margin: 10px 0 12px; letter-spacing: -.3px; font-weight: 800; }
+  .section-head p { margin: 0; color: var(--text-soft); font-size: 17px; }
+
+  /* ---------- 特色 ---------- */
+  .features { background: var(--bg-soft); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .grid { display: grid; gap: 18px; }
+  .g4 { grid-template-columns: repeat(4, 1fr); }
+  .g2 { grid-template-columns: repeat(2, 1fr); }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 24px; box-shadow: var(--shadow);
+    transition: transform .2s, border-color .2s;
+  }
+  .card:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--brand) 40%, var(--border)); }
+  .card .ic {
+    width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center;
+    background: var(--brand-soft); color: var(--brand); margin-bottom: 14px;
+  }
+  .card h3 { margin: 0 0 8px; font-size: 17px; font-weight: 700; }
+  .card p { margin: 0; color: var(--text-soft); font-size: 15px; }
+
+  /* ---------- 功能展示 ---------- */
+  .show { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; }
+  .show + .show { margin-top: 84px; }
+  .show.rev .show-text { order: 2; }
+  .show h3 { font-size: 26px; margin: 0 0 14px; font-weight: 800; letter-spacing: -.3px; }
+  .show p { color: var(--text-soft); margin: 0 0 18px; font-size: 16px; }
+  .list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+  .list li { display: flex; gap: 10px; align-items: flex-start; font-size: 15px; }
+  .list svg { flex: none; margin-top: 4px; color: var(--brand); }
+
+  .mock { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); }
+  .mock-row {
+    display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+    border: 1px solid var(--border); border-radius: 14px; margin-bottom: 10px; background: var(--bg-soft);
+  }
+  .mock-row:last-child { margin-bottom: 0; }
+  .mock-row .swatch { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-size: 13px; font-weight: 700; color: #fff; flex: none; }
+  .mock-row .t { flex: 1; min-width: 0; }
+  .mock-row .t b { display: block; font-size: 14px; }
+  .mock-row .t span { font-size: 12px; color: var(--text-soft); }
+  .pill { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+  .pill.ok { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
+  .pill.warn { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
+  .pill.err { background: color-mix(in srgb, var(--err) 14%, transparent); color: var(--err); }
+  .pill.mute { background: var(--bg-soft); color: var(--text-soft); border: 1px solid var(--border); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .money { font-size: 15px; font-weight: 700; }
+  .bar { height: 8px; border-radius: 999px; background: var(--bg-soft); overflow: hidden; margin-top: 8px; }
+  .bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--brand), var(--brand-2)); }
+
+  /* ---------- 安全 ---------- */
+  .security { background: var(--bg-soft); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .sec-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+  .sec-item { text-align: center; padding: 8px; }
+  .sec-item .ic { margin: 0 auto 12px; }
+  .sec-item b { display: block; font-size: 15px; margin-bottom: 4px; }
+  .sec-item span { font-size: 14px; color: var(--text-soft); }
+
+  /* ---------- 下载 ---------- */
+  .dl-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
+  .dl { text-align: center; padding: 32px 26px; }
+  .dl .ic { margin: 0 auto 16px; width: 52px; height: 52px; border-radius: 15px; }
+  .dl h3 { margin: 0 0 6px; font-size: 20px; }
+  .dl .req { font-size: 13px; color: var(--text-soft); margin: 0 0 18px; }
+  .dl .btn { width: 100%; }
+
+  /* ---------- FAQ ---------- */
+  .faq { max-width: 760px; margin: 0 auto; }
+  details { border: 1px solid var(--border); border-radius: 14px; background: var(--card); margin-bottom: 12px; overflow: hidden; }
+  summary {
+    cursor: pointer; padding: 18px 20px; font-weight: 600; font-size: 16px; list-style: none;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary .arw { transition: transform .2s; color: var(--text-soft); flex: none; }
+  details[open] summary .arw { transform: rotate(180deg); }
+  details .body { padding: 0 20px 20px; color: var(--text-soft); font-size: 15px; }
+
+  /* ---------- CTA ---------- */
+  .cta { text-align: center; padding: 76px 0 88px; background: var(--bg-soft); border-top: 1px solid var(--border); }
+  .cta h2 { margin-bottom: 14px; }
+  .cta p { color: var(--text-soft); margin: 0 0 28px; font-size: 17px; }
+
+  /* ---------- 页脚 ---------- */
+  footer { border-top: 1px solid var(--border); padding: 34px 0; font-size: 14px; color: var(--text-soft); }
+  .foot { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
+  .foot nav { display: flex; gap: 20px; margin-left: auto; }
+  .foot a:hover { color: var(--text); }
+
+  /* ---------- 动效 ---------- */
+  .reveal { opacity: 0; transform: translateY(16px); transition: opacity .6s cubic-bezier(.2,.7,.3,1), transform .6s cubic-bezier(.2,.7,.3,1); }
+  .reveal.in { opacity: 1; transform: none; }
+
+  @media (max-width: 960px) {
+    .hero-inner, .show { grid-template-columns: 1fr; gap: 40px; }
+    .show.rev .show-text { order: 0; }
+    .g4, .sec-grid { grid-template-columns: repeat(2, 1fr); }
+    .g2, .dl-grid { grid-template-columns: 1fr; }
+    .nav-links { display: none; }
+    .hero { padding: 56px 0 68px; }
+    section { padding: 64px 0; }
+  }
+  @media (max-width: 520px) {
+    .g4, .sec-grid { grid-template-columns: 1fr; }
+    .hero-meta { flex-direction: column; gap: 8px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { opacity: 1; transform: none; transition: none; }
+    html { scroll-behavior: auto; }
+  }
+</style>
+</head>
+<body data-page-node-id="D8YdEFrOI6I8O3zU3JuM8t">
+
+<header class="nav" id="nav" data-page-node-id="sb5gDnfHiP1sxRLf1MX5BJ">
+  <div class="wrap nav-inner" data-page-node-id="b9hDNIry332YSFlDV7itpd">
+    <a class="logo" href="#top" data-page-node-id="S6rnp0gJr1nbFXA89v8cpM">
+      <span class="mark" aria-hidden="true" data-page-node-id="2eu5FPz7Ex60Av7jEKdnuv">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="UjLPEOVBLmd5z7mohgLUxK"><path d="M12 3l7 4.5v9L12 21l-7-4.5v-9L12 3z" data-page-node-id="GhfP0cq13BsPpvBEE29Xrz"/><path d="M12 12l7-4.5M12 12v9M12 12L5 7.5" data-page-node-id="HkwxGrTDF6W7s1PvwGPFSS"/></svg>
+      </span>
+      元记
+      <small data-page-node-id="i4jAUvMR3bKhKHnV0iRQ9W">AI Token Vault</small>
+    </a>
+    <nav class="nav-links" data-page-node-id="IcNatfDKFc9JLKdz7RGFXR">
+      <a href="#features" data-page-node-id="88B4ZUmTcIwPGQDnBNacTj">特色</a>
+      <a href="#showcase" data-page-node-id="shipdyivwEpVc5BqHgdMIh">功能</a>
+      <a href="#security" data-page-node-id="W9RHZBzhQPXxptbyEqHgNr">数据安全</a>
+      <a href="#download" data-page-node-id="gVwpYN1dN3I6F3DKp1HGRG">下载</a>
+      <a href="#faq" data-page-node-id="TGVA0kld2GGVryrrdxd5Y6">常见问题</a>
+    </nav>
+    <div class="nav-actions" data-page-node-id="imrIBCknSBly5j6fQMYlWL">
+      <button class="btn icon-btn" id="themeBtn" title="切换深浅色" aria-label="切换深浅色" data-page-node-id="0fGEZLwTQBKvwl41QFQyn6">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="bWyCnBVxYyWxQr0altRmAr"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" data-page-node-id="X2ooQtOEDZE2YFunXn9DNR"/></svg>
+      </button>
+      <a class="btn" href="https://github.com/lswlc33/YJ_ai_tokenvault" target="_blank" rel="noopener" data-page-node-id="24Pw5kfGGjqHwhQezLm4hI">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" data-page-node-id="BboG30qr2iy8wg8S8KGJ7G"><path d="M12 .5A11.5 11.5 0 00.5 12a11.5 11.5 0 007.86 10.92c.58.1.79-.25.79-.55v-2.1c-3.2.7-3.88-1.4-3.88-1.4-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.2 1.77 1.2 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.51-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 015.8 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.24 2.76.12 3.05.74.81 1.19 1.84 1.19 3.1 0 4.43-2.7 5.4-5.26 5.69.41.36.78 1.06.78 2.14v3.17c0 .3.2.66.8.55A11.5 11.5 0 0023.5 12A11.5 11.5 0 0012 .5z" data-page-node-id="qmUMFcF9pEy1pkbvvbJMHJ"/></svg>
+        GitHub
+      </a>
+    </div>
+  </div>
+</header>
+
+<main id="top" data-page-node-id="Pqt32qBXtFAUPGr6q823Ue">
+
+  <!-- Hero -->
+  <section class="hero" data-page-node-id="LvQCGQehdKSZSeriRfikED">
+    <div class="wrap hero-inner" data-page-node-id="tA4a3roDUCCqLDeyQjCAuW">
+      <div data-page-node-id="AFLe9bXpfU4HIQQ3jw8Zym">
+        <span class="badge" data-page-node-id="WRxLkP7zrSd4w8FIEDkoiy"><span class="dot" data-page-node-id="M7hW7RtqOiNfNRXgc1EqGD"></span> 开源 · 本地优先 · <b data-page-node-id="Ajschvj2s6nirEZj9HRWxW">Android &amp; iOS</b></span>
+        <h1 data-page-node-id="vAuTY2RaHDjuALIgSp8vxC">你所有 AI 站点的<br data-page-node-id="CdRughZJBZ5DTn6yLlceNL"><span class="grad" data-page-node-id="IbFPSzEHI8EHKaajr1hojR">密钥与额度</span>，<br data-page-node-id="sNnZeKbtaceIq4iMAvATGH">一个地方管完。</h1>
+        <p class="slogan" data-page-node-id="RXOnlprJQGcvj9J95M4Kd0">元记 —— 词元站点记录。</p>
+        <p class="sub" data-page-node-id="1CscziQefuxTuHk4Ot3suz">中转站给的 API 密钥散落在聊天记录和备忘录里，要用时找不到，不知道哪把还能用，也不知道还剩多少钱。元记把它们收在一处，存在你自己的手机里，并顺手回答两个问题：这把钥匙还能不能用，还剩下多少额度。</p>
+        <div class="hero-cta" data-page-node-id="6BoEoPL2ZECtiav1ClqR5l">
+          <a class="btn btn-primary btn-lg" href="#download" data-page-node-id="RcAJaSIzougf3OEMjtYh9L">下载应用</a>
+          <a class="btn btn-lg" href="#showcase" data-page-node-id="bmCo75HzN3RmedqRDptB3G">看看它能做什么</a>
+        </div>
+        <div class="hero-meta" data-page-node-id="h1LSLUKmiEzz03DInZBf53">
+          <span data-page-node-id="YxsAVqdRrEzu4Pdeq1LM7Y"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="K32o9lStdwGuWOPKgQc8VR"><path d="M20 6L9 17l-5-5" data-page-node-id="1kd0Eyc6ixAojx5S0hPhaT"/></svg> 无需注册账号</span>
+          <span data-page-node-id="REx8ejKpp4lbST2yEAMoHT"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="Z5urCInC3gVj56EfTBCAkM"><path d="M20 6L9 17l-5-5" data-page-node-id="fAdX3dV7Ssj6h4HDyuB0wg"/></svg> 数据不出设备</span>
+          <span data-page-node-id="bl8dhbdFwRVyRkw72Nr0s3"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="oiBxFmvErtam1sqbcAfQgr"><path d="M20 6L9 17l-5-5" data-page-node-id="vMPiHZKp4Vaz0hV9mUbMwK"/></svg> 中英文界面</span>
+        </div>
+      </div>
+
+      <div class="phone-stage" data-page-node-id="sPExpmcIW8yFlIlFHsPKVF">
+        <div class="phone" data-page-node-id="J7LHPUgJDcaVhF0zphLwCP">
+          <div class="phone-screen" data-page-node-id="04EbPkje9fbnJH7twEKhf8">
+            <div class="p-bar" data-page-node-id="WP05z7Utbau7NSPJXWguPw"><span data-page-node-id="kNLaTPsBwko1RNCYXXAVF3">9:41</span><span data-page-node-id="LbskyKQZppt6s3nOgY1Zy8">元记</span></div>
+            <div class="p-title" data-page-node-id="9SwTz1JYoLdSnHQPThEHQA">仪表盘</div>
+            <div class="p-card" data-page-node-id="tx3CW3Sdg2zhTxEPMcJIih">
+              <div class="label" data-page-node-id="ZQUpZCCTCRgHSdjmZxxERH">余额合计</div>
+              <div class="value" data-page-node-id="oxTbJwUgTU7s9bBJG5xp01">$119.02<em data-page-node-id="juelFD4q4QzNBRF1GmTDWX">更新于 刚刚</em></div>
+            </div>
+            <div class="p-grid" data-page-node-id="gETze8qmfagZOgnu2yOHOQ">
+              <div class="p-tile" data-page-node-id="VBtGZ5J8mcFVQPG7I1nGTH"><b data-page-node-id="LKZ84kUXJ5IaORA1ByVLXJ">8</b><span data-page-node-id="12EPEjawGsJWnpJ2uu7Guu">站点</span></div>
+              <div class="p-tile" data-page-node-id="yjan2lPzsVNeioGBMJiyYA"><b data-page-node-id="3gOURT8H1J5TwkODizFPa8">12</b><span data-page-node-id="12m26EE5GiKF4TCHBP7B20">密钥</span></div>
+              <div class="p-tile" data-page-node-id="IZyE7Q8MrFTAQqOIHioG9G"><b data-page-node-id="VHliWlEcCLDrU9iA0AQNdE">10</b><span data-page-node-id="k5MTKZbze5A6Bchwgxi7gm">可用</span></div>
+            </div>
+            <div class="p-card" data-page-node-id="fdshHRXclhXOzVUjFAbVme">
+              <div class="label" data-page-node-id="SStb6UO9qD5ZjAjXNpdfGU">密钥健康分布</div>
+              <div class="p-health" data-page-node-id="XVAQzYQrwPCGJuZUGc4krn">
+                <i style="width: 76%; background: var(--ok)" data-page-node-id="vV6UWXdCfwd4PEknDEbHIf"></i>
+                <i style="width: 14%; background: var(--warn)" data-page-node-id="LTh86WD4bI6dJdW7FgjRxZ"></i>
+                <i style="width: 10%; background: var(--err)" data-page-node-id="e01FzF5oLCE4p2L1AjwCgi"></i>
+              </div>
+              <div class="p-legend" data-page-node-id="1kvGhiydOO8EkYZUC8p2NP">
+                <span data-page-node-id="ETD0elfr8F0G73EZqxoqQ2"><i style="background: var(--ok)" data-page-node-id="CljGNlm8RDdeglmZlMdJYI"></i>可用 10</span>
+                <span data-page-node-id="K3IhuK7tCVJFyBlNR2ggrZ"><i style="background: var(--warn)" data-page-node-id="kqtJt3NYhs2Tqt9LUFfL1V"></i>异常 1</span>
+                <span data-page-node-id="x0z7tElPIHflZCRSFApuu8"><i style="background: var(--err)" data-page-node-id="yGumKvGgqpaW76GxbycRVW"></i>失效 1</span>
+              </div>
+            </div>
+            <div class="p-btn" data-page-node-id="ytvK0YPa6eMEmmc4Y5x5lb">开始探测</div>
+            <div class="p-tabs" data-page-node-id="wlWpTgNynDn1N0bnt3CsrL">
+              <div class="on" data-page-node-id="gybH63u5h6p4cfgPzTZBhH"><b data-page-node-id="QC3LMhlblcq7Rsg8HnGuQi">仪表盘</b>首页</div>
+              <div data-page-node-id="gEIJUm431fEqOSXgaHscNa"><b data-page-node-id="jzxrbAYx0XA7NRkIdoTiXH">管理</b>站点与密钥</div>
+              <div data-page-node-id="U5M3s2SpkvIhOH7jBG890F"><b data-page-node-id="XkCseJa9NCvRNoOuZUHkgD">设置</b>外观与安全</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 特色 -->
+  <section id="features" class="features" data-page-node-id="zJh40pKOdfwlUnscA2pSjs">
+    <div class="wrap" data-page-node-id="kfwTOgMlrg0J6sWWbcmlFy">
+      <div class="section-head reveal" data-page-node-id="X8wS00KqoDptOlkuBJ8LoA">
+        <div class="kicker" data-page-node-id="CQIcCTI4Qh38cXeTtjCMHw">Why 元记</div>
+        <h2 data-page-node-id="l8Q1fo0X2mOzLYdgEB8VSM">八个理由</h2>
+        <p data-page-node-id="W1WEuBDrU8aNejtQn1va1k">不绑定任何商家，不需要账号，装上就能用。</p>
+      </div>
+      <div class="grid g4" data-page-node-id="VhN8dc1XMCYYTz1GlERBhY">
+        <div class="card reveal" data-page-node-id="EUoBmfQICOBC7fnkZObrZB">
+          <div class="ic" data-page-node-id="9B3W8d4I3jdjUukIKHGRBA"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="rOg1vGKhNWthdBAxkgWFos"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6" data-page-node-id="ADFEMWU9UDRtLL3Yt6HpKJ"/></svg></div>
+          <h3 data-page-node-id="5Dyue6PkHJZ6StWfy9wM3o">开源</h3>
+          <p data-page-node-id="MPd5Le09PRgwPbdpqmfmSF">代码完全公开，加密与联网行为可以自己逐行审；不放心发行包就自己编译。</p>
+        </div>
+        <div class="card reveal" data-page-node-id="IZB8sv1hndUOIu0c7uyTaU">
+          <div class="ic" data-page-node-id="x1qCenvLcEh8lr8V10Sbsy"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="0FmhWqHdgH0th6Scme4Ke0"><rect x="6" y="2" width="12" height="20" rx="3" data-page-node-id="OTZVJomtbDWc1coK9Cl87x"/><path d="M11 18h2" data-page-node-id="VDNJmxHGnGXjiv6QFyhPT6"/></svg></div>
+          <h3 data-page-node-id="CvlHu8DTplvxaErr0PNzG5">本地</h3>
+          <p data-page-node-id="J1xQZWc1SDVYWHGfkL9OBG">所有数据只写在你自己的设备上。我们没有服务器，也拿不到你的任何数据。</p>
+        </div>
+        <div class="card reveal" data-page-node-id="s1zAmCAmK6QyB6v5JKdBTb">
+          <div class="ic" data-page-node-id="AWkqdGi5GxIBELEmj5UTES"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="1U4dQB600T1nj24VZGmv5G"><path d="M12 3l8 4v5c0 5-3.4 8-8 9-4.6-1-8-4-8-9V7l8-4z" data-page-node-id="ZGqWAosfpvF1gavDLP8kMX"/><path d="M9 12l2 2 4-4" data-page-node-id="BOlLIM4E6olbIpQZBzbuzL"/></svg></div>
+          <h3 data-page-node-id="drMpTY2tsrBfevrWHgp0Ng">安全</h3>
+          <p data-page-node-id="kd9cY0qEHlkyQydrtAHZGr">6 位 PIN 解锁，密钥与账号密码加密存储；自动锁定、剪贴板定时清除。</p>
+        </div>
+        <div class="card reveal" data-page-node-id="bqL4zJGJT2XjaI794XrwpW">
+          <div class="ic" data-page-node-id="NmArl4dGNbTLwXJyMEnwRd"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="E7bz5ocRy2xuS1C3Ar3cIm"><path d="M4 17V5a2 2 0 012-2h9l5 5v9a2 2 0 01-2 2H6a2 2 0 01-2-2z" data-page-node-id="jdySbMSNMHUoFaUrucyS29"/><path d="M14 3v5h5" data-page-node-id="492vGoGX7hI7HeqkM9bQld"/><path d="M8 13h8M8 17h5" data-page-node-id="zzl48eCtMUlMS8EYJJsU9O"/></svg></div>
+          <h3 data-page-node-id="7JakWZlD9w2tiPVCcSyw55">便携</h3>
+          <p data-page-node-id="sRa5NW8nf250AArINlDbhR">导出一个加密备份文件，在新手机输入同样的 PIN 即可还原，两端互通。</p>
+        </div>
+        <div class="card reveal" data-page-node-id="Ur7dz8BxTVMaguyQyrC8vZ">
+          <div class="ic" data-page-node-id="qYUumltfkSfjp3CBvmoJY9"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="iiyhED7JOwTGSsbvLViQF9"><path d="M12 3l9 5-9 5-9-5 9-5z" data-page-node-id="GLwMidywXXXUgsvezR3Cae"/><path d="M3 13l9 5 9-5" data-page-node-id="VWvU07kGMXshoPCh7IhDT0"/></svg></div>
+          <h3 data-page-node-id="IqJZDYpiJlNuY0gipeOOTF">一站式管理</h3>
+          <p data-page-node-id="NakUH57RSNTEAKb4er6bUg">站点 → 密钥 → 模型与平台账号，三层结构一次录全，不用再翻聊天记录。</p>
+        </div>
+        <div class="card reveal" data-page-node-id="l7jGNVdkYW3MvCDq1NkKmG">
+          <div class="ic" data-page-node-id="7snJ8DcsT6ftaZKPmSsCIJ"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="bDfXF6w93GFQqDdBzmSbR9"><path d="M3 7a2 2 0 012-2h4l2 2.5h8a2 2 0 012 2V17a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" data-page-node-id="4fAdLCUhIwweSXrqFjFfwd"/><path d="M8 13h8" data-page-node-id="bk45WUri1TwAjs6xn2dL09"/></svg></div>
+          <h3 data-page-node-id="yA4X8m1LE1E0M3VSxgcvl1">分类管理</h3>
+          <p data-page-node-id="zawZsXpjhGzhxuOeSpTEDD">自定义分组与颜色，支持搜索、四档排序，以及批量移动与批量删除。</p>
+        </div>
+        <div class="card reveal" data-page-node-id="TYBodIl6BuhrOyTORPEepd">
+          <div class="ic" data-page-node-id="ripTfg1PPbBZ6DDxDHjOJA"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="KJX23oQ0VW2WkTt5TDYSsc"><path d="M3 7h18v11a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" data-page-node-id="QFzS2TQx6zFo9Hj1BB5A2c"/><path d="M16 13h2" data-page-node-id="ZFIaBqyBNgbySQr4mAuxP1"/><path d="M3 7l3-4h12l3 4" data-page-node-id="1azV9cNL3PL2OuAn12iqNg"/></svg></div>
+          <h3 data-page-node-id="3foq3u8gGlC9ew4VYh6Cbn">余额查询</h3>
+          <p data-page-node-id="sZXtkhTeAFWjtIMcaMxjKU">一个按钮查全部站点余额，按币种分列，低额可设提醒阈值。</p>
+        </div>
+        <div class="card reveal" data-page-node-id="gReHoPo5xnYvu6OImrgHaV">
+          <div class="ic" data-page-node-id="EbSPdeL3EOj1k3ZH4F37pQ"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="yxyB9SYzlrBtZv4GhevMvg"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" data-page-node-id="DGWuji134JP6ZI7UQm6go9"/></svg></div>
+          <h3 data-page-node-id="R4F0MEOtVxFnPQBtQpqBrU">测试 API</h3>
+          <p data-page-node-id="NNZtDDP0Fg0onWQg0E4lcs">一键探测全部站点或某把密钥，立刻知道哪些还通、哪些有效。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 功能展示 -->
+  <section id="showcase" data-page-node-id="sQCLsL59RC4fFPZGvmPm8Y">
+    <div class="wrap" data-page-node-id="Rjr7eqfglPO6JILlmGoyeZ">
+      <div class="section-head reveal" data-page-node-id="1w2Ev4ZTHzTTQvwPRNmdxl">
+        <div class="kicker" data-page-node-id="tHPysJ2XRkAGgnPbQmxSXC">Features</div>
+        <h2 data-page-node-id="oG41h4nHOvhtAv1AfrWmdC">它能做什么</h2>
+        <p data-page-node-id="gZGO4u9SlxQsBDuGGnpePv">从录入、验证到查额度和换机，一条链路走完。</p>
+      </div>
+
+      <div class="show reveal" data-page-node-id="7hhlNHgNNxUNTCoZbtWODh">
+        <div class="show-text" data-page-node-id="mGfFq8aMabIps6rPKBPdht">
+          <h3 data-page-node-id="qy9jTnE0sSsgKlu0dRT3NS">站点、密钥与账号，一次录全</h3>
+          <p data-page-node-id="0DIAtSGBMwm1ARAMLYvYbb">一个站点可以存多把密钥、多个模型，以及后台登录账号。密钥与密码默认遮蔽，解锁后才能展开查看与复制，剪贴板到点自动清除。</p>
+          <ul class="list" data-page-node-id="CE32eIuKnY5ZGG3oXl8riC">
+            <li data-page-node-id="NZv5zdja5rbn5smIM3YDZT"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="ujZwXzfoR2pB1r2bmdixy7"><path d="M20 6L9 17l-5-5" data-page-node-id="FdrEnpXvOhJ3Zt3qabXbC1"/></svg><span data-page-node-id="2CyPjQDf26PHfqGtHkKVa6">支持 OpenAI 兼容、Anthropic 与 Responses 三类接口</span></li>
+            <li data-page-node-id="kfejzEKwqPHd6UwX22Gb40"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="CHuzY2qQFTIxkCdP1rte5c"><path d="M20 6L9 17l-5-5" data-page-node-id="qcEvWPZHScu971xntdmBHP"/></svg><span data-page-node-id="9NKUImQ60tDmaG2JBBE4aC">把站点发来的文本整段粘贴进来，解析预览后一次导入</span></li>
+            <li data-page-node-id="DHcy4TAQXrAJ28ZQZBgIEj"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="A8HR4eTnGbkK9earBQ0Sjb"><path d="M20 6L9 17l-5-5" data-page-node-id="FnRkINAJkNhJD4QfOpR8HN"/></svg><span data-page-node-id="gppieHTKo9VrcK8KGid7vc">分组与颜色自定义，支持搜索、排序与批量操作</span></li>
+          </ul>
+        </div>
+        <div class="mock" data-page-node-id="Rd0TBkozEz8IvOV1ZhNJ60">
+          <div class="mock-row" data-page-node-id="XjYne4L1JhNZMVsDDCYsAN">
+            <div class="swatch" style="background: linear-gradient(135deg,#6366f1,#8b5cf6)" data-page-node-id="vCvsdLMU8oLO5VtHmVht0A">A</div>
+            <div class="t" data-page-node-id="6Vqh6R1jCD61dxIqdWMt0j"><b data-page-node-id="ic56aQ3aJaP2ZLEKn0x1TW">Agent Router</b><span data-page-node-id="0lI84qtldEAF5icJrUSn6X">3 把密钥 · 24 个模型 · 1 个账号</span></div>
+            <span class="pill ok" data-page-node-id="T9E8h9RSyK4CY5yF1wis2Z">可用</span>
+          </div>
+          <div class="mock-row" data-page-node-id="gUhpUqyDAXSb4lXxDAwG72">
+            <div class="swatch" style="background: linear-gradient(135deg,#0ea5e9,#22d3ee)" data-page-node-id="r203oSN8Xsy75FthFRd1kY">D</div>
+            <div class="t" data-page-node-id="2dp2Kf40xpClpxN8hBa2o1"><b data-page-node-id="nDMYjsmvEHoK1HwF94aCVg">DeepSeek 官方</b><span data-page-node-id="v5zRwMAft82QoHoIbGMgEi">1 把密钥 · 4 个模型</span></div>
+            <span class="pill ok" data-page-node-id="bQLQ3F5oqUP17cpfzPoEHG">可用</span>
+          </div>
+          <div class="mock-row" data-page-node-id="ghJYVrXaLGjfGSG5uB7uEL">
+            <div class="swatch" style="background: linear-gradient(135deg,#f59e0b,#f97316)" data-page-node-id="e099hUNUEBHbfDf36oTBVz">S</div>
+            <div class="t" data-page-node-id="YGcJ3OMB5Ddx3tvJaKFMq7"><b data-page-node-id="RJEgqyMVjRrbH98kepO2Cj">备用中转</b><span data-page-node-id="yVnnDaFVSO3gIyvOFEnBgM">2 把密钥 · 未探测</span></div>
+            <span class="pill mute" data-page-node-id="fptmD97hagfYErxY52Tbcx">未探测</span>
+          </div>
+          <div class="mock-row" data-page-node-id="9xuKbQETp1Cdixo9R5wLYf">
+            <div class="swatch" style="background: linear-gradient(135deg,#64748b,#94a3b8)" data-page-node-id="L3X8i7M3uJVCAFWYAM3vwo">T</div>
+            <div class="t" data-page-node-id="mEkDB4lTFxqND5MezJZ4Y3"><b data-page-node-id="xprOd4ZjvUKtGX5fdt35cJ">测试站点</b><span data-page-node-id="JkSUia7M9mWxeub8LhgCKP">1 把密钥</span></div>
+            <span class="pill err" data-page-node-id="79eYGZ4Y0Gx5j8IaRJCBR9">失效</span>
+          </div>
+          <div class="chips" style="margin-top: 12px" data-page-node-id="1c8hyHgTJEWiSXGuPzLKOA">
+            <span class="pill mute" data-page-node-id="WX226u1tr27eHJU8UwcBEW">全部</span>
+            <span class="pill mute" data-page-node-id="21SEjXmfDZzr3wYHsv5WSm">常用</span>
+            <span class="pill mute" data-page-node-id="9PB9cXpUXtZSbPgGXVx9aJ">已失效</span>
+            <span class="pill mute" data-page-node-id="8U9d4SaOKIvu6OqCkyer5k">+ 新建分组</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="show rev reveal" data-page-node-id="H9TfN3kH3EqIxSC8Ax186i">
+        <div class="show-text" data-page-node-id="NiSIBuvj0d23LOTcRfbJbL">
+          <h3 data-page-node-id="2v588xwTAyJrpMtNyIAqFW">一键探测，哪把钥匙还能用</h3>
+          <p data-page-node-id="Dn3QPAijFJJpdlFmLt96qZ">首页一个按钮，或者单独探测某家站点、某把密钥。几秒后就能看到结果，不用自己拼 cURL 去看返回码。</p>
+          <ul class="list" data-page-node-id="jEtimDaqFZnCmt2BbtfVc4">
+            <li data-page-node-id="202S0lFz3rlq0V2ohCxmFM"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="KHoKHjFaCzW1SODp2kVnJb"><path d="M20 6L9 17l-5-5" data-page-node-id="MfYFKsZZ22jJcx2vEREFgS"/></svg><span data-page-node-id="aHxdf7fMD3eOLqIWTvTeQI">结果分「可用 / 异常 / 失效 / 未探测」四档，一眼看全</span></li>
+            <li data-page-node-id="2iqRFEeP5KwyhAn6GYPMTh"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="HHoor4x8hUn1lAbB1iYTnl"><path d="M20 6L9 17l-5-5" data-page-node-id="igUj7P2w7euDqGDsGZpLWt"/></svg><span data-page-node-id="Ae9qBMmWMdh9kLwxZz0Coi">只发最小开销的验证请求，不会把额度花在探测上</span></li>
+            <li data-page-node-id="OzslQwtTWO8scqALqGQU0i"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="UVDTRjxEV9FAtcdQUj4qGe"><path d="M20 6L9 17l-5-5" data-page-node-id="20TSfT8U7qVkkaQJ4mnFeY"/></svg><span data-page-node-id="hWzv9orBZ7tUDsDNGqRdVK">网络波动与限流不会把一把好钥匙错误地标成坏钥匙</span></li>
+          </ul>
+        </div>
+        <div class="mock" data-page-node-id="h4CWrKgh5p56zsM2JPW5zf">
+          <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:14px" data-page-node-id="SaXsxa0zdHHFNrrtfT19uQ">
+            <b style="font-size:15px" data-page-node-id="JxPTOtAxFJWgJ5s24uBEvX">本轮探测</b>
+            <span style="font-size:12px; color:var(--text-soft)" data-page-node-id="ogAXnXW4Z0XFOoJ2GzHGBc">12 项 · 耗时 3.2 秒</span>
+          </div>
+          <div class="mock-row" data-page-node-id="AO7mgFyr4eCWcC4GLV8KvL">
+            <div class="t" data-page-node-id="ELB0qxHNH6g68s1DW7G4fC"><b data-page-node-id="KBQMdLpE7cKU6FEhA9bCDn">连通性</b><span data-page-node-id="OfQo7L7nscQHpJ0M5YMHpz">Agent Router · api.example.com</span></div>
+            <span class="pill ok" data-page-node-id="tNqKb0z0V4uXyewxfRAdRO">通过 · 258ms</span>
+          </div>
+          <div class="mock-row" data-page-node-id="V2whHYhepeGotYQdKwqtAJ">
+            <div class="t" data-page-node-id="ibYgr5ZSBAg0S4UgQwwimI"><b data-page-node-id="CXGgfwAnjvEPImCqNtpQor">密钥有效性</b><span data-page-node-id="DPl8wlLXxGI2bThX3DTaQQ">sk-t…7f2a</span></div>
+            <span class="pill ok" data-page-node-id="0R0FB4oy9IHcGgHruN3f4z">有效</span>
+          </div>
+          <div class="mock-row" data-page-node-id="zOPiHgQXEE76HJcyKOS1VQ">
+            <div class="t" data-page-node-id="YB0DDrV3m9Ucv4Bwlafuro"><b data-page-node-id="ghpKjoC1EP80bt2MT79bDz">连通性</b><span data-page-node-id="GLB1BwSCB5g5IDDyl3Vb3Y">备用中转 · backup.example.com</span></div>
+            <span class="pill warn" data-page-node-id="35yTflcL13biG7jd9Pl4Mf">限流</span>
+          </div>
+          <div class="mock-row" data-page-node-id="2WkIIFEh3Z2nSjbSo0nPKz">
+            <div class="t" data-page-node-id="tLXCI6paF5DJCNwsZ6fWL3"><b data-page-node-id="8pyotoToxE8oVLncPGQBqw">密钥有效性</b><span data-page-node-id="DQ26f1tE1DeTRprCDVeRpr">sk-t…91cd</span></div>
+            <span class="pill err" data-page-node-id="ZUqIXXmFsn5GhmCSIzgdAf">已失效</span>
+          </div>
+          <div style="margin-top: 12px; font-size: 13px; color: var(--text-soft)" data-page-node-id="255lLOvUlyzTgkbMC58VmS">仅重试失败项 · 上次探测：刚刚</div>
+        </div>
+      </div>
+
+      <div class="show reveal" data-page-node-id="iiiHJW0qKMTVk11tDlUP1v">
+        <div class="show-text" data-page-node-id="05eDnB0tHVAMxgiTIFablS">
+          <h3 data-page-node-id="WIvpJ3wxtPQhupL8v6G8xN">余额一屏看全，谁快没钱了</h3>
+          <p data-page-node-id="r49cb10eGXo4ZZS9YhMtFB">填好查询信息后，首页刷新一次就能看到所有站点的余额，按币种分列统计，低额站点会被单独标出来。</p>
+          <ul class="list" data-page-node-id="1YdfcrW9GvLg6miEjRFBhc">
+            <li data-page-node-id="VQpQwCGpfMmv29KOaAibl6"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="lV98R5zZ85y1cyddQdIKFm"><path d="M20 6L9 17l-5-5" data-page-node-id="4dzO5M362ZZNBVH2eToM7D"/></svg><span data-page-node-id="PGnATjGLm5wStq7fbGEkmc">内置 new-api、DeepSeek、OpenRouter、SiliconFlow、Moonshot 适配</span></li>
+            <li data-page-node-id="J24nvToSy4nkmrRDxA5CpA"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="LNmFEtNA3HsKERFaF86BuK"><path d="M20 6L9 17l-5-5" data-page-node-id="mbpxj4LnJSDMpsVgHTkQsv"/></svg><span data-page-node-id="xMPAyMhbAphvi3zpyDg1Bn">其他站点可用自定义 JSON 规则，填字段路径即可</span></li>
+            <li data-page-node-id="4KSL3oQBPVAzrENDdjYFVf"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="lWv7uHlAVvS9qyfNGDxN9f"><path d="M20 6L9 17l-5-5" data-page-node-id="Q2Upu9eWhz3JsE6Lefvvxy"/></svg><span data-page-node-id="VxMHfUwzcgg1zw6aTPVD2j">「查询失败」与「余额为 0」分开显示，不会误判</span></li>
+          </ul>
+        </div>
+        <div class="mock" data-page-node-id="SZHwFEwmOPTUbtKvTRALeR">
+          <div style="font-size:12px; color:var(--text-soft)" data-page-node-id="ZhecbbIcqplV7C12lFbLaM">合计</div>
+          <div style="font-size:28px; font-weight:800; letter-spacing:-.5px; margin-bottom:4px" data-page-node-id="ZUHR8E6vroA7gfTKXHUixJ">$119.02 <span style="font-size:14px; font-weight:600; color:var(--text-soft)" data-page-node-id="SNA4j9TC7qc2qG0MrbGHgf">+ ¥86.40</span></div>
+          <div style="font-size:12px; color:var(--text-soft); margin-bottom:16px" data-page-node-id="nYBH6SuF6opPwRcjrHzS45">更新于 刚刚</div>
+          <div class="mock-row" data-page-node-id="mDmqOSXZZ5R9BnFQuIbtzF">
+            <div class="t" data-page-node-id="mgr3eMqX1DnjlKMsVqMH7x"><b data-page-node-id="86lAvltZGmyo1g0K1qkPwQ">Agent Router</b><span data-page-node-id="vJwzOOsCrXEbxDoN9LH6c7">new-api · 已用 $30.98</span></div>
+            <span class="money" data-page-node-id="UPiPPmAyBwye2j58PyQAeQ">$119.02</span>
+          </div>
+          <div class="mock-row" data-page-node-id="eCvLdTceSgK0aomh3ThdvF">
+            <div class="t" data-page-node-id="HJaouLhvcLspOxyddnsCR3"><b data-page-node-id="K639heAoEmucGV9TH6m25z">DeepSeek 官方</b><span data-page-node-id="GevUjf7jW4cCHoT45Iuru7">已用 ¥13.60</span></div>
+            <span class="money" data-page-node-id="BJqh2SKKQOT5Y2bOzAWYKT">¥86.40</span>
+          </div>
+          <div class="mock-row" data-page-node-id="ZuPoya30nt9XRFpJ0NQsHd">
+            <div class="t" data-page-node-id="Cki8kGeHMctyXS6xjyPpEY"><b data-page-node-id="9tHwVu5OAMFGu8wHt5UhMq">备用中转</b><span data-page-node-id="girGnuizOnEJRWLzxtOdUN">低于阈值</span></div>
+            <span class="pill warn" data-page-node-id="0tjZJdN1ExJ6b2wBNUAHsz">$1.20</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="show rev reveal" data-page-node-id="5VNWWaA5NPuBlNICsU1xtx">
+        <div class="show-text" data-page-node-id="3C2gxR7DMfsmGJ2i6GCW2s">
+          <h3 data-page-node-id="9LtAmXIbRbMRUfhLltfFzb">换手机，一个文件带走</h3>
+          <p data-page-node-id="sqtWReJjuISS1Kzyg1LHHM">导出的备份包本身就是加密的：里面是明文内容，但整包用 PIN 加密。存网盘、发给自己都可以，在新设备上输入同样的 PIN 即可还原。</p>
+          <ul class="list" data-page-node-id="8ALbniS4UaHYrvBo5Gv9Yc">
+            <li data-page-node-id="JIi2ZFTaHRbzVtprE44a3c"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="lC5N8RP76NNdrvEfRsaVXd"><path d="M20 6L9 17l-5-5" data-page-node-id="sqIAw408sHZry2USqJ6XgK"/></svg><span data-page-node-id="WUdYAHHtV3tRdwJ9hGMVb8">恢复支持覆盖、合并、仅新增三种模式</span></li>
+            <li data-page-node-id="1qmUb7xnD3aWlLLDmJEw5J"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="Vl9TRMMBiuGGZM5htyUtHR"><path d="M20 6L9 17l-5-5" data-page-node-id="YZLWZ3Vr8u4OS01MTfWVrh"/></svg><span data-page-node-id="sQADh3Imi6b4pOkjxF25Uy">Android 与 iOS 的备份互相通用</span></li>
+            <li data-page-node-id="qPSSzsBGHTnzwYfn1kvnnK"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="4u7sP6Thwh78j3jmCauqCC"><path d="M20 6L9 17l-5-5" data-page-node-id="Vt0U5gfx5n6YZepnJgkVoc"/></svg><span data-page-node-id="PjRrBmZrJpYn0BASjhmNJF">可随时查看备份内容与时间，不依赖任何云服务</span></li>
+          </ul>
+        </div>
+        <div class="mock" data-page-node-id="fH8pOeQRwzFWR2WrUiclCC">
+          <div class="mock-row" data-page-node-id="XN32HBttGYCCfvpCvR9vnl">
+            <div class="t" data-page-node-id="Ug2jEPeC7xS4AV3CsAc9Bu"><b data-page-node-id="L7BhuvDwO4lWr4b9HVwEOn">导出备份</b><span data-page-node-id="Lnrk8eYk5G1Ux2fadW21Pd">8 站点 · 12 密钥 · 24 模型</span></div>
+            <span class="pill mute" data-page-node-id="vLU59KRjjhMFn634Q0QDif">.vault</span>
+          </div>
+          <div style="padding: 14px; border: 1px dashed var(--border); border-radius: 14px; text-align: center; color: var(--text-soft); font-size: 14px; margin-bottom: 10px" data-page-node-id="7HMZb0ZMkREGr987ioHib3">
+            备份包已加密 · 解开它只需要你的 PIN
+          </div>
+          <div class="mock-row" data-page-node-id="9tqoYaDOUlsb2Q9Obq6pYI">
+            <div class="t" data-page-node-id="8poBC2BY8RCj3VBcDegJ5B"><b data-page-node-id="iN2NoV57v5691HpXFlLHLU">恢复到本机</b><span data-page-node-id="BJ8mVRYpkMWln38kxy54RL">选择模式</span></div>
+            <span class="pill ok" data-page-node-id="dIKwUcxK9TF7QBMzWGLcU6">合并</span>
+          </div>
+          <div class="chips" style="margin-top: 12px" data-page-node-id="FgmezCTvSwTljTjA3HAPWk">
+            <span class="pill mute" data-page-node-id="EDnkrpHaELIOX6ErbL8qWl">覆盖</span>
+            <span class="pill ok" data-page-node-id="HzWo0OEM5Eq43kCY5Z1ZU2">合并</span>
+            <span class="pill mute" data-page-node-id="j0JjDCMsno2qvQpuPZ2dTE">仅新增</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 数据安全 -->
+  <section id="security" class="security" data-page-node-id="dNaRvjBAhGSaMrK04Zs093">
+    <div class="wrap" data-page-node-id="M9b7aUXhaEf0C9WYYNui3Z">
+      <div class="section-head reveal" data-page-node-id="G0gCGdqHeFL3bIX5E28Sp9">
+        <div class="kicker" data-page-node-id="VFTqdHkIW082sI4e3MXN5n">Privacy</div>
+        <h2 data-page-node-id="lpHfbZ5gXzfQgkDKnYeqQM">数据只在你手上</h2>
+        <p data-page-node-id="ZHW5i1BaR7XLAl1cXgh8x8">没有账号体系，没有我们的服务器，也没有任何后台上传。</p>
+      </div>
+      <div class="sec-grid" data-page-node-id="VrKvO3cCQMr1QZbCXbsZgM">
+        <div class="sec-item reveal" data-page-node-id="EfeHOf6UIdUlLSfzVYXDc8">
+          <div class="ic" style="width:42px;height:42px;border-radius:12px;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center" data-page-node-id="XkgPsNj9C2duR3Db2OSn3T">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="Sfq86ExYaE0uRIMUgvuDUr"><rect x="4" y="10" width="16" height="11" rx="2" data-page-node-id="WNhK5OjjecxKCbs95JfMDG"/><path d="M8 10V7a4 4 0 018 0v3" data-page-node-id="GpCApdfeTG5GOoGkENkeoA"/></svg>
+          </div>
+          <b data-page-node-id="KuVVmpWl1oXpo87Rjee1Eb">加密存储</b>
+          <span data-page-node-id="HZQPR25Kj252ljVL6qnLi6">密钥、账号密码在写入前就已加密</span>
+        </div>
+        <div class="sec-item reveal" data-page-node-id="3kGSY1mxeYnjnbDuqGVffQ">
+          <div class="ic" style="width:42px;height:42px;border-radius:12px;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center" data-page-node-id="Bzj68KIsaujrNqi0PoTQLE">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="WxbZIcgzobParunKzxVhG8"><path d="M5 12.5l4.5 4.5L19 7" data-page-node-id="rM4AyMjSzIr8etMIg66ct3"/></svg>
+          </div>
+          <b data-page-node-id="3VuACGRzhSIBhhvESIheXC">自动锁定</b>
+          <span data-page-node-id="AV7bscR6sW1gBUJEoRqFEA">切后台、久未操作、锁屏都会上锁</span>
+        </div>
+        <div class="sec-item reveal" data-page-node-id="LB9Fkty6DfWcv5FCBU1qXn">
+          <div class="ic" style="width:42px;height:42px;border-radius:12px;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center" data-page-node-id="A8HGh11gEtWK4CncwkGgXu">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="UWf0Xx1jRRvf8qP9i2d7GG"><path d="M12 3l8 4v5c0 5-3.4 8-8 9-4.6-1-8-4-8-9V7l8-4z" data-page-node-id="lXGdJpmWcamKAKqolnhfnF"/></svg>
+          </div>
+          <b data-page-node-id="f1tG2CDnNs0QBCMORsLmWW">不联网</b>
+          <span data-page-node-id="O0ZsDo4tbwGaSXTdveJuFO">只有你主动点的操作才会发出请求</span>
+        </div>
+        <div class="sec-item reveal" data-page-node-id="ip2N2r0mK4Fi3xFt3CTBqw">
+          <div class="ic" style="width:42px;height:42px;border-radius:12px;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center" data-page-node-id="ipNdE6DLCWBjPaSFybzriq">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="DUIB9xwLTvFyu5PKkCnJ8N"><rect x="9" y="9" width="12" height="12" rx="2" data-page-node-id="vHsR3UaKhCLpL2muorhpzV"/><path d="M5 15H4a1 1 0 01-1-1V4a1 1 0 011-1h10a1 1 0 011 1v1" data-page-node-id="ab2ntH5bdzSqGbk3buMurB"/></svg>
+          </div>
+          <b data-page-node-id="XxpQi66ijYZhgvoVrylVPZ">剪贴板清理</b>
+          <span data-page-node-id="Mxb0bERy9WkZdBbMxu9lTz">复制的密钥到点自动从剪贴板清除</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 下载 -->
+  <section id="download" data-page-node-id="xp7ra8bOuuXIlT3ArODlbb">
+    <div class="wrap" data-page-node-id="J44DErd5rI5RDTygRdneDC">
+      <div class="section-head reveal" data-page-node-id="ok49LQw6ePqKJZ4yCXA3dW">
+        <div class="kicker" data-page-node-id="eWvVA3YwPklixklngEIuu3">Download</div>
+        <h2 data-page-node-id="NMPTtEHnXCMfwg1nqwxaa9">现在就装上</h2>
+        <p data-page-node-id="jOgwnZUfsq8zVB4bwE3MyY">每次更新都会自动构建，产物挂在 GitHub Releases 的 nightly 预发布里。</p>
+      </div>
+      <div class="dl-grid" data-page-node-id="3FxKTbQZ32vZanyb596w7L">
+        <div class="card dl reveal" data-page-node-id="5jvhuRapHbBwTCVgFgZoM8">
+          <div class="ic" data-page-node-id="xlMXhfNMAp3TGIHsihMgkO"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="OpCQsQZPteXs2TN47nRDHd"><rect x="6" y="2" width="12" height="20" rx="3" data-page-node-id="rshjA04hnnMN8Fj6OhFAME"/><path d="M11 18h2" data-page-node-id="t9ymkzv4yXWrwsDCjbs0ew"/></svg></div>
+          <h3 data-page-node-id="cu82LQPRuXmXlfjvrB1r5m">Android</h3>
+          <p class="req" data-page-node-id="g9tDFIIBm676pH97gAT5Xe">需要 Android 13 及以上</p>
+          <a class="btn btn-primary btn-lg" href="https://github.com/lswlc33/YJ_ai_tokenvault/releases" target="_blank" rel="noopener" data-page-node-id="yFApxS1YBByyiAHHXl9T8q">下载 APK</a>
+        </div>
+        <div class="card dl reveal" data-page-node-id="RANo6HnLa9gPQOujlNzFsj">
+          <div class="ic" data-page-node-id="ZMZ6CdjtpES4wwyRT9P0kT"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" data-page-node-id="hTUI1lR84ELdW94KYnNXWD"><path d="M16.4 12.9c-.03-2.2 1.8-3.3 1.9-3.35-1-1.5-2.6-1.7-3.2-1.75-1.35-.14-2.65.8-3.35.8-.7 0-1.75-.78-2.9-.75-1.5.02-2.9.87-3.65 2.2-1.57 2.72-.4 6.75 1.12 8.95.75 1.08 1.63 2.3 2.8 2.25 1.12-.04 1.55-.73 2.9-.73 1.35 0 1.74.73 2.92.71 1.2-.02 1.97-1.1 2.7-2.2.85-1.25 1.2-2.45 1.22-2.52-.03-.01-2.34-.9-2.36-3.61zM14.2 5.9c.62-.75 1.03-1.8.92-2.85-.9.04-1.97.6-2.6 1.35-.57.66-1.06 1.72-.93 2.73 1 .08 2-.48 2.61-1.23z" data-page-node-id="x6NT31oePBzVhWHL2DOH8t"/></svg></div>
+          <h3 data-page-node-id="F08FKlzIoOWuE7KNXenFhF">iOS</h3>
+          <p class="req" data-page-node-id="AB7agQxbihGyUApIzxklRO">需要 iOS 15 及以上，未签名 IPA 需自行签名</p>
+          <a class="btn btn-lg" href="https://github.com/lswlc33/YJ_ai_tokenvault/releases" target="_blank" rel="noopener" data-page-node-id="Dsid3a699Tpt7xh866KiCA">下载 IPA</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq" style="background: var(--bg-soft); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border)" data-page-node-id="BDwobSKeJR88UcVxMAp2Io">
+    <div class="wrap" data-page-node-id="hpjZiHARxYFzQ15TvgcPWy">
+      <div class="section-head reveal" data-page-node-id="4emb4XKdfp1MfzYXszVPQk">
+        <div class="kicker" data-page-node-id="hLkjBcRUCHlkLHBcViKkE1">FAQ</div>
+        <h2 data-page-node-id="xEJ0crW1P4aCs4fYY6k0hT">常见问题</h2>
+      </div>
+      <div class="faq reveal" data-page-node-id="36VuiJGlYhALoFRvlMtukV">
+        <details open data-page-node-id="G3OlkEldlO3fNNTN4F0S2t">
+          <summary data-page-node-id="1e32rGCyCElMMorwSemEpo">数据会传到你们的服务器吗？<svg class="arw" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="1SBT6URJCyEFgE78OdLfrv"><path d="M6 9l6 6 6-6" data-page-node-id="XFp2FzwcVHGAAsKKPJVscI"/></svg></summary>
+          <div class="body" data-page-node-id="ygiMMY3b0D62hkRDxB8nSI">不会。应用没有账号体系，也不连接我们的任何服务——我们没有服务器。唯一的出网请求是你自己点的「探测」「查余额」「检查更新」，目标是你自己填写的站点地址。</div>
+        </details>
+        <details data-page-node-id="dXY56xtKqpAL1NLy3ofx4s">
+          <summary data-page-node-id="lUQJyc2vaiQyKVM28ZeHiQ">换手机怎么办？<svg class="arw" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="ziJzQgn0EvadkmN5QaPUIZ"><path d="M6 9l6 6 6-6" data-page-node-id="U7SNIIOD7C5M42LFVLqmSv"/></svg></summary>
+          <div class="body" data-page-node-id="62HhjM2OcI1Lu1iUQ9REEH">旧手机导出备份文件，新手机安装后选择恢复，输入同样的 6 位 PIN。Android 与 iOS 之间可以互相恢复。</div>
+        </details>
+        <details data-page-node-id="3Ak7BoFIPWuIu4wtX2SrEI">
+          <summary data-page-node-id="F9ligNCJUXv2K4oYR7AmVk">忘了 PIN 怎么办？<svg class="arw" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="mC2oOo5pLR23tAEyLl5aRv"><path d="M6 9l6 6 6-6" data-page-node-id="m1CfipCOc7tEW41T8MHlkG"/></svg></summary>
+          <div class="body" data-page-node-id="7MoHzuIXxCfRnHIzbLMsQU">PIN 是解开数据的唯一凭证，我们不持有它，也没有找回通道。忘记只能清除应用数据重新录入——所以请务必定期导出备份。</div>
+        </details>
+        <details data-page-node-id="MlkdZDvoGWbI5TJ2nRCUUY">
+          <summary data-page-node-id="fB1Fuay9KLQ8nSpxsYiCJA">探测会不会花掉我的额度？<svg class="arw" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="exNuKhKX9lGvULTfU3QIL8"><path d="M6 9l6 6 6-6" data-page-node-id="aYgHGf7XbvrbNd8BjXo4kJ"/></svg></summary>
+          <div class="body" data-page-node-id="FaEHzs4fpeyUpd2G05zCks">常规探测只发最小开销的验证请求，用于确认连通性与密钥有效性，不会跑真实任务。会产生明显花费的逐模型探测，需要你手动单独发起。</div>
+        </details>
+        <details data-page-node-id="l5VK4YpAN0vHsQG93FGJqo">
+          <summary data-page-node-id="fPdV5XMLKT1paAw1mibEZC">支持哪些站点？<svg class="arw" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="LkIY580FvhiuJTug8Ci7P5"><path d="M6 9l6 6 6-6" data-page-node-id="CeYKCBXPKSrttDVIliInKd"/></svg></summary>
+          <div class="body" data-page-node-id="sKsoDo0PekTvTeLuoIjbRH">不绑定具体商家。只要提供 OpenAI 兼容接口、Anthropic 接口或 Responses 接口的官方或中转站点，都可以自行添加。余额查询内置了 new-api、DeepSeek、OpenRouter、SiliconFlow、Moonshot 的适配规则，其他站点可以自定义 JSON 字段路径。</div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta" data-page-node-id="TlcDOWKgCs6MA86eYLEXQ3">
+    <div class="wrap reveal" data-page-node-id="0fHpTooGQnOBAgNZfOl3fb">
+      <h2 data-page-node-id="FT1eGY5h9nd2uIyPBGz9Mq">把散落的密钥，收进一个地方</h2>
+      <p data-page-node-id="jrWe8M97edue8Fnue2cjAg">开源、免费、不需要账号。装上看一眼，就知道哪把钥匙还能用。</p>
+      <div class="hero-cta" style="justify-content: center" data-page-node-id="4xBlFafhHBa535AFgISas7">
+        <a class="btn btn-primary btn-lg" href="#download" data-page-node-id="dVXi1zebZ928vstkwI1tHl">下载应用</a>
+        <a class="btn btn-lg" href="https://github.com/lswlc33/YJ_ai_tokenvault" target="_blank" rel="noopener" data-page-node-id="hQrfHvt08GQ7TMEYSg3q3J">查看源码</a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer data-page-node-id="QmomNCK2w7k2oEeXYpNWOi">
+  <div class="wrap foot" data-page-node-id="wbQ4LGVN8CepkZPKb1hml5">
+    <span data-page-node-id="Kui4pwTemGkVBuYkbb3Sl0">元记 · AI Token Vault —— 词元站点记录</span>
+    <nav data-page-node-id="rnb2G9dsixbAlBvD8C2bkC">
+      <a href="https://github.com/lswlc33/YJ_ai_tokenvault" target="_blank" rel="noopener" data-page-node-id="PEXz5Sx9fX9pot371vexvC">GitHub</a>
+      <a href="https://github.com/lswlc33/YJ_ai_tokenvault/releases" target="_blank" rel="noopener" data-page-node-id="COrOGW0ULQZkO7x8ljTFNC">Releases</a>
+      <a href="#faq" data-page-node-id="h9jNXi0b4y1glnlsEMTEyZ">常见问题</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+  // 深浅色：默认跟随系统，点按钮手动切换并记住选择
+  (function () {
+    var root = document.documentElement;
+    var saved = null;
+    try { saved = localStorage.getItem('yj-theme'); } catch (e) {}
+    var system = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    root.setAttribute('data-theme', saved || system);
+
+    document.getElementById('themeBtn').addEventListener('click', function () {
+      var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      root.setAttribute('data-theme', next);
+      try { localStorage.setItem('yj-theme', next); } catch (e) {}
+    });
+  })();
+
+  // 滚动时给导航加底边
+  (function () {
+    var nav = document.getElementById('nav');
+    var onScroll = function () { nav.classList.toggle('scrolled', window.scrollY > 8); };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+  })();
+
+  // 进入视口时淡入
+  (function () {
+    var items = document.querySelectorAll('.reveal');
+    if (!('IntersectionObserver' in window)) {
+      items.forEach(function (el) { el.classList.add('in'); });
+      return;
+    }
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('in');
+          io.unobserve(entry.target);
+        }
+      });
+    }, { rootMargin: '0px 0px -10% 0px', threshold: 0.08 });
+    items.forEach(function (el) { io.observe(el); });
+  })();
+</script>
+
+</body>
+</html>
