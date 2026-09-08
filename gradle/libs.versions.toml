@@ -48,10 +48,13 @@ androidxTestExtJunit = "1.3.0"
 androidxTestRunner = "1.7.0"
 # okio：KMP IO 库，backup/ 的 gzip 用（GzipSink/GzipSource 已 multiplatform，native 走 zlib）。
 okio = "3.18.1"
-# Compose Multiplatform（阶段3 UI 搬家）：1.11.1 是 2026 年稳定版，要求 Kotlin 2.3.10+（本项目 2.3.21）。
-# MIUIX（0.9.1）底层依赖 org.jetbrains.compose 同代版本，与 1.11.1 兼容。
+# Compose Multiplatform（阶段3 UI 搬家）：1.12.0 是 2026 年稳定版（klib 由 Kotlin 2.3.20 编译，
+# 与本项目 2.3.21 同代）。升它不为新功能：1.11.1 的 ui-uikit 硬引用 iOS 26 的
+# UIViewLayoutRegion，Xcode 16 SDK 链不过；1.12.0 修了这个（compose-multiplatform-core#3278）。
+# CI 的 iOS job 因此才能锁 Xcode 16.4——GH 镜像上只有 Xcode 16 的模拟器 boot 可靠。
+# MIUIX（0.9.1）底层依赖 org.jetbrains.compose 同代版本，与 1.12.0 兼容。
 # 注意：CMP 1.11+ 移除了 iosX64 目标、最低 iOS 14.0，本项目只用 iosArm64/iosSimulatorArm64，不受影响。
-composeMultiplatform = "1.11.1"
+composeMultiplatform = "1.12.0"
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
