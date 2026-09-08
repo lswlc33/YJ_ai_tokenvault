@@ -7,7 +7,31 @@
 中转站给的 API 密钥散落在聊天记录和备忘录里，要用的时候找不到，不知道哪把还能用，也不知道还剩多少钱。
 元记把它们收在一处：**存在你自己的手机里**，并且顺手回答两个问题——这把钥匙还能不能用，还剩下多少额度。
 
-仓库：<https://github.com/lswlc33/YJ_ai_tokenvault>
+![平台](https://img.shields.io/badge/platform-Android%2013%2B%20%7C%20iOS%2015%2B-4f46e5)
+![Kotlin](https://img.shields.io/badge/Kotlin-2.3.21-7F52FF?logo=kotlin&logoColor=white)
+![Compose](https://img.shields.io/badge/Compose%20Multiplatform-1.11-4285F4?logo=jetpackcompose&logoColor=white)
+
+**🌐 官网（功能介绍 · 上手指引 · 路线图）：<https://lswlc33.github.io/YJ_ai_tokenvault/>**
+**📦 仓库：<https://github.com/lswlc33/YJ_ai_tokenvault>**
+
+> 官网由本仓库 `docs/` 目录自动发布，内容与这份 README 同源；改动 `docs/` 后推送到 `master` 即生效。
+
+---
+
+## 目录
+
+- [特色](#特色)
+- [功能一览](#功能一览)
+- [三分钟上手](#三分钟上手)
+- [数据安全](#数据安全)
+- [下载](#下载)
+- [界面截图](#界面截图)
+- [技术栈](#技术栈)
+- [项目结构](#项目结构)
+- [开发状态](#开发状态)
+- [自己编译](#自己编译)
+- [常见问题](#常见问题)
+- [许可](#许可)
 
 ---
 
@@ -15,7 +39,7 @@
 
 - **开源** —— 代码完全公开，加密与联网行为可以自己逐行审；不放心发行包就自己编译。
 - **本地** —— 所有数据只写在你自己的设备上。我们没有服务器，也拿不到你的任何数据。
-- **安全** —— 6 位 PIN 解锁，密钥与账号密码加密存储；自动锁定、剪贴板定时清除、明文需解锁才能展开。
+- **加密** —— 6 位 PIN 解锁，密钥与账号密码经 AES-256-GCM 字段级加密后落库；自动锁定、剪贴板定时清除、明文需解锁才能展开。
 - **便携** —— 导出一个加密备份文件，在新手机上报入同样的 PIN 即可还原。Android 与 iOS 的备份互通。
 - **一站式管理** —— 站点 → 密钥 → 模型与平台账号，三层结构一次录全，不用再翻聊天记录。
 - **分类管理** —— 自定义分组与颜色，支持搜索、排序与批量移动、批量删除。
@@ -33,7 +57,7 @@
 | **平台账号** | 站点后台的登录账号与密码同样加密保存，与密钥同等对待 |
 | **文本导入** | 把站点发来的那一段文本整段粘贴进来，解析预览后确认，一次建好站点、密钥、模型与账号 |
 | **API 探测** | 探测全部 / 单家站点 / 单把密钥。结果分「可用 / 异常 / 未探测」，网络波动不会把一把好钥匙标坏 |
-| **余额** | 适配 new-api、DeepSeek、OpenRouter、 SiliconFlow、Moonshot，也可自定义 JSON 规则；失败与「余额为 0」分开显示，低额可设提醒阈值 |
+| **余额** | 适配 new-api、DeepSeek、OpenRouter、SiliconFlow、Moonshot，也可自定义 JSON 规则；失败与「余额为 0」分开显示，低额可设提醒阈值 |
 | **客户端伪装** | 内置多套常见客户端指纹，也支持从 cURL 命令导入；被站点拦截时会自动尝试可用指纹 |
 | **备份与恢复** | 自包含的加密备份包，恢复支持覆盖 / 合并 / 仅新增 |
 | **自动锁定** | 切到后台、长时间无操作、锁屏时自动上锁，时限可自行设定 |
@@ -48,6 +72,8 @@
 3. **点探测** —— 首页一键探测，几秒后就能看到哪些站点通、哪些密钥有效。
 4. **查余额** —— 在站点里填好余额查询信息，首页刷新即可看到各站余额。
 5. **做备份** —— 设置 → 同步 → 导出备份，把文件存到网盘或电脑里。
+
+官网「上手」一节有每一步的图文说明：<https://lswlc33.github.io/YJ_ai_tokenvault/#start>
 
 ---
 
@@ -71,6 +97,68 @@
 
 ---
 
+## 界面截图
+
+三块主屏（仪表盘 · 管理 · 设置）的界面预览见**官网首页的手机演示图与「功能」一节**：
+<https://lswlc33.github.io/YJ_ai_tokenvault/#showcase>
+
+---
+
+## 技术栈
+
+| 层 | 选型 |
+| --- | --- |
+| 语言 | Kotlin 2.3.21（KSP 2.3.11） |
+| 界面 | Compose Multiplatform + [MIUIX](https://github.com/miuix-kotlin-multiplatform/miuix) 0.9.1 |
+| 架构 | 纯 Kotlin 领域层（零平台依赖、时间与平台能力全部注入）+ 平台实现层 |
+| 数据 | Room（Kotlin Multiplatform，SQLite） |
+| 依赖注入 | Koin |
+| 网络 | Ktor |
+| 构建 | Gradle 9.5 / AGP 9.3 / minSdk 33 · targetSdk 37 |
+
+领域层（`domain` / `endpoint` / `probe` / `balance` / `importer` / `backup` / `crypto` / `catalog`）
+是八个零平台依赖的纯 Kotlin 包，当前时间也算平台能力、由外部注入，因此这一层在 JVM 单测里全覆盖；
+架构分层由 `ArchitectureRulesTest` 与 CI 双重守住，详见 `CLAUDE.md`。
+
+---
+
+## 项目结构
+
+```
+app/       Android 应用壳：入口 Activity、平台实现装配、Room 的 Android 侧驱动
+shared/    Kotlin Multiplatform 共享模块：领域层 + 数据层 + Compose 界面（Android / iOS / JVM）
+iosApp/    iOS 应用壳：Xcode 工程与 SwiftUI 入口
+docs/      官网源码，由 GitHub Pages 发布为 lswlc33.github.io/YJ_ai_tokenvault
+```
+
+---
+
+## 开发状态
+
+功能层（数据、加密、探测、余额、导入、备份、更新、打磨）已全部落地，剩余工作是需要真机、
+真实额度或特定硬件的验收项，以及若干标记为「可砍」的扩展项。当前进度与路线图在官网
+「路线图」一节维护：<https://lswlc33.github.io/YJ_ai_tokenvault/#roadmap>
+
+---
+
+## 自己编译
+
+需要 JDK 17 与 Android SDK：
+
+```bash
+./gradlew :app:assembleDebug      # Windows 用 .\gradlew.bat
+./gradlew :app:installDebug       # 装到已连接的设备
+./gradlew :app:assembleNightly    # 开启混淆的发布包
+./gradlew :app:testDebugUnitTest  # JVM 单测，主力
+```
+
+首次克隆后执行一次，把 hook 接上：`git config core.hooksPath .githooks`。
+
+iOS 侧需要在 macOS 上用 Xcode 构建，工程在 `iosApp/`。
+开发者相关的约定（分层规则、代码风格、签名配置、本地探针）见 `AGENTS.md` 与 `CLAUDE.md`。
+
+---
+
 ## 常见问题
 
 **数据会传到你们的服务器吗？**
@@ -87,20 +175,6 @@ PIN 是解密数据的唯一凭证，我们不持有它，也没有找回通道�
 
 **支持哪些站点？**
 不绑定具体商家。只要是提供 OpenAI 兼容接口、Anthropic 接口或 Responses 接口的官方/中转站点，都可以自行添加。
-
----
-
-## 自己编译
-
-需要 JDK 17 与 Android SDK：
-
-```bash
-./gradlew :app:assembleDebug      # Windows 用 .\gradlew.bat
-./gradlew :app:installDebug       # 装到已连接的设备
-./gradlew :app:assembleNightly    # 开启混淆的发布包
-```
-
-开发者相关的约定（分层规则、代码风格、签名配置）见 `AGENTS.md` 与 `CLAUDE.md`。
 
 ---
 

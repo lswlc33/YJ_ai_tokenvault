@@ -6,6 +6,13 @@
 <title>元记 · AI Token Vault — 词元站点记录</title>
 <meta name="description" content="开源、本地优先的 AI API 密钥保险库。一站式管理所有 AI 站点的密钥、模型与账号，一键探测可用性、查询余额，数据只存在你自己的设备上。" data-page-node-id="Dd4GjFDmiRuyeGbSqA5jzy">
 <meta name="theme-color" content="#ffffff" data-page-node-id="8xK4QZWKDE3Iys8NnAJ0q7">
+<link rel="canonical" href="https://lswlc33.github.io/YJ_ai_tokenvault/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="元记 · AI Token Vault — 词元站点记录">
+<meta property="og:description" content="开源、本地优先的 AI API 密钥保险库。一站式管理所有 AI 站点的密钥、模型与账号，一键探测可用性、查询余额，数据只存在你自己的设备上。">
+<meta property="og:url" content="https://lswlc33.github.io/YJ_ai_tokenvault/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%234f46e5'/%3E%3Cpath d='M12 5.5l5.6 3.6v5.8L12 18.5 6.4 14.9V9.1L12 5.5z' fill='none' stroke='white' stroke-width='1.8' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
   :root {
     --bg: #ffffff;
@@ -214,6 +221,34 @@
   .sec-item b { display: block; font-size: 15px; margin-bottom: 4px; }
   .sec-item span { font-size: 14px; color: var(--text-soft); }
 
+  /* ---------- 上手 ---------- */
+  .start { background: var(--bg-soft); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+  .step .num {
+    width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center;
+    font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 12px;
+    background: linear-gradient(135deg, var(--brand), var(--brand-2));
+    box-shadow: 0 6px 14px color-mix(in srgb, var(--brand) 30%, transparent);
+  }
+  .step h3 { margin: 0 0 6px; font-size: 16px; font-weight: 700; }
+  .step p { margin: 0; font-size: 14px; color: var(--text-soft); }
+  .start-note {
+    margin: 24px auto 0; max-width: 720px; text-align: center; font-size: 14px; color: var(--text-soft);
+  }
+
+  /* ---------- 路线图 ---------- */
+  .road { background: var(--bg-soft); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .road-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .road-col h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; font-size: 16px; }
+  .road-col ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+  .road-col li { display: flex; gap: 9px; align-items: flex-start; font-size: 14px; color: var(--text-soft); }
+  .road-col li b { color: var(--text); font-weight: 600; }
+  .road-col li span { flex: 1; min-width: 0; }
+  .road-col li i { flex: none; width: 7px; height: 7px; border-radius: 50%; margin-top: 9px; }
+  .road-col.done li i { background: var(--ok); }
+  .road-col.testing li i { background: var(--warn); }
+  .road-col.plan li i { background: var(--text-soft); }
+
   /* ---------- 下载 ---------- */
   .dl-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
   .dl { text-align: center; padding: 32px 26px; }
@@ -242,8 +277,11 @@
   /* ---------- 页脚 ---------- */
   footer { border-top: 1px solid var(--border); padding: 34px 0; font-size: 14px; color: var(--text-soft); }
   .foot { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
-  .foot nav { display: flex; gap: 20px; margin-left: auto; }
+  .foot nav { display: flex; flex-wrap: wrap; gap: 20px; margin-left: auto; }
   .foot a:hover { color: var(--text); }
+  .foot-sub { margin-top: 14px; font-size: 13px; line-height: 1.8; max-width: 900px; }
+  .foot-sub a { color: var(--brand); }
+  .foot-sub code { font-size: 12px; background: var(--bg-soft); padding: 1px 6px; border-radius: 6px; }
 
   /* ---------- 动效 ---------- */
   .reveal { opacity: 0; transform: translateY(16px); transition: opacity .6s cubic-bezier(.2,.7,.3,1), transform .6s cubic-bezier(.2,.7,.3,1); }
@@ -254,12 +292,14 @@
     .show.rev .show-text { order: 0; }
     .g4, .sec-grid { grid-template-columns: repeat(2, 1fr); }
     .g2, .dl-grid { grid-template-columns: 1fr; }
+    .steps { grid-template-columns: repeat(2, 1fr); }
+    .road-grid { grid-template-columns: 1fr; }
     .nav-links { display: none; }
     .hero { padding: 56px 0 68px; }
     section { padding: 64px 0; }
   }
   @media (max-width: 520px) {
-    .g4, .sec-grid { grid-template-columns: 1fr; }
+    .g4, .sec-grid, .steps { grid-template-columns: 1fr; }
     .hero-meta { flex-direction: column; gap: 8px; }
   }
   @media (prefers-reduced-motion: reduce) {
@@ -282,8 +322,10 @@
     <nav class="nav-links" data-page-node-id="IcNatfDKFc9JLKdz7RGFXR">
       <a href="#features" data-page-node-id="88B4ZUmTcIwPGQDnBNacTj">特色</a>
       <a href="#showcase" data-page-node-id="shipdyivwEpVc5BqHgdMIh">功能</a>
+      <a href="#start">上手</a>
       <a href="#security" data-page-node-id="W9RHZBzhQPXxptbyEqHgNr">数据安全</a>
       <a href="#download" data-page-node-id="gVwpYN1dN3I6F3DKp1HGRG">下载</a>
+      <a href="#roadmap">路线图</a>
       <a href="#faq" data-page-node-id="TGVA0kld2GGVryrrdxd5Y6">常见问题</a>
     </nav>
     <div class="nav-actions" data-page-node-id="imrIBCknSBly5j6fQMYlWL">
@@ -311,6 +353,7 @@
         <div class="hero-cta" data-page-node-id="6BoEoPL2ZECtiav1ClqR5l">
           <a class="btn btn-primary btn-lg" href="#download" data-page-node-id="RcAJaSIzougf3OEMjtYh9L">下载应用</a>
           <a class="btn btn-lg" href="#showcase" data-page-node-id="bmCo75HzN3RmedqRDptB3G">看看它能做什么</a>
+          <a class="btn btn-lg" href="#start">四步上手</a>
         </div>
         <div class="hero-meta" data-page-node-id="h1LSLUKmiEzz03DInZBf53">
           <span data-page-node-id="YxsAVqdRrEzu4Pdeq1LM7Y"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="K32o9lStdwGuWOPKgQc8VR"><path d="M20 6L9 17l-5-5" data-page-node-id="1kd0Eyc6ixAojx5S0hPhaT"/></svg> 无需注册账号</span>
@@ -556,6 +599,40 @@
     </div>
   </section>
 
+  <!-- 上手 -->
+  <section id="start" class="start">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <div class="kicker">Get started</div>
+        <h2>四步走完，不到三分钟</h2>
+        <p>从空库到「知道哪把钥匙还能用、还剩下多少钱」，中间没有注册，也没有引导页迷宫。</p>
+      </div>
+      <div class="steps">
+        <div class="card step reveal">
+          <div class="num">1</div>
+          <h3>设一个 6 位 PIN</h3>
+          <p>打开应用第一件事。它是解锁与备份的唯一凭证，我们不持有它，也没有找回通道——记牢它，并定期导出备份。</p>
+        </div>
+        <div class="card step reveal">
+          <div class="num">2</div>
+          <h3>录入站点</h3>
+          <p>手动新建，或把站点发来的那段文本整段粘进「粘贴导入」，解析预览后一次建好站点、密钥、模型与账号。</p>
+        </div>
+        <div class="card step reveal">
+          <div class="num">3</div>
+          <h3>点一次探测</h3>
+          <p>首页一个按钮，几秒后就能看到哪些站点通、哪些密钥有效。也支持单独探测某一家或某一把密钥。</p>
+        </div>
+        <div class="card step reveal">
+          <div class="num">4</div>
+          <h3>查余额、做备份</h3>
+          <p>在站点里填好余额查询信息，首页刷新即可看到各站余额；设置 → 同步 → 导出备份，把文件存到网盘或电脑。</p>
+        </div>
+      </div>
+      <p class="start-note">没有账号体系，不需要联网激活。应用唯一的出网请求，是你自己点的「探测」「查余额」「检查更新」。</p>
+    </div>
+  </section>
+
   <!-- 数据安全 -->
   <section id="security" class="security" data-page-node-id="dNaRvjBAhGSaMrK04Zs093">
     <div class="wrap" data-page-node-id="M9b7aUXhaEf0C9WYYNui3Z">
@@ -622,6 +699,47 @@
     </div>
   </section>
 
+  <!-- 路线图 -->
+  <section id="roadmap" class="road">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <div class="kicker">Roadmap</div>
+        <h2>做到哪了</h2>
+        <p>功能层已经落地，剩下的是需要真机、真实额度或特定硬件的验收，以及几个标记为可砍的扩展项。</p>
+      </div>
+      <div class="road-grid">
+        <div class="card road-col done reveal">
+          <h3><span class="pill ok">已落地</span></h3>
+          <ul>
+            <li><i></i><span><b>数据与加密</b>：Room 数据层、PIN 解锁与自动锁定、密钥与账号密码字段级加密</span></li>
+            <li><i></i><span><b>探测</b>：OpenAI 兼容 / Anthropic / Responses 三协议请求与结果分类</span></li>
+            <li><i></i><span><b>余额</b>：new-api、DeepSeek、OpenRouter、SiliconFlow、Moonshot 适配与自定义 JSON 规则</span></li>
+            <li><i></i><span><b>导入与备份</b>：文本粘贴导入、自包含加密备份包（覆盖 / 合并 / 仅新增）</span></li>
+            <li><i></i><span><b>双端</b>：Android 与 iOS 共用一套 Kotlin Multiplatform 代码，两端备份互通</span></li>
+          </ul>
+        </div>
+        <div class="card road-col testing reveal">
+          <h3><span class="pill warn">验收中</span></h3>
+          <ul>
+            <li><i></i><span><b>探测与余额真机对账</b>：已用真实额度跑通，逐项结果与站点后台核对</span></li>
+            <li><i></i><span><b>iOS 真机安装</b>：未签名 IPA 已是完整应用，签名即可装，回归仍在进行</span></li>
+            <li><i></i><span><b>客户端嗅探全链路</b>：被站点拦截时自动换指纹的完整路径</span></li>
+            <li><i></i><span><b>额度耗尽响应</b>：要等某个账号余额自然耗尽才采得到真实报文</span></li>
+          </ul>
+        </div>
+        <div class="card road-col plan reveal">
+          <h3><span class="pill mute">计划中（可砍）</span></h3>
+          <ul>
+            <li><i></i><span><b>模型元数据目录</b>：纯逻辑已就绪，差后台拉取那一步</span></li>
+            <li><i></i><span><b>WebDAV 同步</b>：与周期备份一并评估，不做也不影响核心四件事</span></li>
+            <li><i></i><span><b>文本反向导出</b>：导出函数与单测已就绪，差一个保存入口</span></li>
+            <li><i></i><span><b>无障碍走查</b>：TalkBack 主路径，需要设备逐屏过</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- FAQ -->
   <section id="faq" style="background: var(--bg-soft); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border)" data-page-node-id="BDwobSKeJR88UcVxMAp2Io">
     <div class="wrap" data-page-node-id="hpjZiHARxYFzQ15TvgcPWy">
@@ -669,13 +787,24 @@
 </main>
 
 <footer data-page-node-id="QmomNCK2w7k2oEeXYpNWOi">
-  <div class="wrap foot" data-page-node-id="wbQ4LGVN8CepkZPKb1hml5">
-    <span data-page-node-id="Kui4pwTemGkVBuYkbb3Sl0">元记 · AI Token Vault —— 词元站点记录</span>
-    <nav data-page-node-id="rnb2G9dsixbAlBvD8C2bkC">
-      <a href="https://github.com/lswlc33/YJ_ai_tokenvault" target="_blank" rel="noopener" data-page-node-id="PEXz5Sx9fX9pot371vexvC">GitHub</a>
-      <a href="https://github.com/lswlc33/YJ_ai_tokenvault/releases" target="_blank" rel="noopener" data-page-node-id="COrOGW0ULQZkO7x8ljTFNC">Releases</a>
-      <a href="#faq" data-page-node-id="h9jNXi0b4y1glnlsEMTEyZ">常见问题</a>
-    </nav>
+  <div class="wrap" data-page-node-id="wbQ4LGVN8CepkZPKb1hml5">
+    <div class="foot" data-page-node-id="9footRowA1">
+      <span data-page-node-id="Kui4pwTemGkVBuYkbb3Sl0">元记 · AI Token Vault —— 词元站点记录</span>
+      <nav data-page-node-id="rnb2G9dsixbAlBvD8C2bkC">
+        <a href="#showcase">功能</a>
+        <a href="#start">上手</a>
+        <a href="#roadmap">路线图</a>
+        <a href="#faq" data-page-node-id="h9jNXi0b4y1glnlsEMTEyZ">常见问题</a>
+        <a href="https://github.com/lswlc33/YJ_ai_tokenvault" target="_blank" rel="noopener" data-page-node-id="PEXz5Sx9fX9pot371vexvC">GitHub</a>
+        <a href="https://github.com/lswlc33/YJ_ai_tokenvault/releases" target="_blank" rel="noopener" data-page-node-id="COrOGW0ULQZkO7x8ljTFNC">Releases</a>
+      </nav>
+    </div>
+    <div class="foot-sub">
+      本页源码在仓库的 <code>docs/</code> 目录，与 <a href="https://github.com/lswlc33/YJ_ai_tokenvault#readme" target="_blank" rel="noopener">README</a> 同源维护；
+      开发者约定见 <a href="https://github.com/lswlc33/YJ_ai_tokenvault/blob/master/AGENTS.md" target="_blank" rel="noopener">AGENTS.md</a> 与
+      <a href="https://github.com/lswlc33/YJ_ai_tokenvault/blob/master/CLAUDE.md" target="_blank" rel="noopener">CLAUDE.md</a>。
+      源码公开，可自由阅读、审计与自行编译使用；仓库尚未附加正式开源许可证，在此之前请勿二次分发或上架。
+    </div>
   </div>
 </footer>
 

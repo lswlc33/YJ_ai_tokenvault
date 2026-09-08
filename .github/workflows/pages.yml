@@ -1,0 +1,41 @@
+name: Pages
+
+# 官网部署：docs/ 目录原样发布到 GitHub Pages。
+# 仓库设置里 Pages 的 Source 要选「GitHub Actions」，选了「Deploy from a branch」的话
+# 这个 workflow 会上传产物但没人发布。
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'docs/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 排队而不是互相取消：并发部署会让后一次的产物覆盖到一半，页面出现半新半旧。
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/configure-pages@v5
+
+      # docs/ 整个目录就是站点根目录，index.html 在它下面。
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
