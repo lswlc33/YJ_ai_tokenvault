@@ -183,12 +183,16 @@ jobs:
           set -euo pipefail
           cd iosApp
           mkdir -p build
+          # 先选具体模拟器（arm64），用 id= 目标构建：
+          # 'generic/platform=iOS Simulator' 会带上 x86_64，CMP 的资源同步任务不认。
+          UDID=$(xcrun simctl list devices available | grep -E 'iPhone' | head -1 | grep -oE '[0-9A-Fa-f]{8}(-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}')
+          echo "模拟器 UDID: $UDID"
           # 全量日志落盘：管道 tail 会吃掉 xcodebuild 的退出码，上次就把真错误藏了
           if ! xcodebuild \
             -project iosApp.xcodeproj \
             -scheme iosApp \
             -configuration Debug \
-            -destination 'generic/platform=iOS Simulator' \
+            -destination "id=$UDID" \
             -derivedDataPath build/SimDerivedData \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
             build > build/sim-build.log 2>&1; then
@@ -196,8 +200,6 @@ jobs:
             exit 1
           fi
           APP=build/SimDerivedData/Build/Products/Debug-iphonesimulator/iosApp.app
-          UDID=$(xcrun simctl list devices available | grep -E 'iPhone' | head -1 | grep -oE '[0-9A-Fa-f]{8}(-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}')
-          echo "模拟器 UDID: $UDID"
           xcrun simctl boot "$UDID" || true
           xcrun simctl bootstatus "$UDID" -b
           xcrun simctl install "$UDID" "$APP"
