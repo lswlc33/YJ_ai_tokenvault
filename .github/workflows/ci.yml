@@ -199,23 +199,10 @@ jobs:
           # 上，实测在镜像上 boot 会挂。用 JSON 锁定 Xcode 16.4 配套的 iOS 18.5，
           # 并且**新建**一台干净设备——镜像预建设备的盘上有历史状态，首次 boot
           # 的 Data Migration 会在这种盘上挂死（Status=-1），新设备从零迁移没包袱。
-          SELECT=$(xcrun simctl list runtimes -j | python3 -c '
-import json, subprocess, sys
-rts = json.load(sys.stdin)["runtimes"]
-rt = next((r for r in rts if r.get("version") == "18.5" and r.get("isAvailable")), None) \
-  or next((r for r in rts if str(r.get("version", "")).startswith("18.") and r.get("isAvailable")), None)
-if rt is None:
-    sys.exit("没有可用的 iOS 18.x runtime")
-dts = json.loads(subprocess.check_output(["xcrun", "simctl", "list", "devicetypes", "-j"]))["devicetypes"]
-dt = next((t for t in dts if t["name"] == "iPhone 16"), None) \
-  or next((t for t in dts if "iPhone" in t["name"]), None)
-if dt is None:
-    sys.exit("没有 iPhone 设备类型")
-print(rt["identifier"])
-print(dt["identifier"])
-')
-          RT=$(printf '%s\n' "$SELECT" | sed -n 1p)
-          DT=$(printf '%s\n' "$SELECT" | sed -n 2p)
+          # runtime：优先 iOS 18.5（Xcode 16.4 配套），兜底任意 18.x
+          RT=$(xcrun simctl list runtimes -j | python3 -c "import sys,json; rs=[r for r in json.load(sys.stdin)['runtimes'] if r.get('isAvailable')]; rt=next((r for r in rs if r.get('version')=='18.5'), next((r for r in rs if str(r.get('version','')).startswith('18.')), None)); print(rt['identifier']) if rt else sys.exit('没有可用的 iOS 18.x runtime')")
+          # 设备类型：优先 iPhone 16（18.5 全量设备里一定有）
+          DT=$(xcrun simctl list devicetypes -j | python3 -c "import sys,json; ts=json.load(sys.stdin)['devicetypes']; dt=next((t for t in ts if t.get('name')=='iPhone 16'), next((t for t in ts if 'iPhone' in t.get('name','')), None)); print(dt['identifier']) if dt else sys.exit('没有 iPhone 设备类型')")
           echo "冒烟设备： runtime=$RT devicetype=$DT"
           UDID=$(xcrun simctl create ci-smoke "$DT" "$RT")
           echo "新建模拟器 UDID: $UDID"
@@ -261,7 +248,9 @@ print(dt["identifier"])
           sleep 25
           if [ -n "${PID:-}" ] && ps -p "$PID" > /dev/null 2>&1; then
             echo "应用启动后仍存活 ✓"
-            xcrun simctl io "$UDID" screenshot iosApp/build/ios-sim-smoke.png || true
+            # cwd 已在 iosApp/ 里，路径写 build/…（修复：以前写成 iosApp/build/…
+            # 落到 iosApp/iosApp/build/，截图 artifact 从没上传成功过）
+            xcrun simctl io "$UDID" screenshot build/ios-sim-smoke.png || true
           else
             echo "::error::应用启动后退出（崩溃）"
             echo "--- 应用控制台输出（Kotlin 崩溃栈应在此）---"
