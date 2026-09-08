@@ -182,6 +182,7 @@ jobs:
         run: |
           set -euo pipefail
           cd iosApp
+          mkdir -p build
           # 全量日志落盘：管道 tail 会吃掉 xcodebuild 的退出码，上次就把真错误藏了
           if ! xcodebuild \
             -project iosApp.xcodeproj \
