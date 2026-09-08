@@ -5,7 +5,6 @@ import com.lc33.tokenvault.crypto.Redactor
 import com.lc33.tokenvault.data.VaultDatabase
 import com.lc33.tokenvault.data.seed.ProfileSeeder
 import com.lc33.tokenvault.domain.AutoLockPolicy
-import com.lc33.tokenvault.domain.AutoLockTimeout
 import com.lc33.tokenvault.domain.repo.ApiKeyRepository
 import com.lc33.tokenvault.domain.repo.AuditLogRepository
 import com.lc33.tokenvault.domain.repo.ClientProfileRepository
@@ -30,7 +29,6 @@ import com.lc33.tokenvault.platform.VaultSession
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
@@ -47,8 +45,8 @@ import org.koin.core.qualifier.named
  * 这条路径在编译期、JVM 单测里都验证不到——iOS 的 Room/BundledSQLiteDriver、
  * IosBootStore、剪贴板，只有真跑在模拟器上才算数。
  *
- * 与 jvmTest 的 DiGraphSmokeTest 相同的图 + 三个真实动作：
- * 真开库、真种预设、真读一条设置。
+ * 逐个定义解析并打印结果：谁炸了、因为什么，直接进测试输出（Release 二进制
+ * 没有行号，栈信息只有靠这里的 println 补）。
  */
 class IosDiGraphSmokeTest {
 
@@ -65,52 +63,69 @@ class IosDiGraphSmokeTest {
             modules(platformModule, coreModule)
         }.koin
 
-        // named 限定符（Android 端闪退过一次的那类坑）
-        assertNotNull(koin.get<() -> Long>(named(Qualifiers.NOW)))
-        assertNotNull(koin.get<Map<String, String>>(named(Qualifiers.PLACEHOLDERS)))
-        assertNotNull(koin.get<CoroutineScope>(named(Qualifiers.APP_SCOPE)))
+        val checks: List<Pair<String, () -> Any?>> = listOf(
+            "now" to { koin.get<() -> Long>(named(Qualifiers.NOW)) },
+            "placeholders" to { koin.get<Map<String, String>>(named(Qualifiers.PLACEHOLDERS)) },
+            "appScope" to { koin.get<CoroutineScope>(named(Qualifiers.APP_SCOPE)) },
+            "VaultDatabase" to { koin.get<VaultDatabase>() },
+            "BootStore" to { koin.get<BootStore>() },
+            "SecureClipboard" to { koin.get<SecureClipboard>() },
+            "VaultSession" to { koin.get<VaultSession>() },
+            "ProbeSession" to { koin.get<ProbeSession>() },
+            "AutoLocker" to { koin.get<AutoLocker>() },
+            "TransactionRunner" to { koin.get<TransactionRunner>() },
+            "ProfileSeeder" to { koin.get<ProfileSeeder>() },
+            "ImportWriter" to { koin.get<ImportWriter>() },
+            "GroupRepository" to { koin.get<GroupRepository>() },
+            "ProviderRepository" to { koin.get<ProviderRepository>() },
+            "ApiKeyRepository" to { koin.get<ApiKeyRepository>() },
+            "SettingsRepository" to { koin.get<SettingsRepository>() },
+            "ProviderAccountRepository" to { koin.get<ProviderAccountRepository>() },
+            "ModelRepository" to { koin.get<ModelRepository>() },
+            "ClientProfileRepository" to { koin.get<ClientProfileRepository>() },
+            "AuditLogRepository" to { koin.get<AuditLogRepository>() },
+            "ProbeRunRepository" to { koin.get<ProbeRunRepository>() },
+            "HttpEngine" to { koin.get<HttpEngine>() },
+            "BackupStore" to { koin.get<BackupStore>() },
+            "BackupEngine" to { koin.get<BackupEngine>() },
+            "BalanceEngine" to { koin.get<BalanceEngine>() },
+            "ProbeEngine" to { koin.get<ProbeEngine>() },
+            "UpdateEngine" to { koin.get<UpdateEngine>() },
+            "Redactor" to { koin.get<Redactor>() },
+        )
 
-        // 平台件与会话
-        assertNotNull(koin.get<VaultDatabase>())
-        assertNotNull(koin.get<BootStore>())
-        assertNotNull(koin.get<SecureClipboard>())
-        assertNotNull(koin.get<VaultSession>())
-        assertNotNull(koin.get<ProbeSession>())
-        assertNotNull(koin.get<AutoLocker>())
-
-        // 仓库与引擎
-        assertNotNull(koin.get<TransactionRunner>())
-        assertNotNull(koin.get<ProfileSeeder>())
-        assertNotNull(koin.get<ImportWriter>())
-        assertNotNull(koin.get<GroupRepository>())
-        assertNotNull(koin.get<ProviderRepository>())
-        assertNotNull(koin.get<ApiKeyRepository>())
-        assertNotNull(koin.get<SettingsRepository>())
-        assertNotNull(koin.get<ProviderAccountRepository>())
-        assertNotNull(koin.get<ModelRepository>())
-        assertNotNull(koin.get<ClientProfileRepository>())
-        assertNotNull(koin.get<AuditLogRepository>())
-        assertNotNull(koin.get<ProbeRunRepository>())
-        assertNotNull(koin.get<HttpEngine>())
-        assertNotNull(koin.get<BackupStore>())
-        assertNotNull(koin.get<BackupEngine>())
-        assertNotNull(koin.get<BalanceEngine>())
-        assertNotNull(koin.get<ProbeEngine>())
-        assertNotNull(koin.get<UpdateEngine>())
-        assertNotNull(koin.get<Redactor>())
+        for ((name, resolve) in checks) {
+            try {
+                resolve()
+                println("✓ $name")
+            } catch (t: Throwable) {
+                println("✗ $name")
+                println(t.stackTraceToString())
+                var c = t.cause
+                while (c != null) {
+                    println("由它引起：")
+                    println(c.stackTraceToString())
+                    c = c.cause
+                }
+                throw t
+            }
+        }
 
         // ---- 启动路径的三个真实动作（initIosApp 的后台协程做的事） ----
 
         // 1. boot 存储读改写走一轮（默认值落盘：deviceId 稳定化）
         koin.get<BootStore>().update { it }
+        println("✓ boot 读改写")
 
         // 2. 真开数据库 + 种内置预设（ProfileSeeder.seed 是启动即跑的）
         runBlocking { withTimeout(20.seconds) { koin.get<ProfileSeeder>().seed() } }
+        println("✓ 种内置预设（真开库）")
 
         // 3. 读一条设置（observeAutoLockTimeout 的第一个值；Room Flow 的首次查询）
         val timeout = runBlocking {
             withTimeout(20.seconds) { koin.get<SettingsRepository>().observeAutoLockTimeout().first() }
         }
         assertEquals(AutoLockPolicy.DEFAULT, timeout, "自动锁定时限应落在默认值上")
+        println("✓ Room Flow 首查")
     }
 }

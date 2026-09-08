@@ -198,6 +198,17 @@ room {
     schemaDirectory("$projectDir/schemas")
 }
 
+// 模拟器测试：stdout 与异常全量进控制台。Release 二进制的异常栈没有行号，
+// 靠 IosDiGraphSmokeTest 里的 println 定位（iOS 启动闪退排查用）。
+tasks.withType<org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest>().configureEach {
+    testLogging {
+        showStandardStreams = true
+        showExceptions = true
+        showCauses = true
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+    }
+}
+
 // ---------------------------------------------------------------- 修复：composeResources 进不了 Android APK
 //
 // AGP 9 的 KMP 库插件（com.android.kotlin.multiplatform.library）与 CMP 1.11.1 的
