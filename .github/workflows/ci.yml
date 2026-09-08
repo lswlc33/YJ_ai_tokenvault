@@ -242,7 +242,7 @@ jobs:
           deadline=$((SECONDS + 900))
           while [ "$SECONDS" -lt "$deadline" ]; do
             st=$(sim_state)
-            if [ "$st" != "$last" ]; then echo "模拟器状态： $st（已等 ${SECONDS}s）"; last="$st"; fi
+            if [ "$st" != "$last" ]; then echo "模拟器状态： ${st}（已等 ${SECONDS}s）"; last="$st"; fi
             case "$st" in
               Booted)
                 if xcrun simctl bootstatus "$UDID" -b > /dev/null 2>&1; then ok=1; break; fi ;;
