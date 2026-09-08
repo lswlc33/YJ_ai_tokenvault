@@ -259,12 +259,18 @@ jobs:
           fi
           echo "模拟器就绪 ✓"
           xcrun simctl install "$UDID" "$APP"
-          # --console-pty 把应用的 stdout/stderr 接过来：Kotlin/Native 未捕获异常的
-          # 完整栈会打到 stderr，比崩溃报告好读得多
-          xcrun simctl launch --console-pty "$UDID" com.lc33.tokenvault > build/sim-console.log 2>&1 &
-          sleep 5
-          PID=$(head -1 build/sim-console.log | grep -oE '[0-9]+' | head -1)
+          # launch 不用 --console-pty：它的首行输出不可靠（应用还没打印时为空），
+          # grep 拿不到数字会触发 set -e 直接杀脚本。simctl launch 本身会打印
+          # "com.lc33.tokenvault: <pid>"，直接从这里拿。崩溃栈靠下面的崩溃报告
+          # + log show（本来就有，不依赖 console-pty）。
+          LAUNCH_OUT=$(xcrun simctl launch "$UDID" com.lc33.tokenvault)
+          echo "$LAUNCH_OUT"
+          PID=$(printf '%s\n' "$LAUNCH_OUT" | grep -oE '[0-9]+' | head -1 || true)
           echo "启动 pid: $PID"
+          if [ -z "${PID:-}" ]; then
+            echo "::error::launch 没返回 pid（bundle id 错了？）"
+            exit 1
+          fi
           sleep 25
           if [ -n "${PID:-}" ] && ps -p "$PID" > /dev/null 2>&1; then
             echo "应用启动后仍存活 ✓"
@@ -272,9 +278,7 @@ jobs:
             # 落到 iosApp/iosApp/build/，截图 artifact 从没上传成功过）
             xcrun simctl io "$UDID" screenshot build/ios-sim-smoke.png || true
           else
-            echo "::error::应用启动后退出（崩溃）"
-            echo "--- 应用控制台输出（Kotlin 崩溃栈应在此）---"
-            cat build/sim-console.log || true
+            echo "::error::应用启动后退出（崩溃），launch 输出： $LAUNCH_OUT"
             # 崩溃报告：两处目录里最近 5 分钟的 .ips 全部列出（不只按进程名猜）
             SIMLOGS="$HOME/Library/Developer/CoreSimulator/Devices/$UDID/data/Library/Logs/DiagnosticReports"
             found=0
