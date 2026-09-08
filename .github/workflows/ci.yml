@@ -179,20 +179,25 @@ jobs:
       # 只有真跑才能暴露（链接器死消除没了、单测又从不走这些路）。
       # 启动后 25 秒进程还在 → 存活；否则抓崩溃报告并直接红。
       #
-      # macos-26 runner 的 iPhone 17 Pro 模拟器 boot 时常卡在数据迁移（migrator 反复
-      # 跑完又重试），用最新机型冒烟从没成功过。挑稍早的稳定机型（iPhone 15 / 16），
-      # 且 boot 前先 erase——避免拿到一个别人半路留下来的脏设备。
+      # macos-26 runner 上的 iOS 26 SDK 模拟器只有 iPhone 17/17 Pro，
+      # 旧机型（15/16）列表里没装——grep 找不到时 set -e 会直接秒退。
+      # 拿最新那台、boot 前先 erase：避免拿到 runner 缓存里别人半路留下来的脏设备。
       - name: 模拟器 UI 冒烟（启动 + 存活检查）
         run: |
           set -euo pipefail
           cd iosApp
           mkdir -p build
-          # 挑稍早的稳定机型；最新那代在 macos-26 上 bootstatus 会卡迁移
-          UDID=$(xcrun simctl list devices available | grep -E 'iPhone (15|16) ' | head -1 | grep -oE '[0-9A-Fa-f]{8}(-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}')
+          # macos-26 上 iPhone 17 / 17 Pro 一定在；|| true 防 set -e 把脚本秒退
+          UDID=$(xcrun simctl list devices available | grep -E 'iPhone 17' | head -1 | grep -oE '[0-9A-Fa-f]{8}(-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}' || true)
           if [ -z "$UDID" ]; then
-            UDID=$(xcrun simctl list devices available | grep -E 'iPhone' | head -1 | grep -oE '[0-9A-Fa-f]{8}(-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}')
+            UDID=$(xcrun simctl list devices available | grep -E 'iPhone' | head -1 | grep -oE '[0-9A-Fa-f]{8}(-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}' || true)
           fi
           echo "模拟器 UDID: $UDID"
+          if [ -z "$UDID" ]; then
+            echo "::error::找不到可用的 iPhone 模拟器"
+            xcrun simctl list devices available || true
+            exit 1
+          fi
           # 先把上一次的实例清掉：关机 + erase，从一个干净状态起 boot
           xcrun simctl shutdown "$UDID" 2>/dev/null || true
           xcrun simctl erase "$UDID" 2>/dev/null || true
