@@ -105,13 +105,11 @@ class IosDiGraphSmokeTest {
         koin.get<BootStore>().update { it }
 
         // 2. 真开数据库 + 种内置预设（ProfileSeeder.seed 是启动即跑的）
-        withTimeout(20.seconds) {
-            runBlocking { koin.get<ProfileSeeder>().seed() }
-        }
+        runBlocking { withTimeout(20.seconds) { koin.get<ProfileSeeder>().seed() } }
 
         // 3. 读一条设置（observeAutoLockTimeout 的第一个值；Room Flow 的首次查询）
-        val timeout = withTimeout(20.seconds) {
-            runBlocking { koin.get<SettingsRepository>().observeAutoLockTimeout().first() }
+        val timeout = runBlocking {
+            withTimeout(20.seconds) { koin.get<SettingsRepository>().observeAutoLockTimeout().first() }
         }
         assertEquals(AutoLockPolicy.DEFAULT, timeout, "自动锁定时限应落在默认值上")
     }
