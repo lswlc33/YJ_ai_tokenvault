@@ -105,7 +105,9 @@ jobs:
             echo "signed=false" >> "$GITHUB_ENV"
           fi
           # 仪器测试只编译不运行（要设备，守住"还编得过"即可）。
-          ./gradlew :app:testDebugUnitTest :app:lint :app:assembleDebugAndroidTest :app:assembleNightly --console=plain
+          # :shared:jvmTest 里有 DiGraphSmokeTest——Koin 类型推断的错只有真启动才暴露，
+          # 不能只意本地跑。
+          ./gradlew :app:testDebugUnitTest :app:lint :app:assembleDebugAndroidTest :app:assembleNightly :shared:jvmTest --console=plain
           rm -f release.keystore
 
       - uses: actions/upload-artifact@v4

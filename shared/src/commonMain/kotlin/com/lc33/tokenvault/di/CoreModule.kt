@@ -101,9 +101,11 @@ val coreModule = module {
 
     single<RandomBytes> { SecureRandomBytes }
 
-    single(named(Qualifiers.NOW)) {
-        ::nowMillis
-    }
+    // 类型必须显式写：`::nowMillis` 的推断类型是 KFunction0<Long>，Koin 按精确类型注册，
+    // 仓库们用 get<() -> Long>(named(NOW)) 取时会 NoDefinitionFoundException——解锁后
+    // 第一个 ViewModel 拉仓库就闪退（阶段4 迁移时丢过这个显式转型，设备上炸过一次）。
+    // 原版 Android 代码里的 `System::currentTimeMillis as () -> Long` 就是同一个意思。
+    single<() -> Long>(named(Qualifiers.NOW)) { ::nowMillis }
 
     single { SecretBox(get()) }
     single { KnownSecrets() }
