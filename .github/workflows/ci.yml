@@ -175,6 +175,51 @@ jobs:
           ./gradlew :shared:compileKotlinIosArm64 :shared:compileKotlinIosSimulatorArm64 --console=plain
           ./gradlew :shared:iosSimulatorArm64Test --console=plain
 
+      # 模拟器 UI 冒烟：装上真的启动一次。锁屏首帧、Koin 启动、Room 开库这些
+      # 只有真跑才能暴露（链接器死消除没了、单测又从不走这些路）。
+      # 启动后 25 秒进程还在 → 存活；否则抓崩溃报告并直接红。
+      - name: 模拟器 UI 冒烟（启动 + 存活检查）
+        run: |
+          set -eu
+          cd iosApp
+          xcodebuild \
+            -project iosApp.xcodeproj \
+            -scheme iosApp \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build/SimDerivedData \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            build 2>&1 | tail -5
+          APP=iosApp/build/SimDerivedData/Build/Products/Debug-iphonesimulator/iosApp.app
+          UDID=$(xcrun simctl list devices available | grep -E 'iPhone' | head -1 | grep -oE '[0-9A-Fa-f]{8}(-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}')
+          echo "模拟器 UDID: $UDID"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" "$APP"
+          xcrun simctl launch "$UDID" com.lc33.tokenvault
+          sleep 25
+          if xcrun simctl spawn "$UDID" launchctl list 2>/dev/null | grep -q 'com.lc33.tokenvault'; then
+            echo "应用启动后仍存活 ✓"
+            xcrun simctl io "$UDID" screenshot iosApp/build/ios-sim-smoke.png || true
+          else
+            echo "::error::应用启动后退出（崩溃）"
+            latest=$(ls -t ~/Library/Logs/DiagnosticReports/*iosApp*.ips 2>/dev/null | head -1 || true)
+            if [ -n "${latest:-}" ]; then
+              echo "--- 崩溃报告： $latest ---"
+              cat "$latest"
+            fi
+            exit 1
+          fi
+          # 存活也要把我们的进程日志里的错误打出来（非致命异常未必杀进程）
+          xcrun simctl spawn "$UDID" log show --last 1m --predicate 'process == "iosApp"' --style compact 2>/dev/null | grep -iE 'error|fault|crash|exception' | head -30 || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-sim-smoke-screenshot
+          path: iosApp/build/ios-sim-smoke.png
+          if-no-files-found: ignore
+
       - name: xcodebuild 无签名构建（含 shared.framework）
         run: |
           set -eu
