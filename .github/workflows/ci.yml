@@ -119,10 +119,13 @@ jobs:
   # iOS：在 macOS runner 上编译 shared.framework + iosApp 壳，产出未签名 .ipa。
   # 未签名（CODE_SIGNING_ALLOWED=NO）——目的只是验证 iOS 构建链路，不装真机。
   #
-  # 之前用 macos-26 + iOS 26.0/26.1 模拟器，但 GitHub Actions runner 镜像上的 iPhone 17
-  # boot 会卡在 Data Migration 跑 1 分 38 秒后 Status=-1 失败，是镜像自身问题（erase
-  # 也解决不了）。回退到 macos-15（Xcode 16.x SDK + iOS 18 模拟器），KMP 1.11 链路已
-  # 验证在该环境下编译、模拟器冒烟都能通过。
+  # 模拟器 boot 的坑（macos-26 和 macos-15 各栽过一次，症状相同）：boot 卡在
+  # Data Migration → Waiting on System App → Status=-1。根因是 Xcode 26.x 的
+  # CoreSimulator 启动 iOS 18 runtime 的设备必挂（actions/runner-images#12777）。
+  # macos-26 镜像只有 Xcode 26 + iOS 26 设备，一样卡；macos-15 镜像默认 Xcode 是
+  # 16.4，但"选最新稳定版"会挑到 26.3，闯进同一个坑。所以这里**锁死 Xcode 16.x**
+  # （镜像里 iOS 18.5 runtime 与 iPhone 15/16 设备就是为 16.4 配的），
+  # 冒烟设备也只从 iPhone 15/16 里选。
   ios:
     runs-on: macos-15
     steps:
@@ -130,10 +133,18 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 选最新稳定版 Xcode
+      - name: 锁定 Xcode 16.x（匹配 iOS 18 模拟器 runtime）
         run: |
           set -eu
-          XCODE=$(ls -d /Applications/Xcode*.app | grep -vi beta | sort -V | tail -1)
+          # 不能选"最新"：macos-15 镜像上最新稳定版已是 Xcode 26.x，它的 CoreSimulator
+          # boot iOS 18 runtime 的设备必挂（见 job 注释）。16.4 是镜像默认版，
+          # iOS 18.5 runtime + iPhone 15/16 设备与它配套。
+          XCODE=$(ls -d /Applications/Xcode_16*.app | sort -V | tail -1 || true)
+          if [ -z "${XCODE:-}" ]; then
+            echo "::error::镜像上没有 Xcode 16.x 了（macos-15 镜像变了？请核对 runner-images）"
+            ls -d /Applications/Xcode*.app || true
+            exit 1
+          fi
           echo "使用 $XCODE"
           sudo xcode-select -s "$XCODE"
           xcodebuild -version
@@ -207,7 +218,14 @@ jobs:
           fi
           APP=build/SimDerivedData/Build/Products/Debug-iphonesimulator/iosApp.app
           xcrun simctl boot "$UDID" || true
-          xcrun simctl bootstatus "$UDID" -b
+          # boot 失败时把 runtime / 设备列表打出来：Xcode 与 runtime 不匹配是最常见
+          # 原因，没有上下文的话这步只会沉默一分多钟然后 exit 1。
+          if ! xcrun simctl bootstatus "$UDID" -b; then
+            echo "::error::模拟器 boot 失败（多半是 Xcode 与 runtime 不匹配，见 job 注释）"
+            xcrun simctl list runtimes || true
+            xcrun simctl list devices available || true
+            exit 1
+          fi
           xcrun simctl install "$UDID" "$APP"
           # --console-pty 把应用的 stdout/stderr 接过来：Kotlin/Native 未捕获异常的
           # 完整栈会打到 stderr，比崩溃报告好读得多
