@@ -26,10 +26,19 @@ actual object Haptics {
         }
 
     actual fun tap() {
-        vibrator?.vibrate(VibrationEffect.createOneShot(10, VibrationEffect.DEFAULT_AMPLITUDE))
+        vibrateSafely(10)
     }
 
     actual fun impact() {
-        vibrator?.vibrate(VibrationEffect.createOneShot(25, VibrationEffect.DEFAULT_AMPLITUDE))
+        vibrateSafely(25)
+    }
+
+    /** 触觉是增强反馈，不能因为设备策略/权限异常把主流程打崩。 */
+    private fun vibrateSafely(durationMs: Long) {
+        runCatching {
+            vibrator
+                ?.takeIf { it.hasVibrator() }
+                ?.vibrate(VibrationEffect.createOneShot(durationMs, VibrationEffect.DEFAULT_AMPLITUDE))
+        }
     }
 }

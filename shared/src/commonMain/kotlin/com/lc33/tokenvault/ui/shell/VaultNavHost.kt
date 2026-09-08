@@ -161,9 +161,10 @@ fun VaultNavHost(
             )
         }
 
-        composable<AboutRoute> { AboutScreen(onBack = { nav.popBackStack() }) }
+        composable<AboutRoute> { AboutScreen(onBack = { nav.navigateBackSafely() }) }
 
-        val back: () -> Unit = { nav.popBackStack() }
+        // 统一处理二级页返回：栈已被外部清空时不要让返回事件变成“无响应”。
+        val back: () -> Unit = { nav.navigateBackSafely() }
 
         composable<ProviderDetailRoute> { entry ->
             val route = entry.toRoute<ProviderDetailRoute>()
@@ -611,3 +612,8 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.horizontalFadeOut(
         targetOffsetX = { -it / 4 },
     ) + fadeOut(animationSpec = tween(TransitionDurationMs))
 
+
+/** 返回到上一页；根页面不再消费返回事件，交给 Activity 退出应用。 */
+private fun NavHostController.navigateBackSafely() {
+    if (previousBackStackEntry != null) popBackStack()
+}
