@@ -119,13 +119,15 @@ jobs:
   # iOS：在 macOS runner 上编译 shared.framework + iosApp 壳，产出未签名 .ipa。
   # 未签名（CODE_SIGNING_ALLOWED=NO）——目的只是验证 iOS 构建链路，不装真机。
   #
-  # 模拟器 boot 的坑（macos-26 和 macos-15 各栽过一次，症状相同）：boot 卡在
-  # Data Migration → Waiting on System App → Status=-1。根因是 Xcode 26.x 的
-  # CoreSimulator 启动 iOS 18 runtime 的设备必挂（actions/runner-images#12777）。
-  # macos-26 镜像只有 Xcode 26 + iOS 26 设备，一样卡；macos-15 镜像默认 Xcode 是
-  # 16.4，但"选最新稳定版"会挑到 26.3，闯进同一个坑。所以这里**锁死 Xcode 16.x**
-  # （镜像里 iOS 18.5 runtime 与 iPhone 15/16 设备就是为 16.4 配的），
-  # 冒烟设备也只从 iPhone 15/16 里选。
+  # 模拟器 boot 的坑（症状固定：Data Migration → Waiting on System App → Status=-1）：
+  #   Xcode 26.3 + iOS 18 预建设备（macos-15）、Xcode 26 + iOS 26 设备（macos-26）、
+  #   Xcode 16.4 + iOS 18 预建设备（macos-15）都复现过。三层对策，缺一不可：
+  # 1. 锁 Xcode 16.4：链接靠升 CMP 1.12.0（修旧 Xcode 16 SDK 链接，core#3278），
+  #    Xcode 26 的 CoreSimulator 在 GH 镜像上 boot 不可靠（runner-images#12777）。
+  # 2. boot 前杀 Gradle daemon：本 job 给 daemon 配了 6g 堆，runner 总内存约 7G，
+  #    daemon 活着时 SpringBoard 会被内存压力干掉。
+  # 3. 新建干净设备 + 锁 iOS 18.5 runtime：镜像预建设备盘上有历史状态，首次 boot
+  #    的 Data Migration 会挂死；旧 runtime（18.0~18.4）是给旧 Xcode 装的，别碰。
   ios:
     runs-on: macos-15
     steps:
@@ -193,17 +195,30 @@ jobs:
           set -euo pipefail
           cd iosApp
           mkdir -p build
-          # macos-15 上 iPhone 15/16 都在；|| true 防 set -e 把脚本秒退
-          UDID=$(xcrun simctl list devices available | grep -E 'iPhone (15|16) ' | head -1 | grep -oE '[0-9A-Fa-f]{8}(-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}' || true)
-          if [ -z "$UDID" ]; then
-            UDID=$(xcrun simctl list devices available | grep -E 'iPhone' | head -1 | grep -oE '[0-9A-Fa-f]{8}(-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}' || true)
-          fi
-          echo "模拟器 UDID: $UDID"
-          if [ -z "$UDID" ]; then
-            echo "::error::找不到可用的 iPhone 模拟器"
-            xcrun simctl list devices available || true
-            exit 1
-          fi
+          # 选设备不走 grep 首个命中：那可能落在给旧 Xcode 装的旧 runtime（18.0~18.4）
+          # 上，实测在镜像上 boot 会挂。用 JSON 锁定 Xcode 16.4 配套的 iOS 18.5，
+          # 并且**新建**一台干净设备——镜像预建设备的盘上有历史状态，首次 boot
+          # 的 Data Migration 会在这种盘上挂死（Status=-1），新设备从零迁移没包袱。
+          SELECT=$(xcrun simctl list runtimes -j | python3 -c '
+import json, subprocess, sys
+rts = json.load(sys.stdin)["runtimes"]
+rt = next((r for r in rts if r.get("version") == "18.5" and r.get("isAvailable")), None) \
+  or next((r for r in rts if str(r.get("version", "")).startswith("18.") and r.get("isAvailable")), None)
+if rt is None:
+    sys.exit("没有可用的 iOS 18.x runtime")
+dts = json.loads(subprocess.check_output(["xcrun", "simctl", "list", "devicetypes", "-j"]))["devicetypes"]
+dt = next((t for t in dts if t["name"] == "iPhone 16"), None) \
+  or next((t for t in dts if "iPhone" in t["name"]), None)
+if dt is None:
+    sys.exit("没有 iPhone 设备类型")
+print(rt["identifier"])
+print(dt["identifier"])
+')
+          RT=$(printf '%s\n' "$SELECT" | sed -n 1p)
+          DT=$(printf '%s\n' "$SELECT" | sed -n 2p)
+          echo "冒烟设备： runtime=$RT devicetype=$DT"
+          UDID=$(xcrun simctl create ci-smoke "$DT" "$RT")
+          echo "新建模拟器 UDID: $UDID"
           # 全量日志落盘：管道 tail 会吃掉 xcodebuild 的退出码，上次就把真错误藏了
           if ! xcodebuild \
             -project iosApp.xcodeproj \
@@ -217,14 +232,24 @@ jobs:
             exit 1
           fi
           APP=build/SimDerivedData/Build/Products/Debug-iphonesimulator/iosApp.app
-          xcrun simctl boot "$UDID" || true
-          # boot 失败时把 runtime / 设备列表打出来：Xcode 与 runtime 不匹配是最常见
-          # 原因，没有上下文的话这步只会沉默一分多钟然后 exit 1。
-          if ! xcrun simctl bootstatus "$UDID" -b; then
-            echo "::error::模拟器 boot 失败（多半是 Xcode 与 runtime 不匹配，见 job 注释）"
-            xcrun simctl list runtimes || true
-            xcrun simctl list devices available || true
-            exit 1
+          # 先杀 Gradle daemon 再 boot：本 job 给 daemon 配了 6g 堆，而 macos runner
+          # 总共约 7G 内存——daemon 活着的时候 boot 模拟器，SpringBoard 会被内存压力
+          # 干掉（bootstatus 报 Status=-1）。job 收尾日志里一直能看到孤儿 java 进程。
+          (cd .. && ./gradlew --stop)
+          boot_and_wait() {
+            xcrun simctl shutdown "$1" 2>/dev/null || true
+            xcrun simctl boot "$1" || true
+            xcrun simctl bootstatus "$1" -b
+          }
+          if ! boot_and_wait "$UDID"; then
+            echo "::warning::首次 boot 失败，erase 后重试一次"
+            xcrun simctl erase "$UDID" || true
+            if ! boot_and_wait "$UDID"; then
+              echo "::error::模拟器 boot 两次失败（看上面的 Data Migration / System App 卡点）"
+              xcrun simctl list runtimes || true
+              xcrun simctl list devices || true
+              exit 1
+            fi
           fi
           xcrun simctl install "$UDID" "$APP"
           # --console-pty 把应用的 stdout/stderr 接过来：Kotlin/Native 未捕获异常的
