@@ -212,20 +212,20 @@ jobs:
             xcrun simctl io "$UDID" screenshot iosApp/build/ios-sim-smoke.png || true
           else
             echo "::error::应用启动后退出（崩溃）"
-            # 崩溃报告两处都找：宿主 ~/Library/Logs/DiagnosticReports，
-            # 以及模拟器设备自己的 DiagnosticReports（Xcode 26 起多在这里）
+            # 崩溃报告：两处目录里最近 5 分钟的 .ips 全部列出（不只按进程名猜）
             SIMLOGS="$HOME/Library/Developer/CoreSimulator/Devices/$UDID/data/Library/Logs/DiagnosticReports"
             found=0
-            for d in "$HOME/Library/Logs/DiagnosticReports" "$SIMLOGS"; do
-              for f in $(ls -t "$d"/*iosApp*.ips "$d"/*TokenVault*.ips 2>/dev/null | head -2); do
-                echo "--- 崩溃报告： $f ---"
-                cat "$f"
-                found=1
-              done
+            for f in $(find "$HOME/Library/Logs/DiagnosticReports" "$SIMLOGS" -name '*.ips' -mmin -5 2>/dev/null | head -3); do
+              echo "--- 崩溃报告： $f ---"
+              head -c 6000 "$f"
+              echo
+              found=1
             done
             [ "$found" = 1 ] || echo "（没找到崩溃报告）"
-            echo "--- 进程日志（末尾 120 行）---"
-            xcrun simctl spawn "$UDID" log show --last 3m --predicate 'process == "iosApp"' --style compact 2>/dev/null | tail -120
+            # 进程日志：滤掉 FrontBoard/runningboard 的噪音，tail 才能落到死亡瞬间
+            echo "--- 进程日志（去噪后末尾 80 行）---"
+            xcrun simctl spawn "$UDID" log show --last 3m --predicate 'process == "iosApp"' --style compact 2>/dev/null \
+              | grep -viE 'FrontBoard|SceneExtension|runningboard|BoardServices|xpc:|UIKit:UIScreen' | tail -80
             exit 1
           fi
           # 存活也要把我们的进程日志里的错误打出来（非致命异常未必杀进程）
