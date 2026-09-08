@@ -178,15 +178,24 @@ jobs:
       # 模拟器 UI 冒烟：装上真的启动一次。锁屏首帧、Koin 启动、Room 开库这些
       # 只有真跑才能暴露（链接器死消除没了、单测又从不走这些路）。
       # 启动后 25 秒进程还在 → 存活；否则抓崩溃报告并直接红。
+      #
+      # macos-26 runner 的 iPhone 17 Pro 模拟器 boot 时常卡在数据迁移（migrator 反复
+      # 跑完又重试），用最新机型冒烟从没成功过。挑稍早的稳定机型（iPhone 15 / 16），
+      # 且 boot 前先 erase——避免拿到一个别人半路留下来的脏设备。
       - name: 模拟器 UI 冒烟（启动 + 存活检查）
         run: |
           set -euo pipefail
           cd iosApp
           mkdir -p build
-          # 先选具体模拟器（arm64），用 id= 目标构建：
-          # 'generic/platform=iOS Simulator' 会带上 x86_64，CMP 的资源同步任务不认。
-          UDID=$(xcrun simctl list devices available | grep -E 'iPhone' | head -1 | grep -oE '[0-9A-Fa-f]{8}(-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}')
+          # 挑稍早的稳定机型；最新那代在 macos-26 上 bootstatus 会卡迁移
+          UDID=$(xcrun simctl list devices available | grep -E 'iPhone (15|16) ' | head -1 | grep -oE '[0-9A-Fa-f]{8}(-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}')
+          if [ -z "$UDID" ]; then
+            UDID=$(xcrun simctl list devices available | grep -E 'iPhone' | head -1 | grep -oE '[0-9A-Fa-f]{8}(-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}')
+          fi
           echo "模拟器 UDID: $UDID"
+          # 先把上一次的实例清掉：关机 + erase，从一个干净状态起 boot
+          xcrun simctl shutdown "$UDID" 2>/dev/null || true
+          xcrun simctl erase "$UDID" 2>/dev/null || true
           # 全量日志落盘：管道 tail 会吃掉 xcodebuild 的退出码，上次就把真错误藏了
           if ! xcodebuild \
             -project iosApp.xcodeproj \
@@ -200,7 +209,7 @@ jobs:
             exit 1
           fi
           APP=build/SimDerivedData/Build/Products/Debug-iphonesimulator/iosApp.app
-          xcrun simctl boot "$UDID" || true
+          xcrun simctl boot "$UDID"
           xcrun simctl bootstatus "$UDID" -b
           xcrun simctl install "$UDID" "$APP"
           # --console-pty 把应用的 stdout/stderr 接过来：Kotlin/Native 未捕获异常的
