@@ -203,15 +203,20 @@ jobs:
           xcrun simctl boot "$UDID" || true
           xcrun simctl bootstatus "$UDID" -b
           xcrun simctl install "$UDID" "$APP"
-          # simctl launch 输出 "<bundle id>: <pid>"；模拟器进程就是宿主进程，ps -p 最可靠
-          PID=$(xcrun simctl launch "$UDID" com.lc33.tokenvault | grep -oE '[0-9]+$')
+          # --console-pty 把应用的 stdout/stderr 接过来：Kotlin/Native 未捕获异常的
+          # 完整栈会打到 stderr，比崩溃报告好读得多
+          xcrun simctl launch --console-pty "$UDID" com.lc33.tokenvault > build/sim-console.log 2>&1 &
+          sleep 5
+          PID=$(head -1 build/sim-console.log | grep -oE '[0-9]+' | head -1)
           echo "启动 pid: $PID"
           sleep 25
-          if ps -p "$PID" > /dev/null 2>&1; then
+          if [ -n "${PID:-}" ] && ps -p "$PID" > /dev/null 2>&1; then
             echo "应用启动后仍存活 ✓"
             xcrun simctl io "$UDID" screenshot iosApp/build/ios-sim-smoke.png || true
           else
             echo "::error::应用启动后退出（崩溃）"
+            echo "--- 应用控制台输出（Kotlin 崩溃栈应在此）---"
+            cat build/sim-console.log || true
             # 崩溃报告：两处目录里最近 5 分钟的 .ips 全部列出（不只按进程名猜）
             SIMLOGS="$HOME/Library/Developer/CoreSimulator/Devices/$UDID/data/Library/Logs/DiagnosticReports"
             found=0
