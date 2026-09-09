@@ -156,6 +156,8 @@
     <string name="detail_section_keys">密钥</string>
     <string name="detail_section_models">模型</string>
     <string name="detail_section_accounts">平台账号</string>
+    <string name="detail_models_refresh">刷新模型</string>
+    <string name="detail_key_models_refresh">刷新这把密钥的模型</string>
     <string name="detail_accounts_empty">这家还没有平台账号。只存在本地，永远不会替你填写。</string>
     <!-- Appearance -->
     <string name="appearance_section_theme">主题</string>

@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.health_stale_this_round
 import tokenvault.shared.generated.resources.manage_context
+import tokenvault.shared.generated.resources.detail_key_models_refresh
 import tokenvault.shared.generated.resources.manage_default_key
 import tokenvault.shared.generated.resources.manage_disabled
 import tokenvault.shared.generated.resources.manage_keys_ratio
@@ -42,6 +43,7 @@ import com.lc33.tokenvault.ui.common.relativeLabel
 import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppChip
 import com.lc33.tokenvault.ui.miuix.AppIcon
+import com.lc33.tokenvault.ui.miuix.AppIconButton
 import com.lc33.tokenvault.ui.miuix.AppIconTint
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
@@ -209,6 +211,7 @@ internal fun KeyRow(
     nowMs: Long,
     onClick: () -> Unit,
     onLongPress: (() -> Unit)? = null,
+    onRefreshModels: (() -> Unit)? = null,
 ) {
     val tokens = LocalAppTokens.current
     AppCard(modifier = rowModifier(), onClick = onClick, onLongPress = onLongPress) {
@@ -258,6 +261,13 @@ internal fun KeyRow(
                         color = appSecondaryTextColor,
                     )
                 }
+            }
+            if (onRefreshModels != null) {
+                AppIconButton(
+                    icon = AppIcon.Refresh,
+                    contentDescription = stringResource(Res.string.detail_key_models_refresh),
+                    onClick = onRefreshModels,
+                )
             }
         }
     }

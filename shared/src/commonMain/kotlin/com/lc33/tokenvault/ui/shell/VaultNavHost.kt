@@ -198,6 +198,8 @@ fun VaultNavHost(
                     onRefreshBalance = vm::refreshBalance,
                     onProbeProvider = vm::probeProvider,
                     onProbeKey = vm::probeKey,
+                    onRefreshModels = { vm.refreshModels() },
+                    onRefreshKeyModels = { keyId -> vm.refreshModels(keyId) },
                     onRevealAccount = vm::onRevealAccount,
                     onCopyRevealedAccount = { vm.onCopyRevealedAccount(accountClipboardLabel) },
                     onCloseAccountReveal = vm::onCloseAccountSheet,

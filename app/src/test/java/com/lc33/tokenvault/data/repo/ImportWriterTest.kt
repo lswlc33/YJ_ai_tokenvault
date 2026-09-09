@@ -65,7 +65,7 @@ class ImportWriterTest {
             providers = RoomProviderRepository(providerDao, cipher, ImmediateTransactions()) { now },
             keys = RoomApiKeyRepository(keyDao, cipher, ImmediateTransactions()) { now },
             accounts = RoomProviderAccountRepository(accountDao, cipher, ImmediateTransactions()) { now },
-            models = RoomModelRepository(modelDao) { now },
+            models = RoomModelRepository(modelDao, ImmediateTransactions()) { now },
             transactions = ImmediateTransactions(),
         )
     }

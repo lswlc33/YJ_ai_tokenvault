@@ -317,6 +317,11 @@ class ProviderDetailViewModel constructor(
         probeEngine.probeKey(keyId)
     }
 
+    /** 手动拉模型列表。null = 这家全部启用 Key；指定 id = 只拉那一张 Key。 */
+    fun refreshModels(keyId: Long? = null) {
+        probeEngine.refreshModels(providerId, keyId)
+    }
+
     private fun Provider.toDetailRow(
         rows: List<UiKeyRow>,
         modelCount: Int,

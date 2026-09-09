@@ -171,6 +171,20 @@ jobs:
           restore-keys: |
             ios-${{ runner.os }}-
 
+      # Release 框架的 23 分钟 K/N 链接是 iOS job 的绝对大头。这里只做**精确命中**缓存：
+      # key 覆盖 shared 的全部源码/资源/schema/构建脚本与依赖版本，App-only 改动或同一
+      # commit 重跑都能直接复用；不做 restore-keys，避免把旧框架拿来占空间还要重链。
+      # .gradle 里的 taskHistory 是 Gradle 判断 linkReleaseFrameworkIosArm64 是否
+      # UP-TO-DATE 的必要条件，只缓存产物本身不够。
+      - uses: actions/cache@v4
+        if: github.ref == 'refs/heads/master'
+        with:
+          path: |
+            .gradle
+            shared/build/bin/iosArm64/releaseFramework
+            shared/build/xcode-frameworks/Release
+          key: ios-release-framework-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('build.gradle.kts', 'settings.gradle.kts', 'gradle.properties', 'gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties', 'shared/build.gradle.kts', 'shared/schemas/**', 'shared/src/**') }}
+
       - uses: gradle/actions/setup-gradle@v4
 
       # K/N 链 Release 框架（整个 Compose UI + Room + miuix）比仓库级 4g 堆吃得还多。
@@ -187,8 +201,7 @@ jobs:
       - name: iOS 编译验证 + 模拟器测试
         run: |
           set -eu
-          ./gradlew :shared:compileKotlinIosArm64 :shared:compileKotlinIosSimulatorArm64 --console=plain
-          ./gradlew :shared:iosSimulatorArm64Test --console=plain
+          ./gradlew :shared:compileKotlinIosArm64 :shared:compileKotlinIosSimulatorArm64 :shared:iosSimulatorArm64Test --console=plain
 
       # 模拟器 UI 冒烟：装上真的启动一次。锁屏首帧、Koin 启动、Room 开库这些
       # 只有真跑才能暴露（链接器死消除没了、单测又从不走这些路）。
@@ -306,7 +319,9 @@ jobs:
           path: iosApp/build/ios-sim-smoke.png
           if-no-files-found: ignore
 
+      # PR 不产 nightly IPA；这 23 分钟的 Release 链接只留给 master / 手动触发。
       - name: xcodebuild 无签名构建（含 shared.framework）
+        if: github.ref == 'refs/heads/master'
         run: |
           set -eu
           cd iosApp
@@ -323,6 +338,7 @@ jobs:
             archive
 
       - name: 打包未签名 .ipa
+        if: github.ref == 'refs/heads/master'
         run: |
           set -eu
           APP=iosApp/build/iosApp.xcarchive/Products/Applications/iosApp.app
@@ -333,6 +349,7 @@ jobs:
           echo "产出：iosApp/build/TokenVault-unsigned.ipa"
 
       - uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/master'
         with:
           name: nightly-ipa
           path: iosApp/build/TokenVault-unsigned.ipa

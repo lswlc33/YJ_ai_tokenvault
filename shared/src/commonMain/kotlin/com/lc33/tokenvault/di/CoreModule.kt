@@ -154,7 +154,7 @@ val coreModule = module {
     single<ApiKeyRepository> { RoomApiKeyRepository(get(), get(), get(), get(named(Qualifiers.NOW))) }
     single<SettingsRepository> { RoomSettingsRepository(get()) }
     single<ProviderAccountRepository> { RoomProviderAccountRepository(get(), get(), get(), get(named(Qualifiers.NOW))) }
-    single<ModelRepository> { RoomModelRepository(get(), get(named(Qualifiers.NOW))) }
+    single<ModelRepository> { RoomModelRepository(get(), get(), get(named(Qualifiers.NOW))) }
     single<ClientProfileRepository> { RoomClientProfileRepository(get()) }
     single<AuditLogRepository> { RoomAuditLogRepository(get(), get(), get(named(Qualifiers.NOW))) }
     single<ProbeRunRepository> { RoomProbeRunRepository(get()) }
@@ -181,7 +181,7 @@ val coreModule = module {
     single { BalanceEngine(get(), get(), get(), get(), get(named(Qualifiers.NOW))) }
     single {
         ProbeEngine(
-            providers = get(), keys = get(), clientProfiles = get(), runRepository = get(),
+            providers = get(), keys = get(), models = get(), clientProfiles = get(), runRepository = get(),
             session = get(), engine = get(), audit = get(), settings = get(), autoLocker = get(),
             redactor = get(), knownSecrets = get(), now = get(named(Qualifiers.NOW)),
             placeholders = get(named(Qualifiers.PLACEHOLDERS)),

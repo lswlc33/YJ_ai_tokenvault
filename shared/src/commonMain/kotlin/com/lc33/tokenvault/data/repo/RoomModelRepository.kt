@@ -6,6 +6,9 @@ import com.lc33.tokenvault.data.mapper.toDomain
 import com.lc33.tokenvault.domain.Protocol
 import com.lc33.tokenvault.domain.model.AiModel
 import com.lc33.tokenvault.domain.repo.ModelRepository
+import com.lc33.tokenvault.domain.repo.TransactionRunner
+import com.lc33.tokenvault.probe.ModelMerger
+import com.lc33.tokenvault.probe.NewDiscoveredModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -17,6 +20,7 @@ import kotlinx.coroutines.flow.map
  */
 class RoomModelRepository constructor(
     private val dao: ModelDao,
+    private val transactions: TransactionRunner,
     private val now: () -> Long,
 ) : ModelRepository {
 
@@ -43,5 +47,33 @@ class RoomModelRepository constructor(
                 sortOrder = dao.findByProvider(providerId).size,
             ),
         )
+    }
+
+    override suspend fun applyDiscovered(providerId: Long, protocol: Protocol, modelIds: List<String>) {
+        transactions.inTransaction {
+            val fetched = modelIds.map { NewDiscoveredModel(it, protocol) }
+            val existingEntities = dao.findByProvider(providerId)
+            val existing = existingEntities.map { it.toDomain() }
+            val plan = ModelMerger.merge(existing, fetched, protocol)
+            val stamp = now()
+            val baseOrder = existingEntities.size
+            plan.toInsert.forEachIndexed { index, model ->
+                dao.insertIgnoring(
+                    ModelEntity(
+                        providerId = providerId,
+                        modelId = model.modelId,
+                        protocol = protocol.wireName,
+                        source = "discovered",
+                        discoveredVia = protocol.wireName,
+                        enabled = true,
+                        firstSeenAt = stamp,
+                        lastSeenAt = stamp,
+                        sortOrder = baseOrder + index,
+                    ),
+                )
+            }
+            plan.toTouch.forEach { dao.touchLastSeen(it, stamp) }
+            plan.toDisable.forEach { dao.setEnabled(it, false) }
+        }
     }
 }

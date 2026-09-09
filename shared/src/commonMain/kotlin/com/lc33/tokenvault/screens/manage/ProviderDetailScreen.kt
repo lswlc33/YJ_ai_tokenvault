@@ -15,10 +15,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.unit.dp
 import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.back_cd
+import tokenvault.shared.generated.resources.dashboard_balance_none
 import tokenvault.shared.generated.resources.balance_failed_section
 import tokenvault.shared.generated.resources.detail_account_none
 import tokenvault.shared.generated.resources.detail_account_password
@@ -37,8 +39,10 @@ import tokenvault.shared.generated.resources.detail_key_reveal_hint
 import tokenvault.shared.generated.resources.detail_key_secret
 import tokenvault.shared.generated.resources.detail_key_secret_hint
 import tokenvault.shared.generated.resources.detail_key_set_default
+import tokenvault.shared.generated.resources.detail_key_models_refresh
 import tokenvault.shared.generated.resources.detail_key_sheet_title
 import tokenvault.shared.generated.resources.detail_keys_empty
+import tokenvault.shared.generated.resources.detail_models_refresh
 import tokenvault.shared.generated.resources.detail_probe_key
 import tokenvault.shared.generated.resources.detail_probe_provider
 import tokenvault.shared.generated.resources.detail_section_accounts
@@ -101,6 +105,8 @@ fun ProviderDetailScreen(
     onRefreshBalance: () -> Unit,
     onProbeProvider: () -> Unit,
     onProbeKey: (Long) -> Unit,
+    onRefreshModels: () -> Unit,
+    onRefreshKeyModels: (Long) -> Unit,
     onRevealAccount: (Long) -> Unit,
     onCopyRevealedAccount: (String) -> Unit,
     onCloseAccountReveal: () -> Unit,
@@ -125,6 +131,11 @@ fun ProviderDetailScreen(
                 },
                 actions = {
                     AppIconButton(
+                        icon = AppIcon.Refresh,
+                        contentDescription = stringResource(Res.string.detail_probe_provider),
+                        onClick = onProbeProvider,
+                    )
+                    AppIconButton(
                         icon = AppIcon.Edit,
                         contentDescription = stringResource(Res.string.detail_edit_cd),
                         onClick = onEdit,
@@ -140,7 +151,7 @@ fun ProviderDetailScreen(
             contentPadding = padding,
             verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
         ) {
-            item { HeaderCard(state, onRefreshBalance, onProbeProvider) }
+            item { HeaderCard(state, onRefreshBalance) }
 
             item {
                 Row(
@@ -184,11 +195,28 @@ fun ProviderDetailScreen(
                         nowMs = state.nowMs,
                         onClick = { onRevealKey(row.id) },
                         onLongPress = { onProbeKey(row.id) },
+                        onRefreshModels = { onRefreshKeyModels(row.id) },
                     )
                 }
             }
 
-            item { SectionTitle(text = stringResource(Res.string.detail_section_models)) }
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    SectionTitle(
+                        text = stringResource(Res.string.detail_section_models),
+                        modifier = Modifier.weight(1f),
+                    )
+                    AppIconButton(
+                        icon = AppIcon.Refresh,
+                        contentDescription = stringResource(Res.string.detail_models_refresh),
+                        onClick = onRefreshModels,
+                        enabled = state.keys.isNotEmpty(),
+                    )
+                }
+            }
             items(state.models.size) { index -> ModelRow(state.models[index]) }
 
             item { SectionTitle(text = stringResource(Res.string.detail_section_accounts)) }
@@ -444,7 +472,6 @@ private fun RevealAccountSheet(
 private fun HeaderCard(
     state: ProviderDetailUiState,
     onRefreshBalance: () -> Unit,
-    onProbeProvider: () -> Unit,
 ) {
     val tokens = LocalAppTokens.current
     val provider = state.provider
@@ -471,33 +498,27 @@ private fun HeaderCard(
         }
         // 余额：三种状态要可区分（§9.3）——有金额 / 查询失败 / 没配置。
         val balance = provider.balance
-        when {
-            balance != null -> {
-                AppText(
-                    text = balance.toDisplay(),
-                    style = AppTextStyle.Title,
-                    modifier = Modifier.padding(top = tokens.itemSpacing),
-                )
-            }
-            provider.balanceFailed -> {
-                AppText(
-                    text = stringResource(Res.string.balance_failed_section),
-                    style = AppTextStyle.Secondary,
-                    color = LocalStatusPalette.current.warn,
-                    modifier = Modifier.padding(top = tokens.itemSpacing),
-                )
-            }
-        }
-        AppTextButton(
-            text = stringResource(Res.string.detail_balance_refresh),
-            onClick = onRefreshBalance,
+        val balanceFailed = balance == null && provider.balanceFailed
+        Row(
             modifier = Modifier.padding(top = tokens.itemSpacing),
-        )
-        AppTextButton(
-            text = stringResource(Res.string.detail_probe_provider),
-            onClick = onProbeProvider,
-            modifier = Modifier.padding(top = 4.dp),
-        )
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AppText(
+                text = when {
+                    balance != null -> balance.toDisplay()
+                    balanceFailed -> stringResource(Res.string.balance_failed_section)
+                    else -> stringResource(Res.string.dashboard_balance_none)
+                },
+                style = if (balanceFailed) AppTextStyle.Secondary else AppTextStyle.Title,
+                color = if (balanceFailed) LocalStatusPalette.current.warn else Color.Unspecified,
+                modifier = Modifier.weight(1f),
+            )
+            AppIconButton(
+                icon = AppIcon.Refresh,
+                contentDescription = stringResource(Res.string.detail_balance_refresh),
+                onClick = onRefreshBalance,
+            )
+        }
     }
 }
 
