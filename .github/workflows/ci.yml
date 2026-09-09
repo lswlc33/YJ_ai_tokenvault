@@ -294,7 +294,9 @@ jobs:
           sleep 25
           if [ -n "${PID:-}" ] && ps -p "$PID" > /dev/null 2>&1; then
             echo "应用启动后仍存活 ✓"
-            kill "$CONSOLE_PID" 2>/dev/null || true
+            # --console-pty 的父进程在应用存活时不会自行退出；强杀后 wait 只回收本
+            # shell 记录的进程，避免冒烟成功反而卡在日志附加器上。
+            kill -9 "$CONSOLE_PID" 2>/dev/null || true
             wait "$CONSOLE_PID" 2>/dev/null || true
             # cwd 已在 iosApp/ 里，路径写 build/…（修复：以前写成 iosApp/build/…
             # 落到 iosApp/iosApp/build/，截图 artifact 从没上传成功过）
