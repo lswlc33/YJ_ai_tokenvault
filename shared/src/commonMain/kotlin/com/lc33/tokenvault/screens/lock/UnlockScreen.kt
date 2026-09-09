@@ -1,10 +1,12 @@
 package com.lc33.tokenvault.screens.lock
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -90,48 +92,57 @@ private fun UnlockStatus(
     backoff: UnlockBackoff,
     remainingSeconds: Int,
 ) {
+    val tokens = LocalAppTokens.current
     val palette = LocalStatusPalette.current
     val freeLeft = UnlockBackoff.FREE_ATTEMPTS - backoff.failedAttempts
 
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+    // 这一块常驻最小高度：满 6 位后 busy 从 false 变 true 时，进度条与文案不能把键盘往下顶。
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = tokens.minTouchTarget),
+        contentAlignment = Alignment.Center,
     ) {
-        if (busy) {
-            AppLinearProgress(progress = null, modifier = Modifier.fillMaxWidth())
-            AppText(
-                text = stringResource(Res.string.unlock_busy),
-                style = AppTextStyle.Secondary,
-                color = appSecondaryTextColor,
-            )
-        }
-        when {
-            remainingSeconds > 0 -> AppText(
-                text = stringResource(Res.string.unlock_backoff, formatCountdown(remainingSeconds)),
-                style = AppTextStyle.Body,
-                color = palette.warn,
-                textAlign = TextAlign.Center,
-            )
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            if (busy) {
+                AppLinearProgress(progress = null, modifier = Modifier.fillMaxWidth())
+                AppText(
+                    text = stringResource(Res.string.unlock_busy),
+                    style = AppTextStyle.Secondary,
+                    color = appSecondaryTextColor,
+                )
+            }
+            when {
+                remainingSeconds > 0 -> AppText(
+                    text = stringResource(Res.string.unlock_backoff, formatCountdown(remainingSeconds)),
+                    style = AppTextStyle.Body,
+                    color = palette.warn,
+                    textAlign = TextAlign.Center,
+                )
 
-            error != null -> AppText(
-                text = stringResource(pinErrorRes(error)),
-                style = AppTextStyle.Body,
-                color = palette.error,
-                textAlign = TextAlign.Center,
-            )
-        }
-        if (remainingSeconds == 0 && backoff.failedAttempts > 0) {
-            AppText(
-                text = if (freeLeft > 0) {
-                    pluralStringResource(Res.plurals.unlock_free_left, freeLeft, freeLeft)
-                } else {
-                    stringResource(Res.string.unlock_next_waits)
-                },
-                style = AppTextStyle.Footnote,
-                color = appSecondaryTextColor,
-                textAlign = TextAlign.Center,
-            )
+                error != null -> AppText(
+                    text = stringResource(pinErrorRes(error)),
+                    style = AppTextStyle.Body,
+                    color = palette.error,
+                    textAlign = TextAlign.Center,
+                )
+            }
+            if (remainingSeconds == 0 && backoff.failedAttempts > 0) {
+                AppText(
+                    text = if (freeLeft > 0) {
+                        pluralStringResource(Res.plurals.unlock_free_left, freeLeft, freeLeft)
+                    } else {
+                        stringResource(Res.string.unlock_next_waits)
+                    },
+                    style = AppTextStyle.Footnote,
+                    color = appSecondaryTextColor,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
     }
 }

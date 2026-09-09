@@ -20,6 +20,7 @@ import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -102,10 +103,14 @@ fun VaultNavHost(
         navController = nav,
         startDestination = DashboardRoute,
         modifier = modifier,
-        enterTransition = { horizontalSlideIn() },
-        exitTransition = { horizontalFadeOut() },
-        popEnterTransition = { horizontalSlideInFromLeft() },
-        popExitTransition = { horizontalSlideOut() },
+        enterTransition = {
+            if (isTopLevelTransition()) fadeInTransition() else horizontalSlideIn()
+        },
+        exitTransition = { fadeOutTransition() },
+        popEnterTransition = { fadeInTransition() },
+        popExitTransition = {
+            if (isTopLevelTransition()) fadeOutTransition() else horizontalSlideOut()
+        },
     ) {
         composable<DashboardRoute> {
             val vm: DashboardViewModel = koinViewModel()
@@ -586,7 +591,37 @@ private class PendingRestore(val bytes: ByteArray, val password: CharArray)
 // 预测式返回（Android 13+）需要标准的水平滑动动画才能正确跟手。
 // ---------------------------------------------------------------------------
 
-private const val TransitionDurationMs = 300
+private const val TransitionDurationMs = 250
+private const val TopLevelTransitionDurationMs = 200
+
+/**
+ * 三个一级 tab 是同级关系，只做淡入淡出；进入/返回二级页才是层级关系。
+ *
+ * 预测式返回与普通返回共用 popEnter/popExit 这一组动画。父页只淡入淡出、子页负责
+ * 水平位移，可以避免“手势返回父页从左边滑入、普通返回父页也从左边滑入但进度不同”
+ * 这类视觉割裂。
+ */
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.isTopLevelTransition(): Boolean =
+    initialState.isTopLevelDestination() && targetState.isTopLevelDestination()
+
+private fun NavBackStackEntry.isTopLevelDestination(): Boolean = when {
+    destination.hasRoute<DashboardRoute>() -> true
+    destination.hasRoute<ManageRoute>() -> true
+    destination.hasRoute<SettingsRoute>() -> true
+    else -> false
+}
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.fadeInTransition(): EnterTransition = fadeIn(
+    animationSpec = tween(
+        if (isTopLevelTransition()) TopLevelTransitionDurationMs else TransitionDurationMs,
+    ),
+)
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.fadeOutTransition(): ExitTransition = fadeOut(
+    animationSpec = tween(
+        if (isTopLevelTransition()) TopLevelTransitionDurationMs else TransitionDurationMs,
+    ),
+)
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.horizontalSlideIn(): EnterTransition =
     slideInHorizontally(
@@ -594,24 +629,11 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.horizontalSlideIn(
         initialOffsetX = { it },
     ) + fadeIn(animationSpec = tween(TransitionDurationMs))
 
-private fun AnimatedContentTransitionScope<NavBackStackEntry>.horizontalSlideInFromLeft(): EnterTransition =
-    slideInHorizontally(
-        animationSpec = tween(TransitionDurationMs),
-        initialOffsetX = { -it / 4 },
-    ) + fadeIn(animationSpec = tween(TransitionDurationMs))
-
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.horizontalSlideOut(): ExitTransition =
     slideOutHorizontally(
         animationSpec = tween(TransitionDurationMs),
         targetOffsetX = { it },
     ) + fadeOut(animationSpec = tween(TransitionDurationMs))
-
-private fun AnimatedContentTransitionScope<NavBackStackEntry>.horizontalFadeOut(): ExitTransition =
-    slideOutHorizontally(
-        animationSpec = tween(TransitionDurationMs),
-        targetOffsetX = { -it / 4 },
-    ) + fadeOut(animationSpec = tween(TransitionDurationMs))
-
 
 /** 返回到上一页；根页面不再消费返回事件，交给 Activity 退出应用。 */
 private fun NavHostController.navigateBackSafely() {

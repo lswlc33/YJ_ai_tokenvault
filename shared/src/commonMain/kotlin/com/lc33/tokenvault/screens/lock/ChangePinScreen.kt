@@ -1,10 +1,15 @@
 package com.lc33.tokenvault.screens.lock
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -73,29 +78,39 @@ fun ChangePinScreen(
         PinDots(filled = state.pinLength, slots = state.pinSlots, isError = state.error != null)
         Spacer(Modifier.height(tokens.itemSpacing))
 
-        if (state.busy) {
-            AppLinearProgress(progress = null, modifier = Modifier.fillMaxWidth())
-            Spacer(Modifier.height(tokens.itemSpacing))
-        }
-        if (remaining > 0) {
-            AppText(
-                text = stringResource(Res.string.unlock_backoff, formatCountdown(remaining)),
-                style = AppTextStyle.Body,
-                color = LocalStatusPalette.current.warn,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(tokens.itemSpacing))
-        } else if (state.error != null) {
-            state.error?.let { error ->
-                AppText(
-                    text = stringResource(pinErrorRes(error)),
-                    style = AppTextStyle.Body,
-                    color = LocalStatusPalette.current.error,
-                    textAlign = TextAlign.Center,
-                )
+        // 状态区常驻最小高度：验旧 PIN 派生密钥时，进度条不能把数字键盘和底部说明顶下去。
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = tokens.minTouchTarget),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
+            ) {
+                if (state.busy) {
+                    AppLinearProgress(progress = null, modifier = Modifier.fillMaxWidth())
+                }
+                if (remaining > 0) {
+                    AppText(
+                        text = stringResource(Res.string.unlock_backoff, formatCountdown(remaining)),
+                        style = AppTextStyle.Body,
+                        color = LocalStatusPalette.current.warn,
+                        textAlign = TextAlign.Center,
+                    )
+                } else if (state.error != null) {
+                    AppText(
+                        text = stringResource(pinErrorRes(state.error)),
+                        style = AppTextStyle.Body,
+                        color = LocalStatusPalette.current.error,
+                        textAlign = TextAlign.Center,
+                    )
+                }
             }
-            Spacer(Modifier.height(tokens.itemSpacing))
         }
+        Spacer(Modifier.height(tokens.itemSpacing))
 
         PinKeypad(onDigit = onDigit, onBackspace = onBackspace, enabled = !state.busy && remaining == 0)
         Spacer(Modifier.height(tokens.sectionSpacing))

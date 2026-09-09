@@ -30,6 +30,7 @@ import tokenvault.shared.generated.resources.dashboard_balance_title
 import tokenvault.shared.generated.resources.dashboard_balance_updated
 import tokenvault.shared.generated.resources.dashboard_counts_title
 import tokenvault.shared.generated.resources.dashboard_health_all_ok
+import tokenvault.shared.generated.resources.dashboard_health_empty
 import tokenvault.shared.generated.resources.dashboard_health_title
 import tokenvault.shared.generated.resources.dashboard_probe_cancel
 import tokenvault.shared.generated.resources.dashboard_probe_counts
@@ -179,6 +180,15 @@ internal fun HealthCard(health: HealthBreakdown) {
     val tokens = LocalAppTokens.current
     AppCard(modifier = cardModifier()) {
         CardTitle(stringResource(Res.string.dashboard_health_title))
+        if (health.total == 0) {
+            AppText(
+                text = stringResource(Res.string.dashboard_health_empty),
+                style = AppTextStyle.Secondary,
+                color = appSecondaryTextColor,
+                modifier = Modifier.padding(vertical = tokens.itemSpacing),
+            )
+            return@AppCard
+        }
         SegmentedBar(
             segments = listOf(
                 BarSegment(health.ok, colorOf(UiHealth.Ok)),

@@ -62,18 +62,6 @@ fun DashboardScreen(
             )
         },
     ) { padding ->
-        if (state.isEmpty) {
-            EmptyState(
-                title = stringResource(Res.string.dashboard_empty_title),
-                description = stringResource(Res.string.dashboard_empty_desc),
-                actionText = stringResource(Res.string.dashboard_empty_new),
-                onAction = onOpenManage,
-                secondaryActionText = stringResource(Res.string.dashboard_empty_import),
-                onSecondaryAction = onOpenImport,
-                modifier = Modifier.padding(padding),
-            )
-            return@AppScaffold
-        }
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -81,6 +69,18 @@ fun DashboardScreen(
             contentPadding = padding,
             verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
         ) {
+            if (state.isEmpty) {
+                item {
+                    EmptyState(
+                        title = stringResource(Res.string.dashboard_empty_title),
+                        description = stringResource(Res.string.dashboard_empty_desc),
+                        actionText = stringResource(Res.string.dashboard_empty_new),
+                        onAction = onOpenManage,
+                        secondaryActionText = stringResource(Res.string.dashboard_empty_import),
+                        onSecondaryAction = onOpenImport,
+                    )
+                }
+            }
             item {
                 BalanceCard(
                     balance = state.balance,

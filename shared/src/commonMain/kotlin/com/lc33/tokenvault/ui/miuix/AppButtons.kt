@@ -14,6 +14,7 @@ import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.lc33.tokenvault.platform.Haptics
 import top.yukonga.miuix.kmp.basic.Checkbox
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Surface
@@ -111,7 +112,12 @@ private fun KeyShell(
     content: @Composable () -> Unit,
 ) {
     Surface(
-        onClick = onClick,
+        // PIN 键是自绘键盘，不会经过 AppTextButton 那条通用反馈；这里补上轻触觉，
+        // 否则用户只能靠视觉确认按键已生效。
+        onClick = {
+            Haptics.tap()
+            onClick()
+        },
         modifier = modifier.defaultMinSize(minWidth = minSize, minHeight = minSize),
         enabled = enabled,
         shape = RoundedCornerShape(percent = 50),

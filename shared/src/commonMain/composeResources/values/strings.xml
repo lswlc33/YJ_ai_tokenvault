@@ -37,6 +37,7 @@
         <item quantity="one">The only key is available</item>
         <item quantity="other">All %1$d keys available</item>
     </plurals>
+    <string name="dashboard_health_empty">No keys yet</string>
     <string name="dashboard_attention_title">Needs attention</string>
     <string name="dashboard_attention_none">Nothing needs attention</string>
     <string name="dashboard_attention_fix_client">Switch client profile</string>

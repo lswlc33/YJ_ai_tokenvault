@@ -36,6 +36,7 @@
     <plurals name="dashboard_health_all_ok">
         <item quantity="other">%1$d 张全部可用</item>
     </plurals>
+    <string name="dashboard_health_empty">还没有密钥</string>
     <string name="dashboard_attention_title">需要处理</string>
     <string name="dashboard_attention_none">暂无需要处理的项</string>
     <string name="dashboard_attention_fix_client">换客户端预设</string>
