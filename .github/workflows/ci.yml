@@ -272,27 +272,40 @@ jobs:
           fi
           echo "模拟器就绪 ✓"
           xcrun simctl install "$UDID" "$APP"
-          # launch 不用 --console-pty：它的首行输出不可靠（应用还没打印时为空），
-          # grep 拿不到数字会触发 set -e 直接杀脚本。simctl launch 本身会打印
-          # "com.lc33.tokenvault: <pid>"，直接从这里拿。崩溃栈靠下面的崩溃报告
-          # + log show（本来就有，不依赖 console-pty）。
-          LAUNCH_OUT=$(xcrun simctl launch "$UDID" com.lc33.tokenvault)
-          echo "$LAUNCH_OUT"
-          # 只取冒号后的 PID；bundle id 本身含有数字（lc33），不能对整行取第一个数字。
-          PID=$(printf '%s\n' "$LAUNCH_OUT" | sed -nE 's/.*: ([0-9]+)[[:space:]]*$/\1/p')
-          echo "启动 pid: $PID"
+          # --console-pty 让 Kotlin/Native 的未捕获异常直接落到文件。系统 log/crash report
+          # 对 K/N 崩溃经常是空手而归；首行可能晚到，所以用轮询而不是同步 grep（set -e）。
+          rm -f build/ios-sim-console.log
+          xcrun simctl launch --console-pty "$UDID" com.lc33.tokenvault \
+            > build/ios-sim-console.log 2>&1 &
+          CONSOLE_PID=$!
+          PID=""
+          for _ in $(seq 1 20); do
+            PID=$(sed -nE 's/.*: ([0-9]+)[[:space:]]*$/\1/p' build/ios-sim-console.log | tail -1)
+            [ -n "$PID" ] && break
+            sleep 1
+          done
+          echo "启动 pid: ${PID:-<未拿到>}"
           if [ -z "${PID:-}" ]; then
             echo "::error::launch 没返回 pid（bundle id 错了？）"
+            wait "$CONSOLE_PID" || true
+            tail -200 build/ios-sim-console.log || true
             exit 1
           fi
           sleep 25
           if [ -n "${PID:-}" ] && ps -p "$PID" > /dev/null 2>&1; then
             echo "应用启动后仍存活 ✓"
+            kill "$CONSOLE_PID" 2>/dev/null || true
+            wait "$CONSOLE_PID" 2>/dev/null || true
             # cwd 已在 iosApp/ 里，路径写 build/…（修复：以前写成 iosApp/build/…
             # 落到 iosApp/iosApp/build/，截图 artifact 从没上传成功过）
             xcrun simctl io "$UDID" screenshot build/ios-sim-smoke.png || true
           else
-            echo "::error::应用启动后退出（崩溃），launch 输出： $LAUNCH_OUT"
+            echo "::error::应用启动后退出（崩溃），pid： $PID"
+            # Kotlin/Native 未捕获异常会先出现在 --console-pty 输出里；这是 crash report
+            # 缺失时唯一可靠的现场，先打出来再查系统侧报告。
+            wait "$CONSOLE_PID" || true
+            echo "--- 应用控制台（末尾 200 行）---"
+            tail -200 build/ios-sim-console.log || true
             # 崩溃报告：两处目录里最近 5 分钟的 .ips 全部列出（不只按进程名猜）
             SIMLOGS="$HOME/Library/Developer/CoreSimulator/Devices/$UDID/data/Library/Logs/DiagnosticReports"
             found=0
@@ -315,8 +328,10 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ios-sim-smoke-screenshot
-          path: iosApp/build/ios-sim-smoke.png
+          name: ios-sim-smoke-logs
+          path: |
+            iosApp/build/ios-sim-smoke.png
+            iosApp/build/ios-sim-console.log
           if-no-files-found: ignore
 
       # PR 不产 nightly IPA；这 23 分钟的 Release 链接只留给 master / 手动触发。
