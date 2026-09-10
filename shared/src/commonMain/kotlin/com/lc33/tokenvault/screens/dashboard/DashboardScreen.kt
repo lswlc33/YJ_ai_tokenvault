@@ -1,4 +1,4 @@
-﻿package com.lc33.tokenvault.screens.dashboard
+package com.lc33.tokenvault.screens.dashboard
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -15,13 +15,9 @@ import androidx.compose.ui.Modifier
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.unit.dp
 import tokenvault.shared.generated.resources.Res
-import tokenvault.shared.generated.resources.dashboard_empty_desc
-import tokenvault.shared.generated.resources.dashboard_empty_import
-import tokenvault.shared.generated.resources.dashboard_empty_new
-import tokenvault.shared.generated.resources.dashboard_empty_title
 import tokenvault.shared.generated.resources.dashboard_title
 import com.lc33.tokenvault.screens.model.DashboardUiState
-import com.lc33.tokenvault.ui.common.EmptyState
+import com.lc33.tokenvault.ui.common.UpdateHighlightCard
 import com.lc33.tokenvault.ui.miuix.AppScaffold
 import com.lc33.tokenvault.ui.miuix.AppTopBar
 import com.lc33.tokenvault.ui.miuix.appTopBarScroll
@@ -43,7 +39,7 @@ fun DashboardScreen(
     state: DashboardUiState,
     onOpenProvider: (Long) -> Unit,
     onOpenManage: () -> Unit,
-    onOpenImport: () -> Unit,
+    onOpenUpdate: () -> Unit,
     onOpenProbeRun: () -> Unit,
     onOpenSync: () -> Unit,
     onOpenBalanceBreakdown: () -> Unit,
@@ -69,18 +65,8 @@ fun DashboardScreen(
             contentPadding = padding,
             verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
         ) {
-            if (state.isEmpty) {
-                item {
-                    EmptyState(
-                        title = stringResource(Res.string.dashboard_empty_title),
-                        description = stringResource(Res.string.dashboard_empty_desc),
-                        actionText = stringResource(Res.string.dashboard_empty_new),
-                        onAction = onOpenManage,
-                        secondaryActionText = stringResource(Res.string.dashboard_empty_import),
-                        onSecondaryAction = onOpenImport,
-                    )
-                }
-            }
+            item { UpdateHighlightCard(onOpenUpdate = onOpenUpdate) }
+
             item {
                 BalanceCard(
                     balance = state.balance,

@@ -17,6 +17,7 @@ import com.lc33.tokenvault.data.repo.RoomProviderAccountRepository
 import com.lc33.tokenvault.data.repo.RoomProbeRunRepository
 import com.lc33.tokenvault.data.repo.RoomProviderRepository
 import com.lc33.tokenvault.data.repo.RoomSettingsRepository
+import com.lc33.tokenvault.data.repo.RoomWebDavSettingsRepository
 import com.lc33.tokenvault.data.repo.RoomTransactionRunner
 import com.lc33.tokenvault.data.seed.ProfileSeeder
 import com.lc33.tokenvault.backup.BackupStore
@@ -30,6 +31,7 @@ import com.lc33.tokenvault.domain.repo.ProviderAccountRepository
 import com.lc33.tokenvault.domain.repo.ProbeRunRepository
 import com.lc33.tokenvault.domain.repo.ProviderRepository
 import com.lc33.tokenvault.domain.repo.SettingsRepository
+import com.lc33.tokenvault.domain.repo.WebDavSettingsRepository
 import com.lc33.tokenvault.domain.repo.TransactionRunner
 import com.lc33.tokenvault.engine.BackupEngine
 import com.lc33.tokenvault.engine.BalanceEngine
@@ -37,8 +39,10 @@ import com.lc33.tokenvault.engine.IdleLockSuspender
 import com.lc33.tokenvault.engine.ProbeEngine
 import com.lc33.tokenvault.engine.ProbeSession
 import com.lc33.tokenvault.engine.UpdateEngine
+import com.lc33.tokenvault.engine.WebDavEngine
 import com.lc33.tokenvault.net.HostGate
 import com.lc33.tokenvault.net.HttpEngine
+import com.lc33.tokenvault.net.WebDavClient
 import com.lc33.tokenvault.net.ProxyProvider
 import com.lc33.tokenvault.platform.APP_VERSION_NAME
 import com.lc33.tokenvault.platform.AutoLocker
@@ -153,6 +157,7 @@ val coreModule = module {
     single<ProviderRepository> { RoomProviderRepository(get(), get(), get(), get(named(Qualifiers.NOW))) }
     single<ApiKeyRepository> { RoomApiKeyRepository(get(), get(), get(), get(named(Qualifiers.NOW))) }
     single<SettingsRepository> { RoomSettingsRepository(get()) }
+    single<WebDavSettingsRepository> { RoomWebDavSettingsRepository(get(), get()) }
     single<ProviderAccountRepository> { RoomProviderAccountRepository(get(), get(), get(), get(named(Qualifiers.NOW))) }
     single<ModelRepository> { RoomModelRepository(get(), get(), get(named(Qualifiers.NOW))) }
     single<ClientProfileRepository> { RoomClientProfileRepository(get()) }
@@ -185,6 +190,13 @@ val coreModule = module {
             session = get(), engine = get(), audit = get(), settings = get(), autoLocker = get(),
             redactor = get(), knownSecrets = get(), now = get(named(Qualifiers.NOW)),
             placeholders = get(named(Qualifiers.PLACEHOLDERS)),
+        )
+    }
+    single { WebDavClient(get<ProxyProvider>().client) }
+    single {
+        WebDavEngine(
+            settings = get(), backup = get(), client = get(), audit = get(),
+            now = get(named(Qualifiers.NOW)),
         )
     }
     single {

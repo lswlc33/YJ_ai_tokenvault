@@ -38,7 +38,7 @@ import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppDropdownRow
 import com.lc33.tokenvault.ui.miuix.AppPreferenceGroup
 import com.lc33.tokenvault.ui.miuix.AppText
-import com.lc33.tokenvault.ui.miuix.AppTextButton
+import com.lc33.tokenvault.ui.miuix.AppActionRow
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.SectionTitle
 import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
@@ -159,7 +159,7 @@ private fun VersionCard(
         }
 
         // 检查中禁用按钮，防连点；其余时候都能再点一次。
-        AppTextButton(
+        AppActionRow(
             text = stringResource(Res.string.update_check_now),
             onClick = onCheckNow,
             enabled = updateState.phase != UpdateViewModel.Phase.CHECKING,
@@ -208,7 +208,7 @@ private fun CheckResultCard(
 
     // 去下载：打开 release 的网页地址（API 直接给的 html_url）。
     latest.htmlUrl?.let { url ->
-        AppTextButton(
+        AppActionRow(
             text = stringResource(Res.string.update_open_download),
             onClick = { onOpenDownload(url) },
             modifier = Modifier.padding(top = tokens.itemSpacing),

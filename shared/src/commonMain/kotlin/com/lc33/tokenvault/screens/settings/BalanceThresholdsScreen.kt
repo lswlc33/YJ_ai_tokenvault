@@ -21,7 +21,7 @@ import com.lc33.tokenvault.domain.model.BalanceSnapshot
 import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppTextField
-import com.lc33.tokenvault.ui.miuix.AppTextButton
+import com.lc33.tokenvault.ui.miuix.AppActionRow
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
 import com.lc33.tokenvault.ui.miuix.rememberAppTextFieldState
@@ -94,7 +94,7 @@ fun BalanceThresholdsScreen(
         }
 
         item {
-            AppTextButton(
+            AppActionRow(
                 text = stringResource(Res.string.probe_thresholds_save),
                 onClick = {
                     when (viewModel.save(usdState.text, cnyState.text)) {

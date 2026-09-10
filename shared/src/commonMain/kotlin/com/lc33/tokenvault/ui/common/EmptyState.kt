@@ -9,26 +9,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import com.lc33.tokenvault.ui.miuix.AppText
-import com.lc33.tokenvault.ui.miuix.AppTextButton
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
 
 /**
- * 空态。计划.md §13.4 要求空态给可点的 CTA，所以 [actionText] 存在时必须给 [onAction]。
+ * 空态只描述状态，不放行动入口。
  *
- * [secondaryActionText] 非空时画第二个次级 CTA（如「粘贴导入」），两个动作并排，
- * 让空态本身就能完成最常见的起步动作，而不是把人逼到别处。
+ * 首页必须永远是完整仪表盘；管理页的新建/导入统一收进 FAB。空态里再长出一组
+ * CTA 会让同一动作出现两套入口，也会让“空库”看起来像另一个页面。
  */
 @Composable
 fun EmptyState(
     title: String,
     description: String,
     modifier: Modifier = Modifier,
-    actionText: String? = null,
-    onAction: (() -> Unit)? = null,
-    secondaryActionText: String? = null,
-    onSecondaryAction: (() -> Unit)? = null,
 ) {
     val tokens = LocalAppTokens.current
     Column(
@@ -45,11 +40,5 @@ fun EmptyState(
             color = appSecondaryTextColor,
             textAlign = TextAlign.Center,
         )
-        if (actionText != null && onAction != null) {
-            AppTextButton(text = actionText, onClick = onAction)
-        }
-        if (secondaryActionText != null && onSecondaryAction != null) {
-            AppTextButton(text = secondaryActionText, onClick = onSecondaryAction)
-        }
     }
 }

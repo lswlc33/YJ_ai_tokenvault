@@ -26,7 +26,7 @@ import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppDialog
 import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppText
-import com.lc33.tokenvault.ui.miuix.AppTextButton
+import com.lc33.tokenvault.ui.miuix.AppActionRow
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
@@ -73,13 +73,12 @@ fun BootCorruptScreen(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
-            AppTextButton(
+            AppActionRow(
                 text = stringResource(Res.string.boot_corrupt_restore),
                 onClick = onRestoreFromBackup,
                 modifier = Modifier.fillMaxWidth(),
-                primary = true,
             )
-            AppTextButton(
+            AppActionRow(
                 text = stringResource(Res.string.boot_corrupt_wipe),
                 onClick = { askWipe = true },
                 modifier = Modifier.fillMaxWidth(),
@@ -108,19 +107,18 @@ fun BootCorruptScreen(
             title = stringResource(Res.string.boot_corrupt_wipe_confirm_title),
             summary = stringResource(Res.string.boot_corrupt_wipe_confirm_body),
         ) {
-            AppTextButton(
+            AppActionRow(
                 text = stringResource(Res.string.dialog_cancel),
                 onClick = { askWipe = false },
                 modifier = Modifier.fillMaxWidth(),
             )
-            AppTextButton(
+            AppActionRow(
                 text = stringResource(Res.string.boot_corrupt_wipe_confirm),
                 onClick = {
                     askWipe = false
                     onWipeAndStartOver()
                 },
                 modifier = Modifier.fillMaxWidth(),
-                primary = true,
             )
         }
     }

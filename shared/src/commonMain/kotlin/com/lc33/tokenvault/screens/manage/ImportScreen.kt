@@ -1,4 +1,4 @@
-﻿package com.lc33.tokenvault.screens.manage
+package com.lc33.tokenvault.screens.manage
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -47,7 +47,7 @@ import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppIconButton
 import com.lc33.tokenvault.ui.miuix.AppScaffold
 import com.lc33.tokenvault.ui.miuix.AppText
-import com.lc33.tokenvault.ui.miuix.AppTextButton
+import com.lc33.tokenvault.ui.miuix.AppActionRow
 import com.lc33.tokenvault.ui.miuix.AppTextField
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.AppTopBar
@@ -138,7 +138,7 @@ fun ImportScreen(
                         supportingText = stringResource(Res.string.import_paste_hint),
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing)) {
-                        AppTextButton(
+                        AppActionRow(
                             text = stringResource(Res.string.import_from_clipboard),
                             onClick = {
                                 val text = readClipboard()
@@ -148,7 +148,7 @@ fun ImportScreen(
                                 }
                             },
                         )
-                        AppTextButton(
+                        AppActionRow(
                             text = stringResource(Res.string.import_parse),
                             onClick = { onParse(textFieldState.text) },
                         )
@@ -188,7 +188,7 @@ fun ImportScreen(
             item { SectionTitle(text = stringResource(Res.string.import_section_preview)) }
             items(previews.size) { index -> PreviewCard(previews[index]) { onToggle(index) } }
             item {
-                AppTextButton(
+                AppActionRow(
                     text = pluralStringResource(
                         Res.plurals.import_confirm,
                         previews.count { it.selected },

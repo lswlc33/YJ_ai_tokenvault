@@ -2,6 +2,8 @@ package com.lc33.tokenvault.domain.repo
 
 import com.lc33.tokenvault.domain.AutoLockTimeout
 import com.lc33.tokenvault.domain.DefaultProbeSettings
+import com.lc33.tokenvault.domain.model.PredictiveBackExitDirection
+import com.lc33.tokenvault.domain.model.PredictiveBackStyle
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -137,4 +139,18 @@ interface SettingsRepository {
     fun observeBlurNavBar(): Flow<Boolean>
 
     suspend fun setBlurNavBar(enabled: Boolean)
+
+    /**
+     * 预见式返回样式（§13.4 外观页）。没写过的键回退 [PredictiveBackStyle.Miuix]。
+     *
+     * 存稳定字符串而不是枚举下标：将来调整下拉顺序时，用户已选择的含义不能变。
+     */
+    fun observePredictiveBackStyle(): Flow<PredictiveBackStyle>
+
+    suspend fun setPredictiveBackStyle(style: PredictiveBackStyle)
+
+    /** Scale 样式的退出方向。没写过的键回退 [PredictiveBackExitDirection.AlwaysRight]。 */
+    fun observePredictiveBackExitDirection(): Flow<PredictiveBackExitDirection>
+
+    suspend fun setPredictiveBackExitDirection(direction: PredictiveBackExitDirection)
 }

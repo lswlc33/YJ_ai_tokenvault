@@ -105,7 +105,7 @@
     <string name="settings_data">数据</string>
     <string name="settings_data_summary">模型元数据、分组、日志</string>
     <string name="settings_sync_row">备份与 WebDAV</string>
-    <string name="settings_sync_row_summary">加密备份、恢复、定时上传</string>
+    <string name="settings_sync_row_summary">加密备份、恢复与 WebDAV</string>
     <string name="settings_update_row">检查更新</string>
     <string name="settings_update_row_summary">当前版本 %1$s</string>
     <string name="settings_about_row">关于元记</string>
@@ -163,6 +163,20 @@
     <string name="appearance_section_theme">主题</string>
     <string name="appearance_color_scheme">配色模式</string>
     <string name="appearance_blur">底栏模糊</string>
+    <string name="predictive_back_style">返回动画</string>
+    <string-array name="predictive_back_styles">
+        <item>无</item>
+        <item>AOSP</item>
+        <item>MIUIX</item>
+        <item>缩放</item>
+        <item>经典</item>
+    </string-array>
+    <string name="predictive_back_exit_direction">缩放退出方向</string>
+    <string-array name="predictive_back_exit_directions">
+        <item>跟随手势</item>
+        <item>始终向右</item>
+        <item>始终向左</item>
+    </string-array>
     <string name="appearance_blur_summary">好看，但要花一点 GPU。老机器上可以关掉。</string>
     <string name="appearance_section_language">语言</string>
     <string name="appearance_language">应用语言</string>
@@ -260,6 +274,29 @@
 
     <!-- Sync -->
     <string name="sync_section_local">备份文件</string>
+    <string name="sync_section_webdav">WebDAV</string>
+    <string name="sync_webdav_title">WebDAV 设置</string>
+    <string name="sync_webdav_settings">WebDAV 设置</string>
+    <string name="sync_webdav_settings_summary">先填地址、用户名和密码；远程目录需要已经存在</string>
+    <string name="sync_webdav_settings_configured">已配置；凭据不会回显</string>
+    <string name="sync_webdav_url_label">服务器地址</string>
+    <string name="sync_webdav_url_invalid">地址必须是 http:// 或 https:// 开头</string>
+    <string name="sync_webdav_directory_label">远程目录</string>
+    <string name="sync_webdav_username_label">用户名</string>
+    <string name="sync_webdav_password_label">密码</string>
+    <string name="sync_webdav_credentials_keep">已保存的凭据会保留；输入新值才会覆盖</string>
+    <string name="sync_webdav_credentials_required">首次配置需要同时填用户名和密码</string>
+    <string name="sync_webdav_insecure_required">允许明文 HTTP</string>
+    <string name="sync_insecure_http_warning">Basic 凭据和备份包都会明文过网，只在自建可信网络里打开</string>
+    <string name="sync_webdav_upload">上传备份</string>
+    <string name="sync_webdav_upload_summary">加密后上传，远端最多保留 10 份</string>
+    <string name="sync_webdav_restore">从 WebDAV 恢复最新备份</string>
+    <string name="sync_webdav_restore_summary">下载最新的 .yjv 后再选合并方式</string>
+    <string name="sync_webdav_refresh">刷新远端列表</string>
+    <string name="sync_webdav_refresh_summary">只读操作，不上传也不修改数据</string>
+    <string name="sync_remote_count">远端备份：%1$d 份</string>
+    <string name="sync_result_webdav_configured">WebDAV 设置已保存</string>
+    <string name="sync_result_webdav_uploaded">已上传 %1$s，清理 %2$d 份旧备份</string>
     <string name="sync_export">导出加密备份</string>
     <string name="sync_export_summary">自包含：KDF 参数与盐都在包里，所以能在一台从没见过这台机器的手机上恢复</string>
     <string name="sync_import">从备份恢复</string>
@@ -283,6 +320,9 @@
     <string name="update_channel">更新渠道</string>
     <string name="update_channel_summary">nightly 没过发布前的回归</string>
     <string name="update_section_honesty">这件事到底做了什么</string>
+    <string name="update_highlight_title">检查更新</string>
+    <string name="update_highlight_summary">当前版本 %1$s。更新检查只在你进入更新页后手动触发。</string>
+    <string name="update_highlight_action">打开更新页</string>
     <string name="update_check_now">立即检查</string>
     <string name="update_checking">正在检查…</string>
     <string name="update_up_to_date">已经是最新版本。</string>

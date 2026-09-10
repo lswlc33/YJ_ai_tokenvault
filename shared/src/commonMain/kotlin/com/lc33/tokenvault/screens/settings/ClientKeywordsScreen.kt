@@ -27,7 +27,7 @@ import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppIconButton
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppTextField
-import com.lc33.tokenvault.ui.miuix.AppTextButton
+import com.lc33.tokenvault.ui.miuix.AppActionRow
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.SectionTitle
 import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
@@ -125,7 +125,7 @@ fun ClientKeywordsScreen(
                     .padding(horizontal = tokens.screenPadding, vertical = tokens.itemSpacing),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                AppTextButton(
+                AppActionRow(
                     text = stringResource(Res.string.probe_keywords_add),
                     onClick = {
                         val kw = input.text.trim()
@@ -136,7 +136,7 @@ fun ClientKeywordsScreen(
                     },
                 )
                 Spacer(Modifier.width(12.dp))
-                AppTextButton(
+                AppActionRow(
                     text = stringResource(Res.string.probe_thresholds_save),
                     onClick = {
                         viewModel.save(items)

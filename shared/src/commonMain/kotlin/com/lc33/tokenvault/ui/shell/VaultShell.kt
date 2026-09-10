@@ -14,11 +14,8 @@ import androidx.compose.ui.Modifier
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavDestination
-import androidx.navigation.NavDestination.Companion.hasRoute
-import androidx.navigation.NavHostController
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
+import com.lc33.tokenvault.domain.model.PredictiveBackExitDirection
+import com.lc33.tokenvault.domain.model.PredictiveBackStyle
 import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.platform.Haptics
 import tokenvault.shared.generated.resources.Res
@@ -30,12 +27,13 @@ import com.lc33.tokenvault.ui.miuix.AppNavBarItem
 import com.lc33.tokenvault.ui.miuix.AppScaffold
 import com.lc33.tokenvault.ui.miuix.AppSnackbarHost
 import com.lc33.tokenvault.ui.miuix.LocalAppSnackbar
+import com.lc33.tokenvault.ui.miuix.navigation.rememberVaultBackStack
 import com.lc33.tokenvault.ui.miuix.appLayerBackdrop
 import com.lc33.tokenvault.ui.miuix.rememberAppLayerBackdrop
 import com.lc33.tokenvault.ui.miuix.rememberAppSnackbarState
 
 /**
- * 外层 Shell。**只负责三件事**：底部导航、Snackbar、承载 NavHost。
+ * 外层 Shell。**只负责三件事**：底部导航、Snackbar、承载 Navigation 3 容器。
  *
  * 它不持有 topBar —— 顶栏由各页面自己的 [AppScaffold] 提供（计划.md §13.1）。
  * 把 topBar 放上来的代价很具体：要么变成一个按路由分支的巨型 `when`，
@@ -44,14 +42,14 @@ import com.lc33.tokenvault.ui.miuix.rememberAppSnackbarState
  */
 @Composable
 fun VaultShell() {
-    val nav = rememberNavController()
-    val entry by nav.currentBackStackEntryAsState()
+    val backStack = rememberVaultBackStack()
     val snackbar = rememberAppSnackbarState()
 
-    // 底栏模糊开关。权威 `app_settings.blurNavBar`，由 AppearanceViewModel 派生——
-    // 这里另取一个实例没关系，它派生自单例仓库（同 AppRoot 里配色模式的取法）。
+    // 底栏模糊与返回动画都来自 app_settings：外观页改完，这里和导航层看到的是同一条流。
     val appearance: AppearanceViewModel = koinViewModel()
     val blurNavBar by appearance.blurNavBar.collectAsStateWithLifecycle()
+    val backStyle by appearance.predictiveBackStyle.collectAsStateWithLifecycle()
+    val backExitDirection by appearance.predictiveBackExitDirection.collectAsStateWithLifecycle()
 
     // 底栏模糊：backdrop 捕获内容区，NavigationBar 挂 textureBlur。开关关掉时
     // textureBlur(enabled=false) 直接跳过模糊、内容照常画，所以 backdrop 始终创建无妨。
@@ -62,7 +60,7 @@ fun VaultShell() {
         AppNavBarItem(label = stringResource(Res.string.nav_manage), icon = AppIcon.Manage),
         AppNavBarItem(label = stringResource(Res.string.nav_settings), icon = AppIcon.Settings),
     )
-    val selectedIndex = remember(entry) { topLevelIndexOf(entry?.destination) }
+    val selectedIndex = topLevelIndexOf(backStack.lastOrNull())
 
     AppScaffold(
         bottomBar = {
@@ -81,7 +79,7 @@ fun VaultShell() {
                         // 切 tab 给轻触反馈（问题 5）。只在本页已经在底栏可见时触发，
                         // 否则首屏加载也会震一下。
                         if (selectedIndex >= 0) Haptics.tap()
-                        nav.navigateTopLevel(index)
+                        navigateTopLevel(backStack, index)
                     },
                     blur = blurNavBar,
                     blurBackdrop = backdrop,
@@ -94,7 +92,9 @@ fun VaultShell() {
             // 只取底部：底栏高度不是 inset，页面自己的 Scaffold 无从得知，必须由这里让出来。
             // 顶部与状态栏由页面自己的 Scaffold + TopAppBar 处理（计划.md §15.16）。
             VaultNavHost(
-                nav = nav,
+                backStack = backStack,
+                style = backStyle,
+                exitDirection = backExitDirection,
                 modifier = Modifier
                     .padding(bottom = padding.calculateBottomPadding())
                     .appLayerBackdrop(backdrop),
@@ -104,23 +104,20 @@ fun VaultShell() {
 }
 
 /** 一级页返回 0/1/2，二级页返回 -1（此时不显示底栏）。 */
-private fun topLevelIndexOf(destination: NavDestination?): Int = when {
-    destination == null -> 0
-    destination.hasRoute<DashboardRoute>() -> 0
-    destination.hasRoute<ManageRoute>() -> 1
-    destination.hasRoute<SettingsRoute>() -> 2
+private fun topLevelIndexOf(route: VaultRoute?): Int = when (route) {
+    null, DashboardRoute -> 0
+    ManageRoute -> 1
+    SettingsRoute -> 2
     else -> -1
 }
 
-private fun NavHostController.navigateTopLevel(index: Int) {
-    val route: Any = when (index) {
+/** 三个 tab 都是 Dashboard 后的一层；系统返回永远回到总览，不在 tab 间绕圈。 */
+private fun navigateTopLevel(backStack: MutableList<VaultRoute>, index: Int) {
+    val route = when (index) {
         0 -> DashboardRoute
         1 -> ManageRoute
         else -> SettingsRoute
     }
-    navigate(route) {
-        popUpTo<DashboardRoute> { saveState = true }
-        launchSingleTop = true
-        restoreState = true
-    }
+    while (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
+    if (backStack.lastOrNull() != route) backStack.add(route)
 }

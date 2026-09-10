@@ -40,7 +40,7 @@ import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppIconButton
 import com.lc33.tokenvault.ui.miuix.AppScaffold
 import com.lc33.tokenvault.ui.miuix.AppText
-import com.lc33.tokenvault.ui.miuix.AppTextButton
+import com.lc33.tokenvault.ui.miuix.AppActionRow
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.AppTopBar
 import com.lc33.tokenvault.ui.miuix.SectionTitle
@@ -171,7 +171,7 @@ private fun SummaryCard(
             modifier = Modifier.padding(top = 4.dp),
         )
         if (hasRetryable) {
-            AppTextButton(
+            AppActionRow(
                 text = stringResource(Res.string.probe_run_retry),
                 onClick = onRetry,
                 modifier = Modifier.padding(top = tokens.itemSpacing),

@@ -1,98 +1,103 @@
 package com.lc33.tokenvault.ui.shell
 
+import androidx.navigation3.runtime.NavKey
 import kotlinx.serialization.Serializable
 
 /**
- * 类型安全路由（Navigation Compose 2.8+ 的 `@Serializable` 路由对象）。
+ * Navigation 3 的 `NavKey` 路由（`@Serializable`，进程恢复走 rememberNavBackStack）。
  *
  * 计划.md §13.1 列了全部路由，这里只声明已经有目标页的那几个——
  * 声明一个没有 `composable<T>` 的路由，第一次 navigate 就会崩，
  * 所以路由跟着页面一起加。
  */
 
+/** Navigation 3 的路由 Key。实现都留在本文件，便于一次性注册 KMP 序列化器。 */
+@Serializable
+sealed interface VaultRoute : NavKey
+
 // ---------------------------------------------------------------- 一级页（底栏三项）
 
 /** 只读总览。不提供任何编辑入口，每一行的点击结果都是"跳到管理页的某个详情"。 */
 @Serializable
-data object DashboardRoute
+data object DashboardRoute : VaultRoute
 
 /** 全部内容的列表，也是唯一的编辑入口。 */
 @Serializable
-data object ManageRoute
+data object ManageRoute : VaultRoute
 
 /** 软件自身的配置。本身是导航面板，具体项在各二级页。 */
 @Serializable
-data object SettingsRoute
+data object SettingsRoute : VaultRoute
 
 // ---------------------------------------------------------------- 管理下的二级页
 
 @Serializable
-data class ProviderDetailRoute(val id: Long)
+data class ProviderDetailRoute(val id: Long) : VaultRoute
 
 @Serializable
-data class ProviderEditorRoute(val id: Long? = null)
+data class ProviderEditorRoute(val id: Long? = null) : VaultRoute
 
 @Serializable
-data object ImportRoute
+data object ImportRoute : VaultRoute
 
 @Serializable
-data object GroupsRoute
+data object GroupsRoute : VaultRoute
 
 // ---------------------------------------------------------------- 仪表盘下的二级页
 
 /** 本轮 / 上轮探测的逐项结果。探测是动作不是内容，所以它在这里而不在底栏。 */
 @Serializable
-data object ProbeRunRoute
+data object ProbeRunRoute : VaultRoute
 
 @Serializable
-data object BalanceBreakdownRoute
+data object BalanceBreakdownRoute : VaultRoute
 
 // ---------------------------------------------------------------- 设置下的二级页
 
 @Serializable
-data object AppearanceRoute
+data object AppearanceRoute : VaultRoute
 
 @Serializable
-data object SecurityRoute
+data object SecurityRoute : VaultRoute
 
 /** 改 PIN。只重新包裹数据密钥，不重新加密数据（红线 2）。 */
 @Serializable
-data object ChangePinRoute
+data object ChangePinRoute : VaultRoute
 
 @Serializable
-data object ProbeSettingsRoute
+data object ProbeSettingsRoute : VaultRoute
 
 /** 余额低额阈值编辑（探测设置页的二级页）。 */
 @Serializable
-data object BalanceThresholdsRoute
+data object BalanceThresholdsRoute : VaultRoute
 
 /** 客户端拦截关键词编辑（探测设置页的二级页）。 */
 @Serializable
-data object ClientKeywordsRoute
+data object ClientKeywordsRoute : VaultRoute
 
 /** 手动 HTTP 代理编辑（探测设置页的二级页）。 */
 @Serializable
-data object ProxyRoute
+data object ProxyRoute : VaultRoute
 
 @Serializable
-data object ProfileListRoute
+data object ProfileListRoute : VaultRoute
 
 /** 编辑 / 新建一个客户端预设。id = 0 表示新建（可从 cURL 导入）。 */
 @Serializable
-data class ProfileEditorRoute(val id: Long = 0)
+data class ProfileEditorRoute(val id: Long = 0) : VaultRoute
 
 @Serializable
-data object DataRoute
+data object DataRoute : VaultRoute
 
 /** 日志页（audit_log）。数据页的「日志」入口。 */
 @Serializable
-data object LogRoute
+data object LogRoute : VaultRoute
 
 @Serializable
-data object SyncRoute
+data object SyncRoute : VaultRoute
 
 @Serializable
-data object UpdateRoute
+data object UpdateRoute : VaultRoute
 
 @Serializable
-data object AboutRoute
+data object AboutRoute : VaultRoute

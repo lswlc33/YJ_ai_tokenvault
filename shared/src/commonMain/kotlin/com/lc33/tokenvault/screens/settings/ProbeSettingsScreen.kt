@@ -31,7 +31,7 @@ import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppPreferenceGroup
 import com.lc33.tokenvault.ui.miuix.AppSwitchRow
 import com.lc33.tokenvault.ui.miuix.AppText
-import com.lc33.tokenvault.ui.miuix.AppTextButton
+import com.lc33.tokenvault.ui.miuix.AppActionRow
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.SectionTitle
 import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
@@ -154,7 +154,7 @@ private fun DefaultsNoticeCard(onOpenManage: () -> Unit) {
             style = AppTextStyle.Secondary,
             color = appSecondaryTextColor,
         )
-        AppTextButton(
+        AppActionRow(
             text = stringResource(Res.string.probe_defaults_goto_manage),
             onClick = onOpenManage,
             modifier = Modifier.padding(top = tokens.itemSpacing),

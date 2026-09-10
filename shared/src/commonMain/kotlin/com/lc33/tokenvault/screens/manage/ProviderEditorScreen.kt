@@ -101,7 +101,7 @@ import com.lc33.tokenvault.ui.miuix.AppScaffold
 import com.lc33.tokenvault.ui.miuix.AppSecretTextField
 import com.lc33.tokenvault.ui.miuix.AppSwitchRow
 import com.lc33.tokenvault.ui.miuix.AppText
-import com.lc33.tokenvault.ui.miuix.AppTextButton
+import com.lc33.tokenvault.ui.miuix.AppActionRow
 import com.lc33.tokenvault.ui.miuix.AppTextField
 import com.lc33.tokenvault.ui.miuix.AppTextFieldState
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
@@ -556,7 +556,7 @@ private fun AdvancedBlock(draft: ProviderDraft, onChange: (ProviderDraft) -> Uni
     val timeout = rememberAppTextFieldState(draft.timeoutSeconds)
 
     Column {
-        AppTextButton(
+        AppActionRow(
             text = stringResource(
                 if (expanded) Res.string.editor_advanced_collapse else Res.string.editor_advanced_expand,
             ),

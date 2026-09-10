@@ -187,6 +187,47 @@ fun AppArrowRow(
 }
 
 /**
+ * 主题色大卡片。首页与关于页的“检查更新”入口用它：它必须是页面里的一张卡，
+ * 不是一枚按钮；点击只是跳到更新页，真正的动作按钮仍留在对话框里。
+ */
+@Composable
+fun AppAccentCard(
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val tokens = LocalAppTokens.current
+    Surface(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(tokens.cardRadius),
+        color = appPrimaryColor,
+        contentColor = appOnPrimaryColor,
+    ) {
+        Column(
+            modifier = Modifier.padding(tokens.sectionSpacing),
+            content = content,
+        )
+    }
+}
+
+/**
+ * 页面主体里的动作入口。形态固定为 preference 行，而不是按钮；
+ * 弹层与对话框仍可用 [AppTextButton]，页面主体一律走这里。
+ */
+@Composable
+fun AppActionRow(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    primary: Boolean = false,
+) {
+    // primary 只保留旧调用的语义占位；入口形态不随强调级别变成按钮。
+    AppArrowRow(title = text, modifier = modifier, enabled = enabled, onClick = onClick)
+}
+
+/**
  * 文本按钮。页面主体与弹窗里唯一的"按钮"形态（红线：MIUIX 长方形实心按钮不进页面主体）。
  *
  * [primary] 控制强调级别：主动作（"开始"、"确认"、"从备份恢复"）用主色实底

@@ -17,13 +17,13 @@ activity = "1.13.0"
 fragment = "1.9.0"
 coreKtx = "1.19.0"
 lifecycle = "2.11.0"
-navigation = "2.10.0"
+navigation3 = "1.1.1"
 work = "2.11.2"
 # 1.1.0 是最后一个稳定版（之后只有 1.2.0-alpha / 1.4.0-alpha）。
 # BiometricPrompt + CryptoObject + setAllowedAuthenticators(BIOMETRIC_STRONG) 都在 1.1.0 里。
 biometric = "1.1.0"
 # 实验期库，锁死版本；升级时先在分支里过一遍所有页面（计划.md §15.18）。
-# miuix-nav 只发到 0.9.4-rc01，本项目用 androidx.navigation，不需要它。
+# miuix-nav 只发到 0.9.4-rc01；本项目锁 0.9.1 并使用它的 navigation3-ui KMP 变体。
 #
 # 0.9.3 → 0.9.1 降级（2026-09-07）：iOS 编译被 KLIB ABI 卡死——0.9.2/0.9.3 的 klib
 # 是 Kotlin 2.4.0 编的（abi_version=2.4.0），0.9.4-rc01 是 2.4.10，而本项目 Kotlin
@@ -84,6 +84,8 @@ miuix-blur = { module = "top.yukonga.miuix.kmp:miuix-blur-android", version.ref 
 # KMP 版 miuix-blur（阶段3）：commonMain 里 ui/miuix/AppScaffold 的 LayerBackdrop/textureBlur 用它，
 # 有 iOS 产物（miuix-blur-iosarm64 / -iossimulatorarm64）。
 miuix-blur-kmp = { module = "top.yukonga.miuix.kmp:miuix-blur", version.ref = "miuix" }
+# Navigation 3 UI（MIUIX 0.9.1 的 KMP 版导航容器；0.9.1 本身就是按 nav3 1.1.1 编的）。
+miuix-navigation3-ui = { module = "top.yukonga.miuix.kmp:miuix-navigation3-ui", version.ref = "miuix" }
 
 # --- Compose（不引入 material3，避免与 MIUIX 两套主题打架） ---
 compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
@@ -107,8 +109,10 @@ cmp-components-resources = { module = "org.jetbrains.compose.components:componen
 # 字符串/资源 API：stringResource / pluralStringResource 在 org.jetbrains.compose.resources 包。
 # 由 compose-multiplatform 插件生成 Res 类。
 cmp-ui-tooling-preview = { module = "org.jetbrains.compose.ui:ui-tooling-preview", version.ref = "composeMultiplatform" }
-# multiplatform navigation（org.jetbrains.androidx.navigation.compose）—— 阶段3 替换 androidx.navigation.compose。
-cmp-navigation-compose = { module = "org.jetbrains.androidx.navigation:navigation-compose", version = "2.9.2" }
+# AndroidX Navigation 3 runtime。KMP 显式保存 back stack 需要注册 NavKey 子类。
+androidx-navigation3-runtime = { module = "androidx.navigation3:navigation3-runtime", version.ref = "navigation3" }
+# 给每个 Nav3 entry 提供独立 ViewModelStore/SavedStateHandle，避免页面级 VM 变成 Activity 单例。
+androidx-lifecycle-viewmodel-navigation3 = { module = "androidx.lifecycle:lifecycle-viewmodel-navigation3", version.ref = "lifecycle" }
 # multiplatform lifecycle（org.jetbrains.androidx.lifecycle.*）—— 阶段3 替换 androidx.lifecycle.compose。
 cmp-lifecycle-runtime-compose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose", version = "2.10.0" }
 cmp-lifecycle-viewmodel-compose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose", version = "2.10.0" }
@@ -121,8 +125,6 @@ androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-ru
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 # 切后台自动锁定要用 ProcessLifecycleOwner（计划.md §7.4）
 androidx-lifecycle-process = { module = "androidx.lifecycle:lifecycle-process", version.ref = "lifecycle" }
-# 类型安全路由需要 2.8+
-androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigation" }
 
 # --- 数据层 ---
 room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }

@@ -36,7 +36,7 @@ import tokenvault.shared.generated.resources.onboarding_welcome_title
 import tokenvault.shared.generated.resources.onboarding_welcome_what
 import com.lc33.tokenvault.ui.miuix.AppLinearProgress
 import com.lc33.tokenvault.ui.miuix.AppText
-import com.lc33.tokenvault.ui.miuix.AppTextButton
+import com.lc33.tokenvault.ui.miuix.AppActionRow
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.appPrimaryColor
 import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
@@ -121,12 +121,11 @@ private fun WelcomeStep(onNext: () -> Unit, enabled: Boolean) {
         BulletLine(stringResource(Res.string.onboarding_welcome_local))
     }
     Spacer(Modifier.height(tokens.sectionSpacing))
-    AppTextButton(
+    AppActionRow(
         text = stringResource(Res.string.onboarding_start),
         onClick = onNext,
         modifier = Modifier.fillMaxWidth(),
         enabled = enabled,
-        primary = true,
     )
 }
 
@@ -187,7 +186,7 @@ private fun PinStep(state: OnboardingUiState, callbacks: LockCallbacks) {
     )
     if (confirming) {
         Spacer(Modifier.height(tokens.itemSpacing))
-        AppTextButton(
+        AppActionRow(
             text = stringResource(Res.string.onboarding_pin_restart),
             onClick = callbacks.onOnboardingBack,
             enabled = !state.busy,

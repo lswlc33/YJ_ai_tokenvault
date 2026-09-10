@@ -106,7 +106,7 @@
     <string name="settings_data">Data</string>
     <string name="settings_data_summary">Model metadata, groups, logs</string>
     <string name="settings_sync_row">Backup and WebDAV</string>
-    <string name="settings_sync_row_summary">Encrypted backup, restore, scheduled upload</string>
+    <string name="settings_sync_row_summary">Encrypted backup, restore, and WebDAV</string>
     <string name="settings_update_row">Check for updates</string>
     <string name="settings_update_row_summary">Current version %1$s</string>
     <string name="settings_about_row">About YuanJi</string>
@@ -164,6 +164,20 @@
     <string name="appearance_section_theme">Theme</string>
     <string name="appearance_color_scheme">Color scheme</string>
     <string name="appearance_blur">Blur the navigation bar</string>
+    <string name="predictive_back_style">Back animation</string>
+    <string-array name="predictive_back_styles">
+        <item>None</item>
+        <item>AOSP</item>
+        <item>Miuix</item>
+        <item>Scale</item>
+        <item>Classic</item>
+    </string-array>
+    <string name="predictive_back_exit_direction">Scale exit direction</string>
+    <string-array name="predictive_back_exit_directions">
+        <item>Follow gesture</item>
+        <item>Always right</item>
+        <item>Always left</item>
+    </string-array>
     <string name="appearance_blur_summary">Looks better, costs a little GPU time. Turn it off on older phones.</string>
     <string name="appearance_section_language">Language</string>
     <string name="appearance_language">App language</string>
@@ -261,6 +275,29 @@
 
     <!-- Sync -->
     <string name="sync_section_local">Backup file</string>
+    <string name="sync_section_webdav">WebDAV</string>
+    <string name="sync_webdav_title">WebDAV settings</string>
+    <string name="sync_webdav_settings">WebDAV settings</string>
+    <string name="sync_webdav_settings_summary">Fill in the endpoint, username and password; the remote directory must already exist</string>
+    <string name="sync_webdav_settings_configured">Configured; credentials are not echoed back</string>
+    <string name="sync_webdav_url_label">Server endpoint</string>
+    <string name="sync_webdav_url_invalid">The endpoint must start with http:// or https://</string>
+    <string name="sync_webdav_directory_label">Remote directory</string>
+    <string name="sync_webdav_username_label">Username</string>
+    <string name="sync_webdav_password_label">Password</string>
+    <string name="sync_webdav_credentials_keep">Saved credentials are kept; a new value overwrites them</string>
+    <string name="sync_webdav_credentials_required">Initial setup needs both username and password</string>
+    <string name="sync_webdav_insecure_required">Allow insecure HTTP</string>
+    <string name="sync_insecure_http_warning">Basic credentials and the backup would travel unencrypted; enable only on a trusted self-hosted network</string>
+    <string name="sync_webdav_upload">Upload backup</string>
+    <string name="sync_webdav_upload_summary">Encrypts first and keeps the latest 10 remote copies</string>
+    <string name="sync_webdav_restore">Restore latest WebDAV backup</string>
+    <string name="sync_webdav_restore_summary">Downloads the newest .yjv, then asks how to merge</string>
+    <string name="sync_webdav_refresh">Refresh remote list</string>
+    <string name="sync_webdav_refresh_summary">Read-only; nothing is uploaded or changed</string>
+    <string name="sync_remote_count">Remote backups: %1$d</string>
+    <string name="sync_result_webdav_configured">WebDAV settings saved</string>
+    <string name="sync_result_webdav_uploaded">Uploaded %1$s and pruned %2$d old backups</string>
     <string name="sync_export">Export an encrypted backup</string>
     <string name="sync_export_summary">Self-contained: it carries its own KDF parameters and salt, so it restores on a phone that has never seen this one</string>
     <string name="sync_import">Restore from a backup</string>
@@ -284,6 +321,9 @@
     <string name="update_channel">Update channel</string>
     <string name="update_channel_summary">Nightly is not release-tested</string>
     <string name="update_section_honesty">What this actually does</string>
+    <string name="update_highlight_title">Check for updates</string>
+    <string name="update_highlight_summary">Current version %1$s. Update checks stay manual on the update page.</string>
+    <string name="update_highlight_action">Open update page</string>
     <string name="update_check_now">Check now</string>
     <string name="update_checking">Checking…</string>
     <string name="update_up_to_date">You are on the latest version.</string>

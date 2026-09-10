@@ -2,6 +2,8 @@ package com.lc33.tokenvault
 
 import com.lc33.tokenvault.domain.AutoLockPolicy
 import com.lc33.tokenvault.domain.ClipboardClearPolicy
+import com.lc33.tokenvault.domain.model.PredictiveBackExitDirection
+import com.lc33.tokenvault.domain.model.PredictiveBackStyle
 import com.lc33.tokenvault.ui.theme.AppColorSchemeMode
 import java.io.File
 import org.junit.Assert.assertTrue
@@ -158,6 +160,18 @@ class ArchitectureRulesTest {
     }
 
     @Test
+    fun `页面主体不允许出现文本按钮`() {
+        // 按钮只允许在 OverlayDialog / OverlayBottomSheet 里；页面主体统一走行入口或卡片。
+        val violations = (allKotlinFiles(appSourceRoot) + allKotlinFiles(sharedSourceRoot))
+            .filter { file ->
+                val path = file.displayPath()
+                path.startsWith("screens/") || path.startsWith("shared/screens/")
+            }
+            .filter { it.readText().contains("AppTextButton") }
+            .map { it.displayPath() }
+        fail("页面主体不允许 import 或调用 AppTextButton（弹层按钮由 AppDialog / AppBottomSheet 提供）：", violations)
+    }
+    @Test
     fun `Compose 代码里没有中文字面量`() {
         val violations = mutableListOf<String>()
         for (file in allKotlinFiles(appSourceRoot) + allKotlinFiles(sharedSourceRoot)) {
@@ -183,6 +197,23 @@ class ArchitectureRulesTest {
         fail(
             "配色下拉按下标取值，两边数量必须一致（红线 17 的同一条道理）：",
             arrayItemCountMismatches("color_scheme_modes", AppColorSchemeMode.entries.size, "AppColorSchemeMode"),
+        )
+    }
+
+    @Test
+    fun `返回动画下拉的选项数与枚举一致`() {
+        // 这两个下拉同样按 ordinal/entries 下标取值；顺序错了会直接把用户选的样式换掉。
+        fail(
+            "返回动画下拉按下标取值，两边数量必须一致（红线 17 的同一条道理）：",
+            arrayItemCountMismatches("predictive_back_styles", PredictiveBackStyle.entries.size, "PredictiveBackStyle"),
+        )
+    }
+
+    @Test
+    fun `返回方向下拉的选项数与枚举一致`() {
+        fail(
+            "返回方向下拉按下标取值，两边数量必须一致（红线 17 的同一条道理）：",
+            arrayItemCountMismatches("predictive_back_exit_directions", PredictiveBackExitDirection.entries.size, "PredictiveBackExitDirection"),
         )
     }
 

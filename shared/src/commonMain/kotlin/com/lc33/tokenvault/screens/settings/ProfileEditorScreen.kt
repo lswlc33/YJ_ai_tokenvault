@@ -55,7 +55,7 @@ import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppIconButton
 import com.lc33.tokenvault.ui.miuix.AppScaffold
 import com.lc33.tokenvault.ui.miuix.AppText
-import com.lc33.tokenvault.ui.miuix.AppTextButton
+import com.lc33.tokenvault.ui.miuix.AppActionRow
 import com.lc33.tokenvault.ui.miuix.AppTextField
 import com.lc33.tokenvault.ui.miuix.AppTextFieldState
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
@@ -241,7 +241,7 @@ fun ProfileEditorScreen(
 
             if (!isBuiltin) {
                 item {
-                    AppTextButton(
+                    AppActionRow(
                         text = stringResource(Res.string.profile_editor_delete),
                         onClick = { showDelete = true },
                         modifier = Modifier.padding(horizontal = tokens.screenPadding),
@@ -279,7 +279,7 @@ private fun CurlImportCard(
     val tokens = LocalAppTokens.current
     val palette = LocalStatusPalette.current
     Column {
-        AppTextButton(
+        AppActionRow(
             text = stringResource(Res.string.profile_editor_from_curl),
             onClick = onToggle,
             modifier = Modifier.padding(horizontal = tokens.screenPadding),
@@ -315,7 +315,7 @@ private fun CurlImportCard(
                     color = palette.warn,
                 )
             }
-            AppTextButton(
+            AppActionRow(
                 text = stringResource(Res.string.profile_editor_parse),
                 onClick = onParse,
             )
@@ -350,7 +350,7 @@ private fun AdvancedSection(bodyPatch: AppTextFieldState) {
     val tokens = LocalAppTokens.current
     var expanded by remember { mutableStateOf(false) }
     Column {
-        AppTextButton(
+        AppActionRow(
             text = stringResource(
                 if (expanded) Res.string.editor_advanced_collapse else Res.string.editor_advanced_expand,
             ),

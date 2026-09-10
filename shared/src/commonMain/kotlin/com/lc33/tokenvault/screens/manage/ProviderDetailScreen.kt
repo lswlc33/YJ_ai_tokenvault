@@ -61,7 +61,7 @@ import com.lc33.tokenvault.ui.miuix.AppIconButton
 import com.lc33.tokenvault.ui.miuix.AppScaffold
 import com.lc33.tokenvault.ui.miuix.AppSecretTextField
 import com.lc33.tokenvault.ui.miuix.AppText
-import com.lc33.tokenvault.ui.miuix.AppTextButton
+import com.lc33.tokenvault.ui.miuix.AppActionRow
 import com.lc33.tokenvault.ui.miuix.AppTextField
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.AppTopBar
@@ -288,7 +288,7 @@ private fun HintCard(text: String, actionText: String, onAction: () -> Unit) {
             .padding(horizontal = tokens.screenPadding),
     ) {
         AppText(text = text, style = AppTextStyle.Secondary, color = appSecondaryTextColor)
-        AppTextButton(
+        AppActionRow(
             text = actionText,
             onClick = onAction,
             modifier = Modifier.padding(top = tokens.itemSpacing),
@@ -334,11 +334,11 @@ private fun AddKeySheet(
             supportingText = stringResource(Res.string.detail_key_secret_hint),
             modifier = Modifier.padding(top = tokens.itemSpacing),
         )
-        AppTextButton(
+        AppActionRow(
             text = stringResource(Res.string.editor_save),
             onClick = {
                 val chars = secret.chars
-                if (chars.isEmpty()) return@AppTextButton
+                if (chars.isEmpty()) return@AppActionRow
                 val text = label.text
                 // 先清输入框再交出去：交出去那一份是拷贝，而输入框里那一份归这一层擦
                 secret.clear()
@@ -383,20 +383,20 @@ private fun RevealKeySheet(
             color = appSecondaryTextColor,
             modifier = Modifier.padding(top = tokens.itemSpacing),
         )
-        AppTextButton(
+        AppActionRow(
             text = stringResource(Res.string.secret_copy_cd),
             onClick = onCopy,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = tokens.itemSpacing),
         )
-        AppTextButton(
+        AppActionRow(
             text = stringResource(Res.string.detail_key_set_default),
             onClick = onSetDefault,
             modifier = Modifier.fillMaxWidth(),
         )
         if (onDelete != null) {
-            AppTextButton(
+            AppActionRow(
                 text = stringResource(Res.string.groups_delete),
                 onClick = onDelete,
                 modifier = Modifier.fillMaxWidth(),
@@ -458,7 +458,7 @@ private fun RevealAccountSheet(
             color = appSecondaryTextColor,
             modifier = Modifier.padding(top = tokens.itemSpacing),
         )
-        AppTextButton(
+        AppActionRow(
             text = stringResource(Res.string.secret_copy_cd),
             onClick = { onCopy(account.label) },
             modifier = Modifier

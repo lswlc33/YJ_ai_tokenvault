@@ -1,6 +1,5 @@
 package com.lc33.tokenvault.ui.shell
 
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lc33.tokenvault.domain.model.ClientProfile
@@ -21,8 +20,7 @@ import kotlinx.coroutines.launch
  *
  * 三条决定：
  *
- * 1. **id 从 [SavedStateHandle] 取**（与供应商编辑页同一个理由：进程回收后回来，界面重建而
- *    路由参数还在）。id = 0 表示新建（可从 cURL 导入）。
+ * 1. **id 从 Nav3 路由 Key 取**：back stack 恢复后仍是同一个 Key。id = 0 表示新建。
  * 2. **内置预设可编辑不可删**：`builtinKey` 非空的那枚，删除动作直接 no-op（DAO 那条
  *    `deleteCustom` 的 SQL 也带了 `builtinKey IS NULL`，双保险）。编辑内置时置
  *    `userEdited = true`，这样以后升 [BuiltinPresets.REV] 不会覆盖用户改过的指纹。
@@ -31,10 +29,8 @@ import kotlinx.coroutines.launch
  */
 class ProfileEditorViewModel constructor(
     private val profiles: ClientProfileRepository,
-    savedState: SavedStateHandle,
+    private val profileId: Long,
 ) : ViewModel() {
-
-    private val profileId: Long = savedState.get<Long>("id") ?: 0L
 
     /** 正在编辑的那一枚。新建时为 null。 */
     private val _profile = MutableStateFlow<ClientProfile?>(null)

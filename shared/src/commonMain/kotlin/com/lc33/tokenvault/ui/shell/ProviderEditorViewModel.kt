@@ -1,6 +1,5 @@
 package com.lc33.tokenvault.ui.shell
 
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lc33.tokenvault.crypto.zeroize
@@ -32,9 +31,8 @@ import kotlinx.coroutines.launch
  *
  * 三条决定：
  *
- * 1. **id 从 [SavedStateHandle] 取**，不靠界面在第一次组合时告诉它：进程被回收再回来时
- *    界面会重建，而 `SavedStateHandle` 里的路由参数还在。靠界面传的表现是"从后台回来，
- *    编辑页变成了新建页"。
+ * 1. **id 从 Nav3 路由 Key 取**：进程回收后 back stack 会恢复同一个 Key，页面重建时
+ *    仍会拿到同一个 id；VM 本身则由 ViewModelStore decorator 按路由独立清理。
  * 2. **保存时才规范化地址**（`normalizeBaseUrl`），失败就不写库并发一个事件让界面提示。
  *    编辑页那个实时预览已经把错误摊开了，所以这里只是最后一道闸——但它必须存在：
  *    预览是给人看的，人看不见也能点保存。
@@ -46,12 +44,10 @@ class ProviderEditorViewModel constructor(
     private val groupRepository: GroupRepository,
     private val clientProfiles: ClientProfileRepository,
     private val settings: SettingsRepository,
-    savedState: SavedStateHandle,
+    private val providerId: Long?,
 ) : ViewModel() {
 
     /** 0 或缺失 = 新建。 */
-    private val providerId: Long = savedState.get<Long>("id") ?: 0L
-
     val groups: StateFlow<List<Group>> = groupRepository.observeGroups()
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
@@ -84,7 +80,7 @@ class ProviderEditorViewModel constructor(
     private var loadedProvider: Provider? = null
 
     init {
-        if (providerId != 0L) {
+        if (providerId != null && providerId != 0L) {
             viewModelScope.launch {
                 // 先等分组列表到位：groupIndex 是按列表下标算的，列表还空着时算出来一定是 0，
                 // 表现是"这家明明分了组，编辑页却显示未分组"——而一保存就真的把分组清掉了

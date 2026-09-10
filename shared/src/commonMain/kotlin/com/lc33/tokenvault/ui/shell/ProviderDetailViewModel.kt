@@ -2,7 +2,6 @@ package com.lc33.tokenvault.ui.shell
 
 import com.lc33.tokenvault.platform.nowMillis
 
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lc33.tokenvault.crypto.zeroize
@@ -56,10 +55,8 @@ class ProviderDetailViewModel constructor(
     private val probeEngine: ProbeEngine,
     private val clipboard: SecureClipboard,
     private val knownSecrets: com.lc33.tokenvault.crypto.KnownSecrets,
-    savedState: SavedStateHandle,
+    private val providerId: Long,
 ) : ViewModel() {
-
-    private val providerId: Long = savedState.get<Long>("id") ?: 0L
 
     /**
      * 遮蔽串缓存。

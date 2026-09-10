@@ -106,8 +106,6 @@ fun GroupsScreen(
             EmptyState(
                 title = stringResource(Res.string.groups_empty_title),
                 description = stringResource(Res.string.groups_empty_desc),
-                actionText = stringResource(Res.string.groups_add),
-                onAction = { editing = newGroup },
                 modifier = Modifier.padding(padding),
             )
             return@AppScaffold

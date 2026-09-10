@@ -1,4 +1,4 @@
-﻿package com.lc33.tokenvault.screens.dashboard
+package com.lc33.tokenvault.screens.dashboard
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -67,7 +67,7 @@ import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppIconButton
 import com.lc33.tokenvault.ui.miuix.AppLinearProgress
 import com.lc33.tokenvault.ui.miuix.AppText
-import com.lc33.tokenvault.ui.miuix.AppTextButton
+import com.lc33.tokenvault.ui.miuix.AppActionRow
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
@@ -255,7 +255,7 @@ internal fun AttentionCard(items: List<AttentionItem>, onOpenProvider: (Long) ->
                 Row(horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing)) {
                     // 只有“被客户端校验拦下”这一档有一键修法，其余三档点整行进详情页
                     if (item.kind == AttentionKind.ClientBlocked) {
-                        AppTextButton(
+                        AppActionRow(
                             text = stringResource(Res.string.dashboard_attention_fix_client),
                             onClick = { onOpenProvider(item.providerId) },
                         )
@@ -301,7 +301,7 @@ internal fun ProbeCard(
                 style = AppTextStyle.Footnote,
                 color = appSecondaryTextColor,
             )
-            AppTextButton(
+            AppActionRow(
                 text = stringResource(Res.string.dashboard_probe_cancel),
                 onClick = onCancel,
                 modifier = Modifier.padding(top = tokens.itemSpacing),
@@ -344,9 +344,9 @@ internal fun ProbeCard(
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing)) {
-            AppTextButton(text = stringResource(Res.string.dashboard_probe_start), onClick = onStart)
+            AppActionRow(text = stringResource(Res.string.dashboard_probe_start), onClick = onStart)
             if (lastRun != null) {
-                AppTextButton(
+                AppActionRow(
                     text = stringResource(Res.string.dashboard_probe_detail),
                     onClick = onOpenDetail,
                 )
@@ -380,6 +380,6 @@ internal fun BackupCard(backup: BackupStatus, onOpenSync: () -> Unit) {
                 modifier = Modifier.padding(vertical = tokens.itemSpacing),
             )
         }
-        AppTextButton(text = stringResource(Res.string.dashboard_backup_now), onClick = onOpenSync)
+        AppActionRow(text = stringResource(Res.string.dashboard_backup_now), onClick = onOpenSync)
     }
 }

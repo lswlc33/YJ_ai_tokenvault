@@ -15,14 +15,26 @@ import tokenvault.shared.generated.resources.sync_export_summary
 import tokenvault.shared.generated.resources.sync_import
 import tokenvault.shared.generated.resources.sync_import_summary
 import tokenvault.shared.generated.resources.sync_passphrase_summary
+import tokenvault.shared.generated.resources.sync_remote_count
 import tokenvault.shared.generated.resources.sync_section_local
+import tokenvault.shared.generated.resources.sync_section_webdav
 import tokenvault.shared.generated.resources.sync_title
+import tokenvault.shared.generated.resources.sync_webdav_refresh
+import tokenvault.shared.generated.resources.sync_webdav_refresh_summary
+import tokenvault.shared.generated.resources.sync_webdav_restore
+import tokenvault.shared.generated.resources.sync_webdav_restore_summary
+import tokenvault.shared.generated.resources.sync_webdav_settings
+import tokenvault.shared.generated.resources.sync_webdav_settings_configured
+import tokenvault.shared.generated.resources.sync_webdav_settings_summary
+import tokenvault.shared.generated.resources.sync_webdav_upload
+import tokenvault.shared.generated.resources.sync_webdav_upload_summary
+import com.lc33.tokenvault.domain.model.WebDavConfig
 import com.lc33.tokenvault.screens.model.BackupStatus
+import com.lc33.tokenvault.ui.miuix.AppActionRow
 import com.lc33.tokenvault.ui.miuix.AppArrowRow
 import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppPreferenceGroup
 import com.lc33.tokenvault.ui.miuix.AppText
-import com.lc33.tokenvault.ui.miuix.AppTextButton
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.SectionTitle
 import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
@@ -30,24 +42,24 @@ import com.lc33.tokenvault.ui.theme.LocalAppTokens
 import com.lc33.tokenvault.ui.theme.LocalStatusPalette
 
 /**
- * 同步 —— 备份 / 恢复（计划.md §13.4、§12）。
+ * 同步 —— 本地备份 / 恢复与 WebDAV。
  *
- * 仪表盘那张备份卡点进来就是这一页。
- *
- * 一条不能软化的措辞：
- * - 备份口令默认沿用 PIN，所以传到云上的包同样是**分钟级可破**（§7.6）。提示常驻，
- *   不折叠。
- *
- * WebDAV（服务器 / 凭据 / 目录配置）与「自动备份」（周期上传到 WebDAV）都是可砍项，
- * 入口已移除（`onWebDav` / `autoBackup` 空实现是撑谎）——自动备份依赖 WebDAV 作目标，
- * WebDAV 砍掉后它没有消费方。将来实现 WebDAV 四动词 + 周期备份 Worker 时再加回。
+ * 页面主体只有行入口；所有需要输入或确认的动作都放在弹层里。WebDAV 凭据
+ * 不回显，改地址或目录时可以保留原凭据，只有输入了新值才覆盖。
  */
 @Composable
 fun SyncScreen(
     backup: BackupStatus,
+    webDavConfig: WebDavConfig,
+    webDavBusy: Boolean,
+    remoteBackups: List<String>?,
     onBack: () -> Unit,
     onExport: () -> Unit,
     onImport: () -> Unit,
+    onOpenWebDavSettings: () -> Unit,
+    onUploadWebDav: () -> Unit,
+    onRestoreWebDav: () -> Unit,
+    onRefreshWebDav: () -> Unit,
 ) {
     SettingsSubPage(titleRes = Res.string.sync_title, onBack = onBack) {
         item { StatusCard(backup, onExport) }
@@ -67,11 +79,49 @@ fun SyncScreen(
                 )
             }
         }
+
+        item { SectionTitle(text = stringResource(Res.string.sync_section_webdav)) }
         item {
-            // 备份口令默认沿用 PIN，导出/恢复时每次输入（可换任意长口令）。这里没有
-            // 独立的设置页——"单独设长口令"就是导出时输一个不同于 PIN 的口令，
-            // 持久化独立口令属于 WebDAV 无人值守备份（可砍），所以只留一行常驻提示
-            // （§12.1），不做成一个点了没反应的箭头行。
+            AppPreferenceGroup {
+                AppArrowRow(
+                    title = stringResource(Res.string.sync_webdav_settings),
+                    summary = stringResource(
+                        if (webDavConfig.isReady) {
+                            Res.string.sync_webdav_settings_configured
+                        } else {
+                            Res.string.sync_webdav_settings_summary
+                        },
+                    ),
+                    onClick = onOpenWebDavSettings,
+                )
+                AppActionRow(
+                    text = stringResource(Res.string.sync_webdav_upload),
+                    onClick = onUploadWebDav,
+                    enabled = webDavConfig.isReady && !webDavBusy,
+                )
+                AppActionRow(
+                    text = stringResource(Res.string.sync_webdav_restore),
+                    onClick = onRestoreWebDav,
+                    enabled = webDavConfig.isReady && !webDavBusy,
+                )
+                AppActionRow(
+                    text = stringResource(Res.string.sync_webdav_refresh),
+                    onClick = onRefreshWebDav,
+                    enabled = webDavConfig.isReady && !webDavBusy,
+                )
+            }
+        }
+        item {
+            AppText(
+                text = stringResource(Res.string.sync_remote_count, remoteBackups?.size ?: 0),
+                style = AppTextStyle.Footnote,
+                color = appSecondaryTextColor,
+                modifier = Modifier.padding(horizontal = LocalAppTokens.current.screenPadding),
+            )
+        }
+        item {
+            // 备份口令默认沿用 PIN；WebDAV 上传前同样要输入。这里常驻提示，
+            // 不折叠成“高级设置”。
             AppText(
                 text = stringResource(Res.string.sync_passphrase_summary),
                 style = AppTextStyle.Footnote,
@@ -112,6 +162,6 @@ private fun StatusCard(backup: BackupStatus, onExport: () -> Unit) {
                 modifier = Modifier.padding(vertical = tokens.itemSpacing),
             )
         }
-        AppTextButton(text = stringResource(Res.string.dashboard_backup_now), onClick = onExport)
+        AppActionRow(text = stringResource(Res.string.dashboard_backup_now), onClick = onExport)
     }
 }

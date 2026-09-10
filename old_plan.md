@@ -152,7 +152,7 @@ v3.2 相对 v3.1 的改动都来自 M0.5 实测，集中在：新增红线 33–
 | 语言 / 工具链 | Kotlin **2.3.21**，JDK 17，Gradle **9.5.0**，AGP **9.3.2**，KSP **2.3.11** | 与 `photo` 同一套（AGP 9.3.2 + compileSdk 37 已在本机验证）。AGP 9 **自带 Kotlin 支持**，所以插件块里不写 `org.jetbrains.kotlin.android`。Kotlin 停在 2.3 线是因为 KSP 最新版 2.3.11 依赖 `kotlin-stdlib 2.3.20`——2.4.x 目前没有对应的 KSP |
 | SDK | minSdk 33 / compileSdk 37 / targetSdk 37 | `miuix-blur-android` 要求 33；与 `photo` 一致 |
 | UI | Jetpack Compose + **MIUIX 0.9.3** | 不引入 `material3`，避免两套主题打架 |
-| 导航 | `androidx.navigation:navigation-compose` 类型安全路由（`@Serializable` 路由对象） | 二级页多、需要深链，手写状态机会失控 |
+| 导航 | `androidx.navigation3:navigation3-runtime` + MIUIX 0.9.1 `miuix-navigation3-ui` | 类型安全 `NavKey` 路由、KMP back stack，以及系统预见式返回的普通 / predictive pop 过渡 |
 | 状态 | ViewModel + `StateFlow` + `collectAsStateWithLifecycle` | |
 | 数据库 | **Room** + KSP，跑在**系统自带 SQLite** 上 | 见 4.4 的取舍说明。Room 不是另一个数据库，它就是"直接用 SQLite"外加编译期 SQL 校验、`Flow` 查询和可测迁移 |
 | 启动期存储 | 一个未加密的 boot 存储（Keystore 包裹材料 + 主题等启动必需项） | KDF 盐与包裹后的 DEK 必须在解锁前可读 |
@@ -1210,7 +1210,7 @@ fun VaultScreen(...) {
 
 `AppRoot` 里的锁屏、引导、恢复密钥展示页都要 `FLAG_SECURE`（7.5）。
 
-路由用 Navigation Compose 的类型安全 API：
+路由用 Navigation 3 的 `NavKey` 类型安全 API：
 
 ```kotlin
 // 一级页（底栏三项）
@@ -1489,7 +1489,7 @@ OPENAI_API_KEY=<key>
 | UI | `top.yukonga.miuix.kmp:miuix-ui:0.9.3`、`miuix-preference`、`miuix-icons`、`miuix-squircle`、（可选）`miuix-blur-android`。只有 blur / shader 需要 `-android` 后缀 |
 | Compose | `androidx.compose:compose-bom` → `ui`、`ui-graphics`、`foundation`、`animation`、`ui-tooling-preview`；`androidx.activity:activity-compose`；`androidx.fragment:fragment-ktx` |
 | 生命周期 | `androidx.lifecycle:lifecycle-runtime-compose`、`lifecycle-viewmodel-compose`、`lifecycle-process` |
-| 导航 | `androidx.navigation:navigation-compose`（类型安全路由需 2.8+） |
+| 导航 | `androidx.navigation3:navigation3-runtime`、`top.yukonga.miuix.kmp:miuix-navigation3-ui` |
 | 数据库 | `androidx.room:room-runtime`、`room-compiler`(ksp)、`room-testing`(androidTest) |
 | 网络 | `com.squareup.okhttp3:okhttp`；`com.squareup.okhttp3:mockwebserver3-junit4`(test)。OkHttp 5 的新包名是 `mockwebserver3`，旧 artifact 只是兼容层 |
 | 序列化 / 时间 | `org.jetbrains.kotlinx:kotlinx-serialization-json`、`kotlinx-datetime` |

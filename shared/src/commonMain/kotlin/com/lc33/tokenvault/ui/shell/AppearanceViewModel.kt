@@ -2,6 +2,8 @@ package com.lc33.tokenvault.ui.shell
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lc33.tokenvault.domain.model.PredictiveBackExitDirection
+import com.lc33.tokenvault.domain.model.PredictiveBackStyle
 import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.platform.BootState
 import com.lc33.tokenvault.platform.BootStore
@@ -37,8 +39,25 @@ class AppearanceViewModel constructor(
     val blurNavBar: StateFlow<Boolean> = settings.observeBlurNavBar()
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
+    /** 预见式返回样式。默认 MIUIX：与当前应用整体动效一致，也是迁移前的行为。 */
+    val predictiveBackStyle: StateFlow<PredictiveBackStyle> = settings.observePredictiveBackStyle()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, PredictiveBackStyle.Miuix)
+
+    /** 只对 Scale 生效；其他样式没有独立退出方向。 */
+    val predictiveBackExitDirection: StateFlow<PredictiveBackExitDirection> =
+        settings.observePredictiveBackExitDirection()
+            .stateIn(viewModelScope, SharingStarted.Eagerly, PredictiveBackExitDirection.AlwaysRight)
+
     fun onBlurNavBarChange(enabled: Boolean) {
         viewModelScope.launch { settings.setBlurNavBar(enabled) }
+    }
+
+    fun onPredictiveBackStyleChange(style: PredictiveBackStyle) {
+        viewModelScope.launch { settings.setPredictiveBackStyle(style) }
+    }
+
+    fun onPredictiveBackExitDirectionChange(direction: PredictiveBackExitDirection) {
+        viewModelScope.launch { settings.setPredictiveBackExitDirection(direction) }
     }
 
     private fun readColorScheme(): AppColorSchemeMode {

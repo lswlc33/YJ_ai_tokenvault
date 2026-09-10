@@ -1,4 +1,4 @@
-package com.lc33.tokenvault.data.repo
+﻿package com.lc33.tokenvault.data.repo
 
 import com.lc33.tokenvault.data.dao.AppSettingDao
 import com.lc33.tokenvault.data.entity.AppSettingEntity
@@ -7,6 +7,8 @@ import com.lc33.tokenvault.domain.AutoLockTimeout
 import com.lc33.tokenvault.domain.ClipboardClearPolicy
 import com.lc33.tokenvault.domain.DefaultProbeSettings
 import com.lc33.tokenvault.domain.model.BalanceSnapshot
+import com.lc33.tokenvault.domain.model.PredictiveBackExitDirection
+import com.lc33.tokenvault.domain.model.PredictiveBackStyle
 import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.probe.ProbeClassifier
 import kotlinx.coroutines.flow.Flow
@@ -128,6 +130,31 @@ class RoomSettingsRepository constructor(
         dao.put(AppSettingEntity(key = KEY_BLUR_NAV_BAR, value = enabled.toString()))
     }
 
+    override fun observePredictiveBackStyle(): Flow<PredictiveBackStyle> = dao.observeAll()
+        .map { rows -> PredictiveBackStyle.fromStorage(rows.firstOrNull { it.key == KEY_PREDICTIVE_BACK_STYLE }?.value) }
+        .distinctUntilChanged()
+
+    override suspend fun setPredictiveBackStyle(style: PredictiveBackStyle) {
+        dao.put(AppSettingEntity(key = KEY_PREDICTIVE_BACK_STYLE, value = style.storageValue))
+    }
+
+    override fun observePredictiveBackExitDirection(): Flow<PredictiveBackExitDirection> = dao.observeAll()
+        .map { rows ->
+            PredictiveBackExitDirection.fromStorage(
+                rows.firstOrNull { it.key == KEY_PREDICTIVE_BACK_EXIT_DIRECTION }?.value,
+            )
+        }
+        .distinctUntilChanged()
+
+    override suspend fun setPredictiveBackExitDirection(direction: PredictiveBackExitDirection) {
+        dao.put(
+            AppSettingEntity(
+                key = KEY_PREDICTIVE_BACK_EXIT_DIRECTION,
+                value = direction.storageValue,
+            ),
+        )
+    }
+
     private companion object {
         /**
          * 键名照 §7.4 里的写法。
@@ -156,6 +183,10 @@ class RoomSettingsRepository constructor(
         const val KEY_DEFAULT_PROBE = "defaultProbe"
 
         const val KEY_BLUR_NAV_BAR = "blurNavBar"
+
+        const val KEY_PREDICTIVE_BACK_STYLE = "predictiveBackStyle"
+
+        const val KEY_PREDICTIVE_BACK_EXIT_DIRECTION = "predictiveBackExitDirection"
 
         /**
          * 阈值 → JSON 对象（键 = 币种代码，值 = 金额）。

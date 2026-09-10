@@ -1,30 +1,17 @@
-﻿package com.lc33.tokenvault.ui.shell
+package com.lc33.tokenvault.ui.shell
 
-import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import org.jetbrains.compose.resources.getString
-import org.jetbrains.compose.resources.stringResource
-import org.koin.compose.viewmodel.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavBackStackEntry
-import androidx.navigation.NavDestination.Companion.hasRoute
-import androidx.navigation.NavHostController
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.toRoute
+import com.lc33.tokenvault.crypto.zeroize
+import com.lc33.tokenvault.domain.model.PredictiveBackExitDirection
+import com.lc33.tokenvault.domain.model.PredictiveBackStyle
 import com.lc33.tokenvault.engine.RestoreMode
 import com.lc33.tokenvault.platform.openAppLocaleSettings
 import com.lc33.tokenvault.platform.openExternalUrl
@@ -43,93 +30,108 @@ import com.lc33.tokenvault.screens.settings.AboutScreen
 import com.lc33.tokenvault.screens.settings.AppearanceScreen
 import com.lc33.tokenvault.screens.settings.BalanceThresholdsScreen
 import com.lc33.tokenvault.screens.settings.ClientKeywordsScreen
-import com.lc33.tokenvault.screens.settings.ProxyScreen
 import com.lc33.tokenvault.screens.settings.DataScreen
 import com.lc33.tokenvault.screens.settings.LogScreen
 import com.lc33.tokenvault.screens.settings.ProbeSettingsScreen
-import com.lc33.tokenvault.screens.settings.ProfileListScreen
 import com.lc33.tokenvault.screens.settings.ProfileEditorScreen
+import com.lc33.tokenvault.screens.settings.ProfileListScreen
+import com.lc33.tokenvault.screens.settings.ProxyScreen
 import com.lc33.tokenvault.screens.settings.SecurityScreen
 import com.lc33.tokenvault.screens.settings.SettingsScreen
 import com.lc33.tokenvault.screens.settings.SyncScreen
 import com.lc33.tokenvault.screens.settings.UpdateScreen
 import com.lc33.tokenvault.ui.miuix.AppDialog
 import com.lc33.tokenvault.ui.miuix.AppSecretTextField
+import com.lc33.tokenvault.ui.miuix.AppSwitchRow
 import com.lc33.tokenvault.ui.miuix.AppTextButton
+import com.lc33.tokenvault.ui.miuix.AppTextField
 import com.lc33.tokenvault.ui.miuix.LocalAppSnackbar
+import com.lc33.tokenvault.ui.miuix.navigation.VaultNavDisplay
+import com.lc33.tokenvault.ui.miuix.rememberAppTextFieldState
 import com.lc33.tokenvault.ui.miuix.rememberSecretTextFieldState
 import kotlinx.coroutines.launch
-import tokenvault.shared.generated.resources.Res
+import org.jetbrains.compose.resources.getString
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.viewmodel.koinViewModel
+import org.koin.core.parameter.parametersOf
 import tokenvault.shared.generated.resources.clipboard_label_account
 import tokenvault.shared.generated.resources.clipboard_label_api_key
 import tokenvault.shared.generated.resources.editor_group_none
 import tokenvault.shared.generated.resources.editor_profile_default
 import tokenvault.shared.generated.resources.group_all
 import tokenvault.shared.generated.resources.profile_name_default
-import tokenvault.shared.generated.resources.sync_cancel
+import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.sync_confirm
+import tokenvault.shared.generated.resources.sync_insecure_http_warning
 import tokenvault.shared.generated.resources.sync_mode_add_only
 import tokenvault.shared.generated.resources.sync_mode_merge
 import tokenvault.shared.generated.resources.sync_mode_overwrite
 import tokenvault.shared.generated.resources.sync_passphrase_hint
 import tokenvault.shared.generated.resources.sync_passphrase_prompt
+import tokenvault.shared.generated.resources.sync_remote_count
 import tokenvault.shared.generated.resources.sync_restore_mode
 import tokenvault.shared.generated.resources.sync_result_exported
 import tokenvault.shared.generated.resources.sync_result_failed
 import tokenvault.shared.generated.resources.sync_result_restored
+import tokenvault.shared.generated.resources.sync_result_webdav_configured
+import tokenvault.shared.generated.resources.sync_result_webdav_uploaded
+import tokenvault.shared.generated.resources.sync_webdav_credentials_keep
+import tokenvault.shared.generated.resources.sync_webdav_credentials_required
+import tokenvault.shared.generated.resources.sync_webdav_directory_label
+import tokenvault.shared.generated.resources.sync_webdav_insecure_required
+import tokenvault.shared.generated.resources.sync_webdav_password_label
+import tokenvault.shared.generated.resources.sync_webdav_settings
+import tokenvault.shared.generated.resources.sync_webdav_title
+import tokenvault.shared.generated.resources.sync_webdav_url_invalid
+import tokenvault.shared.generated.resources.sync_webdav_url_label
+import tokenvault.shared.generated.resources.sync_webdav_username_label
 
 /**
- * 导航图。
+ * Navigation 3 导航图。
  *
- * **M3 起管理那一支与仪表盘吃真数据**：管理页、供应商详情、供应商编辑、分组管理、
- * 仪表盘六块卡与余额明细都接 ViewModel + 仓库；分组筛选那个"当前选中"是纯 UI 状态，
- * 留在 `ManageViewModel` 里。M4 起粘贴导入的预览吃真解析器，M6 起客户端预设列表 / 编辑页
- * 与供应商编辑页的预设下拉吃真仓库——`screens/sample` 那个样例包已随 M6 删除。
+ * 路由 Key 是 [VaultRoute]，页面内容由 [VaultNavDisplay] 统一挂上 per-entry
+ * SaveableState / ViewModelStore；带 id 的页面把 id 作为 Koin 参数传入，
+ * 进程恢复时由 back stack 还原同一个 Key。
  */
 @Composable
 fun VaultNavHost(
-    nav: NavHostController,
+    backStack: MutableList<VaultRoute>,
+    style: PredictiveBackStyle,
+    exitDirection: PredictiveBackExitDirection,
     modifier: Modifier = Modifier,
 ) {
-    fun openManage() {
-        nav.navigate(ManageRoute) {
-            popUpTo<DashboardRoute> { saveState = true }
-            launchSingleTop = true
-            restoreState = true
-        }
-    }
+    val navigate: (VaultRoute) -> Unit = { route -> backStack.add(route) }
 
-    NavHost(
-        navController = nav,
-        startDestination = DashboardRoute,
+    // 统一处理二级页返回：根页面不消费返回事件，交给系统退出应用。
+    val back: () -> Unit = {
+        if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
+    }
+    VaultNavDisplay(
+        backStack = backStack,
+        onBack = { back() },
+        style = style,
+        exitDirection = exitDirection,
         modifier = modifier,
-        enterTransition = {
-            if (isTopLevelTransition()) fadeInTransition() else horizontalSlideIn()
-        },
-        exitTransition = { fadeOutTransition() },
-        popEnterTransition = { fadeInTransition() },
-        popExitTransition = {
-            if (isTopLevelTransition()) fadeOutTransition() else horizontalSlideOut()
-        },
-    ) {
-        composable<DashboardRoute> {
+    ) { route ->
+        when (route) {
+            is DashboardRoute -> {
             val vm: DashboardViewModel = koinViewModel()
             val dashboard by vm.state.collectAsStateWithLifecycle()
             DashboardScreen(
                 state = dashboard,
-                onOpenProvider = { id -> nav.navigate(ProviderDetailRoute(id)) },
-                onOpenManage = ::openManage,
-                onOpenImport = { nav.navigate(ImportRoute) },
-                onOpenProbeRun = { nav.navigate(ProbeRunRoute) },
-                onOpenSync = { nav.navigate(SyncRoute) },
-                onOpenBalanceBreakdown = { nav.navigate(BalanceBreakdownRoute) },
+                onOpenProvider = { id -> navigate(ProviderDetailRoute(id)) },
+                onOpenManage = { navigate(ManageRoute) },
+                onOpenUpdate = { navigate(UpdateRoute) },
+                onOpenProbeRun = { navigate(ProbeRunRoute) },
+                onOpenSync = { navigate(SyncRoute) },
+                onOpenBalanceBreakdown = { navigate(BalanceBreakdownRoute) },
                 onStartProbe = vm::startProbe,
                 onCancelProbe = vm::cancelProbe,
                 onRefreshBalance = vm::refreshBalance,
             )
         }
 
-        composable<ManageRoute> {
+            is ManageRoute -> {
             val vm: ManageViewModel = koinViewModel()
             val manage by vm.state.collectAsStateWithLifecycle()
             // 「全部」那一枚 chip 的文案在资源里，而 ViewModel 读不到资源（红线 19）
@@ -138,10 +140,10 @@ fun VaultNavHost(
             ManageScreen(
                 state = manage,
                 onSelectGroup = vm::onSelectGroup,
-                onOpenProvider = { id -> nav.navigate(ProviderDetailRoute(id)) },
-                onOpenGroups = { nav.navigate(GroupsRoute) },
-                onNewProvider = { nav.navigate(ProviderEditorRoute()) },
-                onImport = { nav.navigate(ImportRoute) },
+                onOpenProvider = { id -> navigate(ProviderDetailRoute(id)) },
+                onOpenGroups = { navigate(GroupsRoute) },
+                onNewProvider = { navigate(ProviderEditorRoute()) },
+                onImport = { navigate(ImportRoute) },
                 onQueryChange = vm::onQueryChange,
                 onSort = vm::onSort,
                 onEnterSelection = vm::enterSelection,
@@ -153,27 +155,30 @@ fun VaultNavHost(
             )
         }
 
-        composable<SettingsRoute> {
+            is SettingsRoute -> {
             SettingsScreen(
-                onOpenAppearance = { nav.navigate(AppearanceRoute) },
-                onOpenSecurity = { nav.navigate(SecurityRoute) },
-                onOpenProbeSettings = { nav.navigate(ProbeSettingsRoute) },
-                onOpenProfiles = { nav.navigate(ProfileListRoute) },
-                onOpenData = { nav.navigate(DataRoute) },
-                onOpenSync = { nav.navigate(SyncRoute) },
-                onOpenAbout = { nav.navigate(AboutRoute) },
-                onOpenUpdate = { nav.navigate(UpdateRoute) },
+                onOpenAppearance = { navigate(AppearanceRoute) },
+                onOpenSecurity = { navigate(SecurityRoute) },
+                onOpenProbeSettings = { navigate(ProbeSettingsRoute) },
+                onOpenProfiles = { navigate(ProfileListRoute) },
+                onOpenData = { navigate(DataRoute) },
+                onOpenSync = { navigate(SyncRoute) },
+                onOpenAbout = { navigate(AboutRoute) },
+                onOpenUpdate = { navigate(UpdateRoute) },
             )
         }
 
-        composable<AboutRoute> { AboutScreen(onBack = { nav.navigateBackSafely() }) }
+            is AboutRoute -> {
+            AboutScreen(
+                onBack = { back() },
+                onOpenUpdate = { navigate(UpdateRoute) },
+            )
+        }
 
-        // 统一处理二级页返回：栈已被外部清空时不要让返回事件变成“无响应”。
-        val back: () -> Unit = { nav.navigateBackSafely() }
 
-        composable<ProviderDetailRoute> { entry ->
-            val route = entry.toRoute<ProviderDetailRoute>()
-            val vm: ProviderDetailViewModel = koinViewModel()
+            is ProviderDetailRoute -> {
+                val route = route
+            val vm: ProviderDetailViewModel = koinViewModel(parameters = { parametersOf(route.id) })
             val detail by vm.state.collectAsStateWithLifecycle()
             val revealed by vm.revealed.collectAsStateWithLifecycle()
             val revealedAccount by vm.revealedAccount.collectAsStateWithLifecycle()
@@ -188,7 +193,7 @@ fun VaultNavHost(
                     revealedText = revealed?.text,
                     revealedAccount = revealedAccount,
                     onBack = back,
-                    onEdit = { nav.navigate(ProviderEditorRoute(route.id)) },
+                    onEdit = { navigate(ProviderEditorRoute(route.id)) },
                     onAddKey = vm::onAddKey,
                     onRevealKey = vm::onRevealKey,
                     onCopyRevealed = { vm.onCopyRevealed(clipboardLabel) },
@@ -207,20 +212,24 @@ fun VaultNavHost(
             }
         }
 
-        composable<AppearanceRoute> {
+            is AppearanceRoute -> {
             val vm: AppearanceViewModel = koinViewModel()
             val colorScheme by vm.colorScheme.collectAsStateWithLifecycle()
             val blurNavBar by vm.blurNavBar.collectAsStateWithLifecycle()
             AppearanceScreen(
                 colorScheme = colorScheme,
                 blurNavBar = blurNavBar,
+                predictiveBackStyle = style,
+                predictiveBackExitDirection = exitDirection,
                 onColorSchemeChange = vm::onColorSchemeChange,
                 onBlurNavBarChange = vm::onBlurNavBarChange,
+                onPredictiveBackStyleChange = vm::onPredictiveBackStyleChange,
+                onPredictiveBackExitDirectionChange = vm::onPredictiveBackExitDirectionChange,
                 onBack = back,
                 onOpenSystemLocaleSettings = { openAppLocaleSettings() },
             )
         }
-        composable<SecurityRoute> {
+            is SecurityRoute -> {
             val vm: SecurityViewModel = koinViewModel()
             val autoLockIndex by vm.autoLockIndex.collectAsStateWithLifecycle()
             val idleLock by vm.idleLock.collectAsStateWithLifecycle()
@@ -236,11 +245,11 @@ fun VaultNavHost(
                 onLockOnScreenOffChange = vm::onLockOnScreenOffChange,
                 onClipboardClearIndexChange = vm::onClipboardClearIndexChange,
                 onBack = back,
-                onChangePin = { nav.navigate(ChangePinRoute) },
+                onChangePin = { navigate(ChangePinRoute) },
                 onLockNow = vm::onLockNow,
             )
         }
-        composable<ChangePinRoute> {
+            is ChangePinRoute -> {
             val vm: SecurityViewModel = koinViewModel()
             val state by vm.changePin.collectAsStateWithLifecycle()
             // 改完就退出去。用一次性事件而不是状态里的标志：标志会在重组时重放，
@@ -256,7 +265,7 @@ fun VaultNavHost(
                 },
             )
         }
-        composable<ProbeSettingsRoute> {
+            is ProbeSettingsRoute -> {
             val vm: ProbeSettingsViewModel = koinViewModel()
             val sniffClientProfile by vm.sniffClientProfile.collectAsStateWithLifecycle()
             val defaultProbeReachability by vm.defaultProbeReachability.collectAsStateWithLifecycle()
@@ -275,34 +284,34 @@ fun VaultNavHost(
                 onDefaultProbeBalanceChange = vm::onDefaultProbeBalanceChange,
                 onDefaultProbeModelsChange = vm::onDefaultProbeModelsChange,
                 onBack = back,
-                onOpenManage = ::openManage,
-                onEditThresholds = { nav.navigate(BalanceThresholdsRoute) },
-                onEditKeywords = { nav.navigate(ClientKeywordsRoute) },
-                onEditProxy = { nav.navigate(ProxyRoute) },
+                onOpenManage = { navigate(ManageRoute) },
+                onEditThresholds = { navigate(BalanceThresholdsRoute) },
+                onEditKeywords = { navigate(ClientKeywordsRoute) },
+                onEditProxy = { navigate(ProxyRoute) },
             )
         }
-        composable<BalanceThresholdsRoute> {
+            is BalanceThresholdsRoute -> {
             val vm: BalanceThresholdsViewModel = koinViewModel()
             BalanceThresholdsScreen(
                 viewModel = vm,
                 onBack = back,
             )
         }
-        composable<ClientKeywordsRoute> {
+            is ClientKeywordsRoute -> {
             val vm: ClientKeywordsViewModel = koinViewModel()
             ClientKeywordsScreen(
                 viewModel = vm,
                 onBack = back,
             )
         }
-        composable<ProxyRoute> {
+            is ProxyRoute -> {
             val vm: ProxyViewModel = koinViewModel()
             ProxyScreen(
                 viewModel = vm,
                 onBack = back,
             )
         }
-        composable<ProfileListRoute> {
+            is ProfileListRoute -> {
             val vm: ProfileListViewModel = koinViewModel()
             val profiles by vm.profiles.collectAsStateWithLifecycle()
             val defaultName = stringResource(Res.string.profile_name_default)
@@ -310,13 +319,13 @@ fun VaultNavHost(
                 profiles = profiles,
                 defaultName = defaultName,
                 onBack = back,
-                onOpenProfile = { id -> nav.navigate(ProfileEditorRoute(id)) },
-                onNewFromCurl = { nav.navigate(ProfileEditorRoute()) },
+                onOpenProfile = { id -> navigate(ProfileEditorRoute(id)) },
+                onNewFromCurl = { navigate(ProfileEditorRoute()) },
             )
         }
-        composable<ProfileEditorRoute> { entry ->
-            val route = entry.toRoute<ProfileEditorRoute>()
-            val vm: ProfileEditorViewModel = koinViewModel()
+            is ProfileEditorRoute -> {
+                val route = route
+            val vm: ProfileEditorViewModel = koinViewModel(parameters = { parametersOf(route.id) })
             val loaded by vm.loaded.collectAsStateWithLifecycle()
             val profile by vm.profile.collectAsStateWithLifecycle()
             LaunchedEffect(vm) { vm.saved.collect { back() } }
@@ -330,17 +339,17 @@ fun VaultNavHost(
                 )
             }
         }
-        composable<DataRoute> {
+            is DataRoute -> {
             val vm: DataViewModel = koinViewModel()
             DataScreen(
                 onBack = back,
-                onOpenGroups = { nav.navigate(GroupsRoute) },
-                onOpenLog = { nav.navigate(LogRoute) },
+                onOpenGroups = { navigate(GroupsRoute) },
+                onOpenLog = { navigate(LogRoute) },
                 onClearProbeResults = vm::clearProbeResults,
                 onClearLog = vm::clearLog,
             )
         }
-        composable<LogRoute> {
+            is LogRoute -> {
             val vm: LogViewModel = koinViewModel()
             val entries by vm.entries.collectAsStateWithLifecycle()
             LogScreen(
@@ -348,14 +357,14 @@ fun VaultNavHost(
                 onBack = back,
             )
         }
-        composable<SyncRoute> {
+            is SyncRoute -> {
             val vm: SyncViewModel = koinViewModel()
             SyncRouteContent(
                 onBack = back,
                 vm = vm,
             )
         }
-        composable<UpdateRoute> {
+            is UpdateRoute -> {
             val vm: UpdateViewModel = koinViewModel()
             val updateState by vm.state.collectAsStateWithLifecycle()
             val updateChannel by vm.updateChannel.collectAsStateWithLifecycle()
@@ -372,8 +381,8 @@ fun VaultNavHost(
         }
 
         // 剩下这几个还是 M0.8 立起来的空壳，内容各归各的里程碑（见 §16）
-        composable<ProviderEditorRoute> {
-            val vm: ProviderEditorViewModel = koinViewModel()
+            is ProviderEditorRoute -> {
+            val vm: ProviderEditorViewModel = koinViewModel(parameters = { parametersOf(route.id) })
             val draft by vm.draft.collectAsStateWithLifecycle()
             val groups by vm.groups.collectAsStateWithLifecycle()
             val profiles by vm.profiles.collectAsStateWithLifecycle()
@@ -397,7 +406,7 @@ fun VaultNavHost(
                 )
             }
         }
-        composable<ImportRoute> {
+            is ImportRoute -> {
             val vm: ImportViewModel = koinViewModel()
             val previews by vm.previews.collectAsStateWithLifecycle()
             val parseErrors by vm.parseErrorCount.collectAsStateWithLifecycle()
@@ -413,7 +422,7 @@ fun VaultNavHost(
                 readClipboard = vm::readClipboard,
             )
         }
-        composable<GroupsRoute> {
+            is GroupsRoute -> {
             val vm: ManageViewModel = koinViewModel()
             val manage by vm.state.collectAsStateWithLifecycle()
             GroupsScreen(
@@ -427,7 +436,7 @@ fun VaultNavHost(
         }
         // 探测明细。入口在仪表盘的"查看明细"（有过一轮探测才画）。这一页只读：
         // 看上一轮结果、重试失败项。
-        composable<ProbeRunRoute> {
+            is ProbeRunRoute -> {
             val vm: ProbeRunViewModel = koinViewModel()
             val run by vm.state.collectAsStateWithLifecycle()
             ProbeRunScreen(
@@ -438,10 +447,10 @@ fun VaultNavHost(
                 succeeded = run.succeeded,
                 onBack = back,
                 onRetryFailed = vm::retryFailed,
-                onOpenProvider = { id -> nav.navigate(ProviderDetailRoute(id)) },
+                onOpenProvider = { id -> navigate(ProviderDetailRoute(id)) },
             )
         }
-        composable<BalanceBreakdownRoute> {
+            is BalanceBreakdownRoute -> {
             val vm: DashboardViewModel = koinViewModel()
             val rows by vm.providerRows.collectAsStateWithLifecycle()
             BalanceBreakdownScreen(
@@ -451,22 +460,17 @@ fun VaultNavHost(
                 providers = rows.filter { it.balance != null },
                 failedProviders = rows.filter { it.balanceFailed },
                 onBack = back,
-                onOpenProvider = { id -> nav.navigate(ProviderDetailRoute(id)) },
+                onOpenProvider = { id -> navigate(ProviderDetailRoute(id)) },
             )
+        }
         }
     }
 }
 
 /**
- * 同步页的 SAF 接线（§12.1）。
+ * 同步页的 SAF 与 WebDAV 接线。
  *
- * SAF 文件读写（`CreateDocument` / `OpenDocument`）在这里而不是 ViewModel 里做：
- * 那两个 contract 要 `ActivityResultRegistry`，属于平台能力。这里只负责：
- * 1. 导出：让用户选目标文件 → 输口令 → 写包。
- * 2. 恢复：让用户选备份文件 → 输口令 → 选合并方式 → 落库。
- *
- * 口令用 [AppSecretTextField]（键盘不联想、不记忆），用完即擦。恢复失败与成功都走
- * Snackbar 反馈，不弹状态对话框。
+ * 页面主体只给行入口；口令、凭据与恢复模式都在 OverlayDialog 里完成。
  */
 @Composable
 private fun SyncRouteContent(
@@ -475,22 +479,35 @@ private fun SyncRouteContent(
 ) {
     val snackbar = LocalAppSnackbar.current
     val backup by vm.backup.collectAsStateWithLifecycle()
+    val webDavConfig by vm.webDavConfig.collectAsStateWithLifecycle()
+    val webDavBusy by vm.webDavBusy.collectAsStateWithLifecycle()
 
     val passphrasePrompt = stringResource(Res.string.sync_passphrase_prompt)
     val passphraseHint = stringResource(Res.string.sync_passphrase_hint)
     val confirm = stringResource(Res.string.sync_confirm)
-    val cancel = stringResource(Res.string.sync_cancel)
     val exported = stringResource(Res.string.sync_result_exported)
+    val webDavTitle = stringResource(Res.string.sync_webdav_title)
+    val webDavUrlInvalid = stringResource(Res.string.sync_webdav_url_invalid)
+    val webDavInsecureRequired = stringResource(Res.string.sync_webdav_insecure_required)
+    val webDavCredentialsRequired = stringResource(Res.string.sync_webdav_credentials_required)
 
-    // 口令对话框：一段明文口令，只在提交那一刻活一次
     var pendingAction by remember { mutableStateOf<PendingSyncAction?>(null) }
     val passphraseState = rememberSecretTextFieldState()
 
-    // 恢复模式选择
     var restoreModePicker by remember { mutableStateOf(false) }
     var pendingRestore by remember { mutableStateOf<PendingRestore?>(null) }
+    var webDavRestoreModePicker by remember { mutableStateOf(false) }
+    var pendingWebDavPassword by remember { mutableStateOf<CharArray?>(null) }
 
-    // 事件 → Snackbar
+    var showWebDavSettings by remember { mutableStateOf(false) }
+    var webDavError by remember { mutableStateOf<String?>(null) }
+    var allowInsecure by remember { mutableStateOf(false) }
+    var remoteBackups by remember { mutableStateOf<List<String>?>(null) }
+    val webDavUrlState = rememberAppTextFieldState()
+    val webDavDirectoryState = rememberAppTextFieldState()
+    val webDavUsernameState = rememberSecretTextFieldState()
+    val webDavPasswordState = rememberSecretTextFieldState()
+
     LaunchedEffect(vm) {
         vm.events.collect { event ->
             when (event) {
@@ -498,16 +515,27 @@ private fun SyncRouteContent(
                 is SyncEvent.ExportFailed ->
                     snackbar?.show(getString(Res.string.sync_result_failed, event.message ?: "?"))
                 is SyncEvent.RestoreSucceeded ->
-                    snackbar?.show(
-                        getString(Res.string.sync_result_restored, event.importedProviders),
-                    )
+                    snackbar?.show(getString(Res.string.sync_result_restored, event.importedProviders))
                 is SyncEvent.RestoreFailed ->
+                    snackbar?.show(getString(Res.string.sync_result_failed, event.message ?: "?"))
+                SyncEvent.WebDavConfigSaved -> {
+                    remoteBackups = null
+                    snackbar?.show(getString(Res.string.sync_result_webdav_configured))
+                }
+                is SyncEvent.WebDavListSucceeded -> {
+                    remoteBackups = event.names
+                    snackbar?.show(getString(Res.string.sync_remote_count, event.names.size))
+                }
+                is SyncEvent.WebDavUploadSucceeded ->
+                    snackbar?.show(
+                        getString(Res.string.sync_result_webdav_uploaded, event.fileName, event.prunedCount),
+                    )
+                is SyncEvent.WebDavFailed ->
                     snackbar?.show(getString(Res.string.sync_result_failed, event.message ?: "?"))
             }
         }
     }
 
-    // 导出/导入文件选择（平台能力，见 BackupFilePicker.kt）
     val filePicker = rememberBackupFilePicker(
         onExportPicked = { writeBytes ->
             val password = passphraseState.chars
@@ -526,12 +554,26 @@ private fun SyncRouteContent(
 
     SyncScreen(
         backup = backup,
+        webDavConfig = webDavConfig,
+        webDavBusy = webDavBusy,
+        remoteBackups = remoteBackups,
         onBack = onBack,
         onExport = { pendingAction = PendingSyncAction.Export },
         onImport = { pendingAction = PendingSyncAction.Import },
+        onOpenWebDavSettings = {
+            webDavUrlState.setText(webDavConfig.url)
+            webDavDirectoryState.setText(webDavConfig.remoteDirectory)
+            allowInsecure = webDavConfig.allowInsecure
+            webDavUsernameState.clear()
+            webDavPasswordState.clear()
+            webDavError = null
+            showWebDavSettings = true
+        },
+        onUploadWebDav = { pendingAction = PendingSyncAction.WebDavUpload },
+        onRestoreWebDav = { pendingAction = PendingSyncAction.WebDavRestore },
+        onRefreshWebDav = vm::listWebDavBackups,
     )
 
-    // 口令对话框
     AppDialog(
         show = pendingAction != null,
         onDismissRequest = {
@@ -544,6 +586,17 @@ private fun SyncRouteContent(
             when (pendingAction) {
                 PendingSyncAction.Export -> filePicker.pickExport()
                 PendingSyncAction.Import -> filePicker.pickImport()
+                PendingSyncAction.WebDavUpload -> {
+                    vm.uploadToWebDav(passphraseState.chars)
+                    passphraseState.clear()
+                    pendingAction = null
+                }
+                PendingSyncAction.WebDavRestore -> {
+                    pendingWebDavPassword = passphraseState.chars.copyOf()
+                    passphraseState.clear()
+                    pendingAction = null
+                    webDavRestoreModePicker = true
+                }
                 null -> Unit
             }
         },
@@ -555,89 +608,159 @@ private fun SyncRouteContent(
         )
     }
 
-    // 恢复模式选择
+    AppDialog(
+        show = showWebDavSettings,
+        onDismissRequest = {
+            webDavUsernameState.clear()
+            webDavPasswordState.clear()
+            showWebDavSettings = false
+        },
+        title = webDavTitle,
+        confirmText = confirm,
+        onConfirm = {
+            val url = webDavUrlState.text.trim()
+            val username = webDavUsernameState.chars
+            val password = webDavPasswordState.chars
+
+            webDavError = when {
+                url.isBlank() || !(url.startsWith("https://") || url.startsWith("http://")) ->
+                    webDavUrlInvalid
+                url.startsWith("http://") && !allowInsecure ->
+                    webDavInsecureRequired
+                !webDavConfig.hasCredentials && (username.isEmpty() || password.isEmpty()) ->
+                    webDavCredentialsRequired
+                else -> null
+            }
+
+            if (webDavError == null) {
+                vm.saveWebDavConfig(
+                    url = url,
+                    remoteDirectory = webDavDirectoryState.text,
+                    allowInsecure = allowInsecure,
+                    username = username.takeIf { it.isNotEmpty() },
+                    password = password.takeIf { it.isNotEmpty() },
+                )
+                webDavUsernameState.clear()
+                webDavPasswordState.clear()
+                showWebDavSettings = false
+            }
+        },
+    ) {
+        AppTextField(
+            state = webDavUrlState,
+            label = stringResource(Res.string.sync_webdav_url_label),
+            errorText = webDavError,
+        )
+        AppTextField(
+            state = webDavDirectoryState,
+            label = stringResource(Res.string.sync_webdav_directory_label),
+        )
+        AppSecretTextField(
+            state = webDavUsernameState,
+            label = stringResource(Res.string.sync_webdav_username_label),
+            supportingText = if (webDavConfig.hasCredentials) {
+                stringResource(Res.string.sync_webdav_credentials_keep)
+            } else {
+                null
+            },
+        )
+        AppSecretTextField(
+            state = webDavPasswordState,
+            label = stringResource(Res.string.sync_webdav_password_label),
+        )
+        AppSwitchRow(
+            title = stringResource(Res.string.sync_webdav_insecure_required),
+            checked = allowInsecure,
+            onCheckedChange = { allowInsecure = it },
+            summary = stringResource(Res.string.sync_insecure_http_warning),
+        )
+    }
+
     AppDialog(
         show = restoreModePicker,
         onDismissRequest = {
-            pendingRestore?.password?.let { it.fill(0.toChar()) }
+            pendingRestore?.password?.zeroize()
             pendingRestore = null
             restoreModePicker = false
         },
         title = stringResource(Res.string.sync_restore_mode),
         confirmText = null,
     ) {
-        AppTextButton(text = stringResource(Res.string.sync_mode_merge), onClick = {
-            pendingRestore?.let { vm.restore(it.bytes, it.password, RestoreMode.MERGE) }
+        RestoreModeButton(stringResource(Res.string.sync_mode_merge)) {
+            pendingRestore?.let {
+                vm.restore(it.bytes, it.password, RestoreMode.MERGE)
+                it.password.zeroize()
+            }
+            pendingRestore = null
             restoreModePicker = false
-        })
-        AppTextButton(text = stringResource(Res.string.sync_mode_overwrite), onClick = {
-            pendingRestore?.let { vm.restore(it.bytes, it.password, RestoreMode.OVERWRITE) }
+        }
+        RestoreModeButton(stringResource(Res.string.sync_mode_overwrite)) {
+            pendingRestore?.let {
+                vm.restore(it.bytes, it.password, RestoreMode.OVERWRITE)
+                it.password.zeroize()
+            }
+            pendingRestore = null
             restoreModePicker = false
-        })
-        AppTextButton(text = stringResource(Res.string.sync_mode_add_only), onClick = {
-            pendingRestore?.let { vm.restore(it.bytes, it.password, RestoreMode.ADD_ONLY) }
+        }
+        RestoreModeButton(stringResource(Res.string.sync_mode_add_only)) {
+            pendingRestore?.let {
+                vm.restore(it.bytes, it.password, RestoreMode.ADD_ONLY)
+                it.password.zeroize()
+            }
+            pendingRestore = null
             restoreModePicker = false
-        })
+        }
+    }
+
+    AppDialog(
+        show = webDavRestoreModePicker,
+        onDismissRequest = {
+            pendingWebDavPassword?.zeroize()
+            pendingWebDavPassword = null
+            webDavRestoreModePicker = false
+        },
+        title = stringResource(Res.string.sync_restore_mode),
+        confirmText = null,
+    ) {
+        RestoreModeButton(stringResource(Res.string.sync_mode_merge)) {
+            pendingWebDavPassword?.let {
+                vm.restoreLatestFromWebDav(it, RestoreMode.MERGE)
+                it.zeroize()
+            }
+            pendingWebDavPassword = null
+            webDavRestoreModePicker = false
+        }
+        RestoreModeButton(stringResource(Res.string.sync_mode_overwrite)) {
+            pendingWebDavPassword?.let {
+                vm.restoreLatestFromWebDav(it, RestoreMode.OVERWRITE)
+                it.zeroize()
+            }
+            pendingWebDavPassword = null
+            webDavRestoreModePicker = false
+        }
+        RestoreModeButton(stringResource(Res.string.sync_mode_add_only)) {
+            pendingWebDavPassword?.let {
+                vm.restoreLatestFromWebDav(it, RestoreMode.ADD_ONLY)
+                it.zeroize()
+            }
+            pendingWebDavPassword = null
+            webDavRestoreModePicker = false
+        }
     }
 }
 
-/** 导出口令之后要触发的动作。 */
-private enum class PendingSyncAction { Export, Import }
+@Composable
+private fun RestoreModeButton(text: String, onClick: () -> Unit) {
+    AppTextButton(text = text, onClick = onClick, modifier = Modifier.fillMaxWidth())
+}
+
+/** 口令确认之后要触发的动作。 */
+private enum class PendingSyncAction {
+    Export,
+    Import,
+    WebDavUpload,
+    WebDavRestore,
+}
 
 /** 待恢复的包字节 + 口令（口令用完必须擦）。 */
 private class PendingRestore(val bytes: ByteArray, val password: CharArray)
-
-// ---------------------------------------------------------------------------
-// 转场动画（计划.md §13.1 补丁：NavHost 未配动画导致切换/返回无动效、预测式返回异常）。
-// 约定：进入二级页 = 从右滑入 + 淡入；返回 = 反向滑出。时长 300ms，
-// 预测式返回（Android 13+）需要标准的水平滑动动画才能正确跟手。
-// ---------------------------------------------------------------------------
-
-private const val TransitionDurationMs = 250
-private const val TopLevelTransitionDurationMs = 200
-
-/**
- * 三个一级 tab 是同级关系，只做淡入淡出；进入/返回二级页才是层级关系。
- *
- * 预测式返回与普通返回共用 popEnter/popExit 这一组动画。父页只淡入淡出、子页负责
- * 水平位移，可以避免“手势返回父页从左边滑入、普通返回父页也从左边滑入但进度不同”
- * 这类视觉割裂。
- */
-private fun AnimatedContentTransitionScope<NavBackStackEntry>.isTopLevelTransition(): Boolean =
-    initialState.isTopLevelDestination() && targetState.isTopLevelDestination()
-
-private fun NavBackStackEntry.isTopLevelDestination(): Boolean = when {
-    destination.hasRoute<DashboardRoute>() -> true
-    destination.hasRoute<ManageRoute>() -> true
-    destination.hasRoute<SettingsRoute>() -> true
-    else -> false
-}
-
-private fun AnimatedContentTransitionScope<NavBackStackEntry>.fadeInTransition(): EnterTransition = fadeIn(
-    animationSpec = tween(
-        if (isTopLevelTransition()) TopLevelTransitionDurationMs else TransitionDurationMs,
-    ),
-)
-
-private fun AnimatedContentTransitionScope<NavBackStackEntry>.fadeOutTransition(): ExitTransition = fadeOut(
-    animationSpec = tween(
-        if (isTopLevelTransition()) TopLevelTransitionDurationMs else TransitionDurationMs,
-    ),
-)
-
-private fun AnimatedContentTransitionScope<NavBackStackEntry>.horizontalSlideIn(): EnterTransition =
-    slideInHorizontally(
-        animationSpec = tween(TransitionDurationMs),
-        initialOffsetX = { it },
-    ) + fadeIn(animationSpec = tween(TransitionDurationMs))
-
-private fun AnimatedContentTransitionScope<NavBackStackEntry>.horizontalSlideOut(): ExitTransition =
-    slideOutHorizontally(
-        animationSpec = tween(TransitionDurationMs),
-        targetOffsetX = { it },
-    ) + fadeOut(animationSpec = tween(TransitionDurationMs))
-
-/** 返回到上一页；根页面不再消费返回事件，交给 Activity 退出应用。 */
-private fun NavHostController.navigateBackSafely() {
-    if (previousBackStackEntry != null) popBackStack()
-}

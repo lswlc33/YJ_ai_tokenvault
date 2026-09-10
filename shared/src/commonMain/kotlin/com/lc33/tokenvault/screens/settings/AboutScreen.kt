@@ -37,6 +37,7 @@ import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.AppTopBar
 import com.lc33.tokenvault.ui.miuix.appTopBarScroll
 import com.lc33.tokenvault.ui.miuix.rememberAppTopBarScrollState
+import com.lc33.tokenvault.ui.common.UpdateHighlightCard
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
 
 /**
@@ -51,7 +52,10 @@ import com.lc33.tokenvault.ui.theme.LocalAppTokens
  * 元数据在应用私有目录里是明文（计划.md §4.4、红线 23）。
  */
 @Composable
-fun AboutScreen(onBack: () -> Unit) {
+fun AboutScreen(
+    onBack: () -> Unit,
+    onOpenUpdate: () -> Unit,
+) {
     val scrollState = rememberAppTopBarScrollState()
     val tokens = LocalAppTokens.current
     var showEncryptionDialog by remember { mutableStateOf(false) }
@@ -79,6 +83,12 @@ fun AboutScreen(onBack: () -> Unit) {
                 .appTopBarScroll(scrollState),
             contentPadding = padding,
         ) {
+            item {
+                UpdateHighlightCard(
+                    onOpenUpdate = onOpenUpdate,
+                    modifier = Modifier.padding(horizontal = tokens.screenPadding, vertical = tokens.itemSpacing),
+                )
+            }
             item {
                 AppCard(
                     modifier = Modifier

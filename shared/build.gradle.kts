@@ -132,8 +132,7 @@ kotlin {
             api(libs.cmp.animation)
             implementation(libs.cmp.components.resources)
             implementation(libs.cmp.ui.tooling.preview)
-            // multiplatform navigation / lifecycle（阶段3 替换 androidx.navigation.compose 等）。
-            api(libs.cmp.navigation.compose)
+            // multiplatform lifecycle（阶段3 迁移到 CMP 后由 commonMain 使用）。
             api(libs.cmp.lifecycle.runtime.compose)
             api(libs.cmp.lifecycle.viewmodel.compose)
 
@@ -148,6 +147,10 @@ kotlin {
             api(libs.miuix.preference)
             api(libs.miuix.icons)
             api(libs.miuix.blur.kmp)
+            // Navigation 3：MIUIX 0.9.1 的 NavDisplay 只在 ui/miuix 包装层里 import。
+            implementation(libs.androidx.navigation3.runtime)
+            implementation(libs.androidx.lifecycle.viewmodel.navigation3)
+            implementation(libs.miuix.navigation3.ui)
 
             // Room KMP（阶段4：数据层迁入）。用 `api`：VaultDatabase / DAO 出现在
             // 仓库实现的公开构造签名里，:app 的 DI 与 androidTest 要能看见这些类型。

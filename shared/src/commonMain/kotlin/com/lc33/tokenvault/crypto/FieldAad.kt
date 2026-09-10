@@ -32,6 +32,16 @@ value class FieldAad private constructor(val value: String) {
         }
 
         /**
+         * 字符串主键的设置行。WebDAV 凭据不在业务表里，但同样必须绑定列身份，
+         * 否则用户名密文与密码密文可以互换。
+         */
+        fun ofSetting(key: String, column: String): FieldAad {
+            require(key.isNotBlank()) { "setting key must not be blank" }
+            require(column.isNotBlank()) { "column name must not be blank" }
+            return FieldAad("app_settings:$key:$column")
+        }
+
+        /**
          * 备份包内层用的 AAD。备份里没有行主键（自然键引用，红线 27），
          * 所以绑的是"这是哪个包的哪一段"。
          */

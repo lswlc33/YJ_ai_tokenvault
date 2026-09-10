@@ -55,7 +55,7 @@ import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppIconButton
 import com.lc33.tokenvault.ui.miuix.AppScaffold
 import com.lc33.tokenvault.ui.miuix.AppSearchField
-import com.lc33.tokenvault.ui.miuix.AppTextButton
+import com.lc33.tokenvault.ui.miuix.AppActionRow
 import com.lc33.tokenvault.ui.miuix.AppTopBar
 import com.lc33.tokenvault.ui.miuix.appTopBarScroll
 import com.lc33.tokenvault.ui.miuix.rememberAppTextFieldState
@@ -131,20 +131,18 @@ fun ManageScreen(
                 },
                 actions = {
                     if (selecting) {
-                        AppTextButton(
-                            text = stringResource(
-                                if (selectedCount == visibleRows.size && visibleRows.isNotEmpty()) {
+                        val allVisibleSelected = selectedCount == visibleRows.size && visibleRows.isNotEmpty()
+                        AppIconButton(
+                            icon = if (allVisibleSelected) AppIcon.Backspace else AppIcon.Ok,
+                            contentDescription = stringResource(
+                                if (allVisibleSelected) {
                                     Res.string.manage_deselect_all
                                 } else {
                                     Res.string.manage_select_all
                                 },
                             ),
                             onClick = {
-                                if (selectedCount == visibleRows.size && visibleRows.isNotEmpty()) {
-                                    onClearSelection()
-                                } else {
-                                    onSelectAll(visibleRows.map { it.id })
-                                }
+                                if (allVisibleSelected) onClearSelection() else onSelectAll(visibleRows.map { it.id })
                             },
                         )
                     } else {
@@ -217,7 +215,7 @@ fun ManageScreen(
         onDismissRequest = { showCreateSheet = false },
         title = stringResource(Res.string.add_cd),
     ) {
-        AppTextButton(
+        AppActionRow(
             text = stringResource(Res.string.dashboard_empty_new),
             onClick = {
                 showCreateSheet = false
@@ -225,7 +223,7 @@ fun ManageScreen(
             },
             modifier = Modifier.fillMaxWidth(),
         )
-        AppTextButton(
+        AppActionRow(
             text = stringResource(Res.string.dashboard_empty_import),
             onClick = {
                 showCreateSheet = false
@@ -335,13 +333,13 @@ private fun GroupPickerSheet(
 ) {
     // 第一枚是「全部」伪分组（id == null），这里要的是「未分组」（groupId = null），
     // 语义不同：把它过滤掉，另放一枚「未分组」在最前。
-    AppTextButton(
+    AppActionRow(
         text = stringResource(Res.string.manage_batch_ungrouped),
         onClick = { onPick(null) },
         modifier = Modifier.fillMaxWidth(),
     )
     groups.filter { it.id != null }.forEach { group ->
-        AppTextButton(
+        AppActionRow(
             text = group.name,
             onClick = { onPick(group.id) },
             modifier = Modifier.fillMaxWidth(),
@@ -372,15 +370,11 @@ private fun ProviderList(
             EmptyState(
                 title = stringResource(Res.string.manage_empty_providers_title),
                 description = stringResource(Res.string.manage_empty_providers_desc),
-                actionText = stringResource(Res.string.dashboard_empty_import),
-                onAction = onImport,
             )
         } else {
             EmptyState(
                 title = stringResource(Res.string.manage_empty_group_title),
                 description = stringResource(Res.string.manage_empty_group_desc),
-                actionText = stringResource(Res.string.group_all),
-                onAction = { onSelectGroup(null) },
             )
         }
         return
@@ -405,7 +399,7 @@ private fun ProviderList(
         if (selecting) {
             // 多选态底部操作条：改分组（删除走 FAB）。
             item {
-                AppTextButton(
+                AppActionRow(
                     text = stringResource(Res.string.manage_batch_change_group),
                     onClick = onBatchSetGroup,
                     modifier = Modifier

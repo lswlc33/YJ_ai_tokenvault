@@ -18,7 +18,7 @@ import tokenvault.shared.generated.resources.probe_thresholds_save
 import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppTextField
-import com.lc33.tokenvault.ui.miuix.AppTextButton
+import com.lc33.tokenvault.ui.miuix.AppActionRow
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
 import com.lc33.tokenvault.ui.miuix.rememberAppTextFieldState
@@ -72,7 +72,7 @@ fun ProxyScreen(
         }
 
         item {
-            AppTextButton(
+            AppActionRow(
                 text = stringResource(Res.string.probe_thresholds_save),
                 onClick = {
                     when (viewModel.save(input.text)) {

@@ -214,7 +214,6 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.process)
-    implementation(libs.androidx.navigation.compose)
 
     // 数据层已迁入 :shared（Room KMP，阶段4）。room-runtime 由 shared 的 api 传递，
     // schema 基线与 KSP 编译器都住在 shared/build.gradle.kts。
