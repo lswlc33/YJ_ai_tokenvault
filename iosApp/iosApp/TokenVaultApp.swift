@@ -10,6 +10,10 @@ struct TokenVaultApp: App {
     var body: some Scene {
         WindowGroup {
             ComposeView()
+                // SwiftUI 只负责挂载 Compose；安全区与键盘避让都由 Compose 侧的 Scaffold 处理。
+                // 不忽略 SwiftUI 安全区时，SwiftUI 先裁一次、Compose 再留一次 inset，
+                // iPhone 上会表现为上下各多出一大块空白。
+                .ignoresSafeArea(.all)
         }
     }
 }
