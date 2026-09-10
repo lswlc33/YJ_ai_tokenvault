@@ -7,15 +7,22 @@ package com.lc33.tokenvault.domain.model
  */
 enum class PredictiveBackStyle(val storageValue: String) {
     None("none"),
-    Aosp("aosp"),
     Miuix("miuix"),
     Scale("scale"),
-    Classic("classic"),
     ;
 
     companion object {
-        fun fromStorage(value: String?): PredictiveBackStyle =
-            entries.firstOrNull { it.storageValue == value } ?: Miuix
+        private const val LegacyAospStorageValue = "aosp"
+        private const val LegacyClassicStorageValue = "classic"
+
+        fun fromStorage(value: String?): PredictiveBackStyle = when (value) {
+            None.storageValue -> None
+            Miuix.storageValue -> Miuix
+            Scale.storageValue -> Scale
+            // 旧版 AOSP / 经典都是缩放系返回；样式收窄后映射到最接近的缩放动画。
+            LegacyAospStorageValue, LegacyClassicStorageValue -> Scale
+            else -> Miuix
+        }
     }
 }
 

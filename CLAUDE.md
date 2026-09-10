@@ -327,7 +327,7 @@ M3（接真数据）**管理那一支已完成**，2026-09-06。管理页、供�
 | 字段 | 声称语义 | 实际状态 |
 | --- | --- | --- |
 | ~~`squircle`~~ | ~~连续圆角~~ | ✅ **已移除（2026-09-06）**：`miuix-squircle` 依赖虽在、但 `AppCard` 从未用它，开关拨动无效果是撑谎；用户拍板「只做模糊、不做圆角」，开关与死依赖（`miuix-squircle`）一并移除 |
-| `predictiveBackStyle` / `predictiveBackExitDirection` | 预见式返回样式 / 缩放退出方向 | ✅ **已接真（2026-09-10）**：`app_settings` 存稳定字符串，`VaultNavDisplay`（MIUIX 0.9.1 `navigation3-ui` 的包装层）消费；五种样式 = 无 / AOSP / MIUIX / 缩放 / 经典 |
+| `predictiveBackStyle` / `predictiveBackExitDirection` | 预见式返回样式 / 缩放退出方向 | ✅ **已接真（2026-09-10）**：`app_settings` 存稳定字符串，`VaultNavDisplay`（MIUIX 0.9.1 `navigation3-ui` 的包装层）消费；三种样式 = 无 / MIUIX / 缩放；页面过渡不改透明度，缩放只作用于当前退出页 |
 | `blurNavBar` | 底栏模糊 | ✅ **已接真（2026-09-06）**：`app_settings.blurNavBar`（默认开），`VaultShell` 用 `rememberLayerBackdrop` + `layerBackdrop` 捕获内容区、`AppNavBar` 挂 `textureBlur(enabled=开关)`；blur API 封装在 `ui/miuix/` 的 `AppLayerBackdrop`/`appLayerBackdrop`，Shell 层不碰 MIUIX |
 | ~~`secureFlag`~~ | ~~展示密钥时挂 FLAG_SECURE~~ | ✅ **已移除（2026-09-06）**：文案承诺可关、代码却把整个详情页始终挂 `SecureScreen()`（比承诺更严格）；用户拍板「防截屏始终开」，开关移除，`ProviderDetailScreen` 的 `SecureScreen()` 保持不变 |
 | ~~`clipboardClearIndex`~~ | ~~剪贴板自动清除~~ | ✅ **已接真（2026-09-06）**：`app_settings.clipboardClearSeconds`（存秒数，`ClipboardClearPolicy`），`AndroidSecureClipboard` 订阅缓存、`copy` 时跟随设置，默认 60 秒 |

@@ -166,10 +166,8 @@
     <string name="predictive_back_style">返回动画</string>
     <string-array name="predictive_back_styles">
         <item>无</item>
-        <item>AOSP</item>
         <item>MIUIX</item>
         <item>缩放</item>
-        <item>经典</item>
     </string-array>
     <string name="predictive_back_exit_direction">缩放退出方向</string>
     <string-array name="predictive_back_exit_directions">

@@ -3,17 +3,14 @@ package com.lc33.tokenvault.ui.miuix.navigation
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -139,7 +136,7 @@ fun VaultNavDisplay(
         },
         transitionEffects = NavDisplayTransitionEffects(
             enableCornerClip = true,
-            dimAmount = if (style == PredictiveBackStyle.None) 0f else 0.5f,
+            dimAmount = 0f,
             blockInputDuringTransition = false,
             popDirectionFollowsSwipeEdge = style == PredictiveBackStyle.Scale &&
                 exitDirection == PredictiveBackExitDirection.FollowGesture,
@@ -149,7 +146,7 @@ fun VaultNavDisplay(
 
 private fun AnimatedContentTransitionScope<Scene<VaultRoute>>.appPushTransition(): ContentTransform {
     return if (isTopLevelSceneTransition()) {
-        fadeTopLevel()
+        topLevelTransition()
     } else {
         horizontalPush()
     }
@@ -158,27 +155,31 @@ private fun AnimatedContentTransitionScope<Scene<VaultRoute>>.appPushTransition(
 private fun AnimatedContentTransitionScope<Scene<VaultRoute>>.appPopTransition(
     style: PredictiveBackStyle,
     exitDirection: PredictiveBackExitDirection,
-): ContentTransform = when {
-    isTopLevelSceneTransition() -> fadeTopLevel()
-    style == PredictiveBackStyle.None -> noPredictivePop()
-    style == PredictiveBackStyle.Aosp -> aospPop()
-    style == PredictiveBackStyle.Miuix -> miuixPop()
-    style == PredictiveBackStyle.Scale -> scalePop(exitDirection)
-    else -> classicPop()
-}
+): ContentTransform =
+    if (isTopLevelSceneTransition()) {
+        topLevelTransition()
+    } else {
+        when (style) {
+            PredictiveBackStyle.None -> noPredictivePop()
+            PredictiveBackStyle.Miuix -> miuixPop()
+            PredictiveBackStyle.Scale -> scalePop(exitDirection)
+        }
+    }
 
 private fun AnimatedContentTransitionScope<Scene<VaultRoute>>.appPredictivePopTransition(
     style: PredictiveBackStyle,
     exitDirection: PredictiveBackExitDirection,
     edge: Int,
-): ContentTransform = when {
-    isTopLevelSceneTransition() -> fadeTopLevel()
-    style == PredictiveBackStyle.None -> noPredictivePop()
-    style == PredictiveBackStyle.Aosp -> aospPop()
-    style == PredictiveBackStyle.Miuix -> miuixPop()
-    style == PredictiveBackStyle.Scale -> scalePop(exitDirection, edge)
-    else -> classicPop()
-}
+): ContentTransform =
+    if (isTopLevelSceneTransition()) {
+        topLevelTransition()
+    } else {
+        when (style) {
+            PredictiveBackStyle.None -> noPredictivePop()
+            PredictiveBackStyle.Miuix -> miuixPop()
+            PredictiveBackStyle.Scale -> scalePop(exitDirection, edge)
+        }
+    }
 
 private fun AnimatedContentTransitionScope<Scene<VaultRoute>>.isTopLevelSceneTransition(): Boolean =
     isTopLevelScene(initialState) && isTopLevelScene(targetState)
@@ -186,24 +187,22 @@ private fun AnimatedContentTransitionScope<Scene<VaultRoute>>.isTopLevelSceneTra
 private fun isTopLevelScene(scene: Scene<VaultRoute>): Boolean =
     scene.key is DashboardRoute || scene.key is ManageRoute || scene.key is SettingsRoute
 
-private fun fadeTopLevel(): ContentTransform =
-    fadeIn(tween(TopLevelDurationMs)) togetherWith fadeOut(tween(TopLevelDurationMs))
+private fun AnimatedContentTransitionScope<Scene<VaultRoute>>.topLevelTransition(): ContentTransform {
+    // 一级页切换按 tab 顺序决定方向；只用位移，不用透明度掩盖叠层。
+    val forward = topLevelIndexOf(targetState.key) > topLevelIndexOf(initialState.key)
+    val enterOffset: (Int) -> Int = { if (forward) it / 4 else -it / 4 }
+    val exitOffset: (Int) -> Int = { if (forward) -it / 4 else it / 4 }
+    return slideInHorizontally(tween(TopLevelDurationMs), enterOffset) togetherWith
+        slideOutHorizontally(tween(TopLevelDurationMs), exitOffset)
+}
 
 private fun horizontalPush(): ContentTransform =
-    slideInHorizontally(tween(DurationMs)) { it } + fadeIn(tween(DurationMs)) togetherWith
-        slideOutHorizontally(tween(DurationMs)) { -it / 4 } + fadeOut(tween(DurationMs))
+    slideInHorizontally(tween(DurationMs)) { it } togetherWith
+        slideOutHorizontally(tween(DurationMs)) { -it / 4 }
 
 private fun miuixPop(): ContentTransform =
-    slideInHorizontally(tween(DurationMs)) { -it / 4 } + fadeIn(tween(DurationMs)) togetherWith
-        slideOutHorizontally(tween(DurationMs)) { it } + fadeOut(tween(DurationMs))
-
-private fun aospPop(): ContentTransform =
-    fadeIn(tween(AospDurationMs, easing = AospEasing)) +
-        scaleIn(tween(AospDurationMs, easing = AospEasing), initialScale = AospMinScale) togetherWith
-        scaleOut(
-            animationSpec = tween(AospDurationMs, easing = AospEasing),
-            targetScale = AospMinScale,
-        ) + fadeOut(tween(AospDurationMs, easing = AospEasing))
+    slideInHorizontally(tween(DurationMs)) { -it / 4 } togetherWith
+        slideOutHorizontally(tween(DurationMs)) { it }
 
 private fun scalePop(
     direction: PredictiveBackExitDirection,
@@ -215,29 +214,27 @@ private fun scalePop(
         PredictiveBackExitDirection.AlwaysLeft -> false
     }
     val exitOffset: (Int) -> Int = { if (exitToRight) it else -it }
-    return fadeIn(tween(DurationMs)) +
-        scaleIn(tween(DurationMs, easing = ScaleEasing), initialScale = AospMinScale) togetherWith
-        scaleOut(tween(DurationMs, easing = ScaleEasing), targetScale = ScaleMinScale) +
-        slideOutHorizontally(tween(DurationMs, easing = ScaleEasing), exitOffset)
+    val currentExit = scaleOut(
+        animationSpec = tween(DurationMs, easing = ScaleEasing),
+        targetScale = ScaleMinScale,
+    ) + slideOutHorizontally(tween(DurationMs, easing = ScaleEasing), exitOffset)
+
+    // 缩放样式只处理正在退出的当前页；返回目标页保持原尺寸、原透明度。
+    return EnterTransition.None togetherWith currentExit
 }
 
-private fun classicPop(): ContentTransform =
-    fadeIn(tween(ClassicDurationMs, easing = ScaleEasing)) +
-        scaleIn(tween(ClassicDurationMs, easing = ScaleEasing), initialScale = ClassicMinScale) togetherWith
-        scaleOut(tween(ClassicDurationMs, easing = ScaleEasing), targetScale = ClassicMinScale) +
-        fadeOut(tween(ClassicDurationMs, easing = ScaleEasing))
-
-/** None：手势期间不把页面跟着拖走，提交后再使用普通返回动画。 */
+/** None：不做页面过渡，手势提交后直接切回上一页。 */
 private fun noPredictivePop(): ContentTransform =
-    EnterTransition.None togetherWith fadeOut(tween(NoneDurationMs))
+    EnterTransition.None togetherWith ExitTransition.None
+
+private fun topLevelIndexOf(route: Any?): Int = when (route) {
+    DashboardRoute -> 0
+    ManageRoute -> 1
+    SettingsRoute -> 2
+    else -> -1
+}
 
 private const val DurationMs = 250
 private const val TopLevelDurationMs = 200
-private const val AospDurationMs = 450
-private const val NoneDurationMs = 450
-private const val ClassicDurationMs = 200
-private const val AospMinScale = 0.9f
 private const val ScaleMinScale = 0.85f
-private const val ClassicMinScale = 0.9f
-private val AospEasing = CubicBezierEasing(0.05f, 0f, 0.133333f, 1f)
 private val ScaleEasing = CubicBezierEasing(0.2f, 0f, 0f, 1f)

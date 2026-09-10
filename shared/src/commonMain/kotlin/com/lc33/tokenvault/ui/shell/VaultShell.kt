@@ -1,8 +1,6 @@
 package com.lc33.tokenvault.ui.shell
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.padding
@@ -66,11 +64,11 @@ fun VaultShell() {
         bottomBar = {
             // 底栏用 AnimatedVisibility 平滑退场：直接 `if (selectedIndex >= 0)` 会在
             // 跳到二级页（如设置→检查更新）时让底栏瞬间消失、内容区一帧高度塌陷，
-            // 表现为「底栏先闪一下再跳下一页」。滑出动画把这一帧填成过渡。
+            // 表现为「底栏先闪一下再跳下一页」。滑入滑出把这一帧填成过渡，且不改变透明度。
             AnimatedVisibility(
                 visible = selectedIndex >= 0,
-                enter = slideInVertically { it } + fadeIn(),
-                exit = slideOutVertically { it } + fadeOut(),
+                enter = slideInVertically { it },
+                exit = slideOutVertically { it },
             ) {
                 AppNavBar(
                     items = items,
