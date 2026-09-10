@@ -167,10 +167,8 @@
     <string name="predictive_back_style">Back animation</string>
     <string-array name="predictive_back_styles">
         <item>None</item>
-        <item>AOSP</item>
         <item>Miuix</item>
         <item>Scale</item>
-        <item>Classic</item>
     </string-array>
     <string name="predictive_back_exit_direction">Scale exit direction</string>
     <string-array name="predictive_back_exit_directions">
