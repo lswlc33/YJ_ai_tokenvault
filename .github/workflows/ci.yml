@@ -207,6 +207,9 @@ jobs:
       # 只有真跑才能暴露（链接器死消除没了、单测又从不走这些路）。
       # 启动后 25 秒进程还在 → 存活；否则抓崩溃报告并直接红。
       - name: 模拟器 UI 冒烟（启动 + 存活检查）
+        # 冒烟只依赖编译产物和模拟器，20 分钟足够；不给硬超时时，一个挂住的
+        # simctl 父进程会把 job 拖到 Actions 默认的 360 分钟。
+        timeout-minutes: 20
         run: |
           set -euo pipefail
           cd iosApp
@@ -214,7 +217,7 @@ jobs:
           # 选设备：优先镜像预建的 iPhone 16e（OS 18.5）——cibuildwheel 在同一镜像上
           # 实测可用（其 ios.py 的 2025-10 注释，针对 runner-images#12777 的规避）；
           # 其次 18.5 上的任意预建 iPhone；都没有就新建一台。runtime 锁 18.5
-          # （Xcode 16.4 配套），别碰给旧 Xcode 装的 18.0~18.4 和 iOS 26。
+          #（Xcode 16.4 配套），别碰给旧 Xcode 装的 18.0~18.4 和 iOS 26。
           UDID=$(xcrun simctl list devices available -j | python3 -c "import sys,json; d=json.load(sys.stdin)['devices']; c=[v for k,vs in d.items() if 'iOS-18-5' in k for v in vs if 'iPhone' in v['name']]; c.sort(key=lambda v: 0 if v['name']=='iPhone 16e' else 1); print(c[0]['udid'] if c else '', end='')")
           if [ -n "$UDID" ]; then
             echo "选用预建模拟器 UDID: $UDID"
@@ -242,70 +245,94 @@ jobs:
           # 总共约 7G 内存，boot 前把内存腾干净（收尾日志里一直能看到孤儿 java 进程）。
           (cd .. && ./gradlew --stop)
           # boot 等待：GH 镜像上首次 boot 的 Data Migration 慢且抖（#12777 的「磁盘
-          # 性能问题」），单次 bootstatus 约一分多钟就报 Status=-1 终止，但设备
-          # 常常还在继续起。oppi 项目的结论（oppi#23）：失败后继续等，
+          # 性能问题」）。oppi 项目的结论（oppi#23）：失败后继续等，
           # **别 shutdown/erase 重来**（重启会重做迁移，还可能卡死 shutdown）。
-          # 这里轮询设备状态：Booted 且 bootstatus 通过才算就绪，15 分钟预算。
+          # 这里轮询设备状态；Booted 后再给 bootstatus 2 分钟内部预算。
+          # 不能直接同步调用 bootstatus：它偶发不返回时，外层 10 分钟 deadline 无法打断。
           sim_state() {
             xcrun simctl list devices -j | python3 -c "import sys,json; d=json.load(sys.stdin)['devices']; s=[v['state'] for vs in d.values() for v in vs if v['udid']=='$UDID']; print(s[0] if s else 'unknown', end='')" || echo unknown
           }
           xcrun simctl boot "$UDID" 2>/dev/null || true
           ok=0
           last=""
-          deadline=$((SECONDS + 900))
+          deadline=$((SECONDS + 600))
           while [ "$SECONDS" -lt "$deadline" ]; do
             st=$(sim_state)
-            if [ "$st" != "$last" ]; then echo "模拟器状态： ${st}（已等 ${SECONDS}s）"; last="$st"; fi
+            if [ "$st" != "$last" ]; then echo "模拟器状态： $st（已等 $SECONDS 秒）"; last="$st"; fi
             case "$st" in
               Booted)
-                if xcrun simctl bootstatus "$UDID" -b > /dev/null 2>&1; then ok=1; break; fi ;;
+                xcrun simctl bootstatus "$UDID" -b > build/bootstatus.log 2>&1 &
+                waiter=$!
+                ready=0
+                for _ in $(seq 1 120); do
+                  if ! kill -0 "$waiter" 2>/dev/null; then
+                    if wait "$waiter"; then ready=1; fi
+                    break
+                  fi
+                  sleep 1
+                done
+                if kill -0 "$waiter" 2>/dev/null; then
+                  kill -9 "$waiter" 2>/dev/null || true
+                  wait "$waiter" 2>/dev/null || true
+                  echo "bootstatus 120 秒未返回，继续轮询模拟器状态"
+                elif [ "$ready" = 1 ]; then
+                  ok=1
+                  break
+                fi
+                ;;
               Shutdown)
-                xcrun simctl boot "$UDID" 2>/dev/null || true ;;
+                xcrun simctl boot "$UDID" 2>/dev/null || true
+                ;;
             esac
             sleep 15
           done
           if [ "$ok" != 1 ]; then
-            echo "::error::模拟器 15 分钟内没就绪（见上面的状态轨迹）"
+            echo "::error::模拟器 10 分钟内没就绪（见上面的状态轨迹）"
             xcrun simctl list devices || true
             xcrun simctl list runtimes || true
             exit 1
           fi
           echo "模拟器就绪 ✓"
           xcrun simctl install "$UDID" "$APP"
-          # --console-pty 让 Kotlin/Native 的未捕获异常直接落到文件。系统 log/crash report
-          # 对 K/N 崩溃经常是空手而归；首行可能晚到，所以用轮询而不是同步 grep（set -e）。
+
+          # --console-pty 用来接住 Kotlin/Native 未捕获异常；但它不保证输出
+          # “bundle: pid”，且父进程在 App 存活时不会退出。PID 改从宿主进程表里找，
+          # 退出路径则必须先强杀并回收父进程，绝不能无条件 wait。
+          CONSOLE_PID=""
+          console_cleanup() {
+            if [ -n "$CONSOLE_PID" ] && kill -0 "$CONSOLE_PID" 2>/dev/null; then
+              kill -9 "$CONSOLE_PID" 2>/dev/null || true
+              wait "$CONSOLE_PID" 2>/dev/null || true
+            fi
+          }
           rm -f build/ios-sim-console.log
           xcrun simctl launch --console-pty "$UDID" com.lc33.tokenvault \
             > build/ios-sim-console.log 2>&1 &
           CONSOLE_PID=$!
           PID=""
           for _ in $(seq 1 20); do
-            PID=$(sed -nE 's/.*: ([0-9]+)[[:space:]]*$/\1/p' build/ios-sim-console.log | tail -1)
+            PID=$(ps -axo pid=,comm= | awk '$2 ~ /(^|\/)iosApp$/ { print $1; exit }')
             [ -n "$PID" ] && break
             sleep 1
           done
-          echo "启动 pid: ${PID:-<未拿到>}"
-          if [ -z "${PID:-}" ]; then
-            echo "::error::launch 没返回 pid（bundle id 错了？）"
-            wait "$CONSOLE_PID" || true
+          echo "启动 pid: $PID"
+          if [ -z "$PID" ]; then
+            echo "::error::启动后没找到 iosApp 进程"
+            console_cleanup
             tail -200 build/ios-sim-console.log || true
             exit 1
           fi
           sleep 25
-          if [ -n "${PID:-}" ] && ps -p "$PID" > /dev/null 2>&1; then
+          if ps -p "$PID" > /dev/null 2>&1; then
             echo "应用启动后仍存活 ✓"
-            # --console-pty 的父进程在应用存活时不会自行退出；强杀后 wait 只回收本
-            # shell 记录的进程，避免冒烟成功反而卡在日志附加器上。
-            kill -9 "$CONSOLE_PID" 2>/dev/null || true
-            wait "$CONSOLE_PID" 2>/dev/null || true
+            console_cleanup
             # cwd 已在 iosApp/ 里，路径写 build/…（修复：以前写成 iosApp/build/…
             # 落到 iosApp/iosApp/build/，截图 artifact 从没上传成功过）
             xcrun simctl io "$UDID" screenshot build/ios-sim-smoke.png || true
           else
             echo "::error::应用启动后退出（崩溃），pid： $PID"
-            # Kotlin/Native 未捕获异常会先出现在 --console-pty 输出里；这是 crash report
-            # 缺失时唯一可靠的现场，先打出来再查系统侧报告。
-            wait "$CONSOLE_PID" || true
+            sleep 1
+            console_cleanup
             echo "--- 应用控制台（末尾 200 行）---"
             tail -200 build/ios-sim-console.log || true
             # 崩溃报告：两处目录里最近 5 分钟的 .ips 全部列出（不只按进程名猜）
@@ -318,13 +345,9 @@ jobs:
               found=1
             done
             [ "$found" = 1 ] || echo "（没找到崩溃报告）"
-            # 进程日志：滤掉 FrontBoard/runningboard 的噪音，tail 才能落到死亡瞬间
-            echo "--- 进程日志（去噪后末尾 80 行）---"
-            xcrun simctl spawn "$UDID" log show --last 3m --predicate 'process == "iosApp"' --style compact 2>/dev/null \
-              | grep -viE 'FrontBoard|SceneExtension|runningboard|BoardServices|xpc:|UIKit:UIScreen' | tail -80
             exit 1
           fi
-          # 存活也要把我们的进程日志里的错误打出来（非致命异常未必杀进程）
+          # 存活也要把系统日志里的错误打出来（非致命异常未必杀进程）
           xcrun simctl spawn "$UDID" log show --last 1m --predicate 'process == "iosApp"' --style compact 2>/dev/null | grep -iE 'error|fault|crash|exception' | head -30 || true
 
       - uses: actions/upload-artifact@v4
