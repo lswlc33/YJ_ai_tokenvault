@@ -192,6 +192,16 @@ internal fun ProviderRow(
                 color = appSecondaryTextColor,
             )
         }
+        row.keys.take(2).forEach { key ->
+            KeySummaryRow(key)
+        }
+        if (row.keys.size > 2) {
+            AppText(
+                text = "+${row.keys.size - 2}",
+                style = AppTextStyle.Footnote,
+                color = appSecondaryTextColor,
+            )
+        }
     }
 }
 
@@ -241,7 +251,7 @@ internal fun KeyRow(
                         maxLines = 1,
                         modifier = Modifier.weight(1f, fill = false),
                     )
-                    if (row.isDefault) AppChip(text = stringResource(Res.string.manage_default_key))
+                    AppChip(text = row.sortOrder.toString())
                 }
                 // 只有遮蔽串。明文是借 DEK 现算的（§6.1 推论 3），UiKeyRow 里没有明文字段，
                 // 所以这里连"想画明文"都做不到。
@@ -383,5 +393,25 @@ internal fun AccountRow(row: UiAccountRow, onClick: (() -> Unit)? = null) {
             }
             AppChip(text = stringResource(Res.string.manage_local_only))
         }
+    }
+}
+@Composable
+private fun KeySummaryRow(key: UiKeyRow) {
+    val tokens = LocalAppTokens.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AppText(
+            text = "${key.sortOrder + 1} ${key.label.ifBlank { key.masked }}",
+            style = AppTextStyle.Footnote,
+            color = appSecondaryTextColor,
+            modifier = Modifier.weight(1f),
+            maxLines = 1,
+        )
+        StatusDot(color = colorOf(key.health), label = labelOf(key.health))
     }
 }

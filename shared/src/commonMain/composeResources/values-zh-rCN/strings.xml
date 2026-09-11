@@ -621,4 +621,7 @@
     <string name="about_software_summary">元记在本地保存 AI 供应商密钥、平台账号、模型、余额与探测结果。秘密字段会加密，供应商元数据保留在本地以便离线总览。</string>
     <string name="about_open_source_licenses">开放源代码许可</string>
     <string name="about_open_source_summary">在 GitHub 查看源代码与许可信息。</string>
-</resources>
+    <string name="key_sort_up">上移</string>
+    <string name="key_sort_down">下移</string>
+    <string name="key_enabled">启用</string>
+    <string name="key_settings_title">Key 设置</string></resources>

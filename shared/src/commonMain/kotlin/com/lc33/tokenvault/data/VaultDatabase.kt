@@ -12,6 +12,7 @@ import com.lc33.tokenvault.data.dao.AppSettingDao
 import com.lc33.tokenvault.data.dao.AuditLogDao
 import com.lc33.tokenvault.data.dao.ClientProfileDao
 import com.lc33.tokenvault.data.dao.GroupDao
+import com.lc33.tokenvault.data.dao.KeySettingsDao
 import com.lc33.tokenvault.data.dao.ModelCatalogDao
 import com.lc33.tokenvault.data.dao.ModelDao
 import com.lc33.tokenvault.data.dao.ProbeRunDao
@@ -22,36 +23,19 @@ import com.lc33.tokenvault.data.entity.AppSettingEntity
 import com.lc33.tokenvault.data.entity.AuditLogEntity
 import com.lc33.tokenvault.data.entity.ClientProfileEntity
 import com.lc33.tokenvault.data.entity.GroupEntity
+import com.lc33.tokenvault.data.entity.KeySettingsEntity
 import com.lc33.tokenvault.data.entity.ModelCatalogEntity
 import com.lc33.tokenvault.data.entity.ModelEntity
 import com.lc33.tokenvault.data.entity.ProbeRunEntity
 import com.lc33.tokenvault.data.entity.ProviderAccountEntity
 import com.lc33.tokenvault.data.entity.ProviderEntity
 
-/**
- * 数据库。
- *
- * **跑在系统自带 SQLite 上，不上 SQLCipher**（§4.4）：真正的秘密已经字段级加密，
- * SQLCipher 额外保护的只是元数据，代价是每 ABI 多 1–2 MB 原生库、且库只能解锁后打开。
- * 代价必须诚实写出来——**元数据在应用私有目录里是明文的**，这句话进了"关于"页。
- *
- * 实例是**应用级单例，启动即建**（§6.1 推论 1）。锁定 = 清零 DEK + 跳锁屏，**不关库**。
- * 于是只碰公开数据的后台任务（models.dev 同步、日志清理）在锁定态也能跑。
- *
- * `exportSchema = true` + Room Gradle 插件把 schema JSON 提交进仓库：没有基线，
- * 迁移测试就无从写起。
- *
- * **阶段4 KMP 化**：实体与 DAO 零平台依赖，整个数据层进 commonMain。
- * 跨平台的 `Room.databaseBuilder<T>()` 不能反射拿 `VaultDatabase_Impl`，要靠
- * `@ConstructedBy` + expect object 由 KSP 在**每个 target** 生成 actual
- * （Room KMP 的官方模式，见 room-kmp 文档）。Android 端仍走
- * `Room.databaseBuilder(Context, ...)` 的老路径，不经过这个构造器对象。
- */
 @Database(
     entities = [
         GroupEntity::class,
         ProviderEntity::class,
         ApiKeyEntity::class,
+        KeySettingsEntity::class,
         ProviderAccountEntity::class,
         ClientProfileEntity::class,
         ModelEntity::class,
@@ -69,6 +53,7 @@ abstract class VaultDatabase : RoomDatabase() {
     abstract fun groupDao(): GroupDao
     abstract fun providerDao(): ProviderDao
     abstract fun apiKeyDao(): ApiKeyDao
+    abstract fun keySettingsDao(): KeySettingsDao
     abstract fun providerAccountDao(): ProviderAccountDao
     abstract fun clientProfileDao(): ClientProfileDao
     abstract fun modelDao(): ModelDao
@@ -78,39 +63,15 @@ abstract class VaultDatabase : RoomDatabase() {
     abstract fun appSettingDao(): AppSettingDao
 
     companion object {
-        const val VERSION = 2
+        const val VERSION = 3
         const val FILE_NAME = "vault.db"
 
-        /**
-         * "每个供应商至多一张默认 Key"，在**数据库层面**保证（§6.3）。
-         *
-         * Room 的 `@Index` 不支持 `WHERE` 子句，所以这条部分唯一索引只能手写。
-         * 它的名字刻意**不以 `index_` 开头**——Room 校验 schema 时只读它自己创建的那些
-         * （前缀 `index_`），所以 `idx_` 前缀的索引不会被当成"多出来的索引"而报不匹配。
-         *
-         * 为什么值得费这个劲：应用层的"设默认时清掉其它的"是在一个事务里做的，但如果
-         * 将来某处漏了一句 `clearDefault`，两张默认会**静默**共存，而余额适配器会随机拿到
-         * 其中一张。有了这条索引，那个 bug 会在写入时立刻炸出来。
-         *
-         * 手写 DDL 的执行时机归各平台：Android 在 `RoomDatabase.Callback.onOpen`
-         * 里跑（见 shared androidMain 的 applyHandWrittenSchema 扩展），iOS 包在
-         * SQLiteDriver 包装层里跑——commonMain 摸不到平台的连接对象。
-         */
-
-        /**
-         * v2：余额与模型列表从供应商级改为 Key 级；账号补登录方式；供应商补可达性延迟。
-         *
-         * 旧模型会挂到默认 Key 上。没有默认 Key 的旧模型保留 `keyId = NULL`，
-         * UI 仍能读出这批历史行，但新写入一律要求 Key。
-         */
         val MIGRATION_1_2: Migration = object : Migration(1, 2) {
             override fun migrate(connection: SQLiteConnection) {
                 connection.execSQL("ALTER TABLE providers ADD COLUMN reachabilityLatencyMs INTEGER")
                 connection.execSQL("ALTER TABLE providers ADD COLUMN reachabilityCheckedAt INTEGER")
                 connection.execSQL("ALTER TABLE providers ADD COLUMN reachabilityError TEXT")
                 connection.execSQL("ALTER TABLE providers ADD COLUMN probeModelReachability INTEGER NOT NULL DEFAULT 0")
-                // v1 的 probeModels 语义是“逐模型付费探测”；v2 起它表示“模型列表自动检测”。
-                // 语义变了就不能沿用旧值，否则旧开关会被误解释成允许自动拉列表。
                 connection.execSQL("UPDATE providers SET probeModels = 0")
 
                 connection.execSQL("ALTER TABLE api_keys ADD COLUMN balanceAmount REAL")
@@ -150,8 +111,6 @@ abstract class VaultDatabase : RoomDatabase() {
                     """.trimIndent(),
                 )
 
-                // Room 的 schema 校验会把手写的部分唯一索引当作 Found 侧多出来的
-                // index_*。迁移结束前先删掉它，校验通过后 onOpen 会用同一条 DDL 重建。
                 connection.execSQL("DROP INDEX IF EXISTS idx_keys_default")
                 connection.execSQL("ALTER TABLE provider_accounts ADD COLUMN loginMethods TEXT NOT NULL DEFAULT ''")
                 connection.execSQL(
@@ -177,15 +136,184 @@ abstract class VaultDatabase : RoomDatabase() {
             }
         }
 
-        const val PARTIAL_INDEX_KEYS_DEFAULT =
-            "CREATE UNIQUE INDEX IF NOT EXISTS idx_keys_default " +
-                "ON api_keys(providerId) WHERE isDefault = 1"
+        /**
+         * v3：供应商降级为 Key 合集，行为配置全部下沉到 key_settings。
+         *
+         * 旧供应商上的连接 / 余额 / 探测配置复制到该供应商每一把 Key；
+         * 旧默认 Key 排到最前，作为排序优先级的迁移结果。
+         */
+        val MIGRATION_2_3: Migration = object : Migration(2, 3) {
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL("PRAGMA foreign_keys = OFF")
+
+                // 1) key_settings：一把 Key 一行。
+                connection.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS key_settings (
+                        keyId INTEGER NOT NULL,
+                        apiBaseUrl TEXT NOT NULL,
+                        apiRoot TEXT NOT NULL,
+                        apiVersion TEXT NOT NULL,
+                        supportedProtocols TEXT NOT NULL,
+                        pathOverrides TEXT NOT NULL,
+                        authStyle TEXT NOT NULL,
+                        allowInsecure INTEGER NOT NULL,
+                        clientProfileId INTEGER,
+                        timeoutSeconds INTEGER,
+                        balanceKind TEXT NOT NULL,
+                        balanceBaseUrl TEXT,
+                        balanceUserId TEXT,
+                        balanceTokenEnc BLOB,
+                        balanceConfig TEXT NOT NULL,
+                        quotaPerUnit REAL,
+                        quotaCalibrated INTEGER NOT NULL,
+                        probeEnabled INTEGER NOT NULL,
+                        probeReachability INTEGER NOT NULL,
+                        probeKeyValidity INTEGER NOT NULL,
+                        probeBalance INTEGER NOT NULL,
+                        probeModels INTEGER NOT NULL,
+                        probeModelReachability INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        PRIMARY KEY(keyId),
+                        FOREIGN KEY(keyId) REFERENCES api_keys(id) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(clientProfileId) REFERENCES client_profiles(id) ON UPDATE NO ACTION ON DELETE SET NULL
+                    )
+                    """.trimIndent(),
+                )
+                connection.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_key_settings_keyId ON key_settings(keyId)",
+                )
+                connection.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_key_settings_clientProfileId " +
+                        "ON key_settings(clientProfileId)",
+                )
+                connection.execSQL(
+                    """
+                    INSERT INTO key_settings (
+                        keyId, apiBaseUrl, apiRoot, apiVersion, supportedProtocols, pathOverrides,
+                        authStyle, allowInsecure, clientProfileId, timeoutSeconds, balanceKind,
+                        balanceBaseUrl, balanceUserId, balanceTokenEnc, balanceConfig, quotaPerUnit,
+                        quotaCalibrated, probeEnabled, probeReachability, probeKeyValidity,
+                        probeBalance, probeModels, probeModelReachability, updatedAt
+                    )
+                    SELECT
+                        k.id, p.apiBaseUrl, p.apiRoot, p.apiVersion, p.supportedProtocols,
+                        p.pathOverrides, p.authStyle, p.allowInsecure, p.clientProfileId,
+                        p.timeoutSeconds, p.balanceKind, p.balanceBaseUrl, p.balanceUserId,
+                        p.balanceTokenEnc, p.balanceConfig, p.quotaPerUnit, p.quotaCalibrated,
+                        p.probeEnabled, p.probeReachability, p.probeKeyValidity, p.probeBalance,
+                        p.probeModels, p.probeModelReachability, k.updatedAt
+                    FROM api_keys k
+                    JOIN providers p ON p.id = k.providerId
+                    """.trimIndent(),
+                )
+
+                // 2) api_keys：去掉 isDefault，补 note，保留原 id / 外键 / 探测结果。
+                connection.execSQL(
+                    """
+                    CREATE TABLE api_keys_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        providerId INTEGER NOT NULL,
+                        label TEXT NOT NULL,
+                        note TEXT NOT NULL,
+                        secretEnc BLOB NOT NULL,
+                        fingerprint TEXT NOT NULL,
+                        enabled INTEGER NOT NULL,
+                        health TEXT NOT NULL,
+                        lastOutcome TEXT NOT NULL,
+                        healthDetail TEXT,
+                        httpStatus INTEGER,
+                        latencyMs INTEGER,
+                        checkedAt INTEGER,
+                        okAt INTEGER,
+                        balanceAmount REAL,
+                        balanceUsed REAL,
+                        balanceCurrency TEXT,
+                        balanceRaw TEXT,
+                        balanceCheckedAt INTEGER,
+                        balanceError TEXT,
+                        sortOrder INTEGER NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        FOREIGN KEY(providerId) REFERENCES providers(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                connection.execSQL(
+                    """
+                    INSERT INTO api_keys_new (
+                        id, providerId, label, note, secretEnc, fingerprint, enabled, health,
+                        lastOutcome, healthDetail, httpStatus, latencyMs, checkedAt, okAt,
+                        balanceAmount, balanceUsed, balanceCurrency, balanceRaw,
+                        balanceCheckedAt, balanceError, sortOrder, createdAt, updatedAt
+                    )
+                    SELECT
+                        id, providerId, label, '', secretEnc, fingerprint, enabled, health,
+                        lastOutcome, healthDetail, httpStatus, latencyMs, checkedAt, okAt,
+                        balanceAmount, balanceUsed, balanceCurrency, balanceRaw,
+                        balanceCheckedAt, balanceError,
+                        CASE WHEN isDefault = 1 THEN -1 ELSE sortOrder END,
+                        createdAt, updatedAt
+                    FROM api_keys
+                    """.trimIndent(),
+                )
+                connection.execSQL("DROP TABLE api_keys")
+                connection.execSQL("ALTER TABLE api_keys_new RENAME TO api_keys")
+                connection.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_api_keys_providerId_sortOrder_id " +
+                        "ON api_keys(providerId, sortOrder, id)",
+                )
+                connection.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_api_keys_providerId_fingerprint " +
+                        "ON api_keys(providerId, fingerprint)",
+                )
+
+                // 3) providers：只保留合集信息与官网连通性。
+                connection.execSQL(
+                    """
+                    CREATE TABLE providers_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        name TEXT NOT NULL,
+                        note TEXT,
+                        websiteUrl TEXT,
+                        websiteLatencyMs INTEGER,
+                        websiteCheckedAt INTEGER,
+                        websiteError TEXT,
+                        groupId INTEGER,
+                        color INTEGER,
+                        pinned INTEGER NOT NULL,
+                        sortOrder INTEGER NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        FOREIGN KEY(groupId) REFERENCES groups(id) ON UPDATE NO ACTION ON DELETE SET NULL
+                    )
+                    """.trimIndent(),
+                )
+                connection.execSQL(
+                    """
+                    INSERT INTO providers_new (
+                        id, name, note, websiteUrl, websiteLatencyMs, websiteCheckedAt,
+                        websiteError, groupId, color, pinned, sortOrder, createdAt, updatedAt
+                    )
+                    SELECT
+                        id, name, note, websiteUrl, NULL, NULL, NULL,
+                        groupId, color, pinned, sortOrder, createdAt, updatedAt
+                    FROM providers
+                    """.trimIndent(),
+                )
+                connection.execSQL("DROP TABLE providers")
+                connection.execSQL("ALTER TABLE providers_new RENAME TO providers")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_providers_groupId ON providers(groupId)")
+                connection.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_providers_pinned_sortOrder_id " +
+                        "ON providers(pinned, sortOrder, id)",
+                )
+
+                connection.execSQL("PRAGMA foreign_keys = ON")
+            }
+        }
     }
 }
 
-/**
- * Room KMP 的构造器桥。KSP 会在每个 target 的生成代码里补上 actual；
- * common 编译时还没有 actual，靠 suppress 放行（Room 官方模式）。
- */
 @Suppress("NO_ACTUAL_FOR_EXPECT")
 expect object VaultDatabaseConstructor : RoomDatabaseConstructor<VaultDatabase>

@@ -29,6 +29,7 @@ import com.lc33.tokenvault.screens.model.UiHealth
 import com.lc33.tokenvault.screens.model.UiKeyRow
 import com.lc33.tokenvault.screens.model.UiModelRow
 import com.lc33.tokenvault.screens.model.UiModelSource
+import com.lc33.tokenvault.screens.model.UiKeySettingsSummary
 import com.lc33.tokenvault.screens.model.UiMoney
 import com.lc33.tokenvault.screens.model.UiProviderRow
 
@@ -133,6 +134,10 @@ fun ClientProfile.displayName(defaultProfileName: String): String =
 
 fun ProviderSummary.toRow(
     health: UiHealth,
+    balance: BalanceSnapshot?,
+    host: String,
+    protocols: List<String>,
+    keys: List<UiKeyRow> = emptyList(),
     staleThisRound: Boolean = false,
     lastProbeAt: Long? = null,
 ): UiProviderRow =
@@ -140,9 +145,9 @@ fun ProviderSummary.toRow(
         id = provider.id,
         name = provider.name,
         note = provider.note,
-        host = hostOf(provider.apiRoot),
+        host = host,
         // 协议 chips 用 wireName：它稳定，而且这一排不是给人读的散文
-        protocols = provider.supportedProtocols.map { it.wireName },
+        protocols = protocols,
         colorIndex = provider.color ?: 0,
         pinned = provider.pinned,
         groupId = provider.groupId,
@@ -150,15 +155,31 @@ fun ProviderSummary.toRow(
         okKeyCount = okKeyCount,
         modelCount = modelCount,
         accountCount = accountCount,
-        balance = provider.balance.toUiMoney(),
+        balance = balance.toUiMoney(),
         // “试过但失败”与“压根没查过”必须分开（§9.3），而 toUiMoney 两者都给 null
-        balanceFailed = provider.balance?.failed == true,
+        balanceFailed = balance?.failed == true,
         health = health,
         staleThisRound = staleThisRound,
         sortOrder = provider.sortOrder,
         lastProbeAt = lastProbeAt,
-        reachabilityLatencyMs = provider.reachabilityLatencyMs,
+        reachabilityLatencyMs = provider.website.latencyMs,
+        keys = keys,
     )
+
+/** 供应商合集展示用的 host：取排序第一的启用 Key。没有 Key 时给空串。 */
+fun providerHostOf(keys: List<ApiKey>): String =
+    keys.filter { it.enabled }
+        .minWithOrNull(compareBy({ it.sortOrder }, { it.id }))
+        ?.settings?.apiRoot
+        ?.let { hostOf(it) }
+        .orEmpty()
+
+/** 供应商合集展示用的协议集合：合并所有启用 Key 的协议，顺序保持枚举声明。 */
+fun providerProtocolsOf(keys: List<ApiKey>): List<String> =
+    keys.filter { it.enabled }
+        .flatMap { it.settings.supportedProtocols }
+        .distinct()
+        .map { it.wireName }
 
 /**
  * 分组筛选条。**第一枚是「全部」那个伪分组**（`id == null`，不入库）。
@@ -183,14 +204,32 @@ fun groupChips(allLabel: String, groups: List<Group>, providers: List<UiProvider
 fun ApiKey.toRow(masked: String): UiKeyRow = UiKeyRow(
     id = id,
     label = label,
+    note = note,
     providerId = providerId,
     masked = masked,
     health = health.toUi(),
     latencyMs = latencyMs,
     checkedAt = checkedAt,
-    isDefault = isDefault,
+    enabled = enabled,
+    sortOrder = sortOrder,
     balance = balance.toUiMoney(),
     balanceFailed = balance?.failed == true,
+    settings = UiKeySettingsSummary(
+        apiBaseUrl = settings.apiBaseUrl,
+        apiRoot = settings.apiRoot,
+        protocols = settings.supportedProtocols.map { it.wireName },
+        authStyle = settings.authStyle.wireName,
+        clientProfileId = settings.clientProfileId,
+        timeoutSeconds = settings.timeoutSeconds,
+        allowInsecure = settings.allowInsecure,
+        balanceKind = settings.balanceKind.wireName,
+        probeEnabled = settings.probe.enabled,
+        probeReachability = settings.probe.reachability,
+        probeKeyValidity = settings.probe.keyValidity,
+        probeBalance = settings.probe.balance,
+        probeModels = settings.probe.models,
+        probeModelReachability = settings.probe.modelReachability,
+    ),
 )
 
 /**
@@ -266,9 +305,6 @@ fun aggregateBalanceOf(keys: List<ApiKey>): BalanceSnapshot? {
     )
 }
 
-/** 供应商的协议集合供编辑页显示；顺序按枚举声明，所以每次进页面 chips 不会跳。 */
-fun Provider.protocolWireNames(): List<String> = supportedProtocols.map { it.wireName }
-
 // ---------------------------------------------------------------- 仪表盘的四个聚合
 
 /**
@@ -316,32 +352,6 @@ fun healthBreakdownOf(keys: List<ApiKey>): HealthBreakdown {
  *    而首屏那一行会被放大成“主币种”，按金额排就永远是数字大的那个冒充主角。
  *    字母序至少是**稳定**的：刷一次余额不会让两行对调。
  */
-fun balanceSummaryOf(providers: List<Provider>): BalanceSummary {
-    val failedProviderCount = providers.count { provider ->
-        val providerSnapshots = listOfNotNull(provider.balance)
-        providerSnapshots.isNotEmpty() && providerSnapshots.all { it.failed }
-    }
-    val snapshots = providers.mapNotNull { it.balance }
-    val perCurrency = snapshots
-        .filter { !it.failed && it.amount != null }
-        .groupBy { it.currency }
-        .toList()
-        .sortedBy { it.first }
-        .map { (currency, group) ->
-            // 先各自舍入到"分"再相加，避免浮点误差（FormatMoney.roundedCents，§9.1）
-            val totalCents = group.fold(0L) { acc, snapshot ->
-                acc + FormatMoney.roundedCents(snapshot.amount!!)
-            }
-            UiMoney(currency = currency, amount = FormatMoney.centsToPlainString(totalCents))
-        }
-    return BalanceSummary(
-        perCurrency = perCurrency,
-        // 最新那一次查询的时间。取最大值而不是最小：这一行回答的是“这堆数字有多新”
-        updatedAt = snapshots.mapNotNull { it.checkedAt }.maxOrNull(),
-        failedProviderCount = failedProviderCount,
-    )
-}
-
 /** Key 级余额的仪表盘合计：每张 Key 一份快照，按币种分组，不做汇率换算。 */
 fun keyBalanceSummaryOf(keys: List<ApiKey>): BalanceSummary {
     val snapshots = keys.mapNotNull { it.balance }
@@ -381,13 +391,14 @@ fun keyBalanceSummaryOf(keys: List<ApiKey>): BalanceSummary {
 fun attentionItemsOf(
     summaries: List<ProviderSummary>,
     healthByProvider: Map<Long, List<KeyHealth>>,
+    balanceByProvider: Map<Long, BalanceSnapshot?>,
     thresholds: Map<String, Double>,
 ): List<AttentionItem> {
     val items = mutableListOf<AttentionItem>()
     for (summary in summaries) {
         val provider = summary.provider
         val healths = healthByProvider[provider.id].orEmpty()
-        val balanceState = provider.balance?.state(thresholds)
+        val balanceState = balanceByProvider[provider.id]?.state(thresholds)
         val kinds = LinkedHashSet<AttentionKind>()
         keyAttentionKindOf(healths)?.let { kinds += it }
         // 两条路径指向同一件事（“这家没钱了”）：探密钥时上游直接说了额度不足，

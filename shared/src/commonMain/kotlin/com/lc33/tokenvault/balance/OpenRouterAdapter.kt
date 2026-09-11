@@ -2,7 +2,7 @@ package com.lc33.tokenvault.balance
 
 import com.lc33.tokenvault.domain.BalanceKind
 import com.lc33.tokenvault.domain.model.BalanceSnapshot
-import com.lc33.tokenvault.domain.model.Provider
+import com.lc33.tokenvault.domain.model.KeySettings
 import com.lc33.tokenvault.endpoint.ProbeRequest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.doubleOrNull
@@ -22,13 +22,13 @@ class OpenRouterAdapter : BalanceAdapter {
 
     override val kind: BalanceKind = BalanceKind.OPENROUTER
 
-    override fun buildRequest(provider: Provider, defaultKey: CharArray?, token: CharArray?): ProbeRequest {
-        val root = provider.apiRoot.trimEnd('/')
+    override fun buildRequest(settings: KeySettings, defaultKey: CharArray?, token: CharArray?): ProbeRequest {
+        val root = settings.apiRoot.trimEnd('/')
         val headers = mutableListOf<Pair<String, String>>()
         defaultKey?.let { headers += "Authorization" to "Bearer ${it.concatToString()}" }
         return ProbeRequest(
             method = "GET",
-            url = "$root/${provider.apiVersion}/credits",
+            url = "$root/${settings.apiVersion}/credits",
             headers = headers,
             protocol = null,
         )

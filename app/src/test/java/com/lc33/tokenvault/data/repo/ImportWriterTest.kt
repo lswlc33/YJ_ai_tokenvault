@@ -1,16 +1,10 @@
 package com.lc33.tokenvault.data.repo
 
-import com.lc33.tokenvault.domain.repo.ImportWriter
-
-import com.lc33.tokenvault.domain.repo.TransactionRunner
-
 import com.lc33.tokenvault.crypto.FieldAad
 import com.lc33.tokenvault.crypto.SecretBox
 import com.lc33.tokenvault.domain.BalanceKind
 import com.lc33.tokenvault.domain.Protocol
-import com.lc33.tokenvault.importer.ParsedAccount
-import com.lc33.tokenvault.importer.ParsedKey
-import com.lc33.tokenvault.importer.ParsedModel
+import com.lc33.tokenvault.domain.repo.ImportWriter
 import com.lc33.tokenvault.importer.ParsedRecord
 import com.lc33.tokenvault.importer.TextImporter
 import com.lc33.tokenvault.platform.FileBootStore
@@ -24,12 +18,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
-/**
- * 文本导入的落库编排。
- *
- * 验证的是"解析结果 → 数据库"这条链路的正确性：供应商先写、密钥第一张默认、
- * 账号加密、模型带 needsReview。用真 `VaultSession` + `SecretBox`，所以加密是端到端的。
- */
 class ImportWriterTest {
 
     @get:Rule
@@ -38,6 +26,7 @@ class ImportWriterTest {
     private lateinit var session: VaultSession
     private lateinit var providerDao: FakeProviderDao
     private lateinit var keyDao: FakeApiKeyDao
+    private lateinit var settingsDao: FakeKeySettingsDao
     private lateinit var accountDao: FakeProviderAccountDao
     private lateinit var modelDao: FakeModelDao
     private lateinit var writer: ImportWriter
@@ -57,20 +46,30 @@ class ImportWriterTest {
         session.completeOnboarding()
 
         providerDao = FakeProviderDao()
-        keyDao = FakeApiKeyDao()
+        settingsDao = FakeKeySettingsDao()
+        keyDao = FakeApiKeyDao(settingsDao)
         accountDao = FakeProviderAccountDao()
         modelDao = FakeModelDao()
         val cipher = FieldCipher(session, SecretBox())
         writer = ImportWriter(
-            providers = RoomProviderRepository(providerDao, cipher, ImmediateTransactions()) { now },
-            keys = RoomApiKeyRepository(keyDao, cipher, ImmediateTransactions()) { now },
+            providers = RoomProviderRepository(providerDao, now = { now }),
+            keys = RoomApiKeyRepository(
+                dao = keyDao,
+                settingsDao = settingsDao,
+                cipher = cipher,
+                transactions = ImmediateTransactions(),
+                now = { now },
+            ),
             accounts = RoomProviderAccountRepository(accountDao, cipher, ImmediateTransactions()) { now },
             models = RoomModelRepository(modelDao, ImmediateTransactions()) { now },
             transactions = ImmediateTransactions(),
         )
     }
 
-    private fun sample(): List<ParsedRecord> {
+    private fun parse(text: String): List<ParsedRecord> = TextImporter.parse(text).records
+
+    @Test
+    fun `一条记录落库全链路正确`() = runTest {
         val text = """
             供应商名称 Agent Router
             备注 公司专用账号
@@ -93,33 +92,31 @@ class ImportWriterTest {
             TESTtoken0000000000000000000000000001=
             用户ID 199628
         """.trimIndent()
-        return TextImporter.parse(text).records
-    }
 
-    @Test
-    fun `一条记录落库全链路正确`() = runTest {
-        val count = writer.write(sample())
-        assertEquals(1, count)
+        assertEquals(1, writer.write(parse(text)))
 
-        // 供应商
         val provider = providerDao.rows.single()
         assertEquals("Agent Router", provider.name)
-        assertEquals("https://ps.air-outer.com", provider.apiRoot)
-        assertEquals("v1", provider.apiVersion)
-        assertEquals(BalanceKind.NEWAPI.wireName, provider.balanceKind)
-        assertEquals("199628", provider.balanceUserId)
+        assertEquals("公司专用账号", provider.note)
+        assertEquals("https://ps.air-outer.com", provider.websiteUrl)
 
-        // 密钥：一张，且是默认
         val key = keyDao.rows.single()
         assertEquals(provider.id, key.providerId)
-        assertTrue(key.isDefault)
         assertEquals("主号", key.label)
 
-        // 模型：两个，协议正确
+        val settings = settingsDao.rows.single()
+        assertEquals("https://ps.air-outer.com/v1", settings.apiBaseUrl)
+        assertEquals("https://ps.air-outer.com", settings.apiRoot)
+        assertTrue(settings.supportedProtocols.contains(Protocol.CHAT.wireName))
+        assertTrue(settings.supportedProtocols.contains(Protocol.RESPONSES.wireName))
+        assertEquals(BalanceKind.NEWAPI.wireName, settings.balanceKind)
+        assertEquals("199628", settings.balanceUserId)
+
         assertEquals(2, modelDao.rows.size)
         val byId = modelDao.rows.associateBy { it.modelId }
         assertEquals(Protocol.RESPONSES.wireName, byId["gpt-5.6-sol"]?.protocol)
         assertEquals(Protocol.ANTHROPIC.wireName, byId["claude-opus-5"]?.protocol)
+        assertTrue(modelDao.rows.all { it.keyId == key.id })
     }
 
     @Test
@@ -140,14 +137,12 @@ class ImportWriterTest {
             平台密码 Password2
             账号备注 备用号
         """.trimIndent()
-        writer.write(TextImporter.parse(text).records)
+        writer.write(parse(text))
 
         assertEquals(2, accountDao.rows.size)
         val providerId = providerDao.rows.single().id
-        val labels = accountDao.rows.map { it.label }.toSet()
-        assertEquals(setOf("公司主号", "备用号"), labels)
+        assertEquals(setOf("公司主号", "备用号"), accountDao.rows.map { it.label }.toSet())
 
-        // 用户名密码加密且可解回（用第一张账号验证）
         val first = accountDao.rows.first()
         val usernamePlain = session.withFieldKey { key ->
             SecretBox().open(first.usernameEnc!!, key, FieldAad.of("provider_accounts", first.id, "usernameEnc"), "t")
@@ -165,7 +160,7 @@ class ImportWriterTest {
             模型列表
             DeepSeek V4 Pro Responses
         """.trimIndent()
-        writer.write(TextImporter.parse(text).records)
+        writer.write(parse(text))
 
         val model = modelDao.rows.single()
         assertEquals("DeepSeek V4 Pro", model.modelId)

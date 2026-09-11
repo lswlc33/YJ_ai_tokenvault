@@ -25,6 +25,8 @@ import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.scene.Scene
 import androidx.navigationevent.NavigationEvent
 import androidx.navigation3.ui.NavDisplay
+import androidx.navigation3.ui.defaultPopTransitionSpec
+import androidx.navigation3.ui.defaultTransitionSpec
 import androidx.navigation3.ui.NavDisplayTransitionEffects
 import androidx.savedstate.serialization.SavedStateConfiguration
 import com.lc33.tokenvault.domain.model.PredictiveBackExitDirection
@@ -39,6 +41,8 @@ import com.lc33.tokenvault.ui.shell.DashboardRoute
 import com.lc33.tokenvault.ui.shell.DataRoute
 import com.lc33.tokenvault.ui.shell.GroupsRoute
 import com.lc33.tokenvault.ui.shell.ImportRoute
+import com.lc33.tokenvault.ui.shell.KeyDetailRoute
+import com.lc33.tokenvault.ui.shell.KeyEditorRoute
 import com.lc33.tokenvault.ui.shell.LogRoute
 import com.lc33.tokenvault.ui.shell.ManageRoute
 import com.lc33.tokenvault.ui.shell.ProfileEditorRoute
@@ -69,7 +73,9 @@ fun rememberVaultBackStack(): MutableList<VaultRoute> {
                     subclass(SettingsRoute::class)
                     subclass(ProviderDetailRoute::class)
                     subclass(ProviderEditorRoute::class)
-                    subclass(ImportRoute::class)
+                    subclass(KeyDetailRoute::class)
+                    subclass(KeyEditorRoute::class)
+                                        subclass(ImportRoute::class)
                     subclass(GroupsRoute::class)
                     subclass(ProbeRunRoute::class)
                     subclass(BalanceBreakdownRoute::class)
@@ -130,7 +136,7 @@ fun VaultNavDisplay(
         modifier = modifier,
         onBack = onBack,
         transitionSpec = { appPushTransition() },
-        popTransitionSpec = { appPopTransition(style, exitDirection) },
+        popTransitionSpec = { appPopTransition() },
         predictivePopTransitionSpec = { edge ->
             appPredictivePopTransition(style, exitDirection, edge)
         },
@@ -152,18 +158,12 @@ private fun AnimatedContentTransitionScope<Scene<VaultRoute>>.appPushTransition(
     }
 }
 
-private fun AnimatedContentTransitionScope<Scene<VaultRoute>>.appPopTransition(
-    style: PredictiveBackStyle,
-    exitDirection: PredictiveBackExitDirection,
-): ContentTransform =
+private fun AnimatedContentTransitionScope<Scene<VaultRoute>>.appPopTransition(): ContentTransform =
     if (isTopLevelSceneTransition()) {
         topLevelTransition()
     } else {
-        when (style) {
-            PredictiveBackStyle.None -> noPredictivePop()
-            PredictiveBackStyle.Miuix -> miuixPop()
-            PredictiveBackStyle.Scale -> scalePop(exitDirection)
-        }
+        // 常规返回不吃“预见式返回样式”的配置：按钮返回永远是 MIUIX 的层级平移。
+        miuixPop()
     }
 
 private fun AnimatedContentTransitionScope<Scene<VaultRoute>>.appPredictivePopTransition(
@@ -196,13 +196,11 @@ private fun AnimatedContentTransitionScope<Scene<VaultRoute>>.topLevelTransition
         slideOutHorizontally(tween(TopLevelDurationMs), exitOffset)
 }
 
-private fun horizontalPush(): ContentTransform =
-    slideInHorizontally(tween(DurationMs)) { it } togetherWith
-        slideOutHorizontally(tween(DurationMs)) { -it / 4 }
+private fun AnimatedContentTransitionScope<Scene<VaultRoute>>.horizontalPush(): ContentTransform =
+    defaultTransitionSpec<VaultRoute>().invoke(this)
 
-private fun miuixPop(): ContentTransform =
-    slideInHorizontally(tween(DurationMs)) { -it / 4 } togetherWith
-        slideOutHorizontally(tween(DurationMs)) { it }
+private fun AnimatedContentTransitionScope<Scene<VaultRoute>>.miuixPop(): ContentTransform =
+    defaultPopTransitionSpec<VaultRoute>().invoke(this)
 
 private fun scalePop(
     direction: PredictiveBackExitDirection,

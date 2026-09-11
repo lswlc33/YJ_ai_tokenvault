@@ -4,75 +4,72 @@ import com.lc33.tokenvault.domain.KeyHealth
 import com.lc33.tokenvault.domain.ProbeLevel
 import com.lc33.tokenvault.domain.Protocol
 import com.lc33.tokenvault.domain.model.ApiKey
+import com.lc33.tokenvault.domain.model.KeyProbeSettings
+import com.lc33.tokenvault.domain.model.KeySettings
 import com.lc33.tokenvault.domain.model.Provider
-import com.lc33.tokenvault.domain.model.ProviderProbeSettings
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * 探测计划生成（§8.6 第一步：过滤供应商，§8.3 只做 L1/L2）。
- *
- * 纯函数，验证：
- * - `probeEnabled = 0` 的整家跳过，进 skippedProviders。
- * - L1 按 `supportedProtocols` 每个协议一条。
- * - L2 只为启用的 Key 生成。
- * - 端点规范化失败（空地址 / 无 host）的那家跳过。
- * - host 预算的基数 = 该 host 的启用 Key 数。
- */
 class ProbePlanBuilderTest {
 
-    private fun provider(
-        id: Long,
-        baseUrl: String = "https://api$id.example.test/v1",
-        protocols: Set<Protocol> = setOf(Protocol.CHAT),
-        probe: ProviderProbeSettings = ProviderProbeSettings(),
-    ) = Provider(
-        id = id,
-        name = "Provider $id",
-        apiBaseUrl = baseUrl,
-        apiRoot = baseUrl.removeSuffix("/v1"),
-        supportedProtocols = protocols,
-        probe = probe,
-    )
+    private fun provider(id: Long) = Provider(id = id, name = "Provider $id")
 
-    private fun key(id: Long, providerId: Long, enabled: Boolean = true) = ApiKey(
+    private fun key(
+        id: Long,
+        providerId: Long,
+        enabled: Boolean = true,
+        baseUrl: String = "https://api$providerId.example.test/v1",
+        protocols: Set<Protocol> = setOf(Protocol.CHAT),
+        probe: KeyProbeSettings = KeyProbeSettings(),
+    ) = ApiKey(
         id = id,
         providerId = providerId,
+        label = "key$id",
+        note = "",
         secretEnc = ByteArray(0),
         fingerprint = "fp$id",
-        health = KeyHealth.UNKNOWN,
         enabled = enabled,
+        settings = KeySettings(
+            apiBaseUrl = baseUrl,
+            apiRoot = baseUrl.removeSuffix("/v1"),
+            supportedProtocols = protocols,
+            probe = probe,
+        ),
+        health = KeyHealth.UNKNOWN,
     )
 
     @Test
-    fun `probeEnabled 关掉的那家整家跳过`() {
-        val p = provider(1, probe = ProviderProbeSettings(enabled = false))
-        val plan = ProbePlanBuilder.build(listOf(p)) { emptyList() }
+    fun `探测总闸关掉的那家跳过`() {
+        val p = provider(1)
+        val keys = listOf(key(10, 1, probe = KeyProbeSettings(enabled = false)))
+        val plan = ProbePlanBuilder.build(listOf(p)) { pid -> keys.filter { it.providerId == pid } }
 
         assertTrue(plan.tasks.isEmpty())
         assertEquals(listOf(p), plan.skippedProviders)
     }
 
     @Test
-    fun `每个协议生成一条 L1`() {
-        val p = provider(1, protocols = setOf(Protocol.CHAT, Protocol.ANTHROPIC))
-        val plan = ProbePlanBuilder.build(listOf(p)) { emptyList() }
+    fun `每把 Key 每个协议生成一条 L1`() {
+        val p = provider(1)
+        val keys = listOf(
+            key(10, 1, protocols = setOf(Protocol.CHAT, Protocol.ANTHROPIC)),
+        )
+        val plan = ProbePlanBuilder.build(listOf(p)) { pid -> keys.filter { it.providerId == pid } }
 
         val l1 = plan.tasks.filter { it.level == ProbeLevel.L1_REACHABILITY }
         assertEquals(2, l1.size)
         assertEquals(setOf(Protocol.CHAT, Protocol.ANTHROPIC), l1.map { it.protocol }.toSet())
-        assertNull("L1 不绑密钥", l1.first().keyId)
+        assertEquals(setOf(10L), l1.map { it.keyId }.toSet())
     }
 
     @Test
     fun `L2 只为启用的 Key 生成`() {
         val p = provider(1)
         val keys = listOf(
-            key(10, providerId = 1, enabled = true),
-            key(11, providerId = 1, enabled = false),
-            key(12, providerId = 2, enabled = true), // 别家的，不该算进来
+            key(10, 1, enabled = true),
+            key(11, 1, enabled = false),
+            key(12, 2, enabled = true),
         )
         val plan = ProbePlanBuilder.build(listOf(p)) { pid -> keys.filter { it.providerId == pid } }
 
@@ -83,19 +80,20 @@ class ProbePlanBuilderTest {
 
     @Test
     fun `reachability 关掉就不发 L1，keyValidity 关掉就不发 L2`() {
-        val p = provider(
-            1,
-            probe = ProviderProbeSettings(reachability = false, keyValidity = false),
+        val p = provider(1)
+        val keys = listOf(
+            key(10, 1, probe = KeyProbeSettings(reachability = false, keyValidity = false)),
         )
-        val plan = ProbePlanBuilder.build(listOf(p)) { pid -> listOf(key(10, pid)) }
+        val plan = ProbePlanBuilder.build(listOf(p)) { pid -> keys.filter { it.providerId == pid } }
 
         assertTrue(plan.tasks.isEmpty())
     }
 
     @Test
-    fun `端点规范化失败的那家跳过`() {
-        val p = provider(1, baseUrl = "") // 空地址
-        val plan = ProbePlanBuilder.build(listOf(p)) { emptyList() }
+    fun `端点规范化失败的 Key 跳过`() {
+        val p = provider(1)
+        val keys = listOf(key(10, 1, baseUrl = ""))
+        val plan = ProbePlanBuilder.build(listOf(p)) { pid -> keys.filter { it.providerId == pid } }
 
         assertTrue(plan.tasks.isEmpty())
         assertEquals(listOf(p), plan.skippedProviders)
@@ -111,9 +109,10 @@ class ProbePlanBuilderTest {
     }
 
     @Test
-    fun `无协议的供应商不生成任何任务`() {
-        val p = provider(1, protocols = emptySet())
-        val plan = ProbePlanBuilder.build(listOf(p)) { pid -> listOf(key(10, pid)) }
+    fun `无协议的 Key 不生成任何任务`() {
+        val p = provider(1)
+        val keys = listOf(key(10, 1, protocols = emptySet()))
+        val plan = ProbePlanBuilder.build(listOf(p)) { pid -> keys.filter { it.providerId == pid } }
 
         assertTrue(plan.tasks.isEmpty())
     }

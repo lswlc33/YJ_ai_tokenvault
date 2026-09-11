@@ -3,37 +3,54 @@ package com.lc33.tokenvault.importer
 import com.lc33.tokenvault.domain.BalanceKind
 import com.lc33.tokenvault.domain.Protocol
 import com.lc33.tokenvault.domain.model.AiModel
+import com.lc33.tokenvault.domain.model.ApiKey
+import com.lc33.tokenvault.domain.model.KeySettings
 import com.lc33.tokenvault.domain.model.Provider
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * 反向导出（§11.3）。
- *
- * 核心断言是**往返**：导出的文本再喂给 [TextImporter] 能解析回同样的东西——
- * 这证明导出格式与导入格式真的是同一套。否则"与应用双向"就是一句空话。
- */
 class TextExporterTest {
 
-    private fun sampleProvider() = Provider(
-        name = "Agent Router",
-        note = "公司专用账号",
-        websiteUrl = "https://ps.air-outer.com",
-        apiBaseUrl = "https://ps.air-outer.com/v1",
-        apiRoot = "https://ps.air-outer.com",
-        apiVersion = "v1",
-        supportedProtocols = setOf(Protocol.CHAT, Protocol.RESPONSES, Protocol.ANTHROPIC),
-        balanceKind = BalanceKind.NEWAPI,
-        balanceBaseUrl = "https://ps.air-outer.com",
+    private fun settings(
+        root: String,
+        protocols: Set<Protocol>,
+        balanceKind: BalanceKind,
+    ) = KeySettings(
+        apiBaseUrl = "$root/v1",
+        apiRoot = root,
+        supportedProtocols = protocols,
+        balanceKind = balanceKind,
+        balanceBaseUrl = root,
         balanceUserId = "199628",
+    )
+
+    private fun key(label: String, settings: KeySettings) = ApiKey(
+        id = 1,
+        providerId = 1,
+        label = label,
+        note = "",
+        secretEnc = ByteArray(1),
+        fingerprint = "f",
+        settings = settings,
+    )
+
+    private fun provider(note: String? = "公司专用账号") = Provider(
+        name = "Agent Router",
+        note = note,
+        websiteUrl = "https://ps.air-outer.com",
     )
 
     @Test
     fun `导出再导入能往返`() {
+        val keySettings = settings(
+            root = "https://ps.air-outer.com",
+            protocols = setOf(Protocol.CHAT, Protocol.RESPONSES, Protocol.ANTHROPIC),
+            balanceKind = BalanceKind.NEWAPI,
+        )
         val text = TextExporter.exportProvider(
-            provider = sampleProvider(),
-            keys = listOf("主号" to "sk-TEST0000000000000000000000000001"),
+            provider = provider(),
+            keys = listOf(key("主号", keySettings) to "sk-TEST0000000000000000000000000001"),
             accounts = listOf(
                 TextExporter.ExportedAccount("公司主号", "company@example.com", "Password1"),
             ),
@@ -59,9 +76,10 @@ class TextExporterTest {
 
     @Test
     fun `备注无导出为无再导入变null`() {
+        val keySettings = settings("https://ps.air-outer.com", setOf(Protocol.CHAT), BalanceKind.NONE)
         val text = TextExporter.exportProvider(
-            provider = sampleProvider().copy(note = null),
-            keys = emptyList(),
+            provider = provider(note = null),
+            keys = listOf(key("主号", keySettings) to "sk-TEST"),
             accounts = emptyList(),
             models = emptyList(),
         )
@@ -71,16 +89,14 @@ class TextExporterTest {
 
     @Test
     fun `官方接口导出后能按host推断回deepseek`() {
+        val keySettings = settings(
+            root = "https://api.deepseek.com",
+            protocols = setOf(Protocol.CHAT, Protocol.RESPONSES),
+            balanceKind = BalanceKind.DEEPSEEK,
+        )
         val text = TextExporter.exportProvider(
-            provider = Provider(
-                name = "DeepSeek",
-                apiBaseUrl = "https://api.deepseek.com/v1",
-                apiRoot = "https://api.deepseek.com",
-                apiVersion = "v1",
-                supportedProtocols = setOf(Protocol.CHAT, Protocol.RESPONSES),
-                balanceKind = BalanceKind.DEEPSEEK,
-            ),
-            keys = emptyList(),
+            provider = Provider(name = "DeepSeek"),
+            keys = listOf(key("主号", keySettings) to "sk-TEST"),
             accounts = emptyList(),
             models = emptyList(),
         )

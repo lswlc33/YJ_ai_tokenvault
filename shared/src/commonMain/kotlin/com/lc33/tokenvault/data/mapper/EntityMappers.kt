@@ -1,10 +1,12 @@
 package com.lc33.tokenvault.data.mapper
 
+import com.lc33.tokenvault.data.dao.ApiKeyWithSettingsRow
 import com.lc33.tokenvault.data.dao.ProviderSummaryRow
 import com.lc33.tokenvault.data.entity.ApiKeyEntity
 import com.lc33.tokenvault.data.entity.AuditLogEntity
 import com.lc33.tokenvault.data.entity.ClientProfileEntity
 import com.lc33.tokenvault.data.entity.GroupEntity
+import com.lc33.tokenvault.data.entity.KeySettingsEntity
 import com.lc33.tokenvault.data.entity.ModelEntity
 import com.lc33.tokenvault.data.entity.ProviderAccountEntity
 import com.lc33.tokenvault.data.entity.ProviderEntity
@@ -22,32 +24,14 @@ import com.lc33.tokenvault.domain.model.AuditEntry
 import com.lc33.tokenvault.domain.model.BalanceSnapshot
 import com.lc33.tokenvault.domain.model.ClientProfile
 import com.lc33.tokenvault.domain.model.Group
+import com.lc33.tokenvault.domain.model.KeyProbeSettings
+import com.lc33.tokenvault.domain.model.KeySettings
 import com.lc33.tokenvault.domain.model.LogCategory
 import com.lc33.tokenvault.domain.model.LogLevel
 import com.lc33.tokenvault.domain.model.Provider
 import com.lc33.tokenvault.domain.model.ProviderAccount
-import com.lc33.tokenvault.domain.model.ProviderProbeSettings
 import com.lc33.tokenvault.domain.model.ProviderSummary
-
-/**
- * Room 实体 ↔ 领域模型。
- *
- * CLAUDE.md 要求这两套类分开、中间有**显式**映射器，这里就是那个映射器。列级的
- * CSV / JSON 编解码在 [ColumnCodecs] 里，这一层只做"哪个字段对哪个字段"。
- *
- * 三条规矩：
- *
- * 1. **密文列只搬字节，绝不解密**（§6.1 推论 3）。`secretEnc` / `usernameEnc` /
- *    `passwordEnc` / `balanceTokenEnc` 进来是 `ByteArray`、出去还是 `ByteArray`。
- *    在这里解密的表现很具体：列表页订阅的 `Flow` 会在锁定那一瞬间从内部抛异常，
- *    整条订阅断掉，用户看到的是"数据全没了"。
- * 2. **读方向单向容错**：认不出来的枚举值取默认档而不是抛（每个 `fromWireName` 都这么写）。
- *    一行坏数据不该让整页打不开。写方向不容错——写进去的一定是我们认识的值。
- *    代价要说清楚：坏值被读成默认档之后，**再存一次就把原值覆盖掉了**，所以只有
- *    确实要保存那一行时才写回，不做"读出来顺手规范化再写回"这种事。
- * 3. **派生值不参与映射**：`BalanceState` 由阈值现算（§5.3），`ProbeRun.skippedCount`
- *    是 `total - done`。存进去就会有第二个真相。
- */
+import com.lc33.tokenvault.domain.model.WebsiteStatus
 
 // ------------------------------------------------------------------ groups
 
@@ -57,31 +41,105 @@ fun Group.toEntity(): GroupEntity = GroupEntity(id = id, name = name, sortOrder 
 
 // ------------------------------------------------------------------ providers
 
-/**
- * 余额那几列 → [BalanceSnapshot]。
- *
- * **全都是 null 时返回 null**，而不是返回一个"金额未知"的快照：这两件事在 UI 上不一样，
- * 一个是"没配置余额查询"，另一个是"配了但还没查过"。而 `balanceError` 单独一列的理由是
- * 红线 14 的邻居——查询失败必须与"余额为 0"可区分（§9.3）。
- */
-private fun ProviderEntity.balanceSnapshot(): BalanceSnapshot? {
-    if (balanceAmount == null &&
-        balanceUsed == null &&
-        balanceRaw == null &&
-        balanceCheckedAt == null &&
-        balanceError == null
-    ) {
-        return null
-    }
-    return BalanceSnapshot(
-        amount = balanceAmount,
-        used = balanceUsed,
-        currency = balanceCurrency ?: BalanceSnapshot.UNKNOWN_CURRENCY,
-        raw = balanceRaw,
-        checkedAt = balanceCheckedAt,
-        error = balanceError,
-    )
-}
+fun ProviderEntity.toDomain(): Provider = Provider(
+    id = id,
+    name = name,
+    note = note,
+    websiteUrl = websiteUrl,
+    website = WebsiteStatus(
+        latencyMs = websiteLatencyMs,
+        checkedAt = websiteCheckedAt,
+        error = websiteError,
+    ),
+    groupId = groupId,
+    color = color,
+    pinned = pinned,
+    sortOrder = sortOrder,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+)
+
+fun Provider.toEntity(): ProviderEntity = ProviderEntity(
+    id = id,
+    name = name,
+    note = note,
+    websiteUrl = websiteUrl,
+    websiteLatencyMs = website.latencyMs,
+    websiteCheckedAt = website.checkedAt,
+    websiteError = website.error,
+    groupId = groupId,
+    color = color,
+    pinned = pinned,
+    sortOrder = sortOrder,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+)
+
+fun ProviderSummaryRow.toDomain(): ProviderSummary = ProviderSummary(
+    provider = provider.toDomain(),
+    keyCount = keyCount,
+    okKeyCount = okKeyCount,
+    modelCount = modelCount,
+    accountCount = accountCount,
+)
+
+// ------------------------------------------------------------------ key_settings
+
+fun KeySettingsEntity.toDomain(): KeySettings = KeySettings(
+    apiBaseUrl = apiBaseUrl,
+    apiRoot = apiRoot,
+    apiVersion = apiVersion,
+    supportedProtocols = supportedProtocols.toProtocolSet(),
+    pathOverrides = pathOverrides.toPathOverrides(),
+    authStyle = AuthStyle.fromWireName(authStyle),
+    allowInsecure = allowInsecure,
+    clientProfileId = clientProfileId,
+    timeoutSeconds = timeoutSeconds,
+    balanceKind = BalanceKind.fromWireName(balanceKind),
+    balanceBaseUrl = balanceBaseUrl,
+    balanceUserId = balanceUserId,
+    balanceTokenEnc = balanceTokenEnc,
+    balanceConfig = balanceConfig,
+    quotaPerUnit = quotaPerUnit,
+    quotaCalibrated = quotaCalibrated,
+    probe = KeyProbeSettings(
+        enabled = probeEnabled,
+        reachability = probeReachability,
+        keyValidity = probeKeyValidity,
+        balance = probeBalance,
+        models = probeModels,
+        modelReachability = probeModelReachability,
+    ),
+)
+
+fun KeySettings.toEntity(keyId: Long, updatedAt: Long): KeySettingsEntity = KeySettingsEntity(
+    keyId = keyId,
+    apiBaseUrl = apiBaseUrl,
+    apiRoot = apiRoot,
+    apiVersion = apiVersion,
+    supportedProtocols = supportedProtocols.toCsv(),
+    pathOverrides = pathOverrides.pathOverridesToJson(),
+    authStyle = authStyle.wireName,
+    allowInsecure = allowInsecure,
+    clientProfileId = clientProfileId,
+    timeoutSeconds = timeoutSeconds,
+    balanceKind = balanceKind.wireName,
+    balanceBaseUrl = balanceBaseUrl,
+    balanceUserId = balanceUserId,
+    balanceTokenEnc = balanceTokenEnc,
+    balanceConfig = balanceConfig,
+    quotaPerUnit = quotaPerUnit,
+    quotaCalibrated = quotaCalibrated,
+    probeEnabled = probe.enabled,
+    probeReachability = probe.reachability,
+    probeKeyValidity = probe.keyValidity,
+    probeBalance = probe.balance,
+    probeModels = probe.models,
+    probeModelReachability = probe.modelReachability,
+    updatedAt = updatedAt,
+)
+
+// ------------------------------------------------------------------ api_keys
 
 private fun ApiKeyEntity.balanceSnapshot(): BalanceSnapshot? {
     if (balanceAmount == null &&
@@ -102,130 +160,44 @@ private fun ApiKeyEntity.balanceSnapshot(): BalanceSnapshot? {
     )
 }
 
-fun ProviderEntity.toDomain(): Provider = Provider(
-    id = id,
-    name = name,
-    note = note,
-    websiteUrl = websiteUrl,
-    apiBaseUrl = apiBaseUrl,
-    apiRoot = apiRoot,
-    apiVersion = apiVersion,
-    supportedProtocols = supportedProtocols.toProtocolSet(),
-    pathOverrides = pathOverrides.toPathOverrides(),
-    authStyle = AuthStyle.fromWireName(authStyle),
-    allowInsecure = allowInsecure,
-    clientProfileId = clientProfileId,
-    groupId = groupId,
-    color = color,
-    pinned = pinned,
-    sortOrder = sortOrder,
-    balanceKind = BalanceKind.fromWireName(balanceKind),
-    balanceBaseUrl = balanceBaseUrl,
-    balanceUserId = balanceUserId,
-    balanceTokenEnc = balanceTokenEnc,
-    balanceConfig = balanceConfig,
-    quotaPerUnit = quotaPerUnit,
-    balance = balanceSnapshot(),
-    quotaCalibrated = quotaCalibrated,
-    timeoutSeconds = timeoutSeconds,
-    reachabilityLatencyMs = reachabilityLatencyMs,
-    reachabilityCheckedAt = reachabilityCheckedAt,
-    reachabilityError = reachabilityError,
-    probe = ProviderProbeSettings(
-        enabled = probeEnabled,
-        reachability = probeReachability,
-        keyValidity = probeKeyValidity,
-        balance = probeBalance,
-        models = probeModels,
-        modelReachability = probeModelReachability,
-    ),
-    createdAt = createdAt,
-    updatedAt = updatedAt,
-)
-
-fun Provider.toEntity(): ProviderEntity = ProviderEntity(
-    id = id,
-    name = name,
-    note = note,
-    websiteUrl = websiteUrl,
-    apiBaseUrl = apiBaseUrl,
-    apiRoot = apiRoot,
-    apiVersion = apiVersion,
-    supportedProtocols = supportedProtocols.toCsv(),
-    pathOverrides = pathOverrides.pathOverridesToJson(),
-    authStyle = authStyle.wireName,
-    allowInsecure = allowInsecure,
-    clientProfileId = clientProfileId,
-    groupId = groupId,
-    color = color,
-    pinned = pinned,
-    sortOrder = sortOrder,
-    balanceKind = balanceKind.wireName,
-    balanceBaseUrl = balanceBaseUrl,
-    balanceUserId = balanceUserId,
-    balanceTokenEnc = balanceTokenEnc,
-    balanceConfig = balanceConfig,
-    quotaPerUnit = quotaPerUnit,
-    balanceAmount = balance?.amount,
-    balanceUsed = balance?.used,
-    // 币种只在有快照时写：没查过的行留 null，否则"UNKNOWN"会被当成查过一次的结果
-    balanceCurrency = balance?.currency,
-    balanceRaw = balance?.raw,
-    balanceCheckedAt = balance?.checkedAt,
-    balanceError = balance?.error,
-    quotaCalibrated = quotaCalibrated,
-    timeoutSeconds = timeoutSeconds,
-    reachabilityLatencyMs = reachabilityLatencyMs,
-    reachabilityCheckedAt = reachabilityCheckedAt,
-    reachabilityError = reachabilityError,
-    probeEnabled = probe.enabled,
-    probeReachability = probe.reachability,
-    probeKeyValidity = probe.keyValidity,
-    probeBalance = probe.balance,
-    probeModels = probe.models,
-    probeModelReachability = probe.modelReachability,
-    createdAt = createdAt,
-    updatedAt = updatedAt,
-)
-
-fun ProviderSummaryRow.toDomain(): ProviderSummary = ProviderSummary(
-    provider = provider.toDomain(),
-    keyCount = keyCount,
-    okKeyCount = okKeyCount,
-    modelCount = modelCount,
-    accountCount = accountCount,
-)
-
-// ------------------------------------------------------------------ api_keys
-
-fun ApiKeyEntity.toDomain(): ApiKey = ApiKey(
-    id = id,
-    providerId = providerId,
-    label = label,
-    secretEnc = secretEnc,
-    fingerprint = fingerprint,
-    isDefault = isDefault,
-    enabled = enabled,
-    health = KeyHealth.fromWireName(health),
-    lastOutcome = ProbeOutcome.fromWireName(lastOutcome),
-    healthDetail = healthDetail,
-    httpStatus = httpStatus,
-    latencyMs = latencyMs,
-    checkedAt = checkedAt,
-    okAt = okAt,
-    balance = balanceSnapshot(),
-    sortOrder = sortOrder,
-    createdAt = createdAt,
-    updatedAt = updatedAt,
-)
+fun ApiKeyWithSettingsRow.toDomain(): ApiKey {
+    val settingsEntity = settings
+        ?: KeySettingsEntity(
+            keyId = key.id,
+            apiBaseUrl = "",
+            apiRoot = "",
+            updatedAt = key.updatedAt,
+        )
+    return ApiKey(
+        id = key.id,
+        providerId = key.providerId,
+        label = key.label,
+        note = key.note,
+        secretEnc = key.secretEnc,
+        fingerprint = key.fingerprint,
+        enabled = key.enabled,
+        settings = settingsEntity.toDomain(),
+        health = KeyHealth.fromWireName(key.health),
+        lastOutcome = ProbeOutcome.fromWireName(key.lastOutcome),
+        healthDetail = key.healthDetail,
+        httpStatus = key.httpStatus,
+        latencyMs = key.latencyMs,
+        checkedAt = key.checkedAt,
+        okAt = key.okAt,
+        balance = key.balanceSnapshot(),
+        sortOrder = key.sortOrder,
+        createdAt = key.createdAt,
+        updatedAt = key.updatedAt,
+    )
+}
 
 fun ApiKey.toEntity(): ApiKeyEntity = ApiKeyEntity(
     id = id,
     providerId = providerId,
     label = label,
+    note = note,
     secretEnc = secretEnc,
     fingerprint = fingerprint,
-    isDefault = isDefault,
     enabled = enabled,
     health = health.wireName,
     lastOutcome = lastOutcome.wireName,
@@ -279,12 +251,6 @@ fun ProviderAccount.toEntity(): ProviderAccountEntity = ProviderAccountEntity(
 
 // ------------------------------------------------------------------ models
 
-/**
- * 模型行。
- *
- * `protocol` 认不出来时给 [Protocol.CHAT]：这一列非空，而"这一行属于哪条路径"必须有答案。
- * 猜错的表现是发到错的路径拿 404，可见且可改；跳过整行的表现是模型凭空消失。
- */
 fun ModelEntity.toDomain(): AiModel = AiModel(
     id = id,
     providerId = providerId,

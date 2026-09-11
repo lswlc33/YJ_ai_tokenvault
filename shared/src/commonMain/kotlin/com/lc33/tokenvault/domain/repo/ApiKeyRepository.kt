@@ -2,70 +2,53 @@ package com.lc33.tokenvault.domain.repo
 
 import com.lc33.tokenvault.domain.model.ApiKey
 import com.lc33.tokenvault.domain.model.BalanceSnapshot
+import com.lc33.tokenvault.domain.model.KeySettings
 import kotlinx.coroutines.flow.Flow
 
-/**
- * API 密钥。**这个应用里唯一真正要紧的那张表。**
- *
- * 明文只在三个方法的参数与返回值上出现，而且一律是 [CharArray]（红线 1：可擦）：
- * [add]、[replaceSecret]、[reveal]。其余方法只搬密文与元数据。
- *
- * [reveal] 是唯一能拿到明文的出口，所以它是**红线 1 的收口处**：
- * 调用方拿到的数组用完必须自己 `zeroize()`，而任何把它转成 `String` 的写法都等于
- * 把明文留在堆上到进程结束（`String` 擦不掉）。
- */
 interface ApiKeyRepository {
-
     fun observeByProvider(providerId: Long): Flow<List<ApiKey>>
-
-    /**
-     * 全库的密钥。
-     *
-     * 给“要把所有家一起算”的地方用（仪表盘的健康分布、管理页每一行的聚合状态）。
-     * **一条订阅而不是每家一条**：按家订阅是 N+1，而且新增一家时那一整组 Flow 要重建，
-     * 于是列表会闪一下。不解密，所以锁定态也能读（§6.1 推论 3）。
-     */
     fun observeAll(): Flow<List<ApiKey>>
-
     suspend fun find(id: Long): ApiKey?
 
     /**
-     * 新增一张密钥。返回新行 id。
+     * 新增一张 Key。
      *
-     * @param secret 明文。实现会算指纹、加密、落库，**不擦它**——生命周期归调用方
-     *   （擦调用方的数组等于替它做决定，而它可能还要用同一份明文去做别的事）。
-     * @throws com.lc33.tokenvault.crypto.VaultLockedException 锁定态。
+     * @param secret 明文密钥。实现会算指纹、加密并落库；调用方负责擦掉自己的数组。
+     * @param settings 这把 Key 的请求与探测配置。
+     * @param balanceToken NewAPI 一类余额适配器的独立访问令牌明文；null 表示不写，空数组表示清掉。
      */
-    suspend fun add(providerId: Long, label: String, secret: CharArray): Long
+    suspend fun add(
+        providerId: Long,
+        label: String,
+        note: String,
+        secret: CharArray,
+        settings: KeySettings,
+        balanceToken: CharArray? = null,
+    ): Long
 
-    /** 换掉某一张的明文（用户发现自己粘错了、或者上游轮换了密钥）。指纹跟着重算。 */
     suspend fun replaceSecret(id: Long, secret: CharArray)
 
-    /** 只改元数据（标签、排序）。**不碰密文**，所以不需要 DEK，锁定态也能调。 */
+    /** 只改名称、备注与排序，不碰密文与行为配置。 */
     suspend fun updateMeta(key: ApiKey)
 
-    /**
-     * 解出明文。
-     *
-     * @return 新分配的 [CharArray]，**调用方用完必须擦**。
-     * @throws com.lc33.tokenvault.crypto.VaultLockedException 锁定态。
-     * @throws com.lc33.tokenvault.crypto.DecryptionFailedException 密文坏了或被搬过行
-     *   （AAD 不匹配）。**绝不返回 null**（红线 8）。
-     */
+    /** 保存这把 Key 的行为配置。balanceToken 语义与 [add] 相同。 */
+    suspend fun updateSettings(
+        id: Long,
+        settings: KeySettings,
+        balanceToken: CharArray? = null,
+    )
+
     suspend fun reveal(id: Long): CharArray
 
-    /** 设为默认。同一事务里清掉这家其它的默认标记（红线 6.3）。 */
-    suspend fun setDefault(providerId: Long, keyId: Long)
+    /** 解出余额访问令牌明文。返回的数组归调用方擦。 */
+    suspend fun revealBalanceToken(id: Long): CharArray?
 
     suspend fun setEnabled(id: Long, enabled: Boolean)
-
-    /** 删除。删掉默认那张之后自动把 `sortOrder` 最小的启用 Key 顶上（红线 6.3）。 */
     suspend fun delete(id: Long)
 
-    /**
-     * 落库探测结果（红线 11 的第一条 SQL 对应物）。[health] 非 null 才改 `health` 列，
-     * 同时写 [lastOutcome] / 详情 / 时间戳与 [okAt]（成功时打点）。
-     */
+    /** 同一供应商内重排 Key。排序本身就是优先级，v3 起没有默认 Key。 */
+    suspend fun reorder(providerId: Long, idsInOrder: List<Long>)
+
     suspend fun applyProbeResult(
         id: Long,
         health: String,
@@ -77,10 +60,6 @@ interface ApiKeyRepository {
         okAt: Long?,
     )
 
-    /**
-     * 只写瞬时结论（红线 11 的第二条 SQL 对应物）：`lastOutcome` / 详情 / 时间戳变，
-     * `health` 与 `okAt` 不动——瞬时结果不该改变累计健康状态。
-     */
     suspend fun applyTransientOutcome(
         id: Long,
         lastOutcome: String,
@@ -89,12 +68,6 @@ interface ApiKeyRepository {
         checkedAt: Long,
     )
 
-    /** 只写这张 Key 的余额快照。供应商余额由 UI 层对所有 Key 求和。 */
-    suspend fun updateBalance(
-        id: Long,
-        snapshot: BalanceSnapshot,
-    )
-
-    /** 重置所有密钥的探测字段（health/lastOutcome/详情/时间戳），密钥本身保留。 */
+    suspend fun updateBalance(id: Long, snapshot: BalanceSnapshot)
     suspend fun resetProbeResults()
 }

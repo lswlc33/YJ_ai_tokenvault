@@ -75,11 +75,13 @@ data class UiProviderRow(
      */
     val lastProbeAt: Long? = null,
     val reachabilityLatencyMs: Long? = null,
+    val keys: List<UiKeyRow> = emptyList(),
 )
 
 data class UiKeyRow(
     val id: Long,
     val label: String,
+    val note: String,
     val providerId: Long,
     /**
      * 遮蔽串。**解密之后现算**（§6.1 推论 3），所以它只出现在详情页；这个类里没有明文字段，
@@ -96,9 +98,29 @@ data class UiKeyRow(
      * `relativeBucketOf` + `relativeTimeLabel` 现做——那两个函数本来就是为此拆开的。
      */
     val checkedAt: Long?,
-    val isDefault: Boolean,
+    val enabled: Boolean,
+    val sortOrder: Int,
     val balance: UiMoney? = null,
     val balanceFailed: Boolean = false,
+    val settings: UiKeySettingsSummary = UiKeySettingsSummary(),
+)
+
+/** Key 展示页需要的只读行为摘要；完整编辑状态在 Key 设置页单独持有。 */
+data class UiKeySettingsSummary(
+    val apiBaseUrl: String = "",
+    val apiRoot: String = "",
+    val protocols: List<String> = emptyList(),
+    val authStyle: String = "auto",
+    val clientProfileId: Long? = null,
+    val timeoutSeconds: Int? = null,
+    val allowInsecure: Boolean = false,
+    val balanceKind: String = "none",
+    val probeEnabled: Boolean = true,
+    val probeReachability: Boolean = true,
+    val probeKeyValidity: Boolean = true,
+    val probeBalance: Boolean = true,
+    val probeModels: Boolean = false,
+    val probeModelReachability: Boolean = false,
 )
 
 enum class UiModelSource {

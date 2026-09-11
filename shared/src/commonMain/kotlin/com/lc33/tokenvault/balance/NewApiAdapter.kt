@@ -2,7 +2,7 @@ package com.lc33.tokenvault.balance
 
 import com.lc33.tokenvault.domain.BalanceKind
 import com.lc33.tokenvault.domain.model.BalanceSnapshot
-import com.lc33.tokenvault.domain.model.Provider
+import com.lc33.tokenvault.domain.model.KeySettings
 import com.lc33.tokenvault.endpoint.ProbeRequest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.doubleOrNull
@@ -31,11 +31,11 @@ class NewApiAdapter : BalanceAdapter {
 
     override val kind: BalanceKind = BalanceKind.NEWAPI
 
-    override fun buildRequest(provider: Provider, defaultKey: CharArray?, token: CharArray?): ProbeRequest {
-        val base = provider.balanceBaseUrl?.trimEnd('/') ?: provider.apiRoot.trimEnd('/')
+    override fun buildRequest(settings: KeySettings, defaultKey: CharArray?, token: CharArray?): ProbeRequest {
+        val base = settings.balanceBaseUrl?.trimEnd('/') ?: settings.apiRoot.trimEnd('/')
         val headers = mutableListOf<Pair<String, String>>()
         token?.let { headers += "Authorization" to "Bearer ${it.concatToString()}" }
-        provider.balanceUserId?.let { headers += "New-Api-User" to it }
+        settings.balanceUserId?.let { headers += "New-Api-User" to it }
         return ProbeRequest(
             method = "GET",
             url = "$base/api/user/self",

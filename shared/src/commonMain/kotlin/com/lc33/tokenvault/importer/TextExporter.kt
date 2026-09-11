@@ -4,21 +4,18 @@ import com.lc33.tokenvault.domain.BalanceKind
 import com.lc33.tokenvault.domain.LoginMethod
 import com.lc33.tokenvault.domain.Protocol
 import com.lc33.tokenvault.domain.model.AiModel
+import com.lc33.tokenvault.domain.model.ApiKey
 import com.lc33.tokenvault.domain.model.Provider
 import com.lc33.tokenvault.domain.model.ProviderAccount
 
 /**
- * 反向导出（§11.3）：把供应商导出成与导入相同的文本格式。
+ * 反向导出：把一个供应商合集与其 Key 导出成与导入相同的文本格式。
  *
- * 纯函数：接收领域对象与"密钥 / 密码该不该给明文"的标志，拼出文本。**不读 DEK**——
- * 明文还是遮蔽串由调用方决定（调用方负责 `reveal` 与 `SecretMask.of`），这里只管格式。
- *
- * 遮蔽串用 [SecretMask] 现算，但那一层是 `domain` 的纯逻辑，所以这里也不碰。
- * 反向导出在 v1 里是可砍项（§14.4），先落这个纯函数 + 单测，UI 的 SAF 保存入口后续接。
+ * v3 后行为配置在 Key 上；导出时取该合集下排序第一的启用 Key 作为文本格式的代表。
+ * 文本格式本身没有“每把 Key 独立配置”的表达，多把 Key 只会逐行导出密钥。
  */
 object TextExporter {
 
-    /** 协议 → 导入格式里的别名（`支持端点类型` 块里的写法）。 */
     private fun Protocol.exportAlias(): String = when (this) {
         Protocol.CHAT -> "Chat Completions"
         Protocol.RESPONSES -> "Responses"
@@ -31,44 +28,35 @@ object TextExporter {
         Protocol.ANTHROPIC -> "Anthropic"
     }
 
-    /**
-     * 余额类型还原成导入格式的写法。只有 newapi 与官方接口（DeepSeek）在导入格式里有
-     * 稳定表达；其余（customJson / openrouter 等）反向导出时省略余额段——它们没有
-     * 对应的导入写法，硬写一个会误导下次导入。
-     */
     private fun BalanceKind.exportName(): String? = when (this) {
         BalanceKind.NEWAPI -> "NewAPI"
-        BalanceKind.DEEPSEEK -> "官方接口" // i18n-exempt: 导入格式的"官方接口"字样
+        BalanceKind.DEEPSEEK -> "官方接口" // i18n-exempt: 导入格式的“官方接口”字样
         else -> null
     }
 
-    /**
-     * 导出单个供应商。
-     *
-     * @param keys label 到密钥**展示串**（明文或遮蔽，调用方决定）。
-     * @param accounts 平台账号。username / password 是**展示串**（明文或遮蔽）。
-     * @param models 模型。
-     */
     fun exportProvider(
         provider: Provider,
-        keys: List<Pair<String, String>>,
+        keys: List<Pair<ApiKey, String>>,
         accounts: List<ExportedAccount>,
         models: List<AiModel>,
     ): String = buildString {
-        // 下面的字段名是导出格式的协议（与导入对称），不是 UI 文案（i18n-exempt）
+        val settings = keys.firstOrNull()?.first?.settings
         appendLine("供应商名称 ${provider.name}") // i18n-exempt: 导出格式的字段名
         appendLine("备注 ${provider.note ?: "无"}") // i18n-exempt: 导出格式的字段名
         provider.websiteUrl?.let { appendLine("官网链接 $it") } // i18n-exempt: 导出格式的字段名
-        keys.forEach { (label, secret) ->
-            appendLine("API Key $secret")
+        keys.forEach { (key, secret) ->
+            appendLine("API Key ${key.label.ifBlank { "主号" }} $secret") // i18n-exempt: 导出格式的字段名
         }
-        appendLine("API请求地址 ${provider.apiBaseUrl}") // i18n-exempt: 导出格式的字段名
+        settings?.apiBaseUrl?.takeIf { it.isNotBlank() }?.let {
+            appendLine("API请求地址 $it") // i18n-exempt: 导出格式的字段名
+        }
 
-        if (provider.supportedProtocols.isNotEmpty()) {
+        val protocols = settings?.supportedProtocols.orEmpty()
+        if (protocols.isNotEmpty()) {
             appendLine()
             appendLine("支持端点类型") // i18n-exempt: 导出格式的字段名
             appendLine()
-            provider.supportedProtocols.forEach { appendLine("- ${it.exportAlias()}") }
+            protocols.forEach { appendLine("- ${it.exportAlias()}") }
         }
 
         if (models.isNotEmpty()) {
@@ -77,13 +65,13 @@ object TextExporter {
             models.forEach { appendLine("${it.modelId} ${it.protocol.exportModelSuffix()}") }
         }
 
-        if (provider.balanceKind != BalanceKind.NONE) {
-            val kindName = provider.balanceKind.exportName()
+        if (settings != null && settings.balanceKind != BalanceKind.NONE) {
+            val kindName = settings.balanceKind.exportName()
             if (kindName != null) {
                 appendLine()
                 appendLine("余额查询类型 $kindName") // i18n-exempt: 导出格式的字段名
-                provider.balanceBaseUrl?.let { appendLine("请求地址 $it") } // i18n-exempt: 导出格式的字段名
-                provider.balanceUserId?.let { appendLine("用户ID $it") } // i18n-exempt: 导出格式的字段名
+                settings.balanceBaseUrl?.let { appendLine("请求地址 $it") } // i18n-exempt: 导出格式的字段名
+                settings.balanceUserId?.let { appendLine("用户ID $it") } // i18n-exempt: 导出格式的字段名
             }
         }
 
@@ -96,7 +84,6 @@ object TextExporter {
         }
     }
 
-    /** 导出时的账号。username / password 是展示串（明文或遮蔽）。 */
     data class ExportedAccount(
         val label: String,
         val username: String,
@@ -105,6 +92,5 @@ object TextExporter {
         val loginMethods: Set<LoginMethod> = emptySet(),
     )
 
-    /** 明文导出时插在文件开头的警告注释（§11.3）。 */
     const val PLAINTEXT_WARNING = "# 警告：本文件包含明文 API 密钥与平台密码，请妥善保管，用完即删" // i18n-exempt: 导出文件内容，不是 UI 文案
 }

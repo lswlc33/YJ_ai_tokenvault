@@ -69,6 +69,7 @@ import tokenvault.shared.generated.resources.detail_probe_key
 import tokenvault.shared.generated.resources.detail_probe_provider
 import tokenvault.shared.generated.resources.detail_section_accounts
 import tokenvault.shared.generated.resources.detail_section_keys
+import tokenvault.shared.generated.resources.editor_note
 import tokenvault.shared.generated.resources.editor_save
 import tokenvault.shared.generated.resources.groups_delete
 import tokenvault.shared.generated.resources.secret_copy_cd
@@ -125,17 +126,11 @@ import com.lc33.tokenvault.ui.theme.LocalStatusPalette
 @Composable
 fun ProviderDetailScreen(
     state: ProviderDetailUiState,
-    revealedKeyId: Long?,
-    revealedText: String?,
     revealedAccount: ProviderDetailViewModel.AccountRevealState?,
     onBack: () -> Unit,
     onEdit: () -> Unit,
-    onAddKey: (String, CharArray) -> Unit,
-    onRevealKey: (Long) -> Unit,
-    onCopyRevealed: () -> Unit,
-    onCloseReveal: () -> Unit,
-    onSetDefaultKey: (Long) -> Unit,
-    onDeleteKey: (Long) -> Unit,
+    onAddKey: (String, String, CharArray) -> Unit,
+    onOpenKey: (Long) -> Unit,
     onRefreshBalance: () -> Unit,
     onProbeProvider: () -> Unit,
     onProbeKey: (Long) -> Unit,
@@ -157,7 +152,6 @@ fun ProviderDetailScreen(
     var addModelKeyId by remember { mutableStateOf<Long?>(null) }
     var editingModel by remember { mutableStateOf<UiModelRow?>(null) }
     var pendingDeleteModelId by remember { mutableStateOf<Long?>(null) }
-    var pendingDeleteKeyId by remember { mutableStateOf<Long?>(null) }
 
     AppScaffold(
         topBar = {
@@ -241,7 +235,7 @@ fun ProviderDetailScreen(
                     KeyRow(
                         row = row,
                         nowMs = state.nowMs,
-                        onClick = { onRevealKey(row.id) },
+                        onClick = { onOpenKey(row.id) },
                         onLongPress = { onProbeKey(row.id) },
                     )
                     KeyModelsCard(
@@ -277,9 +271,9 @@ fun ProviderDetailScreen(
     AddKeyDialog(
         show = showAddDialog,
         onDismiss = { showAddDialog = false },
-        onConfirm = { label, secret ->
+        onConfirm = { label, note, secret ->
             showAddDialog = false
-            onAddKey(label, secret)
+            onAddKey(label, note, secret)
         },
     )
 
@@ -308,38 +302,11 @@ fun ProviderDetailScreen(
         },
     )
 
-    RevealKeySheet(
-        text = revealedText,
-        onCopy = onCopyRevealed,
-        onSetDefault = {
-            revealedKeyId?.let(onSetDefaultKey)
-            onCloseReveal()
-        },
-        onDelete = {
-            // 先收起这一层再问：确认框叠在展开的明文上面，而那一层还亮着密钥
-            pendingDeleteKeyId = revealedKeyId
-            onCloseReveal()
-        },
-        onDismiss = onCloseReveal,
-    )
-
     RevealAccountSheet(
         account = revealedAccount,
         onCopy = { label -> onCopyRevealedAccount(label) },
         onSetLoginMethods = onSetAccountLoginMethods,
         onDismiss = onCloseAccountReveal,
-    )
-
-    AppDialog(
-        show = pendingDeleteKeyId != null,
-        onDismissRequest = { pendingDeleteKeyId = null },
-        title = stringResource(Res.string.detail_key_delete_title),
-        summary = stringResource(Res.string.detail_key_delete_body),
-        confirmText = stringResource(Res.string.groups_delete),
-        onConfirm = {
-            pendingDeleteKeyId?.let(onDeleteKey)
-            pendingDeleteKeyId = null
-        },
     )
 
     AppDialog(
@@ -377,10 +344,11 @@ private fun HintCard(text: String, actionText: String, onAction: () -> Unit) {
 private fun AddKeyDialog(
     show: Boolean,
     onDismiss: () -> Unit,
-    onConfirm: (String, CharArray) -> Unit,
+    onConfirm: (String, String, CharArray) -> Unit,
 ) {
     val tokens = LocalAppTokens.current
-    val label = rememberSecretTextFieldState()
+    val label = rememberAppTextFieldState()
+    val note = rememberAppTextFieldState()
     val secret = rememberSecretTextFieldState()
 
     AppDialog(
@@ -388,6 +356,7 @@ private fun AddKeyDialog(
         onDismissRequest = {
             secret.clear()
             label.clear()
+            note.clear()
             onDismiss()
         },
         title = stringResource(Res.string.detail_add_key),
@@ -396,6 +365,11 @@ private fun AddKeyDialog(
             state = label,
             label = stringResource(Res.string.detail_key_label),
             supportingText = stringResource(Res.string.detail_key_label_hint),
+        )
+        AppTextField(
+            state = note,
+            label = stringResource(Res.string.editor_note),
+            modifier = Modifier.padding(top = tokens.itemSpacing),
         )
         AppSecretTextField(
             state = secret,
@@ -414,6 +388,7 @@ private fun AddKeyDialog(
                 onClick = {
                     secret.clear()
                     label.clear()
+                    note.clear()
                     onDismiss()
                 },
                 modifier = Modifier.weight(1f),
@@ -424,9 +399,11 @@ private fun AddKeyDialog(
                     val chars = secret.chars
                     if (chars.isEmpty()) return@AppDialogTextButton
                     val text = label.text
+                    val noteText = note.text
                     secret.clear()
                     label.clear()
-                    onConfirm(text, chars)
+                    note.clear()
+                    onConfirm(text, noteText, chars)
                 },
                 modifier = Modifier.weight(1f),
                 primary = true,
@@ -664,60 +641,6 @@ private fun BoundModelRow(
  *
  * [text] 非空就显示这一层。它是**擦不掉的 `String`**（红线 1），
  * 关掉这一层时 ViewModel 会擦掉它背后那份 `CharArray`。
- */
-@Composable
-private fun RevealKeySheet(
-    text: String?,
-    onCopy: () -> Unit,
-    onSetDefault: () -> Unit,
-    onDelete: (() -> Unit)?,
-    onDismiss: () -> Unit,
-) {
-    val tokens = LocalAppTokens.current
-    AppBottomSheet(
-        show = text != null,
-        onDismissRequest = onDismiss,
-        title = stringResource(Res.string.detail_key_sheet_title),
-    ) {
-        AppText(
-            text = text.orEmpty(),
-            style = AppTextStyle.Body,
-            fontFamily = tokens.monoFontFamily,
-        )
-        AppText(
-            text = stringResource(Res.string.detail_key_reveal_hint),
-            style = AppTextStyle.Footnote,
-            color = appSecondaryTextColor,
-            modifier = Modifier.padding(top = tokens.itemSpacing),
-        )
-        AppActionRow(
-            text = stringResource(Res.string.secret_copy_cd),
-            onClick = onCopy,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = tokens.itemSpacing),
-        )
-        AppActionRow(
-            text = stringResource(Res.string.detail_key_set_default),
-            onClick = onSetDefault,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        if (onDelete != null) {
-            AppActionRow(
-                text = stringResource(Res.string.groups_delete),
-                onClick = onDelete,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-    }
-}
-
-/**
- * 展开一条平台账号（红线 21：账号密码与密钥同等对待，展开看明文、关闭回遮）。
- *
- * [account] 非空就显示这一层。用户名与密码两段都可能为 null（只记了一半，§11.2），
- * 为 null 的那段显示「（未记录）」而不是空串。明文是擦不掉的 `String`，
- * 关掉这一层时 ViewModel 擦掉背后那份 `CharArray`。
  */
 @Composable
 private fun RevealAccountSheet(

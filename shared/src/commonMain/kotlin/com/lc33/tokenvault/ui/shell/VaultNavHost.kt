@@ -1,12 +1,9 @@
 package com.lc33.tokenvault.ui.shell
 
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -24,6 +21,8 @@ import com.lc33.tokenvault.screens.dashboard.DashboardScreen
 import com.lc33.tokenvault.screens.lock.ChangePinScreen
 import com.lc33.tokenvault.screens.manage.GroupsScreen
 import com.lc33.tokenvault.screens.manage.ImportScreen
+import com.lc33.tokenvault.screens.manage.KeyDetailScreen
+import com.lc33.tokenvault.screens.manage.KeyEditorScreen
 import com.lc33.tokenvault.screens.manage.ManageScreen
 import com.lc33.tokenvault.screens.manage.ProviderDetailScreen
 import com.lc33.tokenvault.screens.manage.ProviderEditorScreen
@@ -52,7 +51,6 @@ import com.lc33.tokenvault.ui.miuix.LocalAppSnackbar
 import com.lc33.tokenvault.ui.miuix.navigation.VaultNavDisplay
 import com.lc33.tokenvault.ui.miuix.rememberAppTextFieldState
 import com.lc33.tokenvault.ui.miuix.rememberSecretTextFieldState
-import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
@@ -183,26 +181,18 @@ fun VaultNavHost(
                 val route = route
             val vm: ProviderDetailViewModel = koinViewModel(parameters = { parametersOf(route.id) })
             val detail by vm.state.collectAsStateWithLifecycle()
-            val revealed by vm.revealed.collectAsStateWithLifecycle()
             val revealedAccount by vm.revealedAccount.collectAsStateWithLifecycle()
-            val clipboardLabel = stringResource(Res.string.clipboard_label_api_key)
             val accountClipboardLabel = stringResource(Res.string.clipboard_label_account)
             // 这一家可能刚被删掉（详情页还在栈上）。detail 为 null 时什么都不画：
             // 画一个空壳会让用户以为数据丢了，而真相是这一行已经不存在
             detail?.let { state ->
                 ProviderDetailScreen(
                     state = state,
-                    revealedKeyId = revealed?.keyId,
-                    revealedText = revealed?.text,
                     revealedAccount = revealedAccount,
                     onBack = back,
                     onEdit = { navigate(ProviderEditorRoute(route.id)) },
                     onAddKey = vm::onAddKey,
-                    onRevealKey = vm::onRevealKey,
-                    onCopyRevealed = { vm.onCopyRevealed(clipboardLabel) },
-                    onCloseReveal = vm::onCloseKeySheet,
-                    onSetDefaultKey = vm::onSetDefaultKey,
-                    onDeleteKey = vm::onDeleteKey,
+                    onOpenKey = { keyId -> navigate(KeyDetailRoute(route.id, keyId)) },
                     onRefreshBalance = vm::refreshBalance,
                     onProbeProvider = vm::probeProvider,
                     onProbeKey = vm::probeKey,
@@ -220,6 +210,52 @@ fun VaultNavHost(
             }
         }
 
+            is KeyDetailRoute -> {
+                val vm: KeyDetailViewModel = koinViewModel(
+                    parameters = { parametersOf(route.providerId, route.keyId) },
+                )
+                val state by vm.state.collectAsStateWithLifecycle()
+                val revealed by vm.revealed.collectAsStateWithLifecycle()
+                LaunchedEffect(vm) { vm.deleted.collect { back() } }
+                val keyClipboardLabel = stringResource(Res.string.clipboard_label_api_key)
+                state?.let { keyState ->
+                    KeyDetailScreen(
+                        state = keyState,
+                        revealedText = revealed?.text,
+                        onBack = back,
+                        onEdit = { navigate(KeyEditorRoute(route.providerId, route.keyId)) },
+                        onReveal = vm::reveal,
+                        onCopyRevealed = { vm.copyRevealed(keyClipboardLabel) },
+                        onCloseReveal = vm::closeReveal,
+                        onProbe = vm::probeKey,
+                        onRefreshModels = vm::refreshModels,
+                        onMoveUp = vm::moveUp,
+                        onMoveDown = vm::moveDown,
+                        onDelete = vm::delete,
+                    )
+                }
+            }
+
+            is KeyEditorRoute -> {
+                val vm: KeyEditorViewModel = koinViewModel(parameters = { parametersOf(route.keyId) })
+                val draft by vm.draft.collectAsStateWithLifecycle()
+                val profiles by vm.profiles.collectAsStateWithLifecycle()
+                val loaded by vm.loaded.collectAsStateWithLifecycle()
+                LaunchedEffect(vm) { vm.saved.collect { back() } }
+                val keyProfileDefaultLabel = stringResource(Res.string.profile_name_default)
+                val keyEditorProfileDefault = stringResource(Res.string.editor_profile_default)
+                if (loaded) {
+                    KeyEditorScreen(
+                        draft = draft,
+                        profileNames = listOf(keyEditorProfileDefault) + profiles.map { profile ->
+                            if (profile.builtinKey == "default") keyProfileDefaultLabel else profile.name
+                        },
+                        onChange = vm::onChange,
+                        onBack = back,
+                        onSave = vm::save,
+                    )
+                }
+            }
             is AppearanceRoute -> {
             val vm: AppearanceViewModel = koinViewModel()
             val colorScheme by vm.colorScheme.collectAsStateWithLifecycle()
@@ -396,21 +432,13 @@ fun VaultNavHost(
             val vm: ProviderEditorViewModel = koinViewModel(parameters = { parametersOf(route.id) })
             val draft by vm.draft.collectAsStateWithLifecycle()
             val groups by vm.groups.collectAsStateWithLifecycle()
-            val profiles by vm.profiles.collectAsStateWithLifecycle()
             val loaded by vm.loaded.collectAsStateWithLifecycle()
             LaunchedEffect(vm) { vm.saved.collect { back() } }
-            // 下标 0 固定是「未分组」，与 ProviderDraftMapping 里那张表对齐
             val ungrouped = stringResource(Res.string.editor_group_none)
-            // 客户端预设下拉：0 = 「默认（不伪装）」，其余按仓库返回的预设顺序对齐。
-            // 内置 `default` 那一枚的显示名要本地化，其余品牌名 / 自定义名直接用。
-            val profileDefaultLabel = stringResource(Res.string.profile_name_default)
-            val editorProfileDefault = stringResource(Res.string.editor_profile_default)
             if (loaded) {
                 ProviderEditorScreen(
                     draft = draft,
                     groupNames = listOf(ungrouped) + groups.map { it.name },
-                    profileNames = listOf(editorProfileDefault) +
-                        profiles.map { if (it.builtinKey == "default") profileDefaultLabel else it.name },
                     onChange = vm::onChange,
                     onBack = back,
                     onSave = vm::onSave,
@@ -477,44 +505,17 @@ fun VaultNavHost(
         }
     }
 
-    val topLevelRoutes = listOf(DashboardRoute, ManageRoute, SettingsRoute)
-    val currentPage = topLevelPageIndex(backStack.lastOrNull())
-    if (currentPage >= 0) {
-        val pagerState = rememberPagerState(initialPage = currentPage) { topLevelRoutes.size }
-        LaunchedEffect(currentPage) {
-            if (pagerState.currentPage != currentPage) pagerState.animateScrollToPage(currentPage)
-        }
-        LaunchedEffect(pagerState) {
-            snapshotFlow { pagerState.currentPage }.collect { page ->
-                selectTopLevelPage(backStack, page)
-            }
-        }
-        HorizontalPager(
-            state = pagerState,
-            beyondViewportPageCount = 2,
-            modifier = modifier,
-        ) { page ->
-            val pageRoute = topLevelRoutes[page]
-            VaultNavDisplay(
-                backStack = listOf(pageRoute),
-                onBack = {},
-                style = style,
-                exitDirection = exitDirection,
-                modifier = Modifier.fillMaxSize(),
-            ) { route ->
-                RouteContent(route)
-            }
-        }
-    } else {
-        VaultNavDisplay(
-            backStack = backStack,
-            onBack = { back() },
-            style = style,
-            exitDirection = exitDirection,
-            modifier = modifier,
-        ) { route ->
-            RouteContent(route)
-        }
+    // 一级页也走同一个 NavDisplay：Pager 会把“首页 → 设置”拆成两段相邻滚动，
+    // 第一段经过“管理”时就会把 currentPage 写回 backStack，动画随即被重定向到中间页。
+    // NavDisplay 直接比较初始/目标 scene，既能一步到达，也保留二级页的进出动画。
+    VaultNavDisplay(
+        backStack = backStack,
+        onBack = { back() },
+        style = style,
+        exitDirection = exitDirection,
+        modifier = modifier,
+    ) { route ->
+        RouteContent(route)
     }
 }
 
@@ -801,22 +802,6 @@ private fun SyncRouteContent(
 
 }
 
-private fun topLevelPageIndex(route: VaultRoute?): Int = when (route) {
-    DashboardRoute -> 0
-    ManageRoute -> 1
-    SettingsRoute -> 2
-    else -> -1
-}
-
-private fun selectTopLevelPage(backStack: MutableList<VaultRoute>, index: Int) {
-    val route = when (index) {
-        0 -> DashboardRoute
-        1 -> ManageRoute
-        else -> SettingsRoute
-    }
-    while (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
-    if (backStack.lastOrNull() != route) backStack.add(route)
-}
 
 @Composable
 private fun RestoreModeButton(text: String, onClick: () -> Unit) {

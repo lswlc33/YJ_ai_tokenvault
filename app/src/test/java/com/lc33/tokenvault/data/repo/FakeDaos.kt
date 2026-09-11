@@ -3,10 +3,12 @@ package com.lc33.tokenvault.data.repo
 import com.lc33.tokenvault.domain.repo.TransactionRunner
 
 import com.lc33.tokenvault.data.dao.ApiKeyDao
+import com.lc33.tokenvault.data.dao.ApiKeyWithSettingsRow
 import com.lc33.tokenvault.data.dao.AppSettingDao
 import com.lc33.tokenvault.data.dao.AuditLogDao
 import com.lc33.tokenvault.data.dao.ClientProfileDao
 import com.lc33.tokenvault.data.dao.GroupDao
+import com.lc33.tokenvault.data.dao.KeySettingsDao
 import com.lc33.tokenvault.data.dao.ModelDao
 import com.lc33.tokenvault.data.dao.ProbeRunDao
 import com.lc33.tokenvault.data.dao.ProviderAccountDao
@@ -17,6 +19,7 @@ import com.lc33.tokenvault.data.entity.AppSettingEntity
 import com.lc33.tokenvault.data.entity.AuditLogEntity
 import com.lc33.tokenvault.data.entity.ClientProfileEntity
 import com.lc33.tokenvault.data.entity.GroupEntity
+import com.lc33.tokenvault.data.entity.KeySettingsEntity
 import com.lc33.tokenvault.data.entity.ModelEntity
 import com.lc33.tokenvault.data.entity.ProbeRunEntity
 import com.lc33.tokenvault.data.entity.ProviderAccountEntity
@@ -98,7 +101,6 @@ internal class FakeProviderDao : ProviderDao {
 
     val rows: List<ProviderEntity> get() = store.toList()
 
-    /** 计数一律 0：这个假 DAO 里没有别的表，而聚合那条 SQL 本来也只有真库能验。 */
     override fun observeSummaries(): Flow<List<ProviderSummaryRow>> =
         revision.map { store.map { ProviderSummaryRow(it, 0, 0, 0, 0) } }
 
@@ -132,45 +134,19 @@ internal class FakeProviderDao : ProviderDao {
         ids.forEach { id -> replace(id) { it.copy(groupId = groupId, updatedAt = now) } }
     }
 
-    override suspend fun setBalanceToken(id: Long, token: ByteArray?, now: Long) =
-        replace(id) { it.copy(balanceTokenEnc = token, updatedAt = now) }
-
-    override suspend fun updateBalance(
-        id: Long,
-        amount: Double?,
-        used: Double?,
-        currency: String?,
-        raw: String?,
-        checkedAt: Long,
-        error: String?,
-        calibrated: Boolean,
-    ) = replace(id) {
-        it.copy(
-            balanceAmount = amount,
-            balanceUsed = used,
-            balanceCurrency = currency,
-            balanceRaw = raw,
-            balanceCheckedAt = checkedAt,
-            balanceError = error,
-            quotaCalibrated = calibrated,
-            updatedAt = checkedAt,
-        )
-    }
-
-    override suspend fun updateReachability(
+    override suspend fun updateWebsiteStatus(
         id: Long,
         latencyMs: Long?,
         checkedAt: Long,
         error: String?,
     ) = replace(id) {
         it.copy(
-            reachabilityLatencyMs = latencyMs,
-            reachabilityCheckedAt = checkedAt,
-            reachabilityError = error,
+            websiteLatencyMs = latencyMs,
+            websiteCheckedAt = checkedAt,
+            websiteError = error,
+            updatedAt = checkedAt,
         )
     }
-    override suspend fun calibrateQuotaPerUnit(id: Long, quotaPerUnit: Double) =
-        replace(id) { it.copy(quotaPerUnit = quotaPerUnit, quotaCalibrated = true) }
 
     private inline fun replace(id: Long, transform: (ProviderEntity) -> ProviderEntity) {
         val index = store.indexOfFirst { it.id == id }
@@ -180,36 +156,93 @@ internal class FakeProviderDao : ProviderDao {
     }
 }
 
-internal class FakeApiKeyDao : ApiKeyDao {
+internal class FakeKeySettingsDao : KeySettingsDao {
+    private val store = mutableListOf<KeySettingsEntity>()
+    private val revision = MutableStateFlow(0)
+
+    val rows: List<KeySettingsEntity> get() = store.toList()
+
+    fun peek(keyId: Long): KeySettingsEntity? = store.firstOrNull { it.keyId == keyId }
+
+    fun clearForTest() {
+        store.clear()
+        revision.value++
+    }
+
+    override fun observeByKey(keyId: Long): Flow<KeySettingsEntity?> =
+        revision.map { store.firstOrNull { it.keyId == keyId } }
+
+    override suspend fun findByKey(keyId: Long): KeySettingsEntity? =
+        store.firstOrNull { it.keyId == keyId }
+
+    override suspend fun findAll(): List<KeySettingsEntity> = store.toList()
+
+    override suspend fun insert(settings: KeySettingsEntity) {
+        val index = store.indexOfFirst { it.keyId == settings.keyId }
+        if (index < 0) store += settings else store[index] = settings
+        revision.value++
+    }
+
+    override suspend fun update(settings: KeySettingsEntity) = insert(settings)
+
+    override suspend fun setBalanceToken(keyId: Long, token: ByteArray?, now: Long) {
+        val index = store.indexOfFirst { it.keyId == keyId }
+        if (index >= 0) store[index] = store[index].copy(balanceTokenEnc = token, updatedAt = now)
+        revision.value++
+    }
+
+    override suspend fun calibrateQuotaPerUnit(keyId: Long, quotaPerUnit: Double, now: Long) {
+        val index = store.indexOfFirst { it.keyId == keyId }
+        if (index >= 0) {
+            store[index] = store[index].copy(quotaPerUnit = quotaPerUnit, quotaCalibrated = true, updatedAt = now)
+        }
+        revision.value++
+    }
+
+    override suspend fun delete(keyId: Long) {
+        store.removeAll { it.keyId == keyId }
+        revision.value++
+    }
+}
+
+internal class FakeApiKeyDao(
+    private val settingsDao: FakeKeySettingsDao,
+) : ApiKeyDao {
     private val store = mutableListOf<ApiKeyEntity>()
     private val revision = MutableStateFlow(0)
     private var nextId = 1L
 
     val rows: List<ApiKeyEntity> get() = store.toList()
 
-    /** 测试专用：直接清空（模拟新设备空库）。 */
     fun clearForTest() {
         store.clear()
+        settingsDao.clearForTest()
         revision.value++
     }
 
     private fun ordered(list: List<ApiKeyEntity> = store) =
         list.sortedWith(compareBy({ it.sortOrder }, { it.id }))
 
-    override fun observeByProvider(providerId: Long): Flow<List<ApiKeyEntity>> =
-        revision.map { ordered(store.filter { it.providerId == providerId }) }
+    private fun row(key: ApiKeyEntity) = ApiKeyWithSettingsRow(
+        key = key,
+        settings = settingsDao.peek(key.id),
+    )
 
-    override fun observeAll(): Flow<List<ApiKeyEntity>> = revision.map { ordered() }
+    override fun observeByProvider(providerId: Long): Flow<List<ApiKeyWithSettingsRow>> =
+        revision.map { ordered(store.filter { it.providerId == providerId }).map(::row) }
 
-    override suspend fun findAll(): List<ApiKeyEntity> = ordered()
+    override fun observeAll(): Flow<List<ApiKeyWithSettingsRow>> =
+        revision.map { ordered().map(::row) }
 
-    override suspend fun findByProvider(providerId: Long): List<ApiKeyEntity> =
-        ordered(store.filter { it.providerId == providerId })
+    override suspend fun findAll(): List<ApiKeyWithSettingsRow> = ordered().map(::row)
 
-    override suspend fun findById(id: Long): ApiKeyEntity? = store.firstOrNull { it.id == id }
+    override suspend fun findByProvider(providerId: Long): List<ApiKeyWithSettingsRow> =
+        ordered(store.filter { it.providerId == providerId }).map(::row)
 
-    override suspend fun findDefault(providerId: Long): ApiKeyEntity? =
-        store.firstOrNull { it.providerId == providerId && it.isDefault && it.enabled }
+    override suspend fun findById(id: Long): ApiKeyWithSettingsRow? =
+        store.firstOrNull { it.id == id }?.let(::row)
+
+    override suspend fun findRaw(id: Long): ApiKeyEntity? = store.firstOrNull { it.id == id }
 
     override suspend fun insertRaw(key: ApiKeyEntity): Long {
         val id = nextId++
@@ -220,29 +253,39 @@ internal class FakeApiKeyDao : ApiKeyDao {
 
     override suspend fun update(key: ApiKeyEntity) = replace(key.id) { key }
 
-    override suspend fun deleteRaw(id: Long) {
-        store.removeAll { it.id == id }
-        revision.value++
-    }
-
-    override suspend fun clearDefault(providerId: Long) {
-        store.indices
-            .filter { store[it].providerId == providerId }
-            .forEach { store[it] = store[it].copy(isDefault = false) }
-        revision.value++
-    }
-
-    override suspend fun markDefault(id: Long, now: Long) =
-        replace(id) { it.copy(isDefault = true, updatedAt = now) }
-
-    override suspend fun setEnabledRaw(id: Long, enabled: Boolean, now: Long) =
-        replace(id) { it.copy(enabled = enabled, updatedAt = now) }
-
     override suspend fun setSecret(id: Long, secretEnc: ByteArray, fingerprint: String, now: Long) =
         replace(id) { it.copy(secretEnc = secretEnc, fingerprint = fingerprint, updatedAt = now) }
 
-    override suspend fun setMeta(id: Long, label: String, sortOrder: Int, now: Long) =
-        replace(id) { it.copy(label = label, sortOrder = sortOrder, updatedAt = now) }
+    override suspend fun updateMeta(id: Long, label: String, note: String, sortOrder: Int, now: Long) =
+        replace(id) { it.copy(label = label, note = note, sortOrder = sortOrder, updatedAt = now) }
+
+    override suspend fun setEnabled(id: Long, enabled: Boolean, now: Long) =
+        replace(id) { it.copy(enabled = enabled, updatedAt = now) }
+
+    override suspend fun delete(id: Long) {
+        store.removeAll { it.id == id }
+        settingsDao.delete(id)
+        revision.value++
+    }
+
+    override suspend fun updateBalance(
+        id: Long,
+        amount: Double?,
+        used: Double?,
+        currency: String?,
+        raw: String?,
+        checkedAt: Long,
+        error: String?,
+    ) = replace(id) {
+        it.copy(
+            balanceAmount = amount,
+            balanceUsed = used,
+            balanceCurrency = currency,
+            balanceRaw = raw,
+            balanceCheckedAt = checkedAt,
+            balanceError = error,
+        )
+    }
 
     override suspend fun applyProbeResult(
         id: Long,
@@ -266,7 +309,6 @@ internal class FakeApiKeyDao : ApiKeyDao {
         )
     }
 
-    /** 和真 SQL 一样**不提 health 与 okAt**（红线 11）：假实现照抄那条语句的形状。 */
     override suspend fun applyTransientOutcome(
         id: Long,
         lastOutcome: String,
@@ -283,24 +325,6 @@ internal class FakeApiKeyDao : ApiKeyDao {
         )
     }
 
-    override suspend fun updateBalance(
-        id: Long,
-        amount: Double?,
-        used: Double?,
-        currency: String?,
-        raw: String?,
-        checkedAt: Long,
-        error: String?,
-    ) = replace(id) {
-        it.copy(
-            balanceAmount = amount,
-            balanceUsed = used,
-            balanceCurrency = currency,
-            balanceRaw = raw,
-            balanceCheckedAt = checkedAt,
-            balanceError = error,
-        )
-    }
     override suspend fun resetProbeResults() {
         store.indices.forEach { i ->
             store[i] = store[i].copy(
@@ -316,6 +340,19 @@ internal class FakeApiKeyDao : ApiKeyDao {
         revision.value++
     }
 
+    override suspend fun reorder(providerId: Long, idsInOrder: List<Long>, now: Long) {
+        idsInOrder.forEachIndexed { index, id ->
+            if (store.any { it.id == id && it.providerId == providerId }) {
+                setSortOrder(providerId, id, index, now)
+            }
+        }
+    }
+
+    override suspend fun setSortOrder(providerId: Long, id: Long, sortOrder: Int, now: Long) {
+        val target = store.firstOrNull { it.id == id && it.providerId == providerId } ?: return
+        replace(id) { target.copy(sortOrder = sortOrder, updatedAt = now) }
+    }
+
     private inline fun replace(id: Long, transform: (ApiKeyEntity) -> ApiKeyEntity) {
         val index = store.indexOfFirst { it.id == id }
         if (index < 0) return
@@ -323,7 +360,6 @@ internal class FakeApiKeyDao : ApiKeyDao {
         revision.value++
     }
 }
-
 /** 直接执行，不开事务：JVM 上没有真库可开。 */
 internal class ImmediateTransactions : TransactionRunner {
     override suspend fun <R> inTransaction(block: suspend () -> R): R = block()

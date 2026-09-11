@@ -2,7 +2,7 @@ package com.lc33.tokenvault.balance
 
 import com.lc33.tokenvault.domain.BalanceKind
 import com.lc33.tokenvault.domain.model.BalanceSnapshot
-import com.lc33.tokenvault.domain.model.Provider
+import com.lc33.tokenvault.domain.model.KeySettings
 import com.lc33.tokenvault.endpoint.ProbeRequest
 
 /**
@@ -31,7 +31,7 @@ interface BalanceAdapter {
      *   短命，明文的权威副本仍是调用方那份可擦的数组。
      * @param token `usesOwnToken = true` 的适配器用的独立访问令牌明文。
      */
-    fun buildRequest(provider: Provider, defaultKey: CharArray?, token: CharArray?): ProbeRequest
+    fun buildRequest(settings: KeySettings, defaultKey: CharArray?, token: CharArray?): ProbeRequest
 
     /**
      * 解析响应。失败抛 [BalanceParseException]。

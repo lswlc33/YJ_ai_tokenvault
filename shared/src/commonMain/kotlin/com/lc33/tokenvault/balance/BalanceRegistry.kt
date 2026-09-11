@@ -1,7 +1,7 @@
 package com.lc33.tokenvault.balance
 
 import com.lc33.tokenvault.domain.BalanceKind
-import com.lc33.tokenvault.domain.model.Provider
+import com.lc33.tokenvault.domain.model.KeySettings
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 
@@ -24,14 +24,14 @@ object BalanceRegistry {
     private val json = Json { ignoreUnknownKeys = true }
 
     /** 按供应商的 [BalanceKind] 选适配器。`none` / 认不出来的返回 null（跳过）。 */
-    fun forProvider(provider: Provider): BalanceAdapter? = when (provider.balanceKind) {
+    fun forSettings(settings: KeySettings): BalanceAdapter? = when (settings.balanceKind) {
         BalanceKind.NEWAPI -> newApi
         BalanceKind.DEEPSEEK -> deepSeek
         BalanceKind.OPENROUTER -> openRouter
         BalanceKind.SILICONFLOW -> siliconFlow
         BalanceKind.MOONSHOT -> moonshot
         BalanceKind.CUSTOM_JSON -> CustomJsonAdapter(
-            runCatching { json.parseToJsonElement(provider.balanceConfig).jsonObject }
+            runCatching { json.parseToJsonElement(settings.balanceConfig).jsonObject }
                 .getOrElse { kotlinx.serialization.json.JsonObject(emptyMap()) },
         )
         BalanceKind.NONE -> null

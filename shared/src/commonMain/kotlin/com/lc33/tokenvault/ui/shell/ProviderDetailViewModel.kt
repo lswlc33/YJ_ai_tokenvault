@@ -1,9 +1,11 @@
 package com.lc33.tokenvault.ui.shell
 
+import com.lc33.tokenvault.platform.SecureClipboard
 import com.lc33.tokenvault.platform.nowMillis
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lc33.tokenvault.crypto.KnownSecrets
 import com.lc33.tokenvault.crypto.zeroize
 import com.lc33.tokenvault.domain.LoginMethod
 import com.lc33.tokenvault.domain.Protocol
@@ -11,6 +13,7 @@ import com.lc33.tokenvault.domain.SecretMask
 import com.lc33.tokenvault.domain.model.AiModel
 import com.lc33.tokenvault.domain.model.ApiKey
 import com.lc33.tokenvault.domain.model.Provider
+import com.lc33.tokenvault.domain.model.KeySettings
 import com.lc33.tokenvault.domain.model.ProviderAccount
 import com.lc33.tokenvault.domain.repo.ApiKeyRepository
 import com.lc33.tokenvault.domain.repo.ModelRepository
@@ -18,7 +21,6 @@ import com.lc33.tokenvault.domain.repo.ProviderAccountRepository
 import com.lc33.tokenvault.domain.repo.ProviderRepository
 import com.lc33.tokenvault.engine.BalanceEngine
 import com.lc33.tokenvault.engine.ProbeEngine
-import com.lc33.tokenvault.platform.SecureClipboard
 import com.lc33.tokenvault.screens.model.ProviderDetailUiState
 import com.lc33.tokenvault.screens.model.UiHealth
 import com.lc33.tokenvault.screens.model.UiKeyRow
@@ -58,7 +60,7 @@ class ProviderDetailViewModel constructor(
     private val balanceEngine: BalanceEngine,
     private val probeEngine: ProbeEngine,
     private val clipboard: SecureClipboard,
-    private val knownSecrets: com.lc33.tokenvault.crypto.KnownSecrets,
+    private val knownSecrets: KnownSecrets,
     private val providerId: Long,
 ) : ViewModel() {
 
@@ -77,15 +79,6 @@ class ProviderDetailViewModel constructor(
      * 用户名也加密（红线 21），遮蔽串要解密现算；密码连遮蔽串都不给，只在展开时现算。
      */
     private val accountMasks = MutableStateFlow<Map<Long, String>>(emptyMap())
-
-    /** 当前展开的那一把明文。**全应用只在这里存一份**，关掉就擦。 */
-    private var revealedPlain: CharArray? = null
-
-    private val _revealed = MutableStateFlow<RevealState?>(null)
-    val revealed: StateFlow<RevealState?> = _revealed.asStateFlow()
-
-    /** 展开一把密钥时给界面的东西。 */
-    data class RevealState(val keyId: Long, val text: String)
 
     /**
      * 当前展开的那条账号的明文（用户名 + 密码各一份 [CharArray]，红线 1）。与密钥的
@@ -159,8 +152,8 @@ class ProviderDetailViewModel constructor(
                 keys = keyRows,
                 models = modelRows,
                 accounts = accountRows,
-                modelListEnabled = provider.probe.models,
-                modelReachabilityEnabled = provider.probe.modelReachability,
+                modelListEnabled = data.keys.any { it.settings.probe.models },
+                modelReachabilityEnabled = data.keys.any { it.settings.probe.modelReachability },
                 nowMs = nowMillis(),
             )
         }
@@ -228,91 +221,20 @@ class ProviderDetailViewModel constructor(
         }
     }
 
-    /** 新增一把。[secret] 用完就地擦——仓库刻意不擦入参，这里就是那个负责擦的调用方。 */
-    fun onAddKey(label: String, secret: CharArray) {
+    /** 新增一把。新 Key 先继承该合集下排序第一把 Key 的配置；没有旧 Key 时给空配置。 */
+    fun onAddKey(label: String, note: String, secret: CharArray) {
         viewModelScope.launch {
             try {
-                withContext(Dispatchers.Default) { keys.add(providerId, label, secret) }
+                val settings = keys.observeByProvider(providerId).first()
+                    .firstOrNull()?.settings
+                    ?: KeySettings(apiBaseUrl = "", apiRoot = "")
+                withContext(Dispatchers.Default) {
+                    keys.add(providerId, label, note, secret, settings)
+                }
             } finally {
                 secret.zeroize()
             }
         }
-    }
-
-    fun onSetDefaultKey(keyId: Long) {
-        viewModelScope.launch { keys.setDefault(providerId, keyId) }
-    }
-
-    fun onDeleteKey(keyId: Long) {
-        viewModelScope.launch { keys.delete(keyId) }
-    }
-
-    fun onRevealKey(keyId: Long) {
-        viewModelScope.launch {
-            val plain = withContext(Dispatchers.Default) {
-                runCatching { keys.reveal(keyId) }.getOrNull()
-            } ?: return@launch
-            revealedPlain?.zeroize()
-            revealedPlain = plain
-            // 登记已知明文：这把密钥刚被用户看到，之后若它出现在探测错误 / 审计日志里，
-            // 脱敏器（红线 32 第一道）要能认出它、擦掉它。
-            knownSecrets.add(plain)
-            _revealed.value = RevealState(keyId, plain.concatToString())
-        }
-    }
-
-    /** 复制走的是**明文那一份**，不是展示串——两者内容相同，但只有前者能擦。 */
-    fun onCopyRevealed(label: String) {
-        val plain = revealedPlain ?: return
-        clipboard.copy(label, plain, SecureClipboard.DEFAULT_AUTO_CLEAR_SECONDS)
-    }
-
-    fun onCloseKeySheet() {
-        revealedPlain?.zeroize()
-        revealedPlain = null
-        _revealed.value = null
-    }
-
-    /** 展开一条账号：用户名与密码各解一份（没有的那份给 null），拿到就展示，关掉就擦。 */
-    fun onRevealAccount(accountId: Long) {
-        viewModelScope.launch {
-            val plain = withContext(Dispatchers.Default) {
-                val username = runCatching { accounts.revealUsername(accountId) }.getOrNull()
-                val password = runCatching { accounts.revealPassword(accountId) }.getOrNull()
-                if (username == null && password == null) null
-                else AccountPlain(username, password)
-            }             ?: return@launch
-            revealedAccountPlain?.zeroize()
-            revealedAccountPlain = plain
-            // 账号的用户名 / 密码也是秘密（红线 21），展开后同样登记进已知明文清单。
-            plain.username?.let(knownSecrets::add)
-            plain.password?.let(knownSecrets::add)
-            _revealedAccount.value = AccountRevealState(
-                accountId = accountId,
-                loginMethods = state.value?.accounts
-                    ?.firstOrNull { it.id == accountId }
-                    ?.loginMethods
-                    ?.mapNotNull { LoginMethod.fromWireName(it) }
-                    ?.toSet()
-                    .orEmpty(),
-                label = state.value?.accounts?.firstOrNull { it.id == accountId }?.label.orEmpty(),
-                username = plain.username?.let { it.concatToString() },
-                password = plain.password?.let { it.concatToString() },
-            )
-        }
-    }
-
-    /** 复制账号密码明文（复制的是密码那一份；没记密码就复制用户名）。 */
-    fun onCopyRevealedAccount(label: String) {
-        val plain = revealedAccountPlain ?: return
-        val secret = plain.password ?: plain.username ?: return
-        clipboard.copy(label, secret, SecureClipboard.DEFAULT_AUTO_CLEAR_SECONDS)
-    }
-
-    fun onCloseAccountSheet() {
-        revealedAccountPlain?.zeroize()
-        revealedAccountPlain = null
-        _revealedAccount.value = null
     }
 
     /** 手动添加模型。模型列表自动检测关闭时，这是唯一入口。 */
@@ -361,6 +283,40 @@ class ProviderDetailViewModel constructor(
         probeEngine.probeModel(providerId, keyId, modelId, protocol)
     }
 
+    fun onRevealAccount(accountId: Long) {
+        viewModelScope.launch {
+            val plain = withContext(Dispatchers.Default) {
+                val username = runCatching { accounts.revealUsername(accountId) }.getOrNull()
+                val password = runCatching { accounts.revealPassword(accountId) }.getOrNull()
+                if (username == null && password == null) null else AccountPlain(username, password)
+            } ?: return@launch
+            revealedAccountPlain?.zeroize()
+            revealedAccountPlain = plain
+            plain.username?.let(knownSecrets::add)
+            plain.password?.let(knownSecrets::add)
+            val account = state.value?.accounts?.firstOrNull { it.id == accountId }
+            _revealedAccount.value = AccountRevealState(
+                accountId = accountId,
+                loginMethods = account?.loginMethods?.mapNotNull { LoginMethod.fromWireName(it) }?.toSet().orEmpty(),
+                label = account?.label.orEmpty(),
+                username = plain.username?.let { it.concatToString() },
+                password = plain.password?.let { it.concatToString() },
+            )
+        }
+    }
+
+    /** 复制账号密码明文（复制的是密码那一份；没记密码就复制用户名）。 */
+    fun onCopyRevealedAccount(label: String) {
+        val plain = revealedAccountPlain ?: return
+        val secret = plain.password ?: plain.username ?: return
+        clipboard.copy(label, secret, SecureClipboard.DEFAULT_AUTO_CLEAR_SECONDS)
+    }
+
+    fun onCloseAccountSheet() {
+        revealedAccountPlain?.zeroize()
+        revealedAccountPlain = null
+        _revealedAccount.value = null
+    }
     /** 登录方式是明文元数据，可以在展开账号时直接修改。 */
     fun onSetAccountLoginMethods(accountId: Long, methods: Set<LoginMethod>) {
         viewModelScope.launch {
@@ -403,12 +359,13 @@ class ProviderDetailViewModel constructor(
         accountCount: Int,
     ): UiProviderRow {
         val aggregateBalance = aggregateBalanceOf(keyList)
+        val firstSettings = keyList.firstOrNull()?.settings
         return UiProviderRow(
             id = id,
             name = name,
             note = note,
-            host = hostOf(apiRoot),
-            protocols = protocolWireNames(),
+            host = firstSettings?.apiRoot?.let { hostOf(it) }.orEmpty(),
+            protocols = firstSettings?.supportedProtocols?.map { it.wireName } ?: emptyList(),
             colorIndex = color ?: 0,
             pinned = pinned,
             groupId = groupId,
@@ -420,6 +377,7 @@ class ProviderDetailViewModel constructor(
             balanceFailed = aggregateBalance?.failed == true,
             health = aggregateOf(rows),
             staleThisRound = false,
+            keys = rows,
         )
     }
 
@@ -433,7 +391,6 @@ class ProviderDetailViewModel constructor(
     }
 
     override fun onCleared() {
-        revealedPlain?.zeroize()
         revealedAccountPlain?.zeroize()
     }
 

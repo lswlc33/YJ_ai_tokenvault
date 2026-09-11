@@ -50,8 +50,8 @@ data class BackupProvider(
     val name: String,
     val note: String? = null,
     val websiteUrl: String? = null,
-    val apiBaseUrl: String,
-    val apiRoot: String,
+    val apiBaseUrl: String = "",
+    val apiRoot: String = "",
     val apiVersion: String = "v1",
     val supportedProtocols: List<String> = emptyList(),
     val pathOverrides: Map<String, String> = emptyMap(),
@@ -82,6 +82,33 @@ data class BackupProvider(
     val probeModelReachability: Boolean = false,
 )
 
+/** v3 的 Key 行为配置。旧备份里没有这段，恢复时从 BackupProvider 的旧字段推导。 */
+@Serializable
+data class BackupKeySettings(
+    val apiBaseUrl: String,
+    val apiRoot: String,
+    val apiVersion: String = "v1",
+    val supportedProtocols: List<String> = emptyList(),
+    val pathOverrides: Map<String, String> = emptyMap(),
+    val authStyle: String = "auto",
+    val allowInsecure: Boolean = false,
+    val clientProfileKey: String? = null,
+    val timeoutSeconds: Int? = null,
+    val balanceKind: String = "none",
+    val balanceBaseUrl: String? = null,
+    val balanceUserId: String? = null,
+    val balanceToken: String? = null,
+    val balanceConfig: String = "{}",
+    val quotaPerUnit: Double? = null,
+    val quotaCalibrated: Boolean = false,
+    val probeEnabled: Boolean = true,
+    val probeReachability: Boolean = true,
+    val probeKeyValidity: Boolean = true,
+    val probeBalance: Boolean = true,
+    val probeModels: Boolean = false,
+    val probeModelReachability: Boolean = false,
+)
+
 /** API 密钥。明文。不搬 health / lastOutcome / checkedAt / okAt。 */
 @Serializable
 data class BackupApiKey(
@@ -89,10 +116,12 @@ data class BackupApiKey(
     val providerName: String,
     val providerApiRoot: String,
     val label: String = "",
+    val note: String = "",
     val secret: String,
     val isDefault: Boolean = false,
     val enabled: Boolean = true,
     val sortOrder: Int = 0,
+    val settings: BackupKeySettings? = null,
 )
 
 /** 平台账号。用户名与密码**明文**。 */

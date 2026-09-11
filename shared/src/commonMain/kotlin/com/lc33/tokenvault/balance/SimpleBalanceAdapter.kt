@@ -2,7 +2,7 @@ package com.lc33.tokenvault.balance
 
 import com.lc33.tokenvault.domain.BalanceKind
 import com.lc33.tokenvault.domain.model.BalanceSnapshot
-import com.lc33.tokenvault.domain.model.Provider
+import com.lc33.tokenvault.domain.model.KeySettings
 import com.lc33.tokenvault.endpoint.ProbeRequest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.doubleOrNull
@@ -24,10 +24,10 @@ class SimpleBalanceAdapter(
     private val currency: String,
 ) : BalanceAdapter {
 
-    override fun buildRequest(provider: Provider, defaultKey: CharArray?, token: CharArray?): ProbeRequest {
-        val root = provider.apiRoot.trimEnd('/')
-        // path 里 {ver} 用 provider.apiVersion 替换。
-        val resolved = path.replace("{ver}", provider.apiVersion)
+    override fun buildRequest(settings: KeySettings, defaultKey: CharArray?, token: CharArray?): ProbeRequest {
+        val root = settings.apiRoot.trimEnd('/')
+        // path 里 {ver} 用 settings.apiVersion 替换。
+        val resolved = path.replace("{ver}", settings.apiVersion)
         val headers = mutableListOf<Pair<String, String>>()
         defaultKey?.let { headers += "Authorization" to "Bearer ${it.concatToString()}" }
         return ProbeRequest(

@@ -104,18 +104,22 @@ class DashboardViewModel constructor(
         }
     }
 
-    private fun Snapshot.balancedSummaries(): List<ProviderSummary> = summaries.map { summary ->
-        summary.copy(
-            provider = summary.provider.copy(
-                balance = aggregateBalanceOf(keys.filter { it.providerId == summary.provider.id }),
-            ),
-        )
-    }
+    private fun Snapshot.balanceByProvider(): Map<Long, com.lc33.tokenvault.domain.model.BalanceSnapshot?> =
+        summaries.associate { summary ->
+            summary.provider.id to aggregateBalanceOf(keys.filter { it.providerId == summary.provider.id })
+        }
 
     private fun Snapshot.rows(): List<UiProviderRow> {
         val healths = keys.groupBy({ it.providerId }, { it.health })
-        return balancedSummaries().map { summary ->
-            summary.toRow(health = aggregateHealth(healths[summary.provider.id].orEmpty()))
+        val balances = balanceByProvider()
+        return summaries.map { summary ->
+            val providerKeys = keys.filter { it.providerId == summary.provider.id }
+            summary.toRow(
+                health = aggregateHealth(healths[summary.provider.id].orEmpty()),
+                balance = balances[summary.provider.id],
+                host = providerHostOf(providerKeys),
+                protocols = providerProtocolsOf(providerKeys),
+            )
         }
     }
 
@@ -128,7 +132,8 @@ class DashboardViewModel constructor(
         counts = contentCountsOf(summaries),
         health = healthBreakdownOf(keys),
         attention = attentionItemsOf(
-            summaries = balancedSummaries(),
+            summaries = summaries,
+            balanceByProvider = balanceByProvider(),
             healthByProvider = keys.groupBy({ it.providerId }, { it.health }),
             // 阈值来自设置（§13.4 探测设置页），默认 §9.3 的初值。
             // 不写死数字在这里（红线 15）：初值是有名字、有出处的领域常量。

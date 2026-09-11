@@ -38,6 +38,18 @@ data class ProviderDetailRoute(val id: Long) : VaultRoute
 data class ProviderEditorRoute(val id: Long? = null) : VaultRoute
 
 @Serializable
+data class KeyDetailRoute(
+    val providerId: Long,
+    val keyId: Long,
+) : VaultRoute
+
+@Serializable
+data class KeyEditorRoute(
+    val providerId: Long,
+    val keyId: Long,
+) : VaultRoute
+
+@Serializable
 data object ImportRoute : VaultRoute
 
 @Serializable

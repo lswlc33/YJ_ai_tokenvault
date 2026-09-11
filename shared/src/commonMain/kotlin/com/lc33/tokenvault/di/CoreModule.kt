@@ -55,6 +55,8 @@ import com.lc33.tokenvault.ui.shell.ClientKeywordsViewModel
 import com.lc33.tokenvault.ui.shell.DashboardViewModel
 import com.lc33.tokenvault.ui.shell.DataViewModel
 import com.lc33.tokenvault.ui.shell.ImportViewModel
+import com.lc33.tokenvault.ui.shell.KeyDetailViewModel
+import com.lc33.tokenvault.ui.shell.KeyEditorViewModel
 import com.lc33.tokenvault.ui.shell.LockViewModel
 import com.lc33.tokenvault.ui.shell.LogViewModel
 import com.lc33.tokenvault.ui.shell.ManageViewModel
@@ -138,6 +140,7 @@ val coreModule = module {
     single { get<VaultDatabase>().groupDao() }
     single { get<VaultDatabase>().providerDao() }
     single { get<VaultDatabase>().apiKeyDao() }
+    single { get<VaultDatabase>().keySettingsDao() }
     single { get<VaultDatabase>().providerAccountDao() }
     single { get<VaultDatabase>().clientProfileDao() }
     single { get<VaultDatabase>().modelDao() }
@@ -154,8 +157,8 @@ val coreModule = module {
     single { ProfileSeeder(get()) }
 
     single<GroupRepository> { RoomGroupRepository(get()) }
-    single<ProviderRepository> { RoomProviderRepository(get(), get(), get(), get(named(Qualifiers.NOW))) }
-    single<ApiKeyRepository> { RoomApiKeyRepository(get(), get(), get(), get(named(Qualifiers.NOW))) }
+    single<ProviderRepository> { RoomProviderRepository(get(), get(named(Qualifiers.NOW))) }
+    single<ApiKeyRepository> { RoomApiKeyRepository(get(), get(), get(), get(), get(named(Qualifiers.NOW))) }
     single<SettingsRepository> { RoomSettingsRepository(get()) }
     single<WebDavSettingsRepository> { RoomWebDavSettingsRepository(get(), get()) }
     single<ProviderAccountRepository> { RoomProviderAccountRepository(get(), get(), get(), get(named(Qualifiers.NOW))) }
@@ -173,7 +176,7 @@ val coreModule = module {
     single<BackupStore> {
         RoomBackupStore(
             groupDao = get(), providerDao = get(), keyDao = get(), accountDao = get(),
-            profileDao = get(), modelDao = get(), probeRunDao = get(), appSettingDao = get(),
+            profileDao = get(), settingsDao = get(), modelDao = get(), probeRunDao = get(), appSettingDao = get(),
             cipher = get(), transactions = get(), bootStore = get(), now = get(named(Qualifiers.NOW)),
         )
     }
@@ -219,6 +222,8 @@ val viewModelModule = module {
     viewModelOf(::DashboardViewModel)
     viewModelOf(::DataViewModel)
     viewModelOf(::ImportViewModel)
+    viewModelOf(::KeyDetailViewModel)
+    viewModelOf(::KeyEditorViewModel)
     viewModelOf(::LockViewModel)
     viewModelOf(::LogViewModel)
     viewModelOf(::ManageViewModel)

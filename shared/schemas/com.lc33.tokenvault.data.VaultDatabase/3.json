@@ -1,0 +1,1226 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 3,
+    "identityHash": "f5e7befaca5eae2886fcc87c3004ff62",
+    "entities": [
+      {
+        "tableName": "groups",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `sortOrder` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sortOrder",
+            "columnName": "sortOrder",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_groups_name",
+            "unique": true,
+            "columnNames": [
+              "name"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_groups_name` ON `${TABLE_NAME}` (`name`)"
+          }
+        ]
+      },
+      {
+        "tableName": "providers",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `note` TEXT, `websiteUrl` TEXT, `websiteLatencyMs` INTEGER, `websiteCheckedAt` INTEGER, `websiteError` TEXT, `groupId` INTEGER, `color` INTEGER, `pinned` INTEGER NOT NULL, `sortOrder` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, FOREIGN KEY(`groupId`) REFERENCES `groups`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "note",
+            "columnName": "note",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "websiteUrl",
+            "columnName": "websiteUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "websiteLatencyMs",
+            "columnName": "websiteLatencyMs",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "websiteCheckedAt",
+            "columnName": "websiteCheckedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "websiteError",
+            "columnName": "websiteError",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "groupId",
+            "columnName": "groupId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "color",
+            "columnName": "color",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "pinned",
+            "columnName": "pinned",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sortOrder",
+            "columnName": "sortOrder",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_providers_groupId",
+            "unique": false,
+            "columnNames": [
+              "groupId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_providers_groupId` ON `${TABLE_NAME}` (`groupId`)"
+          },
+          {
+            "name": "index_providers_pinned_sortOrder_id",
+            "unique": false,
+            "columnNames": [
+              "pinned",
+              "sortOrder",
+              "id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_providers_pinned_sortOrder_id` ON `${TABLE_NAME}` (`pinned`, `sortOrder`, `id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "groups",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "groupId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "api_keys",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `providerId` INTEGER NOT NULL, `label` TEXT NOT NULL, `note` TEXT NOT NULL, `secretEnc` BLOB NOT NULL, `fingerprint` TEXT NOT NULL, `enabled` INTEGER NOT NULL, `health` TEXT NOT NULL, `lastOutcome` TEXT NOT NULL, `healthDetail` TEXT, `httpStatus` INTEGER, `latencyMs` INTEGER, `checkedAt` INTEGER, `okAt` INTEGER, `balanceAmount` REAL, `balanceUsed` REAL, `balanceCurrency` TEXT, `balanceRaw` TEXT, `balanceCheckedAt` INTEGER, `balanceError` TEXT, `sortOrder` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, FOREIGN KEY(`providerId`) REFERENCES `providers`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "providerId",
+            "columnName": "providerId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "label",
+            "columnName": "label",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "note",
+            "columnName": "note",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "secretEnc",
+            "columnName": "secretEnc",
+            "affinity": "BLOB",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fingerprint",
+            "columnName": "fingerprint",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "enabled",
+            "columnName": "enabled",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "health",
+            "columnName": "health",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastOutcome",
+            "columnName": "lastOutcome",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "healthDetail",
+            "columnName": "healthDetail",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "httpStatus",
+            "columnName": "httpStatus",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "latencyMs",
+            "columnName": "latencyMs",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "checkedAt",
+            "columnName": "checkedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "okAt",
+            "columnName": "okAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "balanceAmount",
+            "columnName": "balanceAmount",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "balanceUsed",
+            "columnName": "balanceUsed",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "balanceCurrency",
+            "columnName": "balanceCurrency",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "balanceRaw",
+            "columnName": "balanceRaw",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "balanceCheckedAt",
+            "columnName": "balanceCheckedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "balanceError",
+            "columnName": "balanceError",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sortOrder",
+            "columnName": "sortOrder",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_api_keys_providerId_sortOrder_id",
+            "unique": false,
+            "columnNames": [
+              "providerId",
+              "sortOrder",
+              "id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_api_keys_providerId_sortOrder_id` ON `${TABLE_NAME}` (`providerId`, `sortOrder`, `id`)"
+          },
+          {
+            "name": "index_api_keys_providerId_fingerprint",
+            "unique": true,
+            "columnNames": [
+              "providerId",
+              "fingerprint"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_api_keys_providerId_fingerprint` ON `${TABLE_NAME}` (`providerId`, `fingerprint`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "providers",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "providerId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "key_settings",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`keyId` INTEGER NOT NULL, `apiBaseUrl` TEXT NOT NULL, `apiRoot` TEXT NOT NULL, `apiVersion` TEXT NOT NULL, `supportedProtocols` TEXT NOT NULL, `pathOverrides` TEXT NOT NULL, `authStyle` TEXT NOT NULL, `allowInsecure` INTEGER NOT NULL, `clientProfileId` INTEGER, `timeoutSeconds` INTEGER, `balanceKind` TEXT NOT NULL, `balanceBaseUrl` TEXT, `balanceUserId` TEXT, `balanceTokenEnc` BLOB, `balanceConfig` TEXT NOT NULL, `quotaPerUnit` REAL, `quotaCalibrated` INTEGER NOT NULL, `probeEnabled` INTEGER NOT NULL, `probeReachability` INTEGER NOT NULL, `probeKeyValidity` INTEGER NOT NULL, `probeBalance` INTEGER NOT NULL, `probeModels` INTEGER NOT NULL, `probeModelReachability` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`keyId`), FOREIGN KEY(`keyId`) REFERENCES `api_keys`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`clientProfileId`) REFERENCES `client_profiles`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
+        "fields": [
+          {
+            "fieldPath": "keyId",
+            "columnName": "keyId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "apiBaseUrl",
+            "columnName": "apiBaseUrl",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "apiRoot",
+            "columnName": "apiRoot",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "apiVersion",
+            "columnName": "apiVersion",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "supportedProtocols",
+            "columnName": "supportedProtocols",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pathOverrides",
+            "columnName": "pathOverrides",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "authStyle",
+            "columnName": "authStyle",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "allowInsecure",
+            "columnName": "allowInsecure",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "clientProfileId",
+            "columnName": "clientProfileId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "timeoutSeconds",
+            "columnName": "timeoutSeconds",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "balanceKind",
+            "columnName": "balanceKind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "balanceBaseUrl",
+            "columnName": "balanceBaseUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "balanceUserId",
+            "columnName": "balanceUserId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "balanceTokenEnc",
+            "columnName": "balanceTokenEnc",
+            "affinity": "BLOB"
+          },
+          {
+            "fieldPath": "balanceConfig",
+            "columnName": "balanceConfig",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "quotaPerUnit",
+            "columnName": "quotaPerUnit",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "quotaCalibrated",
+            "columnName": "quotaCalibrated",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "probeEnabled",
+            "columnName": "probeEnabled",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "probeReachability",
+            "columnName": "probeReachability",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "probeKeyValidity",
+            "columnName": "probeKeyValidity",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "probeBalance",
+            "columnName": "probeBalance",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "probeModels",
+            "columnName": "probeModels",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "probeModelReachability",
+            "columnName": "probeModelReachability",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "keyId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_key_settings_keyId",
+            "unique": true,
+            "columnNames": [
+              "keyId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_key_settings_keyId` ON `${TABLE_NAME}` (`keyId`)"
+          },
+          {
+            "name": "index_key_settings_clientProfileId",
+            "unique": false,
+            "columnNames": [
+              "clientProfileId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_key_settings_clientProfileId` ON `${TABLE_NAME}` (`clientProfileId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "api_keys",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "keyId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "client_profiles",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "clientProfileId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "provider_accounts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `providerId` INTEGER NOT NULL, `label` TEXT NOT NULL, `usernameEnc` BLOB, `usernameFp` TEXT, `passwordEnc` BLOB, `loginUrl` TEXT, `loginMethods` TEXT NOT NULL, `note` TEXT, `sortOrder` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, FOREIGN KEY(`providerId`) REFERENCES `providers`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "providerId",
+            "columnName": "providerId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "label",
+            "columnName": "label",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "usernameEnc",
+            "columnName": "usernameEnc",
+            "affinity": "BLOB"
+          },
+          {
+            "fieldPath": "usernameFp",
+            "columnName": "usernameFp",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "passwordEnc",
+            "columnName": "passwordEnc",
+            "affinity": "BLOB"
+          },
+          {
+            "fieldPath": "loginUrl",
+            "columnName": "loginUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "loginMethods",
+            "columnName": "loginMethods",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "note",
+            "columnName": "note",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sortOrder",
+            "columnName": "sortOrder",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_provider_accounts_providerId_sortOrder_id",
+            "unique": false,
+            "columnNames": [
+              "providerId",
+              "sortOrder",
+              "id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_provider_accounts_providerId_sortOrder_id` ON `${TABLE_NAME}` (`providerId`, `sortOrder`, `id`)"
+          },
+          {
+            "name": "index_provider_accounts_providerId_usernameFp",
+            "unique": true,
+            "columnNames": [
+              "providerId",
+              "usernameFp"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_provider_accounts_providerId_usernameFp` ON `${TABLE_NAME}` (`providerId`, `usernameFp`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "providers",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "providerId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "client_profiles",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `builtinKey` TEXT, `userAgent` TEXT NOT NULL, `headers` TEXT NOT NULL, `bodyPatch` TEXT NOT NULL, `protocols` TEXT NOT NULL, `verified` INTEGER NOT NULL, `builtinRev` INTEGER NOT NULL, `userEdited` INTEGER NOT NULL, `sortOrder` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "builtinKey",
+            "columnName": "builtinKey",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "userAgent",
+            "columnName": "userAgent",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "headers",
+            "columnName": "headers",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bodyPatch",
+            "columnName": "bodyPatch",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "protocols",
+            "columnName": "protocols",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "verified",
+            "columnName": "verified",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "builtinRev",
+            "columnName": "builtinRev",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "userEdited",
+            "columnName": "userEdited",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sortOrder",
+            "columnName": "sortOrder",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_client_profiles_builtinKey",
+            "unique": true,
+            "columnNames": [
+              "builtinKey"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_client_profiles_builtinKey` ON `${TABLE_NAME}` (`builtinKey`)"
+          }
+        ]
+      },
+      {
+        "tableName": "models",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `providerId` INTEGER NOT NULL, `keyId` INTEGER, `modelId` TEXT NOT NULL, `protocol` TEXT NOT NULL, `displayName` TEXT, `source` TEXT NOT NULL, `discoveredVia` TEXT, `enabled` INTEGER NOT NULL, `favorite` INTEGER NOT NULL, `needsReview` INTEGER NOT NULL, `catalogKey` TEXT, `probeState` TEXT NOT NULL, `lastOutcome` TEXT NOT NULL, `probeDetail` TEXT, `latencyMs` INTEGER, `probedAt` INTEGER, `firstSeenAt` INTEGER NOT NULL, `lastSeenAt` INTEGER, `sortOrder` INTEGER NOT NULL, FOREIGN KEY(`providerId`) REFERENCES `providers`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`keyId`) REFERENCES `api_keys`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "providerId",
+            "columnName": "providerId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "keyId",
+            "columnName": "keyId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "modelId",
+            "columnName": "modelId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "protocol",
+            "columnName": "protocol",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "displayName",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "discoveredVia",
+            "columnName": "discoveredVia",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "enabled",
+            "columnName": "enabled",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "favorite",
+            "columnName": "favorite",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "needsReview",
+            "columnName": "needsReview",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "catalogKey",
+            "columnName": "catalogKey",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "probeState",
+            "columnName": "probeState",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastOutcome",
+            "columnName": "lastOutcome",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "probeDetail",
+            "columnName": "probeDetail",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "latencyMs",
+            "columnName": "latencyMs",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "probedAt",
+            "columnName": "probedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "firstSeenAt",
+            "columnName": "firstSeenAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastSeenAt",
+            "columnName": "lastSeenAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "sortOrder",
+            "columnName": "sortOrder",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_models_providerId_keyId_modelId_protocol",
+            "unique": true,
+            "columnNames": [
+              "providerId",
+              "keyId",
+              "modelId",
+              "protocol"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_models_providerId_keyId_modelId_protocol` ON `${TABLE_NAME}` (`providerId`, `keyId`, `modelId`, `protocol`)"
+          },
+          {
+            "name": "index_models_keyId",
+            "unique": false,
+            "columnNames": [
+              "keyId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_models_keyId` ON `${TABLE_NAME}` (`keyId`)"
+          },
+          {
+            "name": "index_models_catalogKey",
+            "unique": false,
+            "columnNames": [
+              "catalogKey"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_models_catalogKey` ON `${TABLE_NAME}` (`catalogKey`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "providers",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "providerId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "api_keys",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "keyId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "model_catalog",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`key` TEXT NOT NULL, `vendor` TEXT NOT NULL, `modelId` TEXT NOT NULL, `normId` TEXT NOT NULL, `name` TEXT, `family` TEXT, `contextLimit` INTEGER, `outputLimit` INTEGER, `costInput` REAL, `costOutput` REAL, `costCacheRead` REAL, `costCacheWrite` REAL, `inputModalities` TEXT, `outputModalities` TEXT, `reasoning` INTEGER NOT NULL, `toolCall` INTEGER NOT NULL, `attachment` INTEGER NOT NULL, `releaseDate` TEXT, `lastUpdated` TEXT, PRIMARY KEY(`key`))",
+        "fields": [
+          {
+            "fieldPath": "key",
+            "columnName": "key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "vendor",
+            "columnName": "vendor",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "modelId",
+            "columnName": "modelId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "normId",
+            "columnName": "normId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "family",
+            "columnName": "family",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "contextLimit",
+            "columnName": "contextLimit",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "outputLimit",
+            "columnName": "outputLimit",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "costInput",
+            "columnName": "costInput",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "costOutput",
+            "columnName": "costOutput",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "costCacheRead",
+            "columnName": "costCacheRead",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "costCacheWrite",
+            "columnName": "costCacheWrite",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "inputModalities",
+            "columnName": "inputModalities",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "outputModalities",
+            "columnName": "outputModalities",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "reasoning",
+            "columnName": "reasoning",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "toolCall",
+            "columnName": "toolCall",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "attachment",
+            "columnName": "attachment",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "releaseDate",
+            "columnName": "releaseDate",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "lastUpdated",
+            "columnName": "lastUpdated",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "key"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_model_catalog_modelId",
+            "unique": false,
+            "columnNames": [
+              "modelId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_model_catalog_modelId` ON `${TABLE_NAME}` (`modelId`)"
+          },
+          {
+            "name": "index_model_catalog_normId",
+            "unique": false,
+            "columnNames": [
+              "normId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_model_catalog_normId` ON `${TABLE_NAME}` (`normId`)"
+          }
+        ]
+      },
+      {
+        "tableName": "probe_runs",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `scope` TEXT NOT NULL, `startedAt` INTEGER NOT NULL, `finishedAt` INTEGER, `total` INTEGER NOT NULL, `done` INTEGER NOT NULL, `okCount` INTEGER NOT NULL, `failCount` INTEGER NOT NULL, `cancelled` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "scope",
+            "columnName": "scope",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startedAt",
+            "columnName": "startedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "finishedAt",
+            "columnName": "finishedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "total",
+            "columnName": "total",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "done",
+            "columnName": "done",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "okCount",
+            "columnName": "okCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "failCount",
+            "columnName": "failCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cancelled",
+            "columnName": "cancelled",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "audit_log",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `at` INTEGER NOT NULL, `level` TEXT NOT NULL, `category` TEXT NOT NULL, `providerId` INTEGER, `keyId` INTEGER, `runId` INTEGER, `message` TEXT NOT NULL, `detail` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "at",
+            "columnName": "at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "level",
+            "columnName": "level",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "providerId",
+            "columnName": "providerId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "keyId",
+            "columnName": "keyId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "runId",
+            "columnName": "runId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "message",
+            "columnName": "message",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "detail",
+            "columnName": "detail",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_audit_log_at",
+            "unique": false,
+            "columnNames": [
+              "at"
+            ],
+            "orders": [
+              "DESC"
+            ],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_audit_log_at` ON `${TABLE_NAME}` (`at` DESC)"
+          }
+        ]
+      },
+      {
+        "tableName": "app_settings",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`key` TEXT NOT NULL, `value` TEXT, `valueBlob` BLOB, PRIMARY KEY(`key`))",
+        "fields": [
+          {
+            "fieldPath": "key",
+            "columnName": "key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "value",
+            "columnName": "value",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "valueBlob",
+            "columnName": "valueBlob",
+            "affinity": "BLOB"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "key"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'f5e7befaca5eae2886fcc87c3004ff62')"
+    ]
+  }
+}

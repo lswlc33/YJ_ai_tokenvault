@@ -3,6 +3,7 @@ package com.lc33.tokenvault.probe
 import com.lc33.tokenvault.domain.KeyHealth
 import com.lc33.tokenvault.domain.ProbeLevel
 import com.lc33.tokenvault.domain.ProbeOutcome
+import com.lc33.tokenvault.domain.AuthStyle
 import com.lc33.tokenvault.domain.Protocol
 
 /**
@@ -31,6 +32,15 @@ data class ProbeTask(
 
     /** 请求体，L1 是 null，L2 是极简推理 body。 */
     val body: String? = null,
+
+    /** 这把 Key 当前选的客户端预设。 */
+    val clientProfileId: Long? = null,
+
+    /** 这把 Key 当前固化的鉴权风格。 */
+    val authStyle: AuthStyle = AuthStyle.AUTO,
+
+    /** 这把 Key 是否显式允许 HTTP。 */
+    val allowInsecure: Boolean = false,
 )
 
 /** 一个任务的结果。 */

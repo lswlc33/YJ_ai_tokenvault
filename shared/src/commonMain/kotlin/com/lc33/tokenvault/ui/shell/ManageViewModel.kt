@@ -2,6 +2,7 @@ package com.lc33.tokenvault.ui.shell
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lc33.tokenvault.domain.SecretMask
 import com.lc33.tokenvault.domain.repo.ApiKeyRepository
 import com.lc33.tokenvault.domain.repo.GroupRepository
 import com.lc33.tokenvault.domain.repo.ProviderRepository
@@ -104,9 +105,17 @@ class ManageViewModel constructor(
         // 每家「最近探测」= 它那几把密钥 checkedAt 的最大值（§13.4「最近探测」排序档）。
         val lastProbeByProvider = snap.keys.groupBy({ it.providerId }, { it.checkedAt })
             .mapValues { (_, stamps) -> stamps.mapNotNull { it }.maxOrNull() }
-        val rows = snap.balancedSummaries().map { summary ->
+        val balances = snap.summaries.associate { summary ->
+            summary.provider.id to aggregateBalanceOf(snap.keys.filter { it.providerId == summary.provider.id })
+        }
+        val rows = snap.summaries.map { summary ->
+            val providerKeys = snap.keys.filter { it.providerId == summary.provider.id }
             summary.toRow(
                 health = aggregateHealth(healths[summary.provider.id].orEmpty()),
+                balance = balances[summary.provider.id],
+                host = providerHostOf(providerKeys),
+                protocols = providerProtocolsOf(providerKeys),
+                keys = providerKeys.map { it.toRow(SecretMask.ELLIPSIS) },
                 lastProbeAt = lastProbeByProvider[summary.provider.id],
             )
         }
@@ -120,14 +129,6 @@ class ManageViewModel constructor(
             selection = ctrl.selection,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), ManageUiState())
-
-    private fun Snapshot.balancedSummaries() = summaries.map { summary ->
-        summary.copy(
-            provider = summary.provider.copy(
-                balance = aggregateBalanceOf(keys.filter { it.providerId == summary.provider.id }),
-            ),
-        )
-    }
 
     /** 顶栏刷新：只更新余额与供应商可达性延迟，不碰密钥与模型探测。 */
     fun refreshStatus() {

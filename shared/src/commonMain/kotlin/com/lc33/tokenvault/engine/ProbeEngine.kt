@@ -194,20 +194,21 @@ class ProbeEngine constructor(
             .map { it.provider }
             .firstOrNull { it.id == providerId }
             ?: return
-        // “模型列表检测”是独立开关：关着时这里不让自动/手动拉取，用户只能手动维护模型。
-        if (!provider.probe.enabled || !provider.probe.models) return
 
         val selectedKeys = keys.observeAll().first()
-            .filter { it.providerId == providerId && it.enabled && (keyId == null || it.id == keyId) }
+            .filter {
+                it.providerId == providerId &&
+                    it.enabled &&
+                    (keyId == null || it.id == keyId) &&
+                    it.settings.probe.enabled &&
+                    it.settings.probe.models
+            }
         if (selectedKeys.isEmpty()) return
 
         val profileList = clientProfiles.observeAll().first()
         val defaultProfile = profileList.firstOrNull { it.builtinKey == "default" }
-        val clientKeywords = settings.observeClientKeywords().first()
-        // ProbePlanBuilder 会按 keyValidity 决定是否生成 L2。模型列表也需要同一条 GET，
-        // 所以这里只对计划临时打开 keyValidity；是否把结果写回密钥健康仍由真实开关控制。
-        val planProvider = provider.copy(probe = provider.probe.copy(keyValidity = true))
-        val plan = ProbePlanBuilder.build(listOf(planProvider)) { pid ->
+        val clientKeywords = this.settings.observeClientKeywords().first()
+        val plan = ProbePlanBuilder.build(listOf(provider)) { pid ->
             selectedKeys.filter { it.providerId == pid }
         }
 
@@ -234,7 +235,7 @@ class ProbeEngine constructor(
                     body = null,
                     protocol = task.protocol,
                 ),
-                allowInsecure = provider.allowInsecure,
+                allowInsecure = selectedKeys.firstOrNull { it.id == keyIdForTask }?.settings?.allowInsecure ?: false,
             )
             if (response.status == 429) {
                 engine.onRateLimited(task.host)
@@ -255,7 +256,8 @@ class ProbeEngine constructor(
             }
 
             // 模型列表拉取不该绕过用户关掉的密钥检测开关。
-            if (provider.probe.keyValidity) {
+            val taskKey = selectedKeys.firstOrNull { it.id == keyIdForTask }
+            if (taskKey?.settings?.probe?.keyValidity == true) {
                 val scrubbedDetail = classification.detail?.let { redactor.scrub(it) }
                 if (classification.health != null) {
                     keys.applyProbeResult(
@@ -282,7 +284,7 @@ class ProbeEngine constructor(
             if (classification.outcome == ProbeOutcome.SUCCESS) {
                 ModelListParser.parse(response.body, task.protocol)?.let { fetched ->
                     fetched
-                        .filter { it.protocol in provider.supportedProtocols }
+                        .filter { it.protocol in (taskKey?.settings?.supportedProtocols ?: emptySet()) }
                         .forEach { model ->
                             fetchedByKey
                                 .getOrPut(keyIdForTask) { mutableMapOf() }
@@ -330,62 +332,37 @@ class ProbeEngine constructor(
     private suspend fun refreshReachabilityInner() {
         val providerList = providers.observeSummaries().first()
             .map { it.provider }
-            .filter { it.probe.enabled && it.probe.reachability }
+            .filter { !it.websiteUrl.isNullOrBlank() }
         if (providerList.isEmpty()) return
 
-        val profileList = clientProfiles.observeAll().first()
-        val defaultProfile = profileList.firstOrNull { it.builtinKey == "default" }
-        val clientKeywords = settings.observeClientKeywords().first()
-        val providerById = providerList.associateBy { it.id }
-        val plan = ProbePlanBuilder.build(providerList) { _ -> emptyList() }
-
-        // 每家只取第一个协议的一条 L1：供应商延迟是站点级信号，重复打多个协议只会
-        // 放大请求量，不会让“这家通不通”的结论更准。
-        fun profileOf(id: Long?): ClientProfile? =
-            profileList.firstOrNull { it.id == id } ?: defaultProfile
-
-        val tasks = plan.tasks
-            .filter { it.level == ProbeLevel.L1_REACHABILITY }
-            .groupBy(PlannedTask::providerId)
-            .mapValues { (_, group) -> group.first() }
-            .values
-            .mapNotNull { it.toTask(profileOf(it.clientProfileId)) }
-
-        for (task in tasks) {
+        for (provider in providerList) {
+            val started = now()
             val response = engine.execute(
                 ProbeRequest(
                     method = "GET",
-                    url = task.url,
-                    headers = task.headers,
+                    url = provider.websiteUrl!!,
+                    headers = emptyList(),
                     body = null,
-                    protocol = task.protocol,
+                    protocol = null,
                 ),
-                allowInsecure = providerById[task.providerId]?.allowInsecure ?: false,
+                allowInsecure = false,
             )
-            if (response.status == 429) engine.onRateLimited(task.host)
-            val classification = ProbeClassifier.classify(
-                status = response.status.takeIf { response.error == null },
-                body = response.body,
-                error = response.error,
-                level = task.level,
-                clientKeywords = clientKeywords,
-            )
-            providers.updateReachability(
-                id = task.providerId,
+            providers.updateWebsiteStatus(
+                id = provider.id,
                 latencyMs = response.latencyMs,
-                checkedAt = now(),
-                error = classification.detail?.let { redactor.scrub(it) } ?: response.error?.message,
+                checkedAt = started,
+                error = response.error?.message
+                    ?: if (response.status !in 200..399) "http ${response.status}" else null,
             )
         }
 
         audit.record(
             level = LogLevel.INFO,
             category = LogCategory.PROBE,
-            message = "provider reachability refreshed",
-            detail = "providers=${tasks.size}",
+            message = "provider websites checked",
+            detail = "providers=${providerList.size}",
         )
     }
-
     /**
      * 模型可达性探测（快捷）。长按模型手动触发，只发一次极短推理请求；
      * 默认关闭，且必须同时打开全局默认值与该供应商自己的开关。
@@ -410,9 +387,10 @@ class ProbeEngine constructor(
         modelId: String,
         protocol: Protocol,
     ) {
-        val provider = providers.find(providerId) ?: return
-        if (!provider.probe.enabled || !provider.probe.modelReachability) return
-        val endpoints = when (val result = normalizeBaseUrl(provider.apiBaseUrl, provider.pathOverrides)) {
+        val key = keys.find(keyId) ?: return
+        if (!key.settings.probe.enabled || !key.settings.probe.modelReachability) return
+        val keySettings = key.settings
+        val endpoints = when (val result = normalizeBaseUrl(keySettings.apiBaseUrl, keySettings.pathOverrides)) {
             is NormalizeResult.Ok -> result.endpoints
             is NormalizeResult.Err -> return
         }
@@ -428,13 +406,13 @@ class ProbeEngine constructor(
             knownSecrets.add(secret)
             val profileList = clientProfiles.observeAll().first()
             val defaultProfile = profileList.firstOrNull { it.builtinKey == "default" }
-            val profile = profileList.firstOrNull { it.id == provider.clientProfileId } ?: defaultProfile
+            val profile = profileList.firstOrNull { it.id == keySettings.clientProfileId } ?: defaultProfile
             val baseRequest = ProbeRequestBuilder.inference(
                 url = url,
                 protocol = protocol,
                 apiKey = secret,
                 modelId = modelId,
-                authStyle = provider.authStyle,
+                authStyle = keySettings.authStyle,
                 prompt = ProbeRequestBuilder.QUICK_REACHABILITY_PROMPT,
             )
             val patchedBody = mergeBodyPatch(
@@ -450,15 +428,15 @@ class ProbeEngine constructor(
                 ).headers,
                 body = HeaderAssembler.expandPlaceholders(patchedBody, placeholders),
             )
-            val response = engine.execute(request, allowInsecure = provider.allowInsecure)
-            if (response.status == 429) engine.onRateLimited(provider.hostOfForEngine())
+            val response = engine.execute(request, allowInsecure = keySettings.allowInsecure)
+            if (response.status == 429) engine.onRateLimited(keySettings.apiRoot.substringAfter("://").substringBefore('/').substringBefore(':'))
 
             val classification = ProbeClassifier.classify(
                 status = response.status.takeIf { response.error == null },
                 body = response.body,
                 error = response.error,
                 level = ProbeLevel.L3_MODEL,
-                clientKeywords = settings.observeClientKeywords().first(),
+                clientKeywords = this.settings.observeClientKeywords().first(),
             )
             val detail = classification.detail?.let { redactor.scrub(it) }
             val state = modelStateOf(classification)
@@ -514,8 +492,7 @@ class ProbeEngine constructor(
         else -> ModelProbeState.UNKNOWN
     }
 
-    private fun Provider.hostOfForEngine(): String =
-        apiRoot.substringAfter("://").substringBefore('/').substringBefore(':')
+
     private fun startScoped(runScope: String, filter: (PlannedTask) -> Boolean): Boolean {
         if (running) return false
         if (!session.isUnlocked) return false
@@ -576,7 +553,7 @@ class ProbeEngine constructor(
         val profileList: List<ClientProfile> = clientProfiles.observeAll().first()
         val defaultProfile = profileList.firstOrNull { it.builtinKey == "default" }
         // 客户端拦截关键词来自设置（§13.4 探测设置页），默认 §8.2 的内置表。
-        val clientKeywords = settings.observeClientKeywords().first()
+        val clientKeywords = this.settings.observeClientKeywords().first()
         // 客户端嗅探开关（§8.2）：关掉后 CLIENT_BLOCKED 只保留结论、不换预设重试。
         val sniffEnabled = settings.observeSniffClientProfile().first()
 
@@ -619,7 +596,7 @@ class ProbeEngine constructor(
         )
 
         val taskById = tasks.associateBy { it.id }
-        val providerById = providerList.associateBy { it.id }
+        val keyById = allKeys.associateBy { it.id }
         val providerIdByKey = tasks.mapNotNull { task ->
             task.keyId?.let { it to task.providerId }
         }.toMap()
@@ -638,7 +615,6 @@ class ProbeEngine constructor(
                         trySniff(
                             blocked = result,
                             task = taskById[result.taskId],
-                            provider = providerById[result.providerId],
                             profiles = profileList,
                             defaultProfile = defaultProfile,
                             clientKeywords = clientKeywords,
@@ -665,11 +641,11 @@ class ProbeEngine constructor(
                 val resultTask = taskById[result.taskId]
                 if (resultTask?.keyId != null &&
                     resultTask.level == ProbeLevel.L2_KEY_VALIDITY &&
-                    providerById[result.providerId]?.probe?.models == true
+                    keyById[resultTask.keyId]?.settings?.probe?.models == true
                 ) {
                     ModelListParser.parse(result.body, resultTask.protocol)?.let { fetched ->
                         fetched
-                            .filter { it.protocol in providerById[result.providerId]?.supportedProtocols.orEmpty() }
+                            .filter { it.protocol in keyById[resultTask.keyId]?.settings?.supportedProtocols ?: emptySet() }
                             .forEach { model ->
                                 fetchedModels
                                     .getOrPut(resultTask.keyId) { mutableMapOf() }
@@ -704,12 +680,12 @@ class ProbeEngine constructor(
 
         // keyValidity 关掉时没有 L2 响应可复用；模型列表检测若单独开着，就补一次
         // 独立的 GET。这条路径只在必要時触发，避免常见场景双倍请求。
-        providerList
-            .filter { provider ->
-                provider.probe.enabled && provider.probe.models &&
-                    tasks.none { it.providerId == provider.id && it.keyId != null }
+        allKeys
+            .filter { key ->
+                key.enabled && key.settings.probe.enabled && key.settings.probe.models &&
+                    tasks.none { it.keyId == key.id }
             }
-            .forEach { provider -> refreshModelsInner(provider.id, null) }
+            .forEach { key -> refreshModelsInner(key.providerId, key.id) }
 
         finishRun(runId, tasks.size, done, ok, fail, cancelled = false)
     }
@@ -791,6 +767,9 @@ class ProbeEngine constructor(
             keyId = keyId,
             url = url,
             headers = assembled.headers,
+            clientProfileId = clientProfileId,
+            authStyle = authStyle,
+            allowInsecure = allowInsecure,
         )
     }
 
@@ -806,12 +785,11 @@ class ProbeEngine constructor(
     private suspend fun trySniff(
         blocked: ProbeItemResult,
         task: ProbeTask?,
-        provider: Provider?,
         profiles: List<ClientProfile>,
         defaultProfile: ClientProfile?,
         clientKeywords: List<String>,
     ): ProbeItemResult? {
-        if (task == null || provider == null) return null
+        if (task == null) return null
         if (task.host in rateLimitedHosts) return null
         val keyId = task.keyId ?: return null
 
@@ -825,8 +803,8 @@ class ProbeEngine constructor(
             // 同一把密钥在组装阶段已登记，这里再登记一次是防御性的（去重使其无害）：
             // 嗅探同样会把明文放进请求头，若上游回显它，脱敏第一道要能认出。
             knownSecrets.add(secret)
-            val currentProfile = profiles.firstOrNull { it.id == provider.clientProfileId } ?: defaultProfile
-            val plan = SniffPlanBuilder.build(task.protocol, provider.authStyle, provider.clientProfileId, profiles)
+            val currentProfile = profiles.firstOrNull { it.id == task.clientProfileId } ?: defaultProfile
+            val plan = SniffPlanBuilder.build(task.protocol, task.authStyle, task.clientProfileId, profiles)
 
             for (attempt in plan) {
                 // 429 熔断：嗅探是本轮请求数的主要放大来源，撞了立刻停（红线 29）。
@@ -843,7 +821,7 @@ class ProbeEngine constructor(
                         body = task.body,
                         protocol = task.protocol,
                     ),
-                    allowInsecure = false,
+                    allowInsecure = task.allowInsecure,
                 )
 
                 if (response.status == 429) {
@@ -865,7 +843,7 @@ class ProbeEngine constructor(
 
                 // 命中了。SUCCESS 才写回（其它如 UNAUTHORIZED 只说明"钥匙真坏了"，不该固化风格）。
                 if (classification.outcome == ProbeOutcome.SUCCESS) {
-                    writeBack(provider, attempt)
+                    writeBack(keyId, attempt)
                 }
                 return blocked.copy(
                     outcome = classification.outcome,
@@ -880,19 +858,21 @@ class ProbeEngine constructor(
         }
     }
 
-    /** 嗅探命中后的写回。换预设命中 → 写 `clientProfileId` + 置 `verified`；换鉴权头命中 → 写 `authStyle`。 */
-    private suspend fun writeBack(provider: Provider, attempt: SniffAttempt) {
-        val profile = attempt.profile
-        if (profile != null) {
-            providers.save(provider.copy(clientProfileId = profile.id))
+    /** 嗅探命中后的写回：成功才固化到这把 Key 的设置上。 */
+    private suspend fun writeBack(keyId: Long, attempt: SniffAttempt) {
+        val key = keys.find(keyId) ?: return
+        val settings = if (attempt.profile != null) {
+            key.settings.copy(clientProfileId = attempt.profile.id)
+        } else {
+            key.settings.copy(authStyle = attempt.authStyle)
+        }
+        keys.updateSettings(keyId, settings)
+        attempt.profile?.let { profile ->
             clientProfiles.findById(profile.id)?.let {
                 clientProfiles.update(it.copy(verified = true))
             }
-        } else {
-            providers.save(provider.copy(authStyle = attempt.authStyle))
         }
     }
-
     // ------------------------------------------------------------------ 落库
 
     /**

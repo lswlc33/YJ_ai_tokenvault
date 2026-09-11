@@ -130,14 +130,13 @@ class BalanceAdapterTest {
 
     @Test
     fun `registry 按 kind 选适配器`() {
-        assertEquals(BalanceKind.NEWAPI, BalanceRegistry.forProvider(kindOf(BalanceKind.NEWAPI))?.kind)
-        assertEquals(BalanceKind.DEEPSEEK, BalanceRegistry.forProvider(kindOf(BalanceKind.DEEPSEEK))?.kind)
-        assertEquals(BalanceKind.OPENROUTER, BalanceRegistry.forProvider(kindOf(BalanceKind.OPENROUTER))?.kind)
-        assertNull(BalanceRegistry.forProvider(kindOf(BalanceKind.NONE)))
+        assertEquals(BalanceKind.NEWAPI, BalanceRegistry.forSettings(kindOf(BalanceKind.NEWAPI))?.kind)
+        assertEquals(BalanceKind.DEEPSEEK, BalanceRegistry.forSettings(kindOf(BalanceKind.DEEPSEEK))?.kind)
+        assertEquals(BalanceKind.OPENROUTER, BalanceRegistry.forSettings(kindOf(BalanceKind.OPENROUTER))?.kind)
+        assertNull(BalanceRegistry.forSettings(kindOf(BalanceKind.NONE)))
     }
 
-    private fun kindOf(kind: BalanceKind) = com.lc33.tokenvault.domain.model.Provider(
-        name = "t",
+    private fun kindOf(kind: BalanceKind) = com.lc33.tokenvault.domain.model.KeySettings(
         apiBaseUrl = "https://x.com",
         apiRoot = "https://x.com",
         balanceKind = kind,

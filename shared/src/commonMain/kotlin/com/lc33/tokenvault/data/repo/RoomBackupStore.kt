@@ -1,10 +1,9 @@
 package com.lc33.tokenvault.data.repo
 
-import com.lc33.tokenvault.domain.repo.TransactionRunner
-
 import com.lc33.tokenvault.backup.BackupAccount
 import com.lc33.tokenvault.backup.BackupApiKey
 import com.lc33.tokenvault.backup.BackupGroup
+import com.lc33.tokenvault.backup.BackupKeySettings
 import com.lc33.tokenvault.backup.BackupModel
 import com.lc33.tokenvault.backup.BackupProfile
 import com.lc33.tokenvault.backup.BackupProvider
@@ -19,6 +18,7 @@ import com.lc33.tokenvault.data.dao.ApiKeyDao
 import com.lc33.tokenvault.data.dao.AppSettingDao
 import com.lc33.tokenvault.data.dao.ClientProfileDao
 import com.lc33.tokenvault.data.dao.GroupDao
+import com.lc33.tokenvault.data.dao.KeySettingsDao
 import com.lc33.tokenvault.data.dao.ModelDao
 import com.lc33.tokenvault.data.dao.ProbeRunDao
 import com.lc33.tokenvault.data.dao.ProviderAccountDao
@@ -33,27 +33,26 @@ import com.lc33.tokenvault.data.entity.ProviderEntity
 import com.lc33.tokenvault.data.mapper.headersToJson
 import com.lc33.tokenvault.data.mapper.pathOverridesToJson
 import com.lc33.tokenvault.data.mapper.toCsv
-import com.lc33.tokenvault.data.mapper.csvToList
+import com.lc33.tokenvault.data.mapper.toDomain
+import com.lc33.tokenvault.data.mapper.toEntity
 import com.lc33.tokenvault.data.mapper.toHeaderList
 import com.lc33.tokenvault.data.mapper.toPathOverrides
 import com.lc33.tokenvault.data.mapper.toProtocolSet
+import com.lc33.tokenvault.domain.AuthStyle
+import com.lc33.tokenvault.domain.BalanceKind
 import com.lc33.tokenvault.domain.Protocol
+import com.lc33.tokenvault.domain.model.KeyProbeSettings
+import com.lc33.tokenvault.domain.model.KeySettings
+import com.lc33.tokenvault.domain.repo.TransactionRunner
+import kotlinx.coroutines.flow.first
 import com.lc33.tokenvault.platform.BootState
 import com.lc33.tokenvault.platform.BootStore
 
-/**
- * [BackupStore] 的 Room 实现。备份安全关键路径的全部数据访问 + 加解密收在这里。
- *
- * 承担了原来 `engine/BackupEngine` 里所有"直接碰 Room 实体、DAO、FieldCipher、AAD、两步写"
- * 的部分，让引擎迁到 commonMain 后只做编排。每一条红线都在实现里兑现：
- * - 红线 24（AAD 绑 id）：[insertKey] / [insertAccount] / [insertProvider] 的两步写。
- * - 红线 27（明文只在导出这一瞬）：[readSnapshot] reveal 后用 CharArray 中间态擦掉。
- * - §12.1（指纹导入端重算）：[keyExists] / [accountExists] 用本机 DEK 重算。
- */
 class RoomBackupStore constructor(
     private val groupDao: GroupDao,
     private val providerDao: ProviderDao,
     private val keyDao: ApiKeyDao,
+    private val settingsDao: KeySettingsDao,
     private val accountDao: ProviderAccountDao,
     private val profileDao: ClientProfileDao,
     private val modelDao: ModelDao,
@@ -68,101 +67,94 @@ class RoomBackupStore constructor(
     override suspend fun <R> inTransaction(block: suspend () -> R): R =
         transactions.inTransaction(block)
 
-    // ------------------------------------------------------------------ 导出
-
     override suspend fun readSnapshot(): VaultSnapshot {
-        val deviceId = deviceId()
-
-        // 自然键映射：本机 id → 分组名 / 预设键（导出时 provider 的外键列转自然键）
-        val groupNameById = groupDao.findAll().associate { it.id to it.name }
+        val boot = bootStore.read()
+        val deviceId = (boot as? BootState.Ok)?.record?.deviceId.orEmpty()
+        val revision = bootStore.revision.value
         val profileKeyById = profileDao.findAll()
             .associate { it.id to (it.builtinKey ?: it.name) }
-        val providerRefById = providerDao.findAll().associate { it.id to (it.name to it.apiRoot) }
+        val providerEntities = providerDao.findAll()
+        val providerById = providerEntities.associateBy { it.id }
+        val keyRows = keyDao.findAll()
 
-        val groups = groupDao.findAll().map { BackupGroup(name = it.name, sortOrder = it.sortOrder) }
+        val groups = groupDao.findAll().map { BackupGroup(it.name, it.sortOrder) }
+        val providers = providerEntities.map { entity ->
+            val firstKeyRoot = keyRows.firstOrNull { it.key.providerId == entity.id }
+                ?.settings?.apiRoot.orEmpty()
+            BackupProvider(
+                name = entity.name,
+                note = entity.note,
+                websiteUrl = entity.websiteUrl,
+                groupName = entity.groupId?.let { id -> groupDao.findById(id)?.name },
+                color = entity.color,
+                pinned = entity.pinned,
+                sortOrder = entity.sortOrder,
+                apiRoot = entity.websiteUrl.orEmpty(),
+            )
+        }
 
-        val providers = providerDao.findAll().map { entity ->
-            val balanceToken = entity.balanceTokenEnc?.let { enc ->
-                val bytes = cipher.open(enc, FieldAad.of(TABLE_PROVIDERS, entity.id, COL_BALANCE_TOKEN))
-                try { bytes.utf8Chars() } finally { bytes.zeroize() }
+        val apiKeys = keyRows.map { row ->
+            val key = row.key
+            val settings = row.settings
+            val secret = revealSecret(key)
+            val balanceToken = settings?.balanceTokenEnc?.let { enc ->
+                revealBalanceToken(key.id, enc)
             }
             try {
-                BackupProvider(
-                    name = entity.name,
-                    note = entity.note,
-                    websiteUrl = entity.websiteUrl,
-                    apiBaseUrl = entity.apiBaseUrl,
-                    apiRoot = entity.apiRoot,
-                    apiVersion = entity.apiVersion,
-                    supportedProtocols = entity.supportedProtocols.toProtocolSet().map { it.wireName },
-                    pathOverrides = entity.pathOverrides.toPathOverrides().mapKeys { it.key.wireName },
-                    authStyle = entity.authStyle,
-                    allowInsecure = entity.allowInsecure,
-                    clientProfileKey = entity.clientProfileId?.let { profileKeyById[it] },
-                    groupName = entity.groupId?.let { groupNameById[it] },
-                    color = entity.color,
-                    pinned = entity.pinned,
-                    sortOrder = entity.sortOrder,
-                    balanceKind = entity.balanceKind,
-                    balanceBaseUrl = entity.balanceBaseUrl,
-                    balanceUserId = entity.balanceUserId,
-                    balanceToken = balanceToken?.concatToString(),
-                    balanceConfig = entity.balanceConfig,
-                    quotaPerUnit = entity.quotaPerUnit,
-                    quotaCalibrated = entity.quotaCalibrated,
-                    timeoutSeconds = entity.timeoutSeconds,
-                    probeEnabled = entity.probeEnabled,
-                    probeReachability = entity.probeReachability,
-                    probeKeyValidity = entity.probeKeyValidity,
-                    probeBalance = entity.probeBalance,
-                    probeModels = entity.probeModels,
-                    probeModelReachability = entity.probeModelReachability,
+                BackupApiKey(
+                    providerName = providerById[key.providerId]?.name.orEmpty(),
+                    providerApiRoot = providerById[key.providerId]?.websiteUrl.orEmpty(),
+                    label = key.label,
+                    note = key.note,
+                    secret = secret.concatToString(),
+                    enabled = key.enabled,
+                    sortOrder = key.sortOrder,
+                    settings = settings?.let { entity ->
+                        BackupKeySettings(
+                            apiBaseUrl = entity.apiBaseUrl,
+                            apiRoot = entity.apiRoot,
+                            apiVersion = entity.apiVersion,
+                            supportedProtocols = entity.supportedProtocols.split(',').filter { it.isNotBlank() },
+                            pathOverrides = entity.pathOverrides.toPathOverrides()
+                                .mapKeys { it.key.wireName },
+                            authStyle = entity.authStyle,
+                            allowInsecure = entity.allowInsecure,
+                            clientProfileKey = entity.clientProfileId?.let { profileKeyById[it] },
+                            timeoutSeconds = entity.timeoutSeconds,
+                            balanceKind = entity.balanceKind,
+                            balanceBaseUrl = entity.balanceBaseUrl,
+                            balanceUserId = entity.balanceUserId,
+                            balanceToken = balanceToken?.concatToString(),
+                            balanceConfig = entity.balanceConfig,
+                            quotaPerUnit = entity.quotaPerUnit,
+                            quotaCalibrated = entity.quotaCalibrated,
+                            probeEnabled = entity.probeEnabled,
+                            probeReachability = entity.probeReachability,
+                            probeKeyValidity = entity.probeKeyValidity,
+                            probeBalance = entity.probeBalance,
+                            probeModels = entity.probeModels,
+                            probeModelReachability = entity.probeModelReachability,
+                        )
+                    },
                 )
             } finally {
+                secret.zeroize()
                 balanceToken?.zeroize()
             }
         }
 
-        val keySecretById = mutableMapOf<Long, String>()
-        val apiKeys = keyDao.findAll().mapNotNull { entity ->
-            val ref = providerRefById[entity.providerId] ?: return@mapNotNull null
-            val secret = revealSecret(entity)
-            try {
-                val secretText = secret.concatToString()
-                keySecretById[entity.id] = secretText
-                BackupApiKey(
-                    providerName = ref.first,
-                    providerApiRoot = ref.second,
-                    label = entity.label,
-                    secret = secretText,
-                    isDefault = entity.isDefault,
-                    enabled = entity.enabled,
-                    sortOrder = entity.sortOrder,
-                )
-            } finally {
-                secret.zeroize()
-            }
-        }
-
-        val accounts = accountDao.findAll().mapNotNull { entity ->
-            val ref = providerRefById[entity.providerId] ?: return@mapNotNull null
-            val username = entity.usernameEnc?.let { enc ->
-                val bytes = cipher.open(enc, FieldAad.of(TABLE_ACCOUNTS, entity.id, COL_USERNAME))
-                try { bytes.utf8Chars() } finally { bytes.zeroize() }
-            }
-            val password = entity.passwordEnc?.let { enc ->
-                val bytes = cipher.open(enc, FieldAad.of(TABLE_ACCOUNTS, entity.id, COL_PASSWORD))
-                try { bytes.utf8Chars() } finally { bytes.zeroize() }
-            }
+        val accounts = accountDao.findAll().map { entity ->
+            val username = entity.usernameEnc?.let { revealBytes(it, FieldAad.of(TABLE_ACCOUNTS, entity.id, COL_USERNAME)) }
+            val password = entity.passwordEnc?.let { revealBytes(it, FieldAad.of(TABLE_ACCOUNTS, entity.id, COL_PASSWORD)) }
             try {
                 BackupAccount(
-                    providerName = ref.first,
-                    providerApiRoot = ref.second,
+                    providerName = providerById[entity.providerId]?.name.orEmpty(),
+                    providerApiRoot = providerById[entity.providerId]?.websiteUrl.orEmpty(),
                     label = entity.label,
                     username = username?.concatToString(),
                     password = password?.concatToString(),
                     loginUrl = entity.loginUrl,
-                    loginMethods = entity.loginMethods.csvToList(),
+                    loginMethods = entity.loginMethods.split(',').filter { it.isNotBlank() },
                     note = entity.note,
                     sortOrder = entity.sortOrder,
                 )
@@ -172,12 +164,18 @@ class RoomBackupStore constructor(
             }
         }
 
-        val models = modelDao.findAll().mapNotNull { entity ->
-            val ref = providerRefById[entity.providerId] ?: return@mapNotNull null
+        val models = modelDao.findAll().map { entity ->
             BackupModel(
-                providerName = ref.first,
-                providerApiRoot = ref.second,
-                keySecret = entity.keyId?.let { keySecretById[it] },
+                providerName = providerById[entity.providerId]?.name.orEmpty(),
+                providerApiRoot = providerById[entity.providerId]?.websiteUrl.orEmpty(),
+                keySecret = keyRows.firstOrNull { it.key.id == entity.keyId }?.let { row ->
+                    val chars = revealSecret(row.key)
+                    try {
+                        chars.concatToString()
+                    } finally {
+                        chars.zeroize()
+                    }
+                },
                 modelId = entity.modelId,
                 protocol = entity.protocol,
                 displayName = entity.displayName,
@@ -191,31 +189,28 @@ class RoomBackupStore constructor(
             )
         }
 
-        // 只备份 userEdited 或自定义的预设；内置未改动的由新设备 ProfileSeeder 生成
-        val profiles = profileDao.findAll()
-            .filter { it.userEdited || it.builtinKey == null }
-            .map { entity ->
-                BackupProfile(
-                    name = entity.name,
-                    builtinKey = entity.builtinKey,
-                    userAgent = entity.userAgent,
-                    headers = entity.headers.toHeaderList().map { listOf(it.first, it.second) },
-                    bodyPatch = entity.bodyPatch,
-                    protocols = entity.protocols.toProtocolSet().map { it.wireName },
-                    verified = entity.verified,
-                    builtinRev = entity.builtinRev,
-                    userEdited = entity.userEdited,
-                    sortOrder = entity.sortOrder,
-                )
-            }
+        val profiles = profileDao.findAll().map { entity ->
+            BackupProfile(
+                name = entity.name,
+                builtinKey = entity.builtinKey,
+                userAgent = entity.userAgent,
+                headers = entity.headers.toHeaderList().map { listOf(it.first, it.second) },
+                bodyPatch = entity.bodyPatch,
+                protocols = entity.protocols.split(',').filter { it.isNotBlank() },
+                verified = entity.verified,
+                builtinRev = entity.builtinRev,
+                userEdited = entity.userEdited,
+                sortOrder = entity.sortOrder,
+            )
+        }
 
-        val settings = SETTINGS_WHITELIST.mapNotNull { key ->
-            appSettingDao.find(key)?.let { BackupSetting(key = it.key, value = it.value) }
+        val settings = appSettingDao.observeAll().first().map {
+            BackupSetting(it.key, it.value)
         }
 
         return VaultSnapshot(
             deviceId = deviceId,
-            revision = bootStore.revision.value,
+            revision = revision,
             groups = groups,
             providers = providers,
             apiKeys = apiKeys,
@@ -226,124 +221,91 @@ class RoomBackupStore constructor(
         )
     }
 
-    // ------------------------------------------------------------------ 覆盖模式清理
-
     override suspend fun clearAll() {
-        // providers 靠外键 CASCADE 连带删 keys / accounts / models
         providerDao.clear()
-        groupDao.clear()
         profileDao.clearCustom()
+        groupDao.clear()
         probeRunDao.clear()
     }
 
-    // ------------------------------------------------------------------ 自然键解析
-
     override suspend fun findOrInsertGroup(group: BackupGroup): Long {
-        val existing = groupDao.findAll().firstOrNull { it.name == group.name }
-        return existing?.id ?: groupDao.insert(GroupEntity(name = group.name, sortOrder = group.sortOrder))
+        groupDao.findAll().firstOrNull { it.name == group.name }?.let { return it.id }
+        return groupDao.insert(GroupEntity(name = group.name, sortOrder = group.sortOrder))
     }
 
     override suspend fun findOrInsertProfile(profile: BackupProfile): Long {
-        val builtinKey = profile.builtinKey
-        val existing = if (builtinKey != null) {
-            profileDao.findByBuiltinKey(builtinKey)
-        } else {
-            profileDao.findAll().firstOrNull { it.name == profile.name && it.builtinKey == null }
+        profile.builtinKey?.let { key ->
+            profileDao.findByBuiltinKey(key)?.let { return it.id }
         }
-        return existing?.id ?: profileDao.insert(profile.toEntity())
+        profileDao.findAll().firstOrNull { it.name == profile.name }?.let { return it.id }
+        return profileDao.insert(
+            ClientProfileEntity(
+                name = profile.name,
+                builtinKey = profile.builtinKey,
+                userAgent = profile.userAgent,
+                headers = profile.headers.joinToString(",") { it.joinToString(":") },
+                bodyPatch = profile.bodyPatch,
+                protocols = profile.protocols.joinToString(","),
+                verified = profile.verified,
+                builtinRev = profile.builtinRev,
+                userEdited = profile.userEdited,
+                sortOrder = profile.sortOrder,
+            ),
+        )
     }
 
-    override suspend fun findProviderId(name: String, apiRoot: String): Long? =
-        providerDao.findAll().firstOrNull { it.name == name && it.apiRoot == apiRoot }?.id
+    override suspend fun findProviderId(name: String, websiteUrl: String?): Long? =
+        providerDao.findAll().firstOrNull { it.name == name && it.websiteUrl == websiteUrl }?.id
 
-    // ------------------------------------------------------------------ 写入
-
-    override suspend fun insertProvider(
-        provider: BackupProvider,
-        groupId: Long?,
-        profileId: Long?,
-    ): Long {
+    override suspend fun insertProvider(provider: BackupProvider, groupId: Long?): Long {
         val stamp = now()
-        val id = providerDao.insert(
+        return providerDao.insert(
             ProviderEntity(
                 name = provider.name,
                 note = provider.note,
                 websiteUrl = provider.websiteUrl,
-                apiBaseUrl = provider.apiBaseUrl,
-                apiRoot = provider.apiRoot,
-                apiVersion = provider.apiVersion,
-                supportedProtocols = provider.supportedProtocols.joinToString(",").toProtocolSet().toCsv(),
-                pathOverrides = provider.pathOverrides
-                    .mapNotNull { (wire, path) -> Protocol.fromWireName(wire)?.let { it to path } }
-                    .toMap()
-                    .pathOverridesToJson(),
-                authStyle = provider.authStyle,
-                allowInsecure = provider.allowInsecure,
-                clientProfileId = profileId,
                 groupId = groupId,
                 color = provider.color,
                 pinned = provider.pinned,
                 sortOrder = provider.sortOrder,
-                balanceKind = provider.balanceKind,
-                balanceBaseUrl = provider.balanceBaseUrl,
-                balanceUserId = provider.balanceUserId,
-                balanceConfig = provider.balanceConfig,
-                quotaPerUnit = provider.quotaPerUnit,
-                quotaCalibrated = provider.quotaCalibrated,
-                timeoutSeconds = provider.timeoutSeconds,
-                probeEnabled = provider.probeEnabled,
-                probeReachability = provider.probeReachability,
-                probeKeyValidity = provider.probeKeyValidity,
-                probeBalance = provider.probeBalance,
-                probeModels = provider.probeModels,
-                probeModelReachability = provider.probeModelReachability,
                 createdAt = stamp,
                 updatedAt = stamp,
             ),
         )
-        // 余额令牌是明文，恢复时用本机 DEK 重新加密（两步写，红线 24）
-        provider.balanceToken?.let { token ->
-            val bytes = token.toCharArray().toUtf8()
-            try {
-                providerDao.setBalanceToken(
-                    id,
-                    cipher.seal(bytes, FieldAad.of(TABLE_PROVIDERS, id, COL_BALANCE_TOKEN)),
-                    stamp,
-                )
-            } finally {
-                bytes.zeroize()
-            }
-        }
-        return id
     }
 
     override suspend fun keyExists(providerId: Long, secret: String): Boolean {
         val bytes = secret.toCharArray().toUtf8()
         return try {
-            val fingerprint = cipher.fingerprint(bytes)
-            keyDao.findByProvider(providerId).any { it.fingerprint == fingerprint }
+            val fp = cipher.fingerprint(bytes)
+            keyDao.findByProvider(providerId).any { it.key.fingerprint == fp }
         } finally {
             bytes.zeroize()
         }
     }
 
-    override suspend fun insertKey(providerId: Long, key: BackupApiKey) {
+    override suspend fun insertKey(
+        providerId: Long,
+        key: BackupApiKey,
+        profileId: Long?,
+    ): Long {
         val secretChars = key.secret.toCharArray()
         val bytes = secretChars.toUtf8()
-        try {
+        return try {
             val fingerprint = cipher.fingerprint(bytes)
             val stamp = now()
-            val id = keyDao.insert(
+            val id = keyDao.insertRaw(
                 ApiKeyEntity(
                     providerId = providerId,
                     label = key.label,
+                    note = key.note,
                     secretEnc = ByteArray(0),
                     fingerprint = fingerprint,
+                    enabled = key.enabled,
                     sortOrder = key.sortOrder,
                     createdAt = stamp,
                     updatedAt = stamp,
                 ),
-                stamp,
             )
             keyDao.setSecret(
                 id,
@@ -351,9 +313,19 @@ class RoomBackupStore constructor(
                 fingerprint,
                 stamp,
             )
-            // 恢复默认 / 停用标记（直接落库，避免走 add() 的"第一张自动默认"逻辑冲突）
-            if (key.isDefault) keyDao.setDefault(providerId, id, stamp)
-            if (!key.enabled) keyDao.setEnabledRaw(id, false, stamp)
+
+            val settings = key.settings?.toDomain(profileId)
+                ?: KeySettings(apiBaseUrl = "", apiRoot = "")
+            val tokenBytes = key.settings?.balanceToken?.toCharArray()?.toUtf8()
+            try {
+                val sealed = tokenBytes?.let {
+                    cipher.seal(it, FieldAad.of(TABLE_SETTINGS, id, COL_BALANCE_TOKEN))
+                }
+                settingsDao.insert(settings.toEntity(id, stamp).copy(balanceTokenEnc = sealed))
+            } finally {
+                tokenBytes?.zeroize()
+            }
+            id
         } finally {
             bytes.zeroize()
             secretChars.zeroize()
@@ -361,11 +333,11 @@ class RoomBackupStore constructor(
     }
 
     override suspend fun findKeyId(providerId: Long, secret: String?): Long? {
-        if (secret == null) return keyDao.findDefault(providerId)?.id
+        if (secret == null) return keyDao.findByProvider(providerId).firstOrNull()?.key?.id
         val bytes = secret.toCharArray().toUtf8()
         return try {
-            val fingerprint = cipher.fingerprint(bytes)
-            keyDao.findByProvider(providerId).firstOrNull { it.fingerprint == fingerprint }?.id
+            val fp = cipher.fingerprint(bytes)
+            keyDao.findByProvider(providerId).firstOrNull { it.key.fingerprint == fp }?.key?.id
         } finally {
             bytes.zeroize()
         }
@@ -383,11 +355,13 @@ class RoomBackupStore constructor(
     }
 
     override suspend fun insertAccount(providerId: Long, account: BackupAccount) {
-        val usernameBytes = account.username?.toCharArray()?.toUtf8()
-        val passwordBytes = account.password?.toCharArray()?.toUtf8()
+        val stamp = now()
+        val username = account.username?.toCharArray()
+        val password = account.password?.toCharArray()
+        val usernameBytes = username?.toUtf8()
+        val passwordBytes = password?.toUtf8()
         try {
             val usernameFp = usernameBytes?.let { cipher.fingerprint(it) }
-            val stamp = now()
             val id = accountDao.insert(
                 ProviderAccountEntity(
                     providerId = providerId,
@@ -404,14 +378,25 @@ class RoomBackupStore constructor(
                 ),
             )
             usernameBytes?.let {
-                accountDao.setUsername(id, cipher.seal(it, FieldAad.of(TABLE_ACCOUNTS, id, COL_USERNAME)), usernameFp!!, stamp)
+                accountDao.setUsername(
+                    id,
+                    cipher.seal(it, FieldAad.of(TABLE_ACCOUNTS, id, COL_USERNAME)),
+                    usernameFp!!,
+                    stamp,
+                )
             }
             passwordBytes?.let {
-                accountDao.setPassword(id, cipher.seal(it, FieldAad.of(TABLE_ACCOUNTS, id, COL_PASSWORD)), stamp)
+                accountDao.setPassword(
+                    id,
+                    cipher.seal(it, FieldAad.of(TABLE_ACCOUNTS, id, COL_PASSWORD)),
+                    stamp,
+                )
             }
         } finally {
             usernameBytes?.zeroize()
             passwordBytes?.zeroize()
+            username?.zeroize()
+            password?.zeroize()
         }
     }
 
@@ -425,7 +410,6 @@ class RoomBackupStore constructor(
     }
 
     override suspend fun insertModel(providerId: Long, keyId: Long?, model: BackupModel) {
-        val stamp = now()
         modelDao.insertIgnoring(
             ModelEntity(
                 providerId = providerId,
@@ -439,7 +423,7 @@ class RoomBackupStore constructor(
                 favorite = model.favorite,
                 needsReview = model.needsReview,
                 catalogKey = model.catalogKey,
-                firstSeenAt = stamp,
+                firstSeenAt = now(),
                 sortOrder = model.sortOrder,
             ),
         )
@@ -447,13 +431,12 @@ class RoomBackupStore constructor(
 
     override suspend fun findSetting(key: String): String? = appSettingDao.find(key)?.value
 
-    override suspend fun putSetting(key: String, value: String?) =
+    override suspend fun putSetting(key: String, value: String?) {
         appSettingDao.put(AppSettingEntity(key = key, value = value))
+    }
 
-    // ------------------------------------------------------------------ 私有
-
-    private suspend fun revealSecret(entity: ApiKeyEntity): CharArray {
-        val plain = cipher.open(entity.secretEnc, FieldAad.of(TABLE_KEYS, entity.id, COL_SECRET))
+    private fun revealSecret(key: ApiKeyEntity): CharArray {
+        val plain = cipher.open(key.secretEnc, FieldAad.of(TABLE_KEYS, key.id, COL_SECRET))
         return try {
             plain.utf8Chars()
         } finally {
@@ -461,34 +444,59 @@ class RoomBackupStore constructor(
         }
     }
 
-    private fun deviceId(): String = when (val state = bootStore.read()) {
-        is BootState.Ok -> state.record.deviceId
-        else -> "unknown"
+    private fun revealBalanceToken(keyId: Long, enc: ByteArray): CharArray {
+        val plain = cipher.open(enc, FieldAad.of(TABLE_SETTINGS, keyId, COL_BALANCE_TOKEN))
+        return try {
+            plain.utf8Chars()
+        } finally {
+            plain.zeroize()
+        }
     }
 
-    private fun BackupProfile.toEntity(): ClientProfileEntity = ClientProfileEntity(
-        name = name,
-        builtinKey = builtinKey,
-        userAgent = userAgent,
-        headers = headers.mapNotNull { if (it.size >= 2) it[0] to it[1] else null }.headersToJson(),
-        bodyPatch = bodyPatch,
-        protocols = protocols.joinToString(",").toProtocolSet().toCsv(),
-        verified = verified,
-        builtinRev = builtinRev,
-        userEdited = userEdited,
-        sortOrder = sortOrder,
+    private fun revealBytes(enc: ByteArray, aad: FieldAad): CharArray {
+        val plain = cipher.open(enc, aad)
+        return try {
+            plain.utf8Chars()
+        } finally {
+            plain.zeroize()
+        }
+    }
+
+    private fun BackupKeySettings.toDomain(profileId: Long?): KeySettings = KeySettings(
+        apiBaseUrl = apiBaseUrl,
+        apiRoot = apiRoot,
+        apiVersion = apiVersion,
+        supportedProtocols = supportedProtocols.mapNotNull { Protocol.fromWireName(it) }.toSet(),
+        pathOverrides = pathOverrides.mapNotNull { (wire, path) ->
+            Protocol.fromWireName(wire)?.let { it to path }
+        }.toMap(),
+        authStyle = AuthStyle.fromWireName(authStyle),
+        allowInsecure = allowInsecure,
+        clientProfileId = profileId,
+        timeoutSeconds = timeoutSeconds,
+        balanceKind = BalanceKind.fromWireName(balanceKind),
+        balanceBaseUrl = balanceBaseUrl,
+        balanceUserId = balanceUserId,
+        balanceConfig = balanceConfig,
+        quotaPerUnit = quotaPerUnit,
+        quotaCalibrated = quotaCalibrated,
+        probe = KeyProbeSettings(
+            enabled = probeEnabled,
+            reachability = probeReachability,
+            keyValidity = probeKeyValidity,
+            balance = probeBalance,
+            models = probeModels,
+            modelReachability = probeModelReachability,
+        ),
     )
 
     private companion object {
-        const val TABLE_PROVIDERS = "providers"
-        const val COL_BALANCE_TOKEN = "balanceTokenEnc"
         const val TABLE_KEYS = "api_keys"
-        const val COL_SECRET = "secretEnc"
+        const val TABLE_SETTINGS = "key_settings"
         const val TABLE_ACCOUNTS = "provider_accounts"
+        const val COL_SECRET = "secretEnc"
+        const val COL_BALANCE_TOKEN = "balanceTokenEnc"
         const val COL_USERNAME = "usernameEnc"
         const val COL_PASSWORD = "passwordEnc"
-
-        /** 设置白名单（§12.1：themeMode / localeTag 权威在 boot，显式包含）。 */
-        val SETTINGS_WHITELIST = setOf("themeMode", "localeTag")
     }
 }

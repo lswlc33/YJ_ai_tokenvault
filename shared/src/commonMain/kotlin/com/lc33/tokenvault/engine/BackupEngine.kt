@@ -3,8 +3,10 @@ package com.lc33.tokenvault.engine
 import com.lc33.tokenvault.backup.BackupCodec
 import com.lc33.tokenvault.backup.BackupCorruptException
 import com.lc33.tokenvault.backup.BackupHeader
+import com.lc33.tokenvault.backup.BackupKeySettings
 import com.lc33.tokenvault.backup.BackupItemCounts
 import com.lc33.tokenvault.backup.BackupPayload
+import com.lc33.tokenvault.backup.BackupProvider
 import com.lc33.tokenvault.backup.BackupStore
 import com.lc33.tokenvault.backup.gunzip
 import com.lc33.tokenvault.backup.gzip
@@ -177,18 +179,18 @@ class BackupEngine constructor(
         var imported = 0
         for (provider in payload.providers) {
             val ref = provider.name to provider.apiRoot
+            val providerLookup = provider.name to (provider.websiteUrl ?: provider.apiRoot)
             val existingId = if (mode != RestoreMode.OVERWRITE) {
-                store.findProviderId(provider.name, provider.apiRoot)
+                store.findProviderId(providerLookup.first, providerLookup.second)
             } else {
                 null
             }
             val id = existingId ?: store.insertProvider(
                 provider,
                 groupId = provider.groupName?.let { groupIdByName[it] },
-                profileId = provider.clientProfileKey?.let { profileIdByKey[it] },
             ).also { imported++ }
 
-            val keyIdsBySecret = restoreKeys(payload, ref, id, mode)
+            val keyIdsBySecret = restoreKeys(payload, ref, id, mode, provider, profileIdByKey)
             restoreAccounts(payload, ref, id, mode)
             restoreModels(payload, ref, id, mode, keyIdsBySecret)
         }
@@ -210,6 +212,8 @@ class BackupEngine constructor(
         ref: Pair<String, String>,
         providerId: Long,
         mode: RestoreMode,
+        provider: BackupProvider,
+        profileIdByKey: Map<String, Long>,
     ): Map<String, Long> {
         val keyIdsBySecret = mutableMapOf<String, Long>()
         for (key in payload.apiKeys.filter { it.providerName to it.providerApiRoot == ref }) {
@@ -218,12 +222,43 @@ class BackupEngine constructor(
                 store.findKeyId(providerId, key.secret)?.let { keyIdsBySecret[key.secret] = it }
                 continue
             }
-            store.insertKey(providerId, key)
-            store.findKeyId(providerId, key.secret)?.let { keyIdsBySecret[key.secret] = it }
+            val profileKey = key.settings?.clientProfileKey ?: provider.clientProfileKey
+            val profileId = profileKey?.let { profileIdByKey[it] }
+            val restoredKey = if (key.settings == null) {
+                key.copy(settings = legacySettings(provider))
+            } else {
+                key
+            }
+            store.insertKey(providerId, restoredKey, profileId).let { keyIdsBySecret[key.secret] = it }
         }
         return keyIdsBySecret
     }
 
+    /** 旧备份没有 key_settings：把供应商上的旧配置复制到每一把 Key。 */
+    private fun legacySettings(provider: BackupProvider): BackupKeySettings = BackupKeySettings(
+        apiBaseUrl = provider.apiBaseUrl,
+        apiRoot = provider.apiRoot,
+        apiVersion = provider.apiVersion,
+        supportedProtocols = provider.supportedProtocols,
+        pathOverrides = provider.pathOverrides,
+        authStyle = provider.authStyle,
+        allowInsecure = provider.allowInsecure,
+        clientProfileKey = provider.clientProfileKey,
+        timeoutSeconds = provider.timeoutSeconds,
+        balanceKind = provider.balanceKind,
+        balanceBaseUrl = provider.balanceBaseUrl,
+        balanceUserId = provider.balanceUserId,
+        balanceToken = provider.balanceToken,
+        balanceConfig = provider.balanceConfig,
+        quotaPerUnit = provider.quotaPerUnit,
+        quotaCalibrated = provider.quotaCalibrated,
+        probeEnabled = provider.probeEnabled,
+        probeReachability = provider.probeReachability,
+        probeKeyValidity = provider.probeKeyValidity,
+        probeBalance = provider.probeBalance,
+        probeModels = provider.probeModels,
+        probeModelReachability = provider.probeModelReachability,
+    )
     private suspend fun restoreAccounts(
         payload: BackupPayload,
         ref: Pair<String, String>,
