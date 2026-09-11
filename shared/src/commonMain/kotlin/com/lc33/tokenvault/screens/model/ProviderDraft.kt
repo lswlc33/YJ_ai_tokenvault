@@ -48,8 +48,9 @@ data class ProviderDraft(
     val probeEnabled: Boolean = true,
     val probeReachability: Boolean = true,
     val probeKeys: Boolean = true,
-    /** L3。**要钱，只能手动触发**；关掉之后连手动按钮都不出现。 */
+    /** 模型列表自动检测；开启并保存会清掉这家旧模型列表。 */
     val probeModels: Boolean = false,
+    val probeModelReachability: Boolean = false,
     val probeBalance: Boolean = true,
 
     // 高级

@@ -1,6 +1,7 @@
 package com.lc33.tokenvault.screens.manage
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,6 +29,27 @@ import tokenvault.shared.generated.resources.detail_account_password
 import tokenvault.shared.generated.resources.detail_account_reveal_hint
 import tokenvault.shared.generated.resources.detail_account_sheet_title
 import tokenvault.shared.generated.resources.detail_account_username
+import tokenvault.shared.generated.resources.detail_account_login_methods
+import tokenvault.shared.generated.resources.detail_add_model
+import tokenvault.shared.generated.resources.detail_model_delete
+import tokenvault.shared.generated.resources.detail_model_delete_action
+import tokenvault.shared.generated.resources.detail_model_display_name
+import tokenvault.shared.generated.resources.detail_model_edit
+import tokenvault.shared.generated.resources.detail_model_enabled
+import tokenvault.shared.generated.resources.detail_model_id
+import tokenvault.shared.generated.resources.detail_model_protocol
+import tokenvault.shared.generated.resources.detail_models_empty_auto
+import tokenvault.shared.generated.resources.detail_models_empty_manual
+import tokenvault.shared.generated.resources.detail_models_quick_hint
+import tokenvault.shared.generated.resources.detail_models_section
+import tokenvault.shared.generated.resources.detail_reachability_latency
+import tokenvault.shared.generated.resources.dialog_cancel
+import tokenvault.shared.generated.resources.login_method_github
+import tokenvault.shared.generated.resources.login_method_linuxdo
+import tokenvault.shared.generated.resources.manage_context
+import tokenvault.shared.generated.resources.manage_disabled
+import tokenvault.shared.generated.resources.manage_source_discovered
+import tokenvault.shared.generated.resources.manage_source_manual
 import tokenvault.shared.generated.resources.detail_accounts_empty
 import tokenvault.shared.generated.resources.detail_add_key
 import tokenvault.shared.generated.resources.detail_balance_refresh
@@ -39,7 +62,6 @@ import tokenvault.shared.generated.resources.detail_key_reveal_hint
 import tokenvault.shared.generated.resources.detail_key_secret
 import tokenvault.shared.generated.resources.detail_key_secret_hint
 import tokenvault.shared.generated.resources.detail_key_set_default
-import tokenvault.shared.generated.resources.detail_key_models_refresh
 import tokenvault.shared.generated.resources.detail_key_sheet_title
 import tokenvault.shared.generated.resources.detail_keys_empty
 import tokenvault.shared.generated.resources.detail_models_refresh
@@ -47,27 +69,39 @@ import tokenvault.shared.generated.resources.detail_probe_key
 import tokenvault.shared.generated.resources.detail_probe_provider
 import tokenvault.shared.generated.resources.detail_section_accounts
 import tokenvault.shared.generated.resources.detail_section_keys
-import tokenvault.shared.generated.resources.detail_section_models
 import tokenvault.shared.generated.resources.editor_save
 import tokenvault.shared.generated.resources.groups_delete
 import tokenvault.shared.generated.resources.secret_copy_cd
+import com.lc33.tokenvault.domain.LoginMethod
+import com.lc33.tokenvault.domain.Protocol
 import com.lc33.tokenvault.screens.model.ProviderDetailUiState
+import com.lc33.tokenvault.screens.model.UiModelRow
+import com.lc33.tokenvault.screens.model.UiModelSource
+import com.lc33.tokenvault.ui.common.StatusDot
+import com.lc33.tokenvault.ui.common.colorOf
+import com.lc33.tokenvault.ui.common.labelOf
+import com.lc33.tokenvault.ui.common.relativeLabel
 import com.lc33.tokenvault.ui.miuix.AppBottomSheet
+import com.lc33.tokenvault.ui.miuix.AppActionRow
 import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppChip
 import com.lc33.tokenvault.ui.miuix.AppDialog
+import com.lc33.tokenvault.ui.miuix.AppDropdownRow
+import com.lc33.tokenvault.ui.miuix.AppFilterChip
 import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppIconButton
 import com.lc33.tokenvault.ui.miuix.AppScaffold
 import com.lc33.tokenvault.ui.miuix.AppSecretTextField
+import com.lc33.tokenvault.ui.miuix.AppSwitchRow
 import com.lc33.tokenvault.ui.miuix.AppText
-import com.lc33.tokenvault.ui.miuix.AppActionRow
+import com.lc33.tokenvault.ui.miuix.AppDialogTextButton
 import com.lc33.tokenvault.ui.miuix.AppTextField
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.AppTopBar
 import com.lc33.tokenvault.ui.miuix.SectionTitle
 import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
 import com.lc33.tokenvault.ui.miuix.appTopBarScroll
+import com.lc33.tokenvault.ui.miuix.rememberAppTextFieldState
 import com.lc33.tokenvault.ui.miuix.rememberAppTopBarScrollState
 import com.lc33.tokenvault.ui.miuix.rememberSecretTextFieldState
 import com.lc33.tokenvault.ui.shell.ProviderDetailViewModel
@@ -107,14 +141,22 @@ fun ProviderDetailScreen(
     onProbeKey: (Long) -> Unit,
     onRefreshModels: () -> Unit,
     onRefreshKeyModels: (Long) -> Unit,
+    onAddModel: (Long, String, Protocol) -> Unit,
+    onUpdateModel: (Long, String, Protocol, String?, Boolean) -> Unit,
+    onDeleteModel: (Long) -> Unit,
+    onProbeModel: (Long, String, Protocol) -> Unit,
     onRevealAccount: (Long) -> Unit,
     onCopyRevealedAccount: (String) -> Unit,
     onCloseAccountReveal: () -> Unit,
+    onSetAccountLoginMethods: (Long, Set<LoginMethod>) -> Unit,
 ) {
     val scrollState = rememberAppTopBarScrollState()
     val tokens = LocalAppTokens.current
     val provider = state.provider
-    var showAddSheet by remember { mutableStateOf(false) }
+    var showAddDialog by remember { mutableStateOf(false) }
+    var addModelKeyId by remember { mutableStateOf<Long?>(null) }
+    var editingModel by remember { mutableStateOf<UiModelRow?>(null) }
+    var pendingDeleteModelId by remember { mutableStateOf<Long?>(null) }
     var pendingDeleteKeyId by remember { mutableStateOf<Long?>(null) }
 
     AppScaffold(
@@ -154,19 +196,25 @@ fun ProviderDetailScreen(
             item { HeaderCard(state, onRefreshBalance) }
 
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
+                AppCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = tokens.screenPadding),
                 ) {
-                    SectionTitle(
-                        text = stringResource(Res.string.detail_section_keys),
-                        modifier = Modifier.weight(1f),
-                    )
-                    AppIconButton(
-                        icon = AppIcon.Add,
-                        contentDescription = stringResource(Res.string.detail_add_key),
-                        onClick = { showAddSheet = true },
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        SectionTitle(
+                            text = stringResource(Res.string.detail_section_keys),
+                            modifier = Modifier.weight(1f),
+                        )
+                        AppIconButton(
+                            icon = AppIcon.Add,
+                            contentDescription = stringResource(Res.string.detail_add_key),
+                            onClick = { showAddDialog = true },
+                        )
+                    }
                 }
             }
             if (state.keys.isEmpty()) {
@@ -175,7 +223,7 @@ fun ProviderDetailScreen(
                     HintCard(
                         text = stringResource(Res.string.detail_keys_empty),
                         actionText = stringResource(Res.string.detail_add_key),
-                        onAction = { showAddSheet = true },
+                        onAction = { showAddDialog = true },
                     )
                 }
             } else {
@@ -195,29 +243,20 @@ fun ProviderDetailScreen(
                         nowMs = state.nowMs,
                         onClick = { onRevealKey(row.id) },
                         onLongPress = { onProbeKey(row.id) },
-                        onRefreshModels = { onRefreshKeyModels(row.id) },
+                    )
+                    KeyModelsCard(
+                        keyId = row.id,
+                        models = state.models.filter { it.keyId == row.id },
+                        modelListEnabled = state.modelListEnabled,
+                        modelReachabilityEnabled = state.modelReachabilityEnabled,
+                        onRefresh = { onRefreshKeyModels(row.id) },
+                        onAdd = { addModelKeyId = row.id },
+                        onEdit = { editingModel = it },
+                        onQuickProbe = onProbeModel,
                     )
                 }
             }
 
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    SectionTitle(
-                        text = stringResource(Res.string.detail_section_models),
-                        modifier = Modifier.weight(1f),
-                    )
-                    AppIconButton(
-                        icon = AppIcon.Refresh,
-                        contentDescription = stringResource(Res.string.detail_models_refresh),
-                        onClick = onRefreshModels,
-                        enabled = state.keys.isNotEmpty(),
-                    )
-                }
-            }
-            items(state.models.size) { index -> ModelRow(state.models[index]) }
 
             item { SectionTitle(text = stringResource(Res.string.detail_section_accounts)) }
             if (state.accounts.isEmpty()) {
@@ -235,12 +274,37 @@ fun ProviderDetailScreen(
         }
     }
 
-    AddKeySheet(
-        show = showAddSheet,
-        onDismiss = { showAddSheet = false },
+    AddKeyDialog(
+        show = showAddDialog,
+        onDismiss = { showAddDialog = false },
         onConfirm = { label, secret ->
-            showAddSheet = false
+            showAddDialog = false
             onAddKey(label, secret)
+        },
+    )
+
+    ModelDialog(
+        keyId = addModelKeyId,
+        editing = editingModel,
+        protocols = provider.protocols.mapNotNull { Protocol.fromWireName(it) }
+            .ifEmpty { listOf(Protocol.CHAT) },
+        onDismiss = {
+            addModelKeyId = null
+            editingModel = null
+        },
+        onConfirm = { keyId, modelId, protocol, displayName, enabled ->
+            val editing = editingModel
+            if (editing == null) {
+                onAddModel(keyId, modelId, protocol)
+            } else {
+                onUpdateModel(editing.id, modelId, protocol, displayName, enabled)
+            }
+            addModelKeyId = null
+            editingModel = null
+        },
+        onRequestDelete = { model ->
+            pendingDeleteModelId = model.id
+            editingModel = null
         },
     )
 
@@ -262,6 +326,7 @@ fun ProviderDetailScreen(
     RevealAccountSheet(
         account = revealedAccount,
         onCopy = { label -> onCopyRevealedAccount(label) },
+        onSetLoginMethods = onSetAccountLoginMethods,
         onDismiss = onCloseAccountReveal,
     )
 
@@ -274,6 +339,17 @@ fun ProviderDetailScreen(
         onConfirm = {
             pendingDeleteKeyId?.let(onDeleteKey)
             pendingDeleteKeyId = null
+        },
+    )
+
+    AppDialog(
+        show = pendingDeleteModelId != null,
+        onDismissRequest = { pendingDeleteModelId = null },
+        title = stringResource(Res.string.detail_model_delete),
+        confirmText = stringResource(Res.string.groups_delete),
+        onConfirm = {
+            pendingDeleteModelId?.let(onDeleteModel)
+            pendingDeleteModelId = null
         },
     )
 }
@@ -296,16 +372,9 @@ private fun HintCard(text: String, actionText: String, onAction: () -> Unit) {
     }
 }
 
-/**
- * 新增密钥。
- *
- * 标签是普通输入框，密钥那一格是 [AppSecretTextField] + 不可保存的状态：
- * 转屏时可保存的状态会被序列化进 Activity 的 saved instance state（交给
- * `system_server` 放在 Bundle 里），而那是明文密钥。代价是转屏丢掉已输入的内容，
- * 这个代价是对的。
- */
+/** 新增密钥：标准 OverlayDialog + MIUIX 按钮，不再贴到屏幕底部。 */
 @Composable
-private fun AddKeySheet(
+private fun AddKeyDialog(
     show: Boolean,
     onDismiss: () -> Unit,
     onConfirm: (String, CharArray) -> Unit,
@@ -314,7 +383,7 @@ private fun AddKeySheet(
     val label = rememberSecretTextFieldState()
     val secret = rememberSecretTextFieldState()
 
-    AppBottomSheet(
+    AppDialog(
         show = show,
         onDismissRequest = {
             secret.clear()
@@ -334,24 +403,262 @@ private fun AddKeySheet(
             supportingText = stringResource(Res.string.detail_key_secret_hint),
             modifier = Modifier.padding(top = tokens.itemSpacing),
         )
-        AppActionRow(
-            text = stringResource(Res.string.editor_save),
-            onClick = {
-                val chars = secret.chars
-                if (chars.isEmpty()) return@AppActionRow
-                val text = label.text
-                // 先清输入框再交出去：交出去那一份是拷贝，而输入框里那一份归这一层擦
-                secret.clear()
-                label.clear()
-                onConfirm(text, chars)
-            },
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = tokens.itemSpacing),
-        )
+            horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
+        ) {
+            AppDialogTextButton(
+                text = stringResource(Res.string.dialog_cancel),
+                onClick = {
+                    secret.clear()
+                    label.clear()
+                    onDismiss()
+                },
+                modifier = Modifier.weight(1f),
+            )
+            AppDialogTextButton(
+                text = stringResource(Res.string.editor_save),
+                onClick = {
+                    val chars = secret.chars
+                    if (chars.isEmpty()) return@AppDialogTextButton
+                    val text = label.text
+                    secret.clear()
+                    label.clear()
+                    onConfirm(text, chars)
+                },
+                modifier = Modifier.weight(1f),
+                primary = true,
+            )
+        }
     }
 }
 
+/** 手动添加 / 编辑模型。模型是明文元数据，不需要密码键盘。 */
+@Composable
+private fun ModelDialog(
+    keyId: Long?,
+    editing: UiModelRow?,
+    protocols: List<Protocol>,
+    onDismiss: () -> Unit,
+    onConfirm: (Long, String, Protocol, String?, Boolean) -> Unit,
+    onRequestDelete: (UiModelRow) -> Unit,
+) {
+    val tokens = LocalAppTokens.current
+    val modelId = rememberAppTextFieldState()
+    val displayName = rememberAppTextFieldState()
+    var protocol by remember { mutableStateOf(Protocol.CHAT) }
+    var enabled by remember { mutableStateOf(true) }
+    val targetId = editing?.id
+
+    LaunchedEffect(keyId, targetId) {
+        if (keyId == null && editing == null) return@LaunchedEffect
+        val source = editing
+        modelId.setText(source?.modelId.orEmpty())
+        displayName.setText(source?.displayName.orEmpty())
+        protocol = source?.protocol?.let { Protocol.fromWireName(it) } ?: protocols.first()
+        enabled = source?.enabled ?: true
+    }
+
+    AppDialog(
+        show = keyId != null || editing != null,
+        onDismissRequest = onDismiss,
+        title = stringResource(
+            if (editing == null) Res.string.detail_add_model else Res.string.detail_model_edit,
+        ),
+    ) {
+        AppTextField(
+            state = modelId,
+            label = stringResource(Res.string.detail_model_id),
+        )
+        AppTextField(
+            state = displayName,
+            label = stringResource(Res.string.detail_model_display_name),
+            modifier = Modifier.padding(top = tokens.itemSpacing),
+        )
+        AppDropdownRow(
+            title = stringResource(Res.string.detail_model_protocol),
+            items = protocols.map { it.wireName },
+            selectedIndex = protocols.indexOf(protocol).coerceAtLeast(0),
+            onSelect = { index -> protocol = protocols.getOrElse(index) { protocols.first() } },
+            modifier = Modifier.padding(top = tokens.itemSpacing),
+        )
+        AppSwitchRow(
+            title = stringResource(Res.string.detail_model_enabled),
+            checked = enabled,
+            onCheckedChange = { enabled = it },
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = tokens.itemSpacing),
+            horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
+        ) {
+            AppDialogTextButton(
+                text = stringResource(Res.string.dialog_cancel),
+                onClick = onDismiss,
+                modifier = Modifier.weight(1f),
+            )
+            AppDialogTextButton(
+                text = stringResource(Res.string.editor_save),
+                onClick = {
+                    val id = modelId.text.trim()
+                    if (id.isEmpty() || (keyId == null && editing == null)) return@AppDialogTextButton
+                    onConfirm(
+                        keyId ?: editing?.keyId ?: 0L,
+                        id,
+                        protocol,
+                        displayName.text,
+                        enabled,
+                    )
+                },
+                modifier = Modifier.weight(1f),
+                primary = true,
+            )
+        }
+        editing?.let { model ->
+            AppDialogTextButton(
+                text = stringResource(Res.string.detail_model_delete_action),
+                onClick = { onRequestDelete(model) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+/** 一张 Key 自己的模型列表。列表与余额一样绑定在 Key 上。 */
+@Composable
+private fun KeyModelsCard(
+    keyId: Long,
+    models: List<UiModelRow>,
+    modelListEnabled: Boolean,
+    modelReachabilityEnabled: Boolean,
+    onRefresh: () -> Unit,
+    onAdd: () -> Unit,
+    onEdit: (UiModelRow) -> Unit,
+    onQuickProbe: (Long, String, Protocol) -> Unit,
+) {
+    val tokens = LocalAppTokens.current
+    AppCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = tokens.screenPadding),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AppText(
+                text = stringResource(Res.string.detail_models_section),
+                style = AppTextStyle.Subtitle,
+                modifier = Modifier.weight(1f),
+            )
+            if (modelListEnabled) {
+                AppIconButton(
+                    icon = AppIcon.Refresh,
+                    contentDescription = stringResource(Res.string.detail_models_refresh),
+                    onClick = onRefresh,
+                )
+            }
+            AppIconButton(
+                icon = AppIcon.Add,
+                contentDescription = stringResource(Res.string.detail_add_model),
+                onClick = onAdd,
+            )
+        }
+
+        if (models.isEmpty()) {
+            AppText(
+                text = stringResource(
+                    if (modelListEnabled) {
+                        Res.string.detail_models_empty_auto
+                    } else {
+                        Res.string.detail_models_empty_manual
+                    },
+                ),
+                style = AppTextStyle.Secondary,
+                color = appSecondaryTextColor,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        } else {
+            Column(
+                modifier = Modifier.padding(top = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                models.forEach { model ->
+                    BoundModelRow(
+                        row = model,
+                        onClick = { onEdit(model) },
+                        onLongPress = if (modelReachabilityEnabled && model.keyId != null) {
+                            { onQuickProbe(keyId, model.modelId, protocolOf(model.protocol)) }
+                        } else {
+                            null
+                        },
+                    )
+                }
+            }
+        }
+
+        if (modelReachabilityEnabled) {
+            AppText(
+                text = stringResource(Res.string.detail_models_quick_hint),
+                style = AppTextStyle.Footnote,
+                color = appSecondaryTextColor,
+                modifier = Modifier.padding(top = tokens.itemSpacing),
+            )
+        }
+    }
+}
+
+private fun protocolOf(wireName: String): Protocol = Protocol.fromWireName(wireName) ?: Protocol.CHAT
+
+@Composable
+private fun BoundModelRow(
+    row: UiModelRow,
+    onClick: () -> Unit,
+    onLongPress: (() -> Unit)?,
+) {
+    AppCard(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick,
+        onLongPress = onLongPress,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(LocalAppTokens.current.itemSpacing),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                AppText(text = row.modelId, style = AppTextStyle.Body, maxLines = 1)
+                Row(
+                    modifier = Modifier.padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    AppChip(text = row.protocol)
+                    AppChip(
+                        text = stringResource(
+                            when (row.source) {
+                                UiModelSource.Manual -> Res.string.manage_source_manual
+                                UiModelSource.Discovered -> Res.string.manage_source_discovered
+                            },
+                        ),
+                    )
+                    if (!row.enabled) AppChip(text = stringResource(Res.string.manage_disabled))
+                }
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                StatusDot(color = colorOf(row.health), label = labelOf(row.health))
+                row.contextLabel?.let { context ->
+                    AppText(
+                        text = stringResource(Res.string.manage_context, context),
+                        style = AppTextStyle.Footnote,
+                        color = appSecondaryTextColor,
+                    )
+                }
+            }
+        }
+    }
+}
 /**
  * 展开一把密钥。
  *
@@ -416,6 +723,7 @@ private fun RevealKeySheet(
 private fun RevealAccountSheet(
     account: ProviderDetailViewModel.AccountRevealState?,
     onCopy: (String) -> Unit,
+    onSetLoginMethods: (Long, Set<LoginMethod>) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val tokens = LocalAppTokens.current
@@ -453,6 +761,27 @@ private fun RevealAccountSheet(
         )
 
         AppText(
+            text = stringResource(Res.string.detail_account_login_methods),
+            style = AppTextStyle.Footnote,
+            color = appSecondaryTextColor,
+            modifier = Modifier.padding(top = tokens.itemSpacing),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing)) {
+            LoginMethod.entries.forEach { method ->
+                val selected = method in account.loginMethods
+                AppFilterChip(
+                    text = loginMethodLabel(method),
+                    selected = selected,
+                    onClick = {
+                        val next = if (selected) account.loginMethods - method
+                        else account.loginMethods + method
+                        onSetLoginMethods(account.accountId, next)
+                    },
+                )
+            }
+        }
+
+        AppText(
             text = stringResource(Res.string.detail_account_reveal_hint),
             style = AppTextStyle.Footnote,
             color = appSecondaryTextColor,
@@ -468,7 +797,12 @@ private fun RevealAccountSheet(
     }
 }
 
+
 @Composable
+private fun loginMethodLabel(method: LoginMethod): String = when (method) {
+    LoginMethod.GITHUB -> stringResource(Res.string.login_method_github)
+    LoginMethod.LINUX_DO -> stringResource(Res.string.login_method_linuxdo)
+}@Composable
 private fun HeaderCard(
     state: ProviderDetailUiState,
     onRefreshBalance: () -> Unit,
@@ -495,6 +829,14 @@ private fun HeaderCard(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             provider.protocols.forEach { protocol -> AppChip(text = protocol) }
+        }
+        provider.reachabilityLatencyMs?.let { latency ->
+            AppText(
+                text = stringResource(Res.string.detail_reachability_latency, latency),
+                style = AppTextStyle.Footnote,
+                color = appSecondaryTextColor,
+                modifier = Modifier.padding(top = tokens.itemSpacing),
+            )
         }
         // 余额：三种状态要可区分（§9.3）——有金额 / 查询失败 / 没配置。
         val balance = provider.balance

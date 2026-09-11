@@ -19,11 +19,13 @@ class RoomModelRepositoryTest {
         val dao = FakeModelDao()
         repo(dao).applyDiscovered(
             providerId = 1,
+            keyId = 10,
             protocol = Protocol.CHAT,
             modelIds = listOf("gpt-5.6-sol"),
         )
         repo(dao).applyDiscovered(
             providerId = 1,
+            keyId = 10,
             protocol = Protocol.ANTHROPIC,
             modelIds = listOf("claude-opus-5"),
         )
@@ -43,12 +45,14 @@ class RoomModelRepositoryTest {
         val repository = repo(dao)
         repository.applyDiscovered(
             providerId = 1,
+            keyId = 10,
             protocol = Protocol.CHAT,
             modelIds = listOf("gpt-5.6-sol", "gpt-4o"),
         )
         now += 1_000
         repository.applyDiscovered(
             providerId = 1,
+            keyId = 10,
             protocol = Protocol.CHAT,
             modelIds = listOf("gpt-5.6-sol"),
         )
@@ -63,10 +67,10 @@ class RoomModelRepositoryTest {
     fun `手动模型与其它协议发现项不被停用`() = runTest {
         val dao = FakeModelDao()
         val repository = repo(dao)
-        repository.add(1, "my-custom-model", Protocol.CHAT)
-        repository.applyDiscovered(1, Protocol.ANTHROPIC, listOf("claude-opus-5"))
+        repository.add(1, 10, "my-custom-model", Protocol.CHAT)
+        repository.applyDiscovered(1, 10, Protocol.ANTHROPIC, listOf("claude-opus-5"))
         now += 1_000
-        repository.applyDiscovered(1, Protocol.CHAT, emptyList())
+        repository.applyDiscovered(1, 10, Protocol.CHAT, emptyList())
 
         val rows = dao.rows.associateBy { it.modelId }
         assertTrue(rows.getValue("my-custom-model").enabled)

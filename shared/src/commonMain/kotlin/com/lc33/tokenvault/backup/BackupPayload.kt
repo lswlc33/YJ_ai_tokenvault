@@ -79,6 +79,7 @@ data class BackupProvider(
     val probeKeyValidity: Boolean = true,
     val probeBalance: Boolean = true,
     val probeModels: Boolean = false,
+    val probeModelReachability: Boolean = false,
 )
 
 /** API 密钥。明文。不搬 health / lastOutcome / checkedAt / okAt。 */
@@ -103,6 +104,7 @@ data class BackupAccount(
     val username: String? = null,
     val password: String? = null,
     val loginUrl: String? = null,
+    val loginMethods: List<String> = emptyList(),
     val note: String? = null,
     val sortOrder: Int = 0,
 )
@@ -112,6 +114,9 @@ data class BackupAccount(
 data class BackupModel(
     val providerName: String,
     val providerApiRoot: String,
+
+    /** 绑定到哪张 Key。用密钥明文做自然键；null 表示旧备份，恢复时挂默认 Key。 */
+    val keySecret: String? = null,
     val modelId: String,
     val protocol: String,
     val displayName: String? = null,

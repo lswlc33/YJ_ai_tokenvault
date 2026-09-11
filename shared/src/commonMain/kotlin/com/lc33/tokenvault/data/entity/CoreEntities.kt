@@ -99,12 +99,17 @@ data class ProviderEntity(
 
     val timeoutSeconds: Int? = null,
 
+    val reachabilityLatencyMs: Long? = null,
+    val reachabilityCheckedAt: Long? = null,
+    val reachabilityError: String? = null,
+
     // 探测开关，每家一份（红线 36）
     val probeEnabled: Boolean = true,
     val probeReachability: Boolean = true,
     val probeKeyValidity: Boolean = true,
     val probeBalance: Boolean = true,
     val probeModels: Boolean = false,
+    val probeModelReachability: Boolean = false,
 
     val createdAt: Long,
     val updatedAt: Long,
@@ -176,6 +181,14 @@ data class ApiKeyEntity(
     val latencyMs: Long? = null,
     val checkedAt: Long? = null,
     val okAt: Long? = null,
+
+    /** 这张 Key 的余额快照。供应商展示值由所有 Key 的这些列求和。 */
+    val balanceAmount: Double? = null,
+    val balanceUsed: Double? = null,
+    val balanceCurrency: String? = null,
+    val balanceRaw: String? = null,
+    val balanceCheckedAt: Long? = null,
+    val balanceError: String? = null,
     val sortOrder: Int = 0,
     val createdAt: Long,
     val updatedAt: Long,

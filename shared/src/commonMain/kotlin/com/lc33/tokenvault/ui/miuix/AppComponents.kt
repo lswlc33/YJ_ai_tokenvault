@@ -254,6 +254,29 @@ fun AppTextButton(
     )
 }
 
+/**
+ * 弹层里的文本按钮出口。
+ *
+ * 页面不允许直接 import [AppTextButton]（那条架构规则防止主体长出按钮堆），
+ * 但对话框需要“取消 / 保存”两个动作。这个包装保留 MIUIX TextButton 的形态，
+ * 同时让规则继续能区分“页面主体按钮”和“弹层按钮”。
+ */
+@Composable
+fun AppDialogTextButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    primary: Boolean = false,
+) {
+    AppTextButton(
+        text = text,
+        onClick = onClick,
+        modifier = modifier,
+        enabled = enabled,
+        primary = primary,
+    )
+}
 @Composable
 fun AppIconButton(
     icon: AppIcon,

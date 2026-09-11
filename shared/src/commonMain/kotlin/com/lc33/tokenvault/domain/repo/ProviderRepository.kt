@@ -50,6 +50,14 @@ interface ProviderRepository {
     /** 落一次余额查询的结果（§9.3）。[snapshot] 的 amount 为 null 且 error 非空 = 查询失败。 */
     suspend fun updateBalance(id: Long, snapshot: BalanceSnapshot, calibrated: Boolean)
 
+    /** 只更新供应商可达性延迟，不触发密钥探测。 */
+    suspend fun updateReachability(
+        id: Long,
+        latencyMs: Long?,
+        checkedAt: Long,
+        error: String?,
+    )
+
     /** `quotaPerUnit` 被 `/api/status` 校准后单独写（校准失败不碰余额）。 */
     suspend fun calibrateQuotaPerUnit(id: Long, quotaPerUnit: Double)
 }

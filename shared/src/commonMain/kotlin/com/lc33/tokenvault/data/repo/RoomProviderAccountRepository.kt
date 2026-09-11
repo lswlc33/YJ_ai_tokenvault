@@ -8,7 +8,9 @@ import com.lc33.tokenvault.crypto.utf8Chars
 import com.lc33.tokenvault.crypto.zeroize
 import com.lc33.tokenvault.data.dao.ProviderAccountDao
 import com.lc33.tokenvault.data.entity.ProviderAccountEntity
+import com.lc33.tokenvault.data.mapper.toLoginMethodsCsv
 import com.lc33.tokenvault.data.mapper.toDomain
+import com.lc33.tokenvault.domain.LoginMethod
 import com.lc33.tokenvault.domain.model.ProviderAccount
 import com.lc33.tokenvault.domain.repo.ProviderAccountRepository
 import kotlinx.coroutines.flow.Flow
@@ -39,6 +41,7 @@ class RoomProviderAccountRepository constructor(
         username: CharArray?,
         password: CharArray?,
         loginUrl: String?,
+        loginMethods: Set<LoginMethod>,
     ): Long {
         val usernameBytes = username?.toUtf8()
         val passwordBytes = password?.toUtf8()
@@ -56,6 +59,7 @@ class RoomProviderAccountRepository constructor(
                         usernameFp = usernameFp,
                         passwordEnc = null,
                         loginUrl = loginUrl,
+                        loginMethods = loginMethods.toLoginMethodsCsv(),
                         sortOrder = dao.findAll().count { it.providerId == providerId },
                         createdAt = stamp,
                         updatedAt = stamp,
@@ -95,6 +99,10 @@ class RoomProviderAccountRepository constructor(
         } finally {
             plain.zeroize()
         }
+    }
+
+    override suspend fun setLoginMethods(id: Long, methods: Set<LoginMethod>) {
+        dao.setLoginMethods(id, methods.toLoginMethodsCsv(), now())
     }
 
     private fun aadUsername(id: Long) = FieldAad.of(TABLE, id, COLUMN_USERNAME)

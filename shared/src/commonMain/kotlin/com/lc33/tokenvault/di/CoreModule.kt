@@ -183,7 +183,7 @@ val coreModule = module {
             autoLocker = get(), now = get(named(Qualifiers.NOW)),
         )
     }
-    single { BalanceEngine(get(), get(), get(), get(), get(named(Qualifiers.NOW))) }
+    single { BalanceEngine(get(), get(), get(), get(), get(), get(named(Qualifiers.NOW)), get(named(Qualifiers.PLACEHOLDERS))) }
     single {
         ProbeEngine(
             providers = get(), keys = get(), models = get(), clientProfiles = get(), runRepository = get(),

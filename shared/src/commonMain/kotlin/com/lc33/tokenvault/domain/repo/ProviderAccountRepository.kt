@@ -1,5 +1,6 @@
 package com.lc33.tokenvault.domain.repo
 
+import com.lc33.tokenvault.domain.LoginMethod
 import com.lc33.tokenvault.domain.model.ProviderAccount
 import kotlinx.coroutines.flow.Flow
 
@@ -32,6 +33,7 @@ interface ProviderAccountRepository {
         username: CharArray?,
         password: CharArray?,
         loginUrl: String?,
+        loginMethods: Set<LoginMethod> = emptySet(),
     ): Long
 
     /**
@@ -45,4 +47,7 @@ interface ProviderAccountRepository {
      * [CharArray] 归调用方擦。null 表示这条账号没记密码（只记了用户名）。
      */
     suspend fun revealPassword(id: Long): CharArray?
+
+    /** 只改登录方式。这是明文元数据，不需要借 DEK。 */
+    suspend fun setLoginMethods(id: Long, methods: Set<LoginMethod>)
 }

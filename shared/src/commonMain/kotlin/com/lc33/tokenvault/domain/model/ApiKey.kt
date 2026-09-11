@@ -3,6 +3,7 @@ package com.lc33.tokenvault.domain.model
 import com.lc33.tokenvault.domain.KeyHealth
 import com.lc33.tokenvault.domain.ModelProbeState
 import com.lc33.tokenvault.domain.ModelSource
+import com.lc33.tokenvault.domain.LoginMethod
 import com.lc33.tokenvault.domain.ProbeOutcome
 import com.lc33.tokenvault.domain.Protocol
 
@@ -49,6 +50,9 @@ data class ApiKey(
     /** 最近一次**确认可用**。UI 的"上次成功于 …"读它。 */
     val okAt: Long? = null,
 
+    /** 这张 Key 最近一次余额查询的结果。供应商余额由所有 Key 的这一列求和。 */
+    val balance: BalanceSnapshot? = null,
+
     val sortOrder: Int = 0,
     val createdAt: Long = 0,
     val updatedAt: Long = 0,
@@ -70,6 +74,7 @@ data class ApiKey(
             latencyMs == other.latencyMs &&
             checkedAt == other.checkedAt &&
             okAt == other.okAt &&
+            balance == other.balance &&
             sortOrder == other.sortOrder
     }
 
@@ -81,6 +86,7 @@ data class ApiKey(
         result = 31 * result + fingerprint.hashCode()
         result = 31 * result + health.hashCode()
         result = 31 * result + lastOutcome.hashCode()
+        result = 31 * result + (balance?.hashCode() ?: 0)
         return result
     }
 }
@@ -104,7 +110,12 @@ data class ProviderAccount(
 
     /** 空则用 `provider.websiteUrl`。 */
     val loginUrl: String? = null,
+
+    /** 登录方式，可多选。纯记录，不用于发起登录。 */
+    val loginMethods: Set<LoginMethod> = emptySet(),
+
     val note: String? = null,
+
     val sortOrder: Int = 0,
     val createdAt: Long = 0,
     val updatedAt: Long = 0,
@@ -120,6 +131,7 @@ data class ProviderAccount(
             passwordEnc.contentEquals(other.passwordEnc) &&
             loginUrl == other.loginUrl &&
             note == other.note &&
+            loginMethods == other.loginMethods &&
             sortOrder == other.sortOrder
     }
 
@@ -129,6 +141,7 @@ data class ProviderAccount(
         result = 31 * result + label.hashCode()
         result = 31 * result + (usernameEnc?.contentHashCode() ?: 0)
         result = 31 * result + (passwordEnc?.contentHashCode() ?: 0)
+        result = 31 * result + loginMethods.hashCode()
         return result
     }
 }
@@ -137,6 +150,10 @@ data class ProviderAccount(
 data class AiModel(
     val id: Long = 0,
     val providerId: Long,
+
+    /** 模型列表属于哪一张 Key。同一供应商的不同 Key 可见模型可能不同。 */
+    val keyId: Long? = null,
+
     val modelId: String,
     val protocol: Protocol,
     val displayName: String? = null,
@@ -164,5 +181,6 @@ data class AiModel(
     val probedAt: Long? = null,
     val firstSeenAt: Long = 0,
     val lastSeenAt: Long? = null,
+
     val sortOrder: Int = 0,
 )

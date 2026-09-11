@@ -4,6 +4,9 @@ import androidx.room.ConstructedBy
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.RoomDatabaseConstructor
+import androidx.room.migration.Migration
+import androidx.sqlite.SQLiteConnection
+import androidx.sqlite.execSQL
 import com.lc33.tokenvault.data.dao.ApiKeyDao
 import com.lc33.tokenvault.data.dao.AppSettingDao
 import com.lc33.tokenvault.data.dao.AuditLogDao
@@ -75,7 +78,7 @@ abstract class VaultDatabase : RoomDatabase() {
     abstract fun appSettingDao(): AppSettingDao
 
     companion object {
-        const val VERSION = 1
+        const val VERSION = 2
         const val FILE_NAME = "vault.db"
 
         /**
@@ -93,6 +96,84 @@ abstract class VaultDatabase : RoomDatabase() {
          * 里跑（见 shared androidMain 的 applyHandWrittenSchema 扩展），iOS 包在
          * SQLiteDriver 包装层里跑——commonMain 摸不到平台的连接对象。
          */
+
+        /**
+         * v2：余额与模型列表从供应商级改为 Key 级；账号补登录方式；供应商补可达性延迟。
+         *
+         * 旧模型会挂到默认 Key 上。没有默认 Key 的旧模型保留 `keyId = NULL`，
+         * UI 仍能读出这批历史行，但新写入一律要求 Key。
+         */
+        val MIGRATION_1_2: Migration = object : Migration(1, 2) {
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL("ALTER TABLE providers ADD COLUMN reachabilityLatencyMs INTEGER")
+                connection.execSQL("ALTER TABLE providers ADD COLUMN reachabilityCheckedAt INTEGER")
+                connection.execSQL("ALTER TABLE providers ADD COLUMN reachabilityError TEXT")
+                connection.execSQL("ALTER TABLE providers ADD COLUMN probeModelReachability INTEGER NOT NULL DEFAULT 0")
+                // v1 的 probeModels 语义是“逐模型付费探测”；v2 起它表示“模型列表自动检测”。
+                // 语义变了就不能沿用旧值，否则旧开关会被误解释成允许自动拉列表。
+                connection.execSQL("UPDATE providers SET probeModels = 0")
+
+                connection.execSQL("ALTER TABLE api_keys ADD COLUMN balanceAmount REAL")
+                connection.execSQL("ALTER TABLE api_keys ADD COLUMN balanceUsed REAL")
+                connection.execSQL("ALTER TABLE api_keys ADD COLUMN balanceCurrency TEXT")
+                connection.execSQL("ALTER TABLE api_keys ADD COLUMN balanceRaw TEXT")
+                connection.execSQL("ALTER TABLE api_keys ADD COLUMN balanceCheckedAt INTEGER")
+                connection.execSQL("ALTER TABLE api_keys ADD COLUMN balanceError TEXT")
+                connection.execSQL(
+                    """
+                    UPDATE api_keys SET
+                        balanceAmount = (
+                            SELECT providers.balanceAmount FROM providers
+                            WHERE providers.id = api_keys.providerId
+                        ),
+                        balanceUsed = (
+                            SELECT providers.balanceUsed FROM providers
+                            WHERE providers.id = api_keys.providerId
+                        ),
+                        balanceCurrency = (
+                            SELECT providers.balanceCurrency FROM providers
+                            WHERE providers.id = api_keys.providerId
+                        ),
+                        balanceRaw = (
+                            SELECT providers.balanceRaw FROM providers
+                            WHERE providers.id = api_keys.providerId
+                        ),
+                        balanceCheckedAt = (
+                            SELECT providers.balanceCheckedAt FROM providers
+                            WHERE providers.id = api_keys.providerId
+                        ),
+                        balanceError = (
+                            SELECT providers.balanceError FROM providers
+                            WHERE providers.id = api_keys.providerId
+                        )
+                    WHERE api_keys.isDefault = 1
+                    """.trimIndent(),
+                )
+
+                connection.execSQL("ALTER TABLE provider_accounts ADD COLUMN loginMethods TEXT NOT NULL DEFAULT ''")
+                connection.execSQL(
+                    "ALTER TABLE models ADD COLUMN keyId INTEGER REFERENCES api_keys(id) " +
+                        "ON UPDATE NO ACTION ON DELETE CASCADE",
+                )
+                connection.execSQL(
+                    """
+                    UPDATE models SET keyId = (
+                        SELECT id FROM api_keys
+                        WHERE api_keys.providerId = models.providerId AND api_keys.isDefault = 1
+                        LIMIT 1
+                    )
+                    """.trimIndent(),
+                )
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_models_keyId ON models(keyId)")
+                connection.execSQL("DROP INDEX IF EXISTS index_models_providerId_modelId_protocol")
+                connection.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS " +
+                        "index_models_providerId_keyId_modelId_protocol " +
+                        "ON models(providerId, keyId, modelId, protocol)",
+                )
+            }
+        }
+
         const val PARTIAL_INDEX_KEYS_DEFAULT =
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_keys_default " +
                 "ON api_keys(providerId) WHERE isDefault = 1"

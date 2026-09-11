@@ -20,6 +20,10 @@ import tokenvault.shared.generated.resources.about_encryption_row
 import tokenvault.shared.generated.resources.about_encryption_row_summary
 import tokenvault.shared.generated.resources.about_not_password_manager_row
 import tokenvault.shared.generated.resources.about_not_password_manager_summary
+import tokenvault.shared.generated.resources.about_open_source_licenses
+import tokenvault.shared.generated.resources.about_open_source_summary
+import tokenvault.shared.generated.resources.about_software_summary
+import tokenvault.shared.generated.resources.about_summary_title
 import tokenvault.shared.generated.resources.about_title
 import tokenvault.shared.generated.resources.about_version
 import tokenvault.shared.generated.resources.app_name
@@ -37,7 +41,6 @@ import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.AppTopBar
 import com.lc33.tokenvault.ui.miuix.appTopBarScroll
 import com.lc33.tokenvault.ui.miuix.rememberAppTopBarScrollState
-import com.lc33.tokenvault.ui.common.UpdateHighlightCard
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
 
 /**
@@ -54,7 +57,7 @@ import com.lc33.tokenvault.ui.theme.LocalAppTokens
 @Composable
 fun AboutScreen(
     onBack: () -> Unit,
-    onOpenUpdate: () -> Unit,
+    onOpenLicenses: () -> Unit,
 ) {
     val scrollState = rememberAppTopBarScrollState()
     val tokens = LocalAppTokens.current
@@ -83,12 +86,7 @@ fun AboutScreen(
                 .appTopBarScroll(scrollState),
             contentPadding = padding,
         ) {
-            item {
-                UpdateHighlightCard(
-                    onOpenUpdate = onOpenUpdate,
-                    modifier = Modifier.padding(horizontal = tokens.screenPadding, vertical = tokens.itemSpacing),
-                )
-            }
+
             item {
                 AppCard(
                     modifier = Modifier
@@ -107,7 +105,29 @@ fun AboutScreen(
                 }
             }
             item {
+                AppCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = tokens.screenPadding, vertical = tokens.itemSpacing),
+                ) {
+                    AppText(
+                        text = stringResource(Res.string.about_summary_title),
+                        style = AppTextStyle.Subtitle,
+                    )
+                    AppText(
+                        text = stringResource(Res.string.about_software_summary),
+                        style = AppTextStyle.Secondary,
+                        modifier = Modifier.padding(top = tokens.itemSpacing),
+                    )
+                }
+            }
+            item {
                 AppPreferenceGroup {
+                    AppArrowRow(
+                        title = stringResource(Res.string.about_open_source_licenses),
+                        summary = stringResource(Res.string.about_open_source_summary),
+                        onClick = onOpenLicenses,
+                    )
                     AppArrowRow(
                         title = stringResource(Res.string.about_encryption_row),
                         summary = stringResource(Res.string.about_encryption_row_summary),

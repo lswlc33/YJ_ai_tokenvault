@@ -58,12 +58,13 @@ object ProbeRequestBuilder {
         apiKey: CharArray?,
         modelId: String,
         authStyle: AuthStyle? = null,
+        prompt: String = DEFAULT_INFERENCE_PROMPT,
     ): ProbeRequest {
         val headers = authHeaders(protocol, apiKey, authStyle)
         val body = when (protocol) {
-            Protocol.CHAT -> chatBody(modelId)
-            Protocol.RESPONSES -> responsesBody(modelId)
-            Protocol.ANTHROPIC -> anthropicBody(modelId)
+            Protocol.CHAT -> chatBody(modelId, prompt)
+            Protocol.RESPONSES -> responsesBody(modelId, prompt)
+            Protocol.ANTHROPIC -> anthropicBody(modelId, prompt)
         }
         return ProbeRequest(
             method = "POST",
@@ -104,14 +105,18 @@ object ProbeRequestBuilder {
     /** 不鉴权基线检测用的占位令牌。选这个值是因为它一眼可辨、不会被当成真密钥。 */
     const val INVALID_PROBE_TOKEN = "yj-probe-invalid"
 
+    const val DEFAULT_INFERENCE_PROMPT = "ping"
+
+    const val QUICK_REACHABILITY_PROMPT = "请不要思考 仅回复 hi" // i18n-exempt: 上游请求内容，不是 UI 文案
+
     // ------------------------------------------------------------------ 极简 body
 
-    private fun chatBody(modelId: String): String =
-        """{"model":"$modelId","messages":[{"role":"user","content":"ping"}],"max_tokens":$MINIMAL_MAX_TOKENS}"""
+    private fun chatBody(modelId: String, prompt: String): String =
+        """{"model":"$modelId","messages":[{"role":"user","content":"$prompt"}],"max_tokens":$MINIMAL_MAX_TOKENS}"""
 
-    private fun responsesBody(modelId: String): String =
-        """{"model":"$modelId","input":"ping","max_output_tokens":$MINIMAL_MAX_TOKENS}"""
+    private fun responsesBody(modelId: String, prompt: String): String =
+        """{"model":"$modelId","input":"$prompt","max_output_tokens":$MINIMAL_MAX_TOKENS}"""
 
-    private fun anthropicBody(modelId: String): String =
-        """{"model":"$modelId","max_tokens":$MINIMAL_MAX_TOKENS,"messages":[{"role":"user","content":"ping"}]}"""
+    private fun anthropicBody(modelId: String, prompt: String): String =
+        """{"model":"$modelId","max_tokens":$MINIMAL_MAX_TOKENS,"messages":[{"role":"user","content":"$prompt"}]}"""
 }

@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.lc33.tokenvault.domain.repo.ApiKeyRepository
 import com.lc33.tokenvault.domain.repo.GroupRepository
 import com.lc33.tokenvault.domain.repo.ProviderRepository
+import com.lc33.tokenvault.engine.BalanceEngine
+import com.lc33.tokenvault.engine.ProbeEngine
 import com.lc33.tokenvault.screens.model.ManageUiState
 import com.lc33.tokenvault.screens.model.ProviderSort
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +33,8 @@ class ManageViewModel constructor(
     private val providers: ProviderRepository,
     private val groups: GroupRepository,
     private val keys: ApiKeyRepository,
+    private val probeEngine: ProbeEngine,
+    private val balanceEngine: BalanceEngine,
 ) : ViewModel() {
 
     private val selectedGroupId = MutableStateFlow<Long?>(null)
@@ -100,7 +104,7 @@ class ManageViewModel constructor(
         // 每家「最近探测」= 它那几把密钥 checkedAt 的最大值（§13.4「最近探测」排序档）。
         val lastProbeByProvider = snap.keys.groupBy({ it.providerId }, { it.checkedAt })
             .mapValues { (_, stamps) -> stamps.mapNotNull { it }.maxOrNull() }
-        val rows = snap.summaries.map { summary ->
+        val rows = snap.balancedSummaries().map { summary ->
             summary.toRow(
                 health = aggregateHealth(healths[summary.provider.id].orEmpty()),
                 lastProbeAt = lastProbeByProvider[summary.provider.id],
@@ -116,6 +120,22 @@ class ManageViewModel constructor(
             selection = ctrl.selection,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), ManageUiState())
+
+    private fun Snapshot.balancedSummaries() = summaries.map { summary ->
+        summary.copy(
+            provider = summary.provider.copy(
+                balance = aggregateBalanceOf(keys.filter { it.providerId == summary.provider.id }),
+            ),
+        )
+    }
+
+    /** 顶栏刷新：只更新余额与供应商可达性延迟，不碰密钥与模型探测。 */
+    fun refreshStatus() {
+        viewModelScope.launch {
+            probeEngine.refreshReachability()
+            runCatching { balanceEngine.refreshAll() }
+        }
+    }
 
     fun onSelectGroup(id: Long?) {
         selectedGroupId.value = id

@@ -33,7 +33,7 @@ class ImportWriter constructor(
                 val provider = record.toProvider() ?: continue
                 val providerId = providers.save(provider, record.balanceToken)
 
-                for (key in record.keys) {
+                val keyIds = record.keys.map { key ->
                     keys.add(providerId, key.label, key.secret)
                 }
                 for (account in record.accounts) {
@@ -43,10 +43,16 @@ class ImportWriter constructor(
                         username = account.username,
                         password = account.password,
                         loginUrl = account.loginUrl ?: provider.websiteUrl,
+                        loginMethods = account.loginMethods,
                     )
                 }
-                for (model in record.models) {
-                    models.add(providerId, model.modelId, model.protocol, model.needsReview)
+                // 文本格式没有“模型属于哪把 Key”的表达，导入时挂到第一张（也就是默认）Key。
+                // 没有密钥时跳过模型：现在的模型列表必须绑定在 Key 上，不能落成悬空行。
+                val defaultKeyId = keyIds.firstOrNull()
+                if (defaultKeyId != null) {
+                    for (model in record.models) {
+                        models.add(providerId, defaultKeyId, model.modelId, model.protocol, model.needsReview)
+                    }
                 }
                 count++
             }

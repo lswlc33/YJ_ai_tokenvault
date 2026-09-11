@@ -19,6 +19,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.health_stale_this_round
+import tokenvault.shared.generated.resources.balance_failed_section
 import tokenvault.shared.generated.resources.manage_context
 import tokenvault.shared.generated.resources.detail_key_models_refresh
 import tokenvault.shared.generated.resources.manage_default_key
@@ -29,7 +30,10 @@ import tokenvault.shared.generated.resources.manage_local_only
 import tokenvault.shared.generated.resources.manage_models_count
 import tokenvault.shared.generated.resources.manage_pinned
 import tokenvault.shared.generated.resources.manage_source_discovered
+import tokenvault.shared.generated.resources.login_method_github
+import tokenvault.shared.generated.resources.login_method_linuxdo
 import tokenvault.shared.generated.resources.manage_source_manual
+import com.lc33.tokenvault.domain.LoginMethod
 import com.lc33.tokenvault.screens.model.UiAccountRow
 import com.lc33.tokenvault.screens.model.UiHealth
 import com.lc33.tokenvault.screens.model.UiKeyRow
@@ -144,6 +148,13 @@ internal fun ProviderRow(
                     )
                 }
                 StatusDot(color = colorOf(row.health), label = labelOf(row.health))
+                row.reachabilityLatencyMs?.let { latency ->
+                    AppText(
+                        text = stringResource(Res.string.manage_latency, latency),
+                        style = AppTextStyle.Footnote,
+                        color = appSecondaryTextColor,
+                    )
+                }
                 if (row.staleThisRound) {
                     // 红线 11：瞬时失败不改写健康结论，但要让用户知道"这一轮没验证成"
                     AppText(
@@ -252,6 +263,19 @@ internal fun KeyRow(
                         color = appSecondaryTextColor,
                     )
                 }
+                val balance = row.balance
+                if (balance != null) {
+                    AppText(
+                        text = "${balance.currency} ${balance.amount}",
+                        style = AppTextStyle.Footnote,
+                    )
+                } else if (row.balanceFailed) {
+                    AppText(
+                        text = stringResource(Res.string.balance_failed_section),
+                        style = AppTextStyle.Footnote,
+                        color = appSecondaryTextColor,
+                    )
+                }
                 val checkedAt = row.checkedAt
                 if (checkedAt != null) {
                     // 分档是纯函数、文案在资源里，所以"算"在这里而不是在 ViewModel（它拿不到资源）
@@ -274,9 +298,13 @@ internal fun KeyRow(
 }
 
 @Composable
-internal fun ModelRow(row: UiModelRow, onClick: (() -> Unit)? = null) {
+internal fun ModelRow(
+    row: UiModelRow,
+    onClick: (() -> Unit)? = null,
+    onLongPress: (() -> Unit)? = null,
+) {
     val tokens = LocalAppTokens.current
-    AppCard(modifier = rowModifier(), onClick = onClick) {
+    AppCard(modifier = rowModifier(), onClick = onClick, onLongPress = onLongPress) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
@@ -321,6 +349,10 @@ internal fun ModelRow(row: UiModelRow, onClick: (() -> Unit)? = null) {
 }
 
 @Composable
+private fun loginMethodLabel(method: LoginMethod): String = when (method) {
+    LoginMethod.GITHUB -> stringResource(Res.string.login_method_github)
+    LoginMethod.LINUX_DO -> stringResource(Res.string.login_method_linuxdo)
+}@Composable
 internal fun AccountRow(row: UiAccountRow, onClick: (() -> Unit)? = null) {
     val tokens = LocalAppTokens.current
     AppCard(modifier = rowModifier(), onClick = onClick) {
@@ -338,6 +370,16 @@ internal fun AccountRow(row: UiAccountRow, onClick: (() -> Unit)? = null) {
                     fontFamily = tokens.monoFontFamily,
                     maxLines = 1,
                 )
+                if (row.loginMethods.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        row.loginMethods.forEach { wire ->
+                        LoginMethod.fromWireName(wire)?.let { method -> AppChip(text = loginMethodLabel(method)) }
+                    }
+                    }
+                }
             }
             AppChip(text = stringResource(Res.string.manage_local_only))
         }

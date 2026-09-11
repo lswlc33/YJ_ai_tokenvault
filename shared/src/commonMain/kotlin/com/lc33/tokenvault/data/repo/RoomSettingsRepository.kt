@@ -1,4 +1,4 @@
-﻿package com.lc33.tokenvault.data.repo
+package com.lc33.tokenvault.data.repo
 
 import com.lc33.tokenvault.data.dao.AppSettingDao
 import com.lc33.tokenvault.data.entity.AppSettingEntity
@@ -242,7 +242,7 @@ class RoomSettingsRepository constructor(
         }
 
         /**
-         * 默认探测值 → JSON 对象（四个布尔，键名照 [DefaultProbeSettings] 字段名）。
+         * 默认探测值 → JSON 对象（五个布尔，键名照 [DefaultProbeSettings] 字段名）。
          *
          * 用对象而不是数组，理由同 [encodeThresholds]：字段顺序无关紧要，
          * 未来加字段只增不改，旧值不丢。
@@ -252,6 +252,7 @@ class RoomSettingsRepository constructor(
             put(KEY_PROBE_KEYS, JsonPrimitive(settings.keys))
             put(KEY_PROBE_BALANCE, JsonPrimitive(settings.balance))
             put(KEY_PROBE_MODELS, JsonPrimitive(settings.models))
+            put(KEY_PROBE_MODEL_REACHABILITY, JsonPrimitive(settings.modelReachability))
         }.toString()
 
         /**
@@ -267,7 +268,15 @@ class RoomSettingsRepository constructor(
                     reachability = obj[KEY_PROBE_REACHABILITY]?.jsonPrimitive?.booleanOrNull ?: defaults.reachability,
                     keys = obj[KEY_PROBE_KEYS]?.jsonPrimitive?.booleanOrNull ?: defaults.keys,
                     balance = obj[KEY_PROBE_BALANCE]?.jsonPrimitive?.booleanOrNull ?: defaults.balance,
-                    models = obj[KEY_PROBE_MODELS]?.jsonPrimitive?.booleanOrNull ?: defaults.models,
+                    modelReachability = obj[KEY_PROBE_MODEL_REACHABILITY]?.jsonPrimitive?.booleanOrNull
+                        ?: defaults.modelReachability,
+                    // 旧包里的 models 是“逐模型付费探测”，不是“模型列表自动检测”。
+                    // 只有同包出现 modelReachability 才说明它是 v2 语义；否则迁移时重置为关。
+                    models = if (obj.containsKey(KEY_PROBE_MODEL_REACHABILITY)) {
+                        obj[KEY_PROBE_MODELS]?.jsonPrimitive?.booleanOrNull ?: defaults.models
+                    } else {
+                        false
+                    },
                 )
             }.getOrDefault(defaults)
         }
@@ -279,6 +288,8 @@ class RoomSettingsRepository constructor(
         const val KEY_PROBE_BALANCE = "balance"
 
         const val KEY_PROBE_MODELS = "models"
+
+        const val KEY_PROBE_MODEL_REACHABILITY = "modelReachability"
 
         /** 与 [com.lc33.tokenvault.data.mapper.ColumnCodecs] 同款：读方向单向容错。 */
         private val json = Json { ignoreUnknownKeys = true }

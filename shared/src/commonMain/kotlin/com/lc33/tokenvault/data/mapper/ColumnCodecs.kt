@@ -1,5 +1,6 @@
 package com.lc33.tokenvault.data.mapper
 
+import com.lc33.tokenvault.domain.LoginMethod
 import com.lc33.tokenvault.domain.Protocol
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -89,6 +90,18 @@ fun String.toHeaderList(): List<Pair<String, String>> = runCatching {
         key to value
     }
 }.getOrDefault(emptyList())
+
+/** 登录方式集合 → CSV。保持枚举声明顺序，备份与数据库里的字符串都稳定。 */
+fun Set<LoginMethod>.toLoginMethodsCsv(): String =
+    LoginMethod.entries.filter { it in this }.joinToString(",") { it.wireName }
+
+fun String.toLoginMethodSet(): Set<LoginMethod> =
+    split(',')
+        .asSequence()
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .mapNotNull { LoginMethod.fromWireName(it) }
+        .toCollection(LinkedHashSet())
 
 /** CSV 形式的模态列表（`model_catalog` 用）。 */
 fun List<String>.toCsv(): String = joinToString(",")

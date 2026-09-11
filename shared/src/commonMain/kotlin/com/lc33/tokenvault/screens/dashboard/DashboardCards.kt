@@ -61,6 +61,7 @@ import com.lc33.tokenvault.ui.common.durationSeconds
 import com.lc33.tokenvault.ui.common.labelOf
 import com.lc33.tokenvault.ui.common.messageOf
 import com.lc33.tokenvault.ui.common.relativeLabel
+import com.lc33.tokenvault.ui.miuix.AppAccentCard
 import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppDivider
 import com.lc33.tokenvault.ui.miuix.AppIcon
@@ -69,6 +70,7 @@ import com.lc33.tokenvault.ui.miuix.AppLinearProgress
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppActionRow
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
+import com.lc33.tokenvault.ui.miuix.appOnPrimaryColor
 import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
 import com.lc33.tokenvault.ui.theme.LocalStatusPalette
@@ -92,14 +94,17 @@ internal fun BalanceCard(
     onOpenBreakdown: () -> Unit,
 ) {
     val tokens = LocalAppTokens.current
-    val palette = LocalStatusPalette.current
-    AppCard(modifier = cardModifier(), onClick = onOpenBreakdown) {
+    AppAccentCard(modifier = cardModifier(), onClick = onOpenBreakdown) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                CardTitle(stringResource(Res.string.dashboard_balance_title))
+                AppText(
+                    text = stringResource(Res.string.dashboard_balance_title),
+                    style = AppTextStyle.Subtitle,
+                    color = appOnPrimaryColor,
+                )
                 val updatedAt = balance.updatedAt
                 if (updatedAt != null) {
                     // 分档在纯函数里、文案在资源里（RelativeTime.kt 就是为此拆开的），
@@ -110,7 +115,7 @@ internal fun BalanceCard(
                             relativeLabel(nowMs, updatedAt),
                         ),
                         style = AppTextStyle.Footnote,
-                        color = appSecondaryTextColor,
+                        color = appOnPrimaryColor,
                     )
                 }
             }
@@ -124,10 +129,10 @@ internal fun BalanceCard(
             AppText(
                 text = stringResource(Res.string.dashboard_balance_none),
                 style = AppTextStyle.Secondary,
-                color = appSecondaryTextColor,
+                color = appOnPrimaryColor,
                 modifier = Modifier.padding(top = tokens.itemSpacing),
             )
-            return@AppCard
+            return@AppAccentCard
         }
         balance.perCurrency.forEachIndexed { index, money ->
             AppText(
@@ -140,14 +145,14 @@ internal fun BalanceCard(
         AppText(
             text = stringResource(Res.string.dashboard_balance_no_fx),
             style = AppTextStyle.Footnote,
-            color = appSecondaryTextColor,
+            color = appOnPrimaryColor,
             modifier = Modifier.padding(top = tokens.itemSpacing),
         )
         if (balance.failedProviderCount > 0) {
             AppText(
                 text = stringResource(Res.string.dashboard_balance_failed, balance.failedProviderCount),
                 style = AppTextStyle.Footnote,
-                color = palette.warn,
+                color = appOnPrimaryColor,
                 modifier = Modifier.padding(top = 4.dp),
             )
         }
@@ -366,7 +371,7 @@ internal fun BackupCard(backup: BackupStatus, onOpenSync: () -> Unit) {
             AppText(
                 text = stringResource(Res.string.dashboard_backup_never),
                 style = AppTextStyle.Secondary,
-                color = palette.warn,
+                color = appOnPrimaryColor,
                 modifier = Modifier.padding(vertical = tokens.itemSpacing),
             )
         } else {

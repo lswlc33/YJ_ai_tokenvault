@@ -1,4 +1,4 @@
-﻿package com.lc33.tokenvault.screens.model
+package com.lc33.tokenvault.screens.model
 
 /**
  * 页面层的展示模型。
@@ -74,6 +74,7 @@ data class UiProviderRow(
      * 用它排；null 表示从没探测过，排最后。
      */
     val lastProbeAt: Long? = null,
+    val reachabilityLatencyMs: Long? = null,
 )
 
 data class UiKeyRow(
@@ -96,6 +97,8 @@ data class UiKeyRow(
      */
     val checkedAt: Long?,
     val isDefault: Boolean,
+    val balance: UiMoney? = null,
+    val balanceFailed: Boolean = false,
 )
 
 enum class UiModelSource {
@@ -108,6 +111,7 @@ data class UiModelRow(
     val modelId: String,
     val displayName: String?,
     val providerId: Long,
+    val keyId: Long? = null,
     val protocol: String,
     val source: UiModelSource,
     val health: UiHealth,
@@ -121,4 +125,5 @@ data class UiAccountRow(
     val providerId: Long,
     /** 只给遮蔽串。密码连遮蔽串都不给——它只在展开时现算（红线 21）。 */
     val maskedUsername: String,
+    val loginMethods: List<String> = emptyList(),
 )

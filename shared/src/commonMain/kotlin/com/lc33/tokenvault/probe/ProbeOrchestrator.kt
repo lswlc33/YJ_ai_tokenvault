@@ -12,7 +12,8 @@ import kotlinx.coroutines.isActive
 /**
  * 发一次请求的抽象（§8.5）。
  *
- * 生产实现包装 `net/OkHttpEngine`；测试里用假实现，不碰真实网络。
+ * 生产实现包装
+et/OkHttpEngine`；测试里用假实现，不碰真实网络。
  */
 fun interface ProbeTransport {
     suspend fun execute(request: ProbeRequest, allowInsecure: Boolean): ProbeResponse
@@ -147,6 +148,7 @@ class ProbeOrchestrator(
                     health = classification.health,
                     detail = classification.detail,
                     latencyMs = response.latencyMs,
+                    body = response.body,
                 ),
             )
         }

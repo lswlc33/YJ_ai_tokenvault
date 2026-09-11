@@ -47,6 +47,10 @@ interface ProviderAccountDao {
     @Query("UPDATE provider_accounts SET usernameEnc = :enc, usernameFp = :fp, updatedAt = :now WHERE id = :id")
     suspend fun setUsername(id: Long, enc: ByteArray, fp: String, now: Long)
 
+    /** 登录方式是明文元数据，单独写，避免整行替换把两段密文一起暴露给编辑路径。 */
+    @Query("UPDATE provider_accounts SET loginMethods = :loginMethods, updatedAt = :now WHERE id = :id")
+    suspend fun setLoginMethods(id: Long, loginMethods: String, now: Long)
+
     /** 回填密码密文，同理只动密码列。 */
     @Query("UPDATE provider_accounts SET passwordEnc = :enc, updatedAt = :now WHERE id = :id")
     suspend fun setPassword(id: Long, enc: ByteArray, now: Long)
@@ -113,6 +117,13 @@ interface ModelDao {
     @Query("SELECT * FROM models WHERE providerId = :providerId")
     suspend fun findByProvider(providerId: Long): List<ModelEntity>
 
+    @Query("SELECT * FROM models WHERE providerId = :providerId AND keyId = :keyId ORDER BY sortOrder, modelId")
+    suspend fun findByProviderAndKey(providerId: Long, keyId: Long): List<ModelEntity>
+
+    /** 开启「模型列表自动更新」前的确认动作：清掉这家已保存的模型列表。 */
+    @Query("DELETE FROM models WHERE providerId = :providerId")
+    suspend fun deleteByProvider(providerId: Long)
+
     /** 全量快照（备份导出用）。 */
     @Query("SELECT * FROM models ORDER BY providerId, sortOrder, modelId")
     suspend fun findAll(): List<ModelEntity>
@@ -150,10 +161,11 @@ interface ModelDao {
         WHERE providerId = :providerId
           AND source = 'discovered'
           AND discoveredVia = :protocol
+          AND keyId = :keyId
           AND modelId NOT IN (:seenModelIds)
         """,
     )
-    suspend fun disableVanished(providerId: Long, protocol: String, seenModelIds: List<String>)
+    suspend fun disableVanished(providerId: Long, keyId: Long, protocol: String, seenModelIds: List<String>)
 
     @Query(
         """

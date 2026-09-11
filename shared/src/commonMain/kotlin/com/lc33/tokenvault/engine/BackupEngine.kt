@@ -188,9 +188,9 @@ class BackupEngine constructor(
                 profileId = provider.clientProfileKey?.let { profileIdByKey[it] },
             ).also { imported++ }
 
-            restoreKeys(payload, ref, id, mode)
+            val keyIdsBySecret = restoreKeys(payload, ref, id, mode)
             restoreAccounts(payload, ref, id, mode)
-            restoreModels(payload, ref, id, mode)
+            restoreModels(payload, ref, id, mode, keyIdsBySecret)
         }
 
         restoreSettings(payload.appSettings, mode)
@@ -210,14 +210,18 @@ class BackupEngine constructor(
         ref: Pair<String, String>,
         providerId: Long,
         mode: RestoreMode,
-    ) {
+    ): Map<String, Long> {
+        val keyIdsBySecret = mutableMapOf<String, Long>()
         for (key in payload.apiKeys.filter { it.providerName to it.providerApiRoot == ref }) {
             // 合并 / 仅新增：按重算后的指纹去重（§12.1 指纹在导入端重算）
             if (mode != RestoreMode.OVERWRITE && store.keyExists(providerId, key.secret)) {
+                store.findKeyId(providerId, key.secret)?.let { keyIdsBySecret[key.secret] = it }
                 continue
             }
             store.insertKey(providerId, key)
+            store.findKeyId(providerId, key.secret)?.let { keyIdsBySecret[key.secret] = it }
         }
+        return keyIdsBySecret
     }
 
     private suspend fun restoreAccounts(
@@ -239,12 +243,20 @@ class BackupEngine constructor(
         ref: Pair<String, String>,
         providerId: Long,
         mode: RestoreMode,
+        keyIdsBySecret: Map<String, Long>,
     ) {
         for (model in payload.models.filter { it.providerName to it.providerApiRoot == ref }) {
-            if (mode != RestoreMode.OVERWRITE && store.modelExists(providerId, model.modelId)) {
+            val keyId = if (model.keySecret == null) {
+                store.findKeyId(providerId, null) ?: continue
+            } else {
+                keyIdsBySecret[model.keySecret] ?: continue
+            }
+            if (mode != RestoreMode.OVERWRITE &&
+                store.modelExists(providerId, keyId, model.modelId, model.protocol)
+            ) {
                 continue
             }
-            store.insertModel(providerId, model)
+            store.insertModel(providerId, keyId, model)
         }
     }
 

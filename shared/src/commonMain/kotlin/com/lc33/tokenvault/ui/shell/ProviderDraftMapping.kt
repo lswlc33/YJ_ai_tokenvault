@@ -64,6 +64,7 @@ fun Provider.toDraft(groupIndex: Int, profiles: List<ClientProfile> = emptyList(
     probeReachability = probe.reachability,
     probeKeys = probe.keyValidity,
     probeModels = probe.models,
+    probeModelReachability = probe.modelReachability,
     probeBalance = probe.balance,
     pathOverrideAnthropic = pathOverrides[Protocol.ANTHROPIC].orEmpty(),
     authStyleIndex = AUTH_STYLES.indexOf(authStyle).coerceAtLeast(0),
@@ -134,6 +135,7 @@ fun ProviderDraft.toProvider(
             keyValidity = probeKeys,
             balance = probeBalance,
             models = probeModels,
+            modelReachability = probeModelReachability,
         ),
     )
 }

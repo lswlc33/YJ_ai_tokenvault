@@ -20,7 +20,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -93,18 +92,29 @@ class DashboardViewModel constructor(
      */
     fun refreshBalance() {
         viewModelScope.launch {
-            val summaries = snapshot.first().summaries
-            summaries.forEach { summary ->
-                if (summary.provider.balanceKind != com.lc33.tokenvault.domain.BalanceKind.NONE) {
-                    runCatching { balanceEngine.refresh(summary.provider.id) }
-                }
-            }
+            runCatching { balanceEngine.refreshAll() }
         }
+    }
+
+    /** 顶栏刷新：只查余额与供应商可达性延迟，不触发密钥检测或模型请求。 */
+    fun refreshStatus() {
+        viewModelScope.launch {
+            probeEngine.refreshReachability()
+            runCatching { balanceEngine.refreshAll() }
+        }
+    }
+
+    private fun Snapshot.balancedSummaries(): List<ProviderSummary> = summaries.map { summary ->
+        summary.copy(
+            provider = summary.provider.copy(
+                balance = aggregateBalanceOf(keys.filter { it.providerId == summary.provider.id }),
+            ),
+        )
     }
 
     private fun Snapshot.rows(): List<UiProviderRow> {
         val healths = keys.groupBy({ it.providerId }, { it.health })
-        return summaries.map { summary ->
+        return balancedSummaries().map { summary ->
             summary.toRow(health = aggregateHealth(healths[summary.provider.id].orEmpty()))
         }
     }
@@ -114,11 +124,11 @@ class DashboardViewModel constructor(
         progress: com.lc33.tokenvault.screens.model.ProbeProgress?,
         lastRun: ProbeRunSummary?,
     ): DashboardUiState = DashboardUiState(
-        balance = balanceSummaryOf(summaries.map { it.provider }),
+        balance = keyBalanceSummaryOf(keys),
         counts = contentCountsOf(summaries),
         health = healthBreakdownOf(keys),
         attention = attentionItemsOf(
-            summaries = summaries,
+            summaries = balancedSummaries(),
             healthByProvider = keys.groupBy({ it.providerId }, { it.health }),
             // 阈值来自设置（§13.4 探测设置页），默认 §9.3 的初值。
             // 不写死数字在这里（红线 15）：初值是有名字、有出处的领域常量。
