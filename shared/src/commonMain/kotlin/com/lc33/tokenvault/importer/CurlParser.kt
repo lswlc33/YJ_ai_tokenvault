@@ -38,6 +38,8 @@ object CurlParser {
         var userAgent: String? = null
         var method: String? = null
         var dataBody: String? = null
+        var url: String? = null
+        var apiKey: String? = null
         val dropped = mutableListOf<String>()
 
         var i = 0
@@ -62,6 +64,10 @@ object CurlParser {
                     i += 2
                 }
                 tok == "--compressed" -> i += 1
+                tok.startsWith("http://") || tok.startsWith("https://") -> {
+                    url = tok
+                    i += 1
+                }
                 else -> i += 1
             }
         }
@@ -70,6 +76,10 @@ object CurlParser {
         val kept = mutableListOf<Pair<String, String>>()
         for ((key, value) in headers) {
             if (key.lowercase() in DROPPED_HEADERS) {
+                when (key.lowercase()) {
+                    "authorization" -> apiKey = value.substringAfter("Bearer ", value).trim().ifEmpty { null }
+                    "x-api-key" -> apiKey = value.trim().ifEmpty { null }
+                }
                 dropped += key
             } else {
                 kept += key to value
@@ -79,6 +89,8 @@ object CurlParser {
         val bodyPatch = dataBody?.let { inferBodyPatch(it) } ?: "{}"
 
         return CurlResult(
+            url = url,
+            apiKey = apiKey,
             userAgent = userAgent,
             method = method,
             headers = kept,
@@ -210,6 +222,12 @@ object CurlParser {
 
 /** cURL 解析结果：一个客户端预设草稿，还没落库。 */
 data class CurlResult(
+    /** cURL 中的请求 URL；没有则 null（表单让用户补）。 */
+    val url: String? = null,
+
+    /** `Authorization: Bearer …` 或 `x-api-key` 提取出的 API Key；没有则 null。 */
+    val apiKey: String? = null,
+
     /** `-A/--user-agent` 提取的 UA；没有则 null（预览页让用户补）。 */
     val userAgent: String?,
 

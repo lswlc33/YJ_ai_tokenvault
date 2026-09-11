@@ -35,7 +35,7 @@ data object SettingsRoute : VaultRoute
 data class ProviderDetailRoute(val id: Long) : VaultRoute
 
 @Serializable
-data class ProviderEditorRoute(val id: Long? = null) : VaultRoute
+data class ProviderEditorRoute(val id: Long = 0L) : VaultRoute
 
 @Serializable
 data class KeyDetailRoute(
@@ -110,6 +110,9 @@ data object SyncRoute : VaultRoute
 
 @Serializable
 data object UpdateRoute : VaultRoute
+
+@Serializable
+data object LicensesRoute : VaultRoute
 
 @Serializable
 data object AboutRoute : VaultRoute

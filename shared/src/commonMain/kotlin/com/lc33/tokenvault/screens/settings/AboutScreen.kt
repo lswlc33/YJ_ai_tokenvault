@@ -85,13 +85,14 @@ fun AboutScreen(
                 .fillMaxSize()
                 .appTopBarScroll(scrollState),
             contentPadding = padding,
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(tokens.itemSpacing),
         ) {
 
             item {
                 AppCard(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = tokens.screenPadding, vertical = tokens.itemSpacing),
+                        .padding(horizontal = tokens.screenPadding),
                 ) {
                     AppText(text = stringResource(Res.string.app_name), style = AppTextStyle.Title)
                     AppText(
@@ -108,7 +109,7 @@ fun AboutScreen(
                 AppCard(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = tokens.screenPadding, vertical = tokens.itemSpacing),
+                        .padding(horizontal = tokens.screenPadding),
                 ) {
                     AppText(
                         text = stringResource(Res.string.about_summary_title),

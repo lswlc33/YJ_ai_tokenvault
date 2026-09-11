@@ -26,6 +26,20 @@ class CurlParserTest {
     }
 
     @Test
+    fun `提取 URL 与 Authorization 里的 API Key`() {
+        val curl = "curl -H 'Authorization: Bearer sk-abc123' https://api.example.com/v1/chat/completions"
+        val result = CurlParser.parse(curl)
+        assertEquals("https://api.example.com/v1/chat/completions", result.url)
+        assertEquals("sk-abc123", result.apiKey)
+    }
+
+    @Test
+    fun `提取 x-api-key 作为 API Key`() {
+        val curl = "curl -H 'x-api-key: sk-xyz789' https://api.example.com/v1/messages"
+        val result = CurlParser.parse(curl)
+        assertEquals("sk-xyz789", result.apiKey)
+    }
+    @Test
     fun `长选项形式也解析`() {
         val curl = "curl --user-agent 'UA/2.0' --header 'x-custom: v' --request POST https://x.com"
         val result = CurlParser.parse(curl)

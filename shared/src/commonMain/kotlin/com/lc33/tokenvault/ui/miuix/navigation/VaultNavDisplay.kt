@@ -43,6 +43,7 @@ import com.lc33.tokenvault.ui.shell.GroupsRoute
 import com.lc33.tokenvault.ui.shell.ImportRoute
 import com.lc33.tokenvault.ui.shell.KeyDetailRoute
 import com.lc33.tokenvault.ui.shell.KeyEditorRoute
+import com.lc33.tokenvault.ui.shell.LicensesRoute
 import com.lc33.tokenvault.ui.shell.LogRoute
 import com.lc33.tokenvault.ui.shell.ManageRoute
 import com.lc33.tokenvault.ui.shell.ProfileEditorRoute
@@ -89,6 +90,7 @@ fun rememberVaultBackStack(): MutableList<VaultRoute> {
                     subclass(ProfileListRoute::class)
                     subclass(ProfileEditorRoute::class)
                     subclass(DataRoute::class)
+                    subclass(LicensesRoute::class)
                     subclass(LogRoute::class)
                     subclass(SyncRoute::class)
                     subclass(UpdateRoute::class)
@@ -141,7 +143,7 @@ fun VaultNavDisplay(
             appPredictivePopTransition(style, exitDirection, edge)
         },
         transitionEffects = NavDisplayTransitionEffects(
-            enableCornerClip = true,
+            // 顶栏 tab 与二级页共用这个 effects 通道；关掉圆角裁切，避免底栏切换看起来像层级卡片动画。\n            enableCornerClip = false,
             dimAmount = 0f,
             blockInputDuringTransition = false,
             popDirectionFollowsSwipeEdge = style == PredictiveBackStyle.Scale &&
@@ -190,8 +192,8 @@ private fun isTopLevelScene(scene: Scene<VaultRoute>): Boolean =
 private fun AnimatedContentTransitionScope<Scene<VaultRoute>>.topLevelTransition(): ContentTransform {
     // 一级页切换按 tab 顺序决定方向；只用位移，不用透明度掩盖叠层。
     val forward = topLevelIndexOf(targetState.key) > topLevelIndexOf(initialState.key)
-    val enterOffset: (Int) -> Int = { if (forward) it / 4 else -it / 4 }
-    val exitOffset: (Int) -> Int = { if (forward) -it / 4 else it / 4 }
+    val enterOffset: (Int) -> Int = { if (forward) it else -it }
+    val exitOffset: (Int) -> Int = { if (forward) -it else it }
     return slideInHorizontally(tween(TopLevelDurationMs), enterOffset) togetherWith
         slideOutHorizontally(tween(TopLevelDurationMs), exitOffset)
 }

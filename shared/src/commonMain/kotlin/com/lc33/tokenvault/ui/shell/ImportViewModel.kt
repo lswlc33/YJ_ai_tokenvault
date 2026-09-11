@@ -3,9 +3,12 @@ package com.lc33.tokenvault.ui.shell
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lc33.tokenvault.domain.repo.ImportWriter
+import com.lc33.tokenvault.importer.CurlParser
+import com.lc33.tokenvault.importer.ParsedKey
 import com.lc33.tokenvault.importer.ParsedRecord
 import com.lc33.tokenvault.importer.TextImporter
 import com.lc33.tokenvault.platform.SecureClipboard
+import com.lc33.tokenvault.screens.manage.CurlImportForm
 import com.lc33.tokenvault.screens.manage.ImportPreview
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,6 +37,10 @@ class ImportViewModel constructor(
     private val _previews = MutableStateFlow<List<ImportPreview>>(emptyList())
     val previews: StateFlow<List<ImportPreview>> = _previews.asStateFlow()
 
+    /** cURL 识别成功后的待完善表单；null 表示当前不是 cURL 导入。 */
+    private val _curlForm = MutableStateFlow<CurlImportForm?>(null)
+    val curlForm: StateFlow<CurlImportForm?> = _curlForm.asStateFlow()
+
     /** 有记录因为缺「供应商名称」而整条解析失败。只给条数，文案在界面拼。 */
     private val _parseErrorCount = MutableStateFlow(0)
     val parseErrorCount: StateFlow<Int> = _parseErrorCount.asStateFlow()
@@ -56,6 +63,19 @@ class ImportViewModel constructor(
         records = emptyList()
         _previews.value = emptyList()
         _parseErrorCount.value = 0
+        _curlForm.value = null
+
+        if (text.trimStart().startsWith("curl", ignoreCase = true)) {
+            val result = CurlParser.parse(text)
+            val url = result.url.orEmpty()
+            _curlForm.value = CurlImportForm(
+                name = url.substringAfter("://").substringBefore('/').substringBefore(':'),
+                website = url.substringBefore('/').takeIf { it.contains("://") }.orEmpty(),
+                baseUrl = url,
+                apiKey = result.apiKey.orEmpty(),
+            )
+            return
+        }
 
         val result = TextImporter.parse(text)
         records = result.records
@@ -63,6 +83,43 @@ class ImportViewModel constructor(
         _parseErrorCount.value = result.errors.size
     }
 
+    fun updateCurlForm(form: CurlImportForm) {
+        _curlForm.value = form
+    }
+
+    /** 用户补齐 cURL 表单后写入：一张供应商 + 一把 Key。 */
+    fun confirmCurl(form: CurlImportForm, onDone: (Int) -> Unit = {}) {
+        if (_importing.value) return
+        if (form.name.isBlank() || form.baseUrl.isBlank() || form.apiKey.isBlank()) return
+
+        val record = ParsedRecord(
+            name = form.name.trim(),
+            note = form.note.trim().ifBlank { null },
+            websiteUrl = form.website.trim().ifBlank { null },
+            apiBaseUrl = form.baseUrl.trim(),
+            supportedProtocols = protocolsFromCurlUrl(form.baseUrl),
+            keys = listOf(ParsedKey(label = "Key 1", secret = form.apiKey.toCharArray())),
+        )
+
+        _importing.value = true
+        viewModelScope.launch {
+            try {
+                val count = withContext(Dispatchers.Default) { writer.write(listOf(record)) }
+                _importedCount.value = count
+                _curlForm.value = null
+                onDone(count)
+            } finally {
+                _importing.value = false
+            }
+        }
+    }
+
+    private fun protocolsFromCurlUrl(url: String): Set<com.lc33.tokenvault.domain.Protocol> = when {
+        url.contains("/messages", ignoreCase = true) -> setOf(com.lc33.tokenvault.domain.Protocol.ANTHROPIC)
+        url.contains("/responses", ignoreCase = true) -> setOf(com.lc33.tokenvault.domain.Protocol.RESPONSES)
+        url.contains("/chat/completions", ignoreCase = true) -> setOf(com.lc33.tokenvault.domain.Protocol.CHAT)
+        else -> setOf(com.lc33.tokenvault.domain.Protocol.CHAT)
+    }
     fun toggle(index: Int) {
         val current = _previews.value
         if (index !in current.indices) return

@@ -33,6 +33,7 @@ import com.lc33.tokenvault.screens.settings.AppearanceScreen
 import com.lc33.tokenvault.screens.settings.BalanceThresholdsScreen
 import com.lc33.tokenvault.screens.settings.ClientKeywordsScreen
 import com.lc33.tokenvault.screens.settings.DataScreen
+import com.lc33.tokenvault.screens.settings.LicensesScreen
 import com.lc33.tokenvault.screens.settings.LogScreen
 import com.lc33.tokenvault.screens.settings.ProbeSettingsScreen
 import com.lc33.tokenvault.screens.settings.ProfileEditorScreen
@@ -170,9 +171,7 @@ fun VaultNavHost(
             is AboutRoute -> {
             AboutScreen(
                 onBack = { back() },
-                onOpenLicenses = {
-                    openExternalUrl("https://github.com/lswlc33/YJ_ai_tokenvault")
-                },
+                onOpenLicenses = { navigate(LicensesRoute) },
             )
         }
 
@@ -396,6 +395,10 @@ fun VaultNavHost(
                 onClearLog = vm::clearLog,
             )
         }
+            is LicensesRoute -> {
+                LicensesScreen(onBack = back)
+            }
+
             is LogRoute -> {
             val vm: LogViewModel = koinViewModel()
             val entries by vm.entries.collectAsStateWithLifecycle()
@@ -448,6 +451,7 @@ fun VaultNavHost(
             is ImportRoute -> {
             val vm: ImportViewModel = koinViewModel()
             val previews by vm.previews.collectAsStateWithLifecycle()
+            val curlForm by vm.curlForm.collectAsStateWithLifecycle()
             val parseErrors by vm.parseErrorCount.collectAsStateWithLifecycle()
             val importing by vm.importing.collectAsStateWithLifecycle()
             ImportScreen(
@@ -457,7 +461,9 @@ fun VaultNavHost(
                 onBack = back,
                 onParse = vm::parse,
                 onToggle = vm::toggle,
+                curlForm = curlForm,
                 onConfirm = { vm.confirm { back() } },
+                onConfirmCurl = { vm.confirmCurl(it) { back() } },
                 readClipboard = vm::readClipboard,
             )
         }

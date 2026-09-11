@@ -346,13 +346,23 @@ fun AppBottomSheet(
     title: String? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val tokens = LocalAppTokens.current
     OverlayBottomSheet(
         show = show,
         modifier = modifier,
         title = title,
         onDismissRequest = onDismissRequest,
     ) {
-        Column(modifier = Modifier.fillMaxWidth(), content = content)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    horizontal = tokens.screenPadding,
+                    vertical = tokens.itemSpacing,
+                ),
+            verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
+            content = content,
+        )
     }
 }
 

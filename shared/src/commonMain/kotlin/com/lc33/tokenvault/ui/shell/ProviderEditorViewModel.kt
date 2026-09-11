@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
 class ProviderEditorViewModel constructor(
     private val providers: ProviderRepository,
     private val groupRepository: GroupRepository,
-    private val providerId: Long?,
+    private val providerId: Long,
 ) : ViewModel() {
 
     val groups: StateFlow<List<Group>> = groupRepository.observeGroups()
@@ -43,7 +43,7 @@ class ProviderEditorViewModel constructor(
     private var loadedProvider: com.lc33.tokenvault.domain.model.Provider? = null
 
     init {
-        if (providerId != null && providerId != 0L) {
+        if (providerId != 0L) {
             viewModelScope.launch {
                 val groupList = groupRepository.observeGroups().first()
                 val provider = providers.find(providerId)

@@ -184,13 +184,17 @@ private fun PinStep(state: OnboardingUiState, callbacks: LockCallbacks) {
         onBackspace = callbacks.onPinBackspace,
         enabled = !state.busy,
     )
+    // 第一次输入与第二次输入都必须为底部操作留出同样的高度。
+    // 第一屏直接少一行会让居中的键盘整体上移，看起来像“键盘跳了”。
+    Spacer(Modifier.height(tokens.itemSpacing))
     if (confirming) {
-        Spacer(Modifier.height(tokens.itemSpacing))
         AppActionRow(
             text = stringResource(Res.string.onboarding_pin_restart),
             onClick = callbacks.onOnboardingBack,
             enabled = !state.busy,
         )
+    } else {
+        Spacer(Modifier.height(tokens.minTouchTarget))
     }
 }
 

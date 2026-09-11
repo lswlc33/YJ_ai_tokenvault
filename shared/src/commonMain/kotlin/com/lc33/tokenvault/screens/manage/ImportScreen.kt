@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import org.jetbrains.compose.resources.pluralStringResource
@@ -18,6 +19,10 @@ import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.unit.dp
 import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.back_cd
+import tokenvault.shared.generated.resources.detail_key_secret
+import tokenvault.shared.generated.resources.editor_base_url
+import tokenvault.shared.generated.resources.editor_name
+import tokenvault.shared.generated.resources.editor_website
 import tokenvault.shared.generated.resources.import_confirm
 import tokenvault.shared.generated.resources.import_counts
 import tokenvault.shared.generated.resources.import_from_clipboard
@@ -42,12 +47,14 @@ import tokenvault.shared.generated.resources.import_skipped
 import tokenvault.shared.generated.resources.import_title
 import com.lc33.tokenvault.importer.ImportIssue
 import com.lc33.tokenvault.ui.miuix.AppCard
+import com.lc33.tokenvault.ui.miuix.AppFab
 import com.lc33.tokenvault.ui.miuix.AppChip
 import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppIconButton
 import com.lc33.tokenvault.ui.miuix.AppScaffold
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppActionRow
+import com.lc33.tokenvault.ui.miuix.AppSecretTextField
 import com.lc33.tokenvault.ui.miuix.AppTextField
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.AppTopBar
@@ -55,6 +62,7 @@ import com.lc33.tokenvault.ui.miuix.SectionTitle
 import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
 import com.lc33.tokenvault.ui.miuix.appTopBarScroll
 import com.lc33.tokenvault.ui.miuix.rememberAppTextFieldState
+import com.lc33.tokenvault.ui.miuix.rememberSecretTextFieldState
 import com.lc33.tokenvault.ui.miuix.rememberAppTopBarScrollState
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
 import com.lc33.tokenvault.ui.theme.LocalStatusPalette
@@ -75,6 +83,14 @@ data class ImportPreview(
     val selected: Boolean = true,
 )
 
+/** cURL 识别成功后填入表单的草稿。缺的字段由用户补齐后再确认写入。 */
+data class CurlImportForm(
+    val name: String = "",
+    val note: String = "",
+    val website: String = "",
+    val baseUrl: String = "",
+    val apiKey: String = "",
+)
 /**
  * 文本导入（计划.md §11、§13.4）。
  *
@@ -87,19 +103,53 @@ data class ImportPreview(
 @Composable
 fun ImportScreen(
     previews: List<ImportPreview>,
+    curlForm: CurlImportForm?,
     parseErrors: Int,
     importing: Boolean,
     onBack: () -> Unit,
     onParse: (String) -> Unit,
     onToggle: (Int) -> Unit,
     onConfirm: () -> Unit,
+    onConfirmCurl: (CurlImportForm) -> Unit,
     readClipboard: () -> String?,
 ) {
     val scrollState = rememberAppTopBarScrollState()
     val tokens = LocalAppTokens.current
     val textFieldState = rememberAppTextFieldState()
+    val curlName = rememberAppTextFieldState()
+    val curlWebsite = rememberAppTextFieldState()
+    val curlBaseUrl = rememberAppTextFieldState()
+    val curlApiKey = rememberSecretTextFieldState()
+
+    fun currentCurlForm() = CurlImportForm(
+        name = curlName.text.trim(),
+        website = curlWebsite.text.trim(),
+        baseUrl = curlBaseUrl.text.trim(),
+        apiKey = curlApiKey.text,
+    )
+
+    LaunchedEffect(curlForm) {
+        curlForm?.let {
+            if (curlName.text != it.name) curlName.setText(it.name)
+            if (curlWebsite.text != it.website) curlWebsite.setText(it.website)
+            if (curlBaseUrl.text != it.baseUrl) curlBaseUrl.setText(it.baseUrl)
+            if (curlApiKey.text != it.apiKey) curlApiKey.setText(it.apiKey)
+        }
+    }
 
     AppScaffold(
+        floatingActionButton = {
+            val curlReady = curlForm != null &&
+                curlName.text.isNotBlank() && curlBaseUrl.text.isNotBlank() && curlApiKey.text.isNotBlank()
+            val textReady = curlForm == null && previews.any { it.selected }
+            if ((curlReady || textReady) && !importing) {
+                AppFab(
+                    icon = AppIcon.Ok,
+                    contentDescription = pluralStringResource(Res.plurals.import_confirm, 1, 1),
+                    onClick = { if (curlForm != null) onConfirmCurl(currentCurlForm()) else onConfirm() },
+                )
+            }
+        },
         topBar = {
             AppTopBar(
                 title = stringResource(Res.string.import_title),
@@ -170,6 +220,45 @@ fun ImportScreen(
                 }
             }
 
+            curlForm?.let { form ->
+                item { SectionTitle(text = stringResource(Res.string.import_section_preview)) }
+                item {
+                    AppCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = tokens.screenPadding, vertical = tokens.itemSpacing),
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing)) {
+                            AppTextField(
+                                state = curlName,
+                                label = stringResource(Res.string.editor_name),
+                            )
+                            AppTextField(
+                                state = curlWebsite,
+                                label = stringResource(Res.string.editor_website),
+                            )
+                            AppTextField(
+                                state = curlBaseUrl,
+                                label = stringResource(Res.string.editor_base_url),
+                            )
+                            AppSecretTextField(
+                                state = curlApiKey,
+                                label = stringResource(Res.string.detail_key_secret),
+                            )
+                            AppActionRow(
+                                text = pluralStringResource(Res.plurals.import_confirm, 1, 1),
+                                enabled = !importing &&
+                                    curlName.text.isNotBlank() &&
+                                    curlBaseUrl.text.isNotBlank() &&
+                                    curlApiKey.text.isNotBlank(),
+                                onClick = { onConfirmCurl(currentCurlForm()) },
+                            )
+                        }
+                    }
+                }
+                item { Spacer(modifier = Modifier.height(tokens.sectionSpacing)) }
+                return@LazyColumn
+            }
             if (previews.isEmpty()) {
                 item {
                     AppText(

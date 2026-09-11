@@ -625,8 +625,10 @@
     <string name="about_summary_title">About YuanJi</string>
     <string name="about_software_summary">YuanJi stores AI provider keys, platform accounts, models, balances, and probe results locally. Secret fields are encrypted, while provider metadata stays available for an offline overview.</string>
     <string name="about_open_source_licenses">Open-source licenses</string>
-    <string name="about_open_source_summary">View the source and license information on GitHub.</string>
+    <string name="about_open_source_summary">View the libraries included in this app and their licenses.</string>
     <string name="key_sort_up">Move up</string>
     <string name="key_sort_down">Move down</string>
     <string name="key_enabled">Enabled</string>
-    <string name="key_settings_title">Key settings</string></resources>
+    <string name="key_settings_title">Key settings</string>    <string name="licenses_title">Open-source licenses</string>
+    <string name="licenses_intro">Libraries included in this app and their licenses.</string>
+    <string name="licenses_license_label">License</string></resources>

@@ -74,6 +74,7 @@ fun DashboardScreen(
             contentPadding = padding,
             verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
         ) {
+            item { Spacer(modifier = Modifier.height(tokens.itemSpacing)) }
             item {
                 BalanceCard(
                     balance = state.balance,
