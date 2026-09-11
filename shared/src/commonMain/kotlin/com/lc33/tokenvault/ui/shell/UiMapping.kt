@@ -250,8 +250,9 @@ fun aggregateBalanceOf(keys: List<ApiKey>): BalanceSnapshot? {
             error = snapshots.firstNotNullOfOrNull { it.error },
         )
     }
-    val grouped = successful.groupBy { it.currency }.toSortedMap()
-    val currency = grouped.keys.first()
+    val grouped = successful.groupBy { it.currency }
+    // Kotlin/Native 的 common stdlib 没有 toSortedMap；币种只要稳定排序即可。
+    val currency = grouped.keys.minOrNull() ?: return null
     val group = grouped.getValue(currency)
     val totalCents = group.fold(0L) { acc, snapshot ->
         acc + FormatMoney.roundedCents(snapshot.amount!!)
