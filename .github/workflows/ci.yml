@@ -295,46 +295,38 @@ jobs:
           echo "模拟器就绪 ✓"
           xcrun simctl install "$UDID" "$APP"
 
-          # --console-pty 用来接住 Kotlin/Native 未捕获异常；但它不保证输出
-          # “bundle: pid”，且父进程在 App 存活时不会退出。PID 改从宿主进程表里找，
-          # 退出路径则必须先强杀并回收父进程，绝不能无条件 wait。
-          CONSOLE_PID=""
-          console_cleanup() {
-            if [ -n "$CONSOLE_PID" ] && kill -0 "$CONSOLE_PID" 2>/dev/null; then
-              kill -9 "$CONSOLE_PID" 2>/dev/null || true
-              wait "$CONSOLE_PID" 2>/dev/null || true
-            fi
-          }
-          rm -f build/ios-sim-console.log
-          xcrun simctl launch --console-pty "$UDID" com.lc33.tokenvault \
-            > build/ios-sim-console.log 2>&1 &
-          CONSOLE_PID=$!
-          PID=""
-          for _ in $(seq 1 20); do
-            PID=$(ps -axo pid=,comm= | awk '$2 ~ /(^|\/)iosApp$/ { print $1; exit }')
-            [ -n "$PID" ] && break
-            sleep 1
-          done
-          echo "启动 pid: $PID"
-          if [ -z "$PID" ]; then
-            echo "::error::启动后没找到 iosApp 进程"
-            console_cleanup
-            tail -200 build/ios-sim-console.log || true
+          # 用普通 launch 拿退出码和 “bundle: pid”。--console-pty 在部分 runner 上
+          # 会停在 pty 建立阶段，结果既不输出错误也不启动 App；这次失败的表现就是
+          # console.log 为 0 字节且宿主进程表里没有 iosApp。
+          rm -f build/ios-launch.log
+          set +e
+          xcrun simctl launch "$UDID" com.lc33.tokenvault \
+            > build/ios-launch.log 2>&1
+          LAUNCH_STATUS=$?
+          set -e
+          cat build/ios-launch.log
+          if [ "$LAUNCH_STATUS" -ne 0 ]; then
+            echo "::error::simctl launch 失败（退出码 $LAUNCH_STATUS）"
             exit 1
           fi
+          PID=$(sed -nE 's/^[^:]+: ([0-9]+)$/\1/p' build/ios-launch.log | head -1)
+          if [ -z "$PID" ]; then
+            echo "::error::simctl launch 成功但输出里没有 pid"
+            exit 1
+          fi
+          echo "启动 pid: $PID"
           sleep 25
           if ps -p "$PID" > /dev/null 2>&1; then
             echo "应用启动后仍存活 ✓"
-            console_cleanup
             # cwd 已在 iosApp/ 里，路径写 build/…（修复：以前写成 iosApp/build/…
             # 落到 iosApp/iosApp/build/，截图 artifact 从没上传成功过）
             xcrun simctl io "$UDID" screenshot build/ios-sim-smoke.png || true
           else
             echo "::error::应用启动后退出（崩溃），pid： $PID"
             sleep 1
-            console_cleanup
-            echo "--- 应用控制台（末尾 200 行）---"
-            tail -200 build/ios-sim-console.log || true
+            echo "--- 应用系统日志（最近 1 分钟）---"
+            xcrun simctl spawn "$UDID" log show --last 1m \
+              --predicate 'process == "iosApp"' --style compact || true
             # 崩溃报告：两处目录里最近 5 分钟的 .ips 全部列出（不只按进程名猜）
             SIMLOGS="$HOME/Library/Developer/CoreSimulator/Devices/$UDID/data/Library/Logs/DiagnosticReports"
             found=0
@@ -356,7 +348,7 @@ jobs:
           name: ios-sim-smoke-logs
           path: |
             iosApp/build/ios-sim-smoke.png
-            iosApp/build/ios-sim-console.log
+            iosApp/build/ios-launch.log
           if-no-files-found: ignore
 
       # PR 不产 nightly IPA；这 23 分钟的 Release 链接只留给 master / 手动触发。
