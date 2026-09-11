@@ -18,7 +18,7 @@ import platform.Foundation.NSUserDomainMask
  * iOS 没有系统 SQLite 的 androidx 驱动，只能用内置的 [BundledSQLiteDriver]
  * （自带一份编好的 SQLite，行为与 Android 端系统库一致，Room KMP 官方推荐）。
  *
- * 外键 PRAGMA 与手写索引走 `RoomDatabase.Callback`——它在 commonMain 里也有，
+ * 外键 PRAGMA 走 `RoomDatabase.Callback`——它在 commonMain 里也有，
  * 时机与 Android 端完全对齐：`onOpen` 在 schema 校验之后跑，`IF NOT EXISTS`
  * 保证幂等（万一某个版本的 onCreate 漏了，升级时会自动补上）。
  * journal mode 用 Room 默认（WAL），与 Android 端一致。
@@ -43,16 +43,11 @@ fun createVaultDatabase(): VaultDatabase {
         .setDriver(BundledSQLiteDriver())
         .addCallback(
             object : RoomDatabase.Callback() {
-                override fun onCreate(connection: SQLiteConnection) {
-                    connection.execSQL(VaultDatabase.PARTIAL_INDEX_KEYS_DEFAULT)
-                }
-
                 override fun onOpen(connection: SQLiteConnection) {
                     connection.execSQL("PRAGMA foreign_keys = ON")
-                    connection.execSQL(VaultDatabase.PARTIAL_INDEX_KEYS_DEFAULT)
                 }
             },
         )
-        .addMigrations(VaultDatabase.MIGRATION_1_2)
+        .addMigrations(VaultDatabase.MIGRATION_1_2, VaultDatabase.MIGRATION_2_3)
             .build()
 }
