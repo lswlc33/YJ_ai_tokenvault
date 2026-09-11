@@ -103,6 +103,11 @@ android {
         localeFilters += listOf("zh-rCN", "en")
     }
 
+    // MigrationTestHelper 从测试 APK 的 assets 里读 Room 导出的 schema JSON。
+    sourceSets.getByName("androidTest") {
+        assets.srcDir(layout.projectDirectory.dir("../shared/schemas"))
+    }
+
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
