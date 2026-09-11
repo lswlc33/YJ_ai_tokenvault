@@ -143,7 +143,8 @@ fun VaultNavDisplay(
             appPredictivePopTransition(style, exitDirection, edge)
         },
         transitionEffects = NavDisplayTransitionEffects(
-            // 顶栏 tab 与二级页共用这个 effects 通道；关掉圆角裁切，避免底栏切换看起来像层级卡片动画。\n            enableCornerClip = false,
+            // 顶栏 tab 与二级页共用这个 effects 通道；关掉圆角裁切，避免底栏切换看起来像层级卡片动画。
+            enableCornerClip = false,
             dimAmount = 0f,
             blockInputDuringTransition = false,
             popDirectionFollowsSwipeEdge = style == PredictiveBackStyle.Scale &&
