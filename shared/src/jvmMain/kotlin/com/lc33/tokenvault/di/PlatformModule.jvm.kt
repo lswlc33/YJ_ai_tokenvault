@@ -22,7 +22,7 @@ import org.koin.dsl.module
  * 没有真实的发布形态，所以这里只求"能解析、行为合理"：数据库与 boot 文件放在
  * `~/.tokenvault/`，剪贴板是诚实的 no-op（JVM 没有系统剪贴板可谈）。
  *
- * 数据库回调与 iOS 端 / Android 端逐条对齐（外键 PRAGMA + 手写索引，WAL）。
+ * 数据库回调与 Android 端逐条对齐（外键 PRAGMA；v3 起没有手写部分索引）。
  */
 actual val platformModule: Module = module {
 
@@ -32,17 +32,12 @@ actual val platformModule: Module = module {
             .setDriver(BundledSQLiteDriver())
             .addCallback(
                 object : RoomDatabase.Callback() {
-                    override fun onCreate(connection: SQLiteConnection) {
-                        connection.execSQL(VaultDatabase.PARTIAL_INDEX_KEYS_DEFAULT)
-                    }
-
                     override fun onOpen(connection: SQLiteConnection) {
                         connection.execSQL("PRAGMA foreign_keys = ON")
-                        connection.execSQL(VaultDatabase.PARTIAL_INDEX_KEYS_DEFAULT)
                     }
                 },
             )
-            .addMigrations(VaultDatabase.MIGRATION_1_2)
+            .addMigrations(VaultDatabase.MIGRATION_1_2, VaultDatabase.MIGRATION_2_3)
             .build()
     }
 
