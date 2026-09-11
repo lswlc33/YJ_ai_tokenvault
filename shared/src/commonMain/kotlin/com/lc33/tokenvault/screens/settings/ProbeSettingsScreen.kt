@@ -9,6 +9,8 @@ import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.editor_probe_balance
 import tokenvault.shared.generated.resources.editor_probe_keys
 import tokenvault.shared.generated.resources.editor_probe_models
+import tokenvault.shared.generated.resources.editor_probe_model_reachability
+import tokenvault.shared.generated.resources.editor_probe_model_reachability_summary
 import tokenvault.shared.generated.resources.editor_probe_models_summary
 import tokenvault.shared.generated.resources.editor_probe_reachability
 import tokenvault.shared.generated.resources.probe_defaults_goto_manage
@@ -57,11 +59,13 @@ fun ProbeSettingsScreen(
     defaultProbeKeys: Boolean,
     defaultProbeBalance: Boolean,
     defaultProbeModels: Boolean,
+    defaultProbeModelReachability: Boolean,
     onSniffClientProfileChange: (Boolean) -> Unit,
     onDefaultProbeReachabilityChange: (Boolean) -> Unit,
     onDefaultProbeKeysChange: (Boolean) -> Unit,
     onDefaultProbeBalanceChange: (Boolean) -> Unit,
     onDefaultProbeModelsChange: (Boolean) -> Unit,
+    onDefaultProbeModelReachabilityChange: (Boolean) -> Unit,
     onBack: () -> Unit,
     onOpenManage: () -> Unit,
     onEditThresholds: () -> Unit,
@@ -96,6 +100,12 @@ fun ProbeSettingsScreen(
                     summary = stringResource(Res.string.editor_probe_models_summary),
                     checked = defaultProbeModels,
                     onCheckedChange = onDefaultProbeModelsChange,
+                )
+                AppSwitchRow(
+                    title = stringResource(Res.string.editor_probe_model_reachability),
+                    summary = stringResource(Res.string.editor_probe_model_reachability_summary),
+                    checked = defaultProbeModelReachability,
+                    onCheckedChange = onDefaultProbeModelReachabilityChange,
                 )
             }
         }

@@ -10,6 +10,7 @@ import com.lc33.tokenvault.data.dao.ApiKeyDao
 import com.lc33.tokenvault.data.entity.ApiKeyEntity
 import com.lc33.tokenvault.data.mapper.toDomain
 import com.lc33.tokenvault.domain.model.ApiKey
+import com.lc33.tokenvault.domain.model.BalanceSnapshot
 import com.lc33.tokenvault.domain.repo.ApiKeyRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -132,6 +133,19 @@ class RoomApiKeyRepository constructor(
         detail = detail,
         httpStatus = httpStatus,
         checkedAt = checkedAt,
+    )
+
+    override suspend fun updateBalance(
+        id: Long,
+        snapshot: BalanceSnapshot,
+    ) = dao.updateBalance(
+        id = id,
+        amount = snapshot.amount,
+        used = snapshot.used,
+        currency = snapshot.currency,
+        raw = snapshot.raw,
+        checkedAt = snapshot.checkedAt ?: now(),
+        error = snapshot.error,
     )
 
     override suspend fun resetProbeResults() = dao.resetProbeResults()

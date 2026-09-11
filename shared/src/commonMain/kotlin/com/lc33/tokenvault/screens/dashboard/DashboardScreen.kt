@@ -16,8 +16,10 @@ import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.unit.dp
 import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.dashboard_title
+import tokenvault.shared.generated.resources.refresh_status_cd
 import com.lc33.tokenvault.screens.model.DashboardUiState
-import com.lc33.tokenvault.ui.common.UpdateHighlightCard
+import com.lc33.tokenvault.ui.miuix.AppIcon
+import com.lc33.tokenvault.ui.miuix.AppIconButton
 import com.lc33.tokenvault.ui.miuix.AppScaffold
 import com.lc33.tokenvault.ui.miuix.AppTopBar
 import com.lc33.tokenvault.ui.miuix.appTopBarScroll
@@ -39,13 +41,13 @@ fun DashboardScreen(
     state: DashboardUiState,
     onOpenProvider: (Long) -> Unit,
     onOpenManage: () -> Unit,
-    onOpenUpdate: () -> Unit,
     onOpenProbeRun: () -> Unit,
     onOpenSync: () -> Unit,
     onOpenBalanceBreakdown: () -> Unit,
     onStartProbe: () -> Unit,
     onCancelProbe: () -> Unit,
     onRefreshBalance: () -> Unit,
+    onRefreshStatus: () -> Unit,
 ) {
     val scrollState = rememberAppTopBarScrollState()
     val tokens = LocalAppTokens.current
@@ -55,6 +57,13 @@ fun DashboardScreen(
             AppTopBar(
                 title = stringResource(Res.string.dashboard_title),
                 scrollState = scrollState,
+                actions = {
+                    AppIconButton(
+                        icon = AppIcon.Refresh,
+                        contentDescription = stringResource(Res.string.refresh_status_cd),
+                        onClick = onRefreshStatus,
+                    )
+                },
             )
         },
     ) { padding ->
@@ -65,8 +74,6 @@ fun DashboardScreen(
             contentPadding = padding,
             verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
         ) {
-            item { UpdateHighlightCard(onOpenUpdate = onOpenUpdate) }
-
             item {
                 BalanceCard(
                     balance = state.balance,

@@ -55,6 +55,9 @@ interface BackupStore {
     /** 插入密钥（内部两步写 + 加密，红线 24）。恢复默认/停用标记一并处理。 */
     suspend fun insertKey(providerId: Long, key: BackupApiKey)
 
+    /** 按密钥明文找已恢复的 Key id；secret 为 null 时返回默认 Key。 */
+    suspend fun findKeyId(providerId: Long, secret: String?): Long?
+
     /** 该供应商下是否已有同指纹账号（usernameFp 用本机 DEK 重算）。 */
     suspend fun accountExists(providerId: Long, username: String?): Boolean
 
@@ -62,10 +65,10 @@ interface BackupStore {
     suspend fun insertAccount(providerId: Long, account: BackupAccount)
 
     /** 该供应商下是否已有同 modelId 的模型。 */
-    suspend fun modelExists(providerId: Long, modelId: String): Boolean
+    suspend fun modelExists(providerId: Long, keyId: Long?, modelId: String, protocol: String): Boolean
 
     /** 插入模型。 */
-    suspend fun insertModel(providerId: Long, model: BackupModel)
+    suspend fun insertModel(providerId: Long, keyId: Long?, model: BackupModel)
 
     // ------------------------------------------------------------------ 恢复：设置
 

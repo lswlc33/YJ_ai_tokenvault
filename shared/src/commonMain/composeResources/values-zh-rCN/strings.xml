@@ -1,4 +1,4 @@
-﻿<resources>
+<resources>
     <string name="app_name">元记</string>
 
     <!-- Generic -->
@@ -318,9 +318,6 @@
     <string name="update_channel">更新渠道</string>
     <string name="update_channel_summary">nightly 没过发布前的回归</string>
     <string name="update_section_honesty">这件事到底做了什么</string>
-    <string name="update_highlight_title">检查更新</string>
-    <string name="update_highlight_summary">当前版本 %1$s。更新检查只在你进入更新页后手动触发。</string>
-    <string name="update_highlight_action">打开更新页</string>
     <string name="update_check_now">立即检查</string>
     <string name="update_checking">正在检查…</string>
     <string name="update_up_to_date">已经是最新版本。</string>
@@ -498,8 +495,8 @@
     <string name="editor_probe_keys_summary">模型列表接口鉴权的站不花钱。不鉴权的站要靠真实调用才有结论，那一次只能手动。</string>
     <string name="editor_probe_balance">余额查询</string>
     <string name="editor_probe_balance_summary">问的是管理接口。不花钱。</string>
-    <string name="editor_probe_models">模型探测 / 预热</string>
-    <string name="editor_probe_models_summary">每个模型一次真实调用，会花钱。只能手动触发，自动探测永远不含它。关掉之后这一家连手动按钮都不出现。</string>
+    <string name="editor_probe_models">模型列表检测</string>
+    <string name="editor_probe_models_summary">开启后，探测时会按密钥自动更新模型列表；关闭后需要手动添加和编辑模型。</string>
     <string name="probe_section_defaults">新建供应商时的默认值</string>
     <string name="probe_defaults_notice">下面这几个开关只是「新建供应商时用哪个默认值」。每家供应商建好之后各自留一份，因为每个中转站都不一样——有的在条款里禁止自动化检测，有的三个请求就限流。改这里的默认值不会动你已经有的那些供应商。</string>
     <string name="probe_defaults_goto_manage">逐家去看一遍</string>
@@ -593,4 +590,35 @@
     <string name="groups_name_label">分组名称</string>
     <string name="groups_delete_title">删掉这个分组？</string>
     <string name="groups_delete_body">里面的供应商不会被删——它们会落回「全部」。</string>
+    <!-- 绑定密钥的模型、快捷模型探测与账号登录方式。 -->
+    <string name="detail_models_section">模型</string>
+    <string name="detail_models_empty_auto">还没有模型。刷新这把密钥，或等下一轮探测自动更新。</string>
+    <string name="detail_models_empty_manual">还没有模型。请手动添加。</string>
+    <string name="detail_add_model">添加模型</string>
+    <string name="detail_model_edit">编辑模型</string>
+    <string name="detail_model_id">模型 ID</string>
+    <string name="detail_model_display_name">显示名称</string>
+    <string name="detail_model_protocol">协议</string>
+    <string name="detail_model_enabled">启用</string>
+    <string name="detail_model_delete">删掉这个模型？</string>
+    <string name="detail_model_delete_action">删除模型</string>
+    <string name="detail_models_quick_hint">长按模型可发送一次简短请求。</string>
+    <string name="detail_reachability_latency">供应商延迟：%1$d ms</string>
+    <string name="detail_account_login_methods">登录方式</string>
+    <string name="login_method_github">GitHub</string>
+    <string name="login_method_linuxdo">LINUX DO</string>
+    <string name="refresh_status_cd">刷新余额和供应商延迟</string>
+
+    <!-- 探测默认值。 -->
+    <string name="editor_probe_model_reachability">模型可达性探测（快捷）</string>
+    <string name="editor_probe_model_reachability_summary">默认关闭。开启后长按模型，才会发送一次简短的付费请求。</string>
+    <string name="editor_probe_models_confirm_title">清除已保存的模型？</string>
+    <string name="editor_probe_models_confirm_action">开启</string>
+    <string name="editor_probe_models_confirm_body">开启模型列表检测会清除这家已保存的模型列表。之后每轮探测会按密钥重新拉取。</string>
+
+    <!-- 关于页。 -->
+    <string name="about_summary_title">关于元记</string>
+    <string name="about_software_summary">元记在本地保存 AI 供应商密钥、平台账号、模型、余额与探测结果。秘密字段会加密，供应商元数据保留在本地以便离线总览。</string>
+    <string name="about_open_source_licenses">开放源代码许可</string>
+    <string name="about_open_source_summary">在 GitHub 查看源代码与许可信息。</string>
 </resources>

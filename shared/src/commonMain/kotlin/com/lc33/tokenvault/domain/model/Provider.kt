@@ -69,6 +69,11 @@ data class Provider(
     /** 单独超时，null 表示用全局值。 */
     val timeoutSeconds: Int? = null,
 
+    /** 最近一次供应商可达性探测的延迟。只表示站点可达，不代表任何密钥有效。 */
+    val reachabilityLatencyMs: Long? = null,
+    val reachabilityCheckedAt: Long? = null,
+    val reachabilityError: String? = null,
+
     /** 探测开关，**每家单独一份**（红线 36）。 */
     val probe: ProviderProbeSettings = ProviderProbeSettings(),
 
@@ -103,6 +108,9 @@ data class Provider(
             balance == other.balance &&
             quotaCalibrated == other.quotaCalibrated &&
             timeoutSeconds == other.timeoutSeconds &&
+            reachabilityLatencyMs == other.reachabilityLatencyMs &&
+            reachabilityCheckedAt == other.reachabilityCheckedAt &&
+            reachabilityError == other.reachabilityError &&
             probe == other.probe &&
             createdAt == other.createdAt &&
             updatedAt == other.updatedAt
@@ -116,6 +124,7 @@ data class Provider(
         result = 31 * result + (balanceTokenEnc?.contentHashCode() ?: 0)
         result = 31 * result + balanceKind.hashCode()
         result = 31 * result + (balance?.hashCode() ?: 0)
+        result = 31 * result + (reachabilityLatencyMs?.hashCode() ?: 0)
         result = 31 * result + probe.hashCode()
         result = 31 * result + updatedAt.hashCode()
         return result
@@ -128,7 +137,7 @@ data class Provider(
  * 全局一份开关没法表达"这一家先别自动探"，而这是真实需求：额度紧的那家不想被 L3 烧钱，
  * 挂在 Cloudflare 后面的那家不想被定时任务反复撞 1015。设置里的同名项只是**新建时的默认值**。
  *
- * [enabled] 是总闸。关掉时 UI 上其余四项**灰掉而不是隐藏**——藏起来会让人以为设置丢了。
+ * [enabled] 是总闸。关掉时 UI 上其余五项**灰掉而不是隐藏**——藏起来会让人以为设置丢了。
  */
 data class ProviderProbeSettings(
     val enabled: Boolean = true,
@@ -136,8 +145,11 @@ data class ProviderProbeSettings(
     val keyValidity: Boolean = true,
     val balance: Boolean = true,
 
-    /** 逐模型探测。**必然花钱**，所以默认关，而且自动路径上一概不许（红线 36）。 */
+    /** 模型列表自动检测。开启后探测时按 Key 拉取并合并模型列表。 */
     val models: Boolean = false,
+
+    /** 模型可达性探测（快捷）。默认关，只允许用户长按模型手动触发。 */
+    val modelReachability: Boolean = false,
 )
 
 /**

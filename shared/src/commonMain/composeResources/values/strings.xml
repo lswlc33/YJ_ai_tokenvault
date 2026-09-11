@@ -1,4 +1,4 @@
-﻿<resources>
+<resources>
     <string name="app_name">YuanJi</string>
 
     <!-- Generic -->
@@ -319,9 +319,6 @@
     <string name="update_channel">Update channel</string>
     <string name="update_channel_summary">Nightly is not release-tested</string>
     <string name="update_section_honesty">What this actually does</string>
-    <string name="update_highlight_title">Check for updates</string>
-    <string name="update_highlight_summary">Current version %1$s. Update checks stay manual on the update page.</string>
-    <string name="update_highlight_action">Open update page</string>
     <string name="update_check_now">Check now</string>
     <string name="update_checking">Checking…</string>
     <string name="update_up_to_date">You are on the latest version.</string>
@@ -502,8 +499,8 @@
     <string name="editor_probe_keys_summary">Costs nothing where the model list is authenticated. Where it is not, a verdict needs a real call — that one is manual only.</string>
     <string name="editor_probe_balance">Balance query</string>
     <string name="editor_probe_balance_summary">Asks the management API. Costs nothing.</string>
-    <string name="editor_probe_models">Model probe / warm-up</string>
-    <string name="editor_probe_models_summary">One real call per model, so it costs money. Manual only — automatic probing never includes it. Turning this off also hides the manual button for this provider.</string>
+    <string name="editor_probe_models">Model list detection</string>
+    <string name="editor_probe_models_summary">When on, model lists update automatically per key during probing. When off, models are maintained manually.</string>
     <string name="probe_section_defaults">Defaults for new providers</string>
     <string name="probe_defaults_notice">The switches below are only the defaults used when you add a provider. Each provider keeps its own copy afterwards, because every gateway is different — some forbid automated checks in their terms, some rate-limit after three requests. Changing a default here does not touch providers you already have.</string>
     <string name="probe_defaults_goto_manage">Review them provider by provider</string>
@@ -598,4 +595,35 @@
     <string name="groups_name_label">Group name</string>
     <string name="groups_delete_title">Delete this group?</string>
     <string name="groups_delete_body">The providers in it are not deleted — they fall back to All.</string>
+    <!-- Key-bound models, quick model probing, and account login methods. -->
+    <string name="detail_models_section">Models</string>
+    <string name="detail_models_empty_auto">No model yet. Refresh this key or wait for the next probe.</string>
+    <string name="detail_models_empty_manual">No model yet. Add one manually.</string>
+    <string name="detail_add_model">Add model</string>
+    <string name="detail_model_edit">Edit model</string>
+    <string name="detail_model_id">Model ID</string>
+    <string name="detail_model_display_name">Display name</string>
+    <string name="detail_model_protocol">Protocol</string>
+    <string name="detail_model_enabled">Enabled</string>
+    <string name="detail_model_delete">Delete this model?</string>
+    <string name="detail_model_delete_action">Delete model</string>
+    <string name="detail_models_quick_hint">Long-press a model to send one short request.</string>
+    <string name="detail_reachability_latency">Provider latency: %1$d ms</string>
+    <string name="detail_account_login_methods">Login methods</string>
+    <string name="login_method_github">GitHub</string>
+    <string name="login_method_linuxdo">LINUX DO</string>
+    <string name="refresh_status_cd">Refresh balance and provider latency</string>
+
+    <!-- Probe defaults. -->
+    <string name="editor_probe_model_reachability">Model reachability probe (quick)</string>
+    <string name="editor_probe_model_reachability_summary">Off by default. When enabled, long-press a model to send one short paid request.</string>
+    <string name="editor_probe_models_confirm_title">Clear saved models?</string>
+    <string name="editor_probe_models_confirm_action">Turn on</string>
+    <string name="editor_probe_models_confirm_body">Turning on model list detection will clear this provider's saved model lists. New lists will be fetched per key during probing.</string>
+
+    <!-- About page. -->
+    <string name="about_summary_title">About YuanJi</string>
+    <string name="about_software_summary">YuanJi stores AI provider keys, platform accounts, models, balances, and probe results locally. Secret fields are encrypted, while provider metadata stays available for an offline overview.</string>
+    <string name="about_open_source_licenses">Open-source licenses</string>
+    <string name="about_open_source_summary">View the source and license information on GitHub.</string>
 </resources>

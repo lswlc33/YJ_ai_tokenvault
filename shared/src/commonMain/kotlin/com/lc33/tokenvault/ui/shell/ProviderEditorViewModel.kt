@@ -9,6 +9,7 @@ import com.lc33.tokenvault.domain.model.Group
 import com.lc33.tokenvault.domain.model.Provider
 import com.lc33.tokenvault.domain.repo.ClientProfileRepository
 import com.lc33.tokenvault.domain.repo.GroupRepository
+import com.lc33.tokenvault.domain.repo.ModelRepository
 import com.lc33.tokenvault.domain.repo.ProviderRepository
 import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.endpoint.NormalizeResult
@@ -43,6 +44,7 @@ class ProviderEditorViewModel constructor(
     private val providers: ProviderRepository,
     private val groupRepository: GroupRepository,
     private val clientProfiles: ClientProfileRepository,
+    private val models: ModelRepository,
     private val settings: SettingsRepository,
     private val providerId: Long?,
 ) : ViewModel() {
@@ -105,6 +107,7 @@ class ProviderEditorViewModel constructor(
                     probeKeys = defaults.keys,
                     probeBalance = defaults.balance,
                     probeModels = defaults.models,
+                    probeModelReachability = defaults.modelReachability,
                 )
             }
         }
@@ -129,7 +132,15 @@ class ProviderEditorViewModel constructor(
         }
         viewModelScope.launch {
             try {
-                providers.save(draft.toProvider(loadedProvider, normalized, groups.value, profiles.value), token)
+                val savedId = providers.save(
+                    draft.toProvider(loadedProvider, normalized, groups.value, profiles.value),
+                    token,
+                )
+                // “开启模型列表自动更新”承诺会清掉旧列表；确认发生在 UI，真正清理放在
+                // 保存成功之后，避免用户取消编辑时模型已经被删。
+                if (loadedProvider?.probe?.models == false && draft.probeModels) {
+                    models.clearByProvider(savedId)
+                }
                 _saved.tryEmit(Unit)
             } finally {
                 token?.zeroize()

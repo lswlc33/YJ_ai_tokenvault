@@ -1,6 +1,7 @@
 package com.lc33.tokenvault.importer
 
 import com.lc33.tokenvault.domain.BalanceKind
+import com.lc33.tokenvault.domain.LoginMethod
 import com.lc33.tokenvault.domain.Protocol
 
 /**
@@ -122,6 +123,7 @@ data class ParsedAccount(
     val username: CharArray? = null,
     val password: CharArray? = null,
     val loginUrl: String? = null,
+    val loginMethods: Set<LoginMethod> = emptySet(),
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

@@ -38,6 +38,17 @@ enum class BalanceKind(val wireName: String, val usesOwnToken: Boolean) {
     }
 }
 
+/** 平台账号的登录方式。只做记录，不承担任何登录能力。 */
+enum class LoginMethod(val wireName: String) {
+    GITHUB("github"),
+    LINUX_DO("linuxdo"),
+    ;
+
+    companion object {
+        fun fromWireName(value: String): LoginMethod? = entries.firstOrNull { it.wireName == value }
+    }
+}
+
 /** 模型来源（§8.3 的三路合并）。 */
 enum class ModelSource(val wireName: String) {
     /** 用户手动录入。**自动同步永不改动它**（红线 13）。 */

@@ -157,6 +157,18 @@ internal class FakeProviderDao : ProviderDao {
         )
     }
 
+    override suspend fun updateReachability(
+        id: Long,
+        latencyMs: Long?,
+        checkedAt: Long,
+        error: String?,
+    ) = replace(id) {
+        it.copy(
+            reachabilityLatencyMs = latencyMs,
+            reachabilityCheckedAt = checkedAt,
+            reachabilityError = error,
+        )
+    }
     override suspend fun calibrateQuotaPerUnit(id: Long, quotaPerUnit: Double) =
         replace(id) { it.copy(quotaPerUnit = quotaPerUnit, quotaCalibrated = true) }
 
@@ -271,6 +283,24 @@ internal class FakeApiKeyDao : ApiKeyDao {
         )
     }
 
+    override suspend fun updateBalance(
+        id: Long,
+        amount: Double?,
+        used: Double?,
+        currency: String?,
+        raw: String?,
+        checkedAt: Long,
+        error: String?,
+    ) = replace(id) {
+        it.copy(
+            balanceAmount = amount,
+            balanceUsed = used,
+            balanceCurrency = currency,
+            balanceRaw = raw,
+            balanceCheckedAt = checkedAt,
+            balanceError = error,
+        )
+    }
     override suspend fun resetProbeResults() {
         store.indices.forEach { i ->
             store[i] = store[i].copy(
@@ -341,6 +371,9 @@ internal class FakeProviderAccountDao : ProviderAccountDao {
     override suspend fun setPassword(id: Long, enc: ByteArray, now: Long) =
         replace(id) { it.copy(passwordEnc = enc, updatedAt = now) }
 
+    override suspend fun setLoginMethods(id: Long, loginMethods: String, now: Long) =
+        replace(id) { it.copy(loginMethods = loginMethods, updatedAt = now) }
+
     private inline fun replace(id: Long, transform: (ProviderAccountEntity) -> ProviderAccountEntity) {
         val index = store.indexOfFirst { it.id == id }
         if (index < 0) return
@@ -374,6 +407,14 @@ internal class FakeModelDao : ModelDao {
     override suspend fun findByProvider(providerId: Long): List<ModelEntity> =
         ordered().filter { it.providerId == providerId }
 
+    override suspend fun findByProviderAndKey(providerId: Long, keyId: Long): List<ModelEntity> =
+        ordered().filter { it.providerId == providerId && it.keyId == keyId }
+
+    override suspend fun deleteByProvider(providerId: Long) {
+        store.removeAll { it.providerId == providerId }
+        revision.value++
+    }
+
     override suspend fun findById(id: Long): ModelEntity? = store.firstOrNull { it.id == id }
 
     override suspend fun insertIgnoring(model: ModelEntity): Long {
@@ -396,11 +437,16 @@ internal class FakeModelDao : ModelDao {
     override suspend fun touchLastSeen(id: Long, now: Long) =
         replace(id) { it.copy(lastSeenAt = now) }
 
-    override suspend fun disableVanished(providerId: Long, protocol: String, seenModelIds: List<String>) {
+    override suspend fun disableVanished(
+        providerId: Long,
+        keyId: Long,
+        protocol: String,
+        seenModelIds: List<String>,
+    ) {
         store.indices
             .filter {
                 val m = store[it]
-                m.providerId == providerId && m.source == "discovered" &&
+                m.providerId == providerId && m.keyId == keyId && m.source == "discovered" &&
                     m.discoveredVia == protocol && m.modelId !in seenModelIds
             }
             .forEach { store[it] = store[it].copy(enabled = false) }

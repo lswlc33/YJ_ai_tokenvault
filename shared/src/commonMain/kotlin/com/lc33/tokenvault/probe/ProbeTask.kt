@@ -48,6 +48,9 @@ data class ProbeItemResult(
     val health: KeyHealth? = null,
     val detail: String? = null,
     val latencyMs: Long? = null,
+
+    /** 原始响应体。只给引擎做模型列表解析，绝不直接进 UI 或日志。 */
+    val body: String? = null,
 )
 
 /** 一轮探测的进度。 */

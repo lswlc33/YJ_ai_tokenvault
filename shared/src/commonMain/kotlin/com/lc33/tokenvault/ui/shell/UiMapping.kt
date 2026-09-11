@@ -40,7 +40,8 @@ import com.lc33.tokenvault.screens.model.UiProviderRow
  * 于是列表页手上就有了密文与足以解开它的上下文。
  *
  * **这一层全是纯函数、不读资源、不读当前时间**：需要本地化的东西（相对时间、状态文案）
- * 留给页面去 `stringResource`，需要 `now` 的地方由调用方传。所以它可以在 JVM 单测里覆盖。
+ * 留给页面去 `stringResource`，需要
+ow` 的地方由调用方传。所以它可以在 JVM 单测里覆盖。
  */
 
 /**
@@ -156,6 +157,7 @@ fun ProviderSummary.toRow(
         staleThisRound = staleThisRound,
         sortOrder = provider.sortOrder,
         lastProbeAt = lastProbeAt,
+        reachabilityLatencyMs = provider.reachabilityLatencyMs,
     )
 
 /**
@@ -187,6 +189,8 @@ fun ApiKey.toRow(masked: String): UiKeyRow = UiKeyRow(
     latencyMs = latencyMs,
     checkedAt = checkedAt,
     isDefault = isDefault,
+    balance = balance.toUiMoney(),
+    balanceFailed = balance?.failed == true,
 )
 
 /**
@@ -202,6 +206,7 @@ fun AiModel.toRow(): UiModelRow = UiModelRow(
     modelId = modelId,
     displayName = displayName,
     providerId = providerId,
+    keyId = keyId,
     protocol = protocol.wireName,
     source = when (source) {
         ModelSource.MANUAL -> UiModelSource.Manual
@@ -226,7 +231,39 @@ fun ProviderAccount.toRow(maskedUsername: String): UiAccountRow = UiAccountRow(
     label = label,
     providerId = providerId,
     maskedUsername = maskedUsername,
+    loginMethods = loginMethods.map { it.wireName },
 )
+
+/**
+ * 把一家供应商所有 Key 的余额合成一个展示快照。
+ *
+ * 同币种先定点舍入再相加；只要有任何一把 Key 查成功，就不把整家标成失败。多币种时
+ * 取字母序第一组展示（列表行只有一个金额位），仪表盘合计仍按币种分组，不做汇率换算。
+ */
+fun aggregateBalanceOf(keys: List<ApiKey>): BalanceSnapshot? {
+    val snapshots = keys.mapNotNull { it.balance }
+    if (snapshots.isEmpty()) return null
+    val successful = snapshots.filter { !it.failed && it.amount != null }
+    if (successful.isEmpty()) {
+        return BalanceSnapshot(
+            checkedAt = snapshots.mapNotNull { it.checkedAt }.maxOrNull(),
+            error = snapshots.firstNotNullOfOrNull { it.error },
+        )
+    }
+    val grouped = successful.groupBy { it.currency }.toSortedMap()
+    val currency = grouped.keys.first()
+    val group = grouped.getValue(currency)
+    val totalCents = group.fold(0L) { acc, snapshot ->
+        acc + FormatMoney.roundedCents(snapshot.amount!!)
+    }
+    return BalanceSnapshot(
+        amount = totalCents / 100.0,
+        used = group.mapNotNull { it.used }.takeIf { it.size == group.size }
+            ?.sumOf { FormatMoney.roundedCents(it) }?.div(100.0),
+        currency = currency,
+        checkedAt = snapshots.mapNotNull { it.checkedAt }.maxOrNull(),
+    )
+}
 
 /** 供应商的协议集合供编辑页显示；顺序按枚举声明，所以每次进页面 chips 不会跳。 */
 fun Provider.protocolWireNames(): List<String> = supportedProtocols.map { it.wireName }
@@ -279,6 +316,10 @@ fun healthBreakdownOf(keys: List<ApiKey>): HealthBreakdown {
  *    字母序至少是**稳定**的：刷一次余额不会让两行对调。
  */
 fun balanceSummaryOf(providers: List<Provider>): BalanceSummary {
+    val failedProviderCount = providers.count { provider ->
+        val providerSnapshots = listOfNotNull(provider.balance)
+        providerSnapshots.isNotEmpty() && providerSnapshots.all { it.failed }
+    }
     val snapshots = providers.mapNotNull { it.balance }
     val perCurrency = snapshots
         .filter { !it.failed && it.amount != null }
@@ -296,7 +337,31 @@ fun balanceSummaryOf(providers: List<Provider>): BalanceSummary {
         perCurrency = perCurrency,
         // 最新那一次查询的时间。取最大值而不是最小：这一行回答的是“这堆数字有多新”
         updatedAt = snapshots.mapNotNull { it.checkedAt }.maxOrNull(),
-        failedProviderCount = snapshots.count { it.failed },
+        failedProviderCount = failedProviderCount,
+    )
+}
+
+/** Key 级余额的仪表盘合计：每张 Key 一份快照，按币种分组，不做汇率换算。 */
+fun keyBalanceSummaryOf(keys: List<ApiKey>): BalanceSummary {
+    val snapshots = keys.mapNotNull { it.balance }
+    val perCurrency = snapshots
+        .filter { !it.failed && it.amount != null }
+        .groupBy { it.currency }
+        .toList()
+        .sortedBy { it.first }
+        .map { (currency, group) ->
+            val totalCents = group.fold(0L) { acc, snapshot ->
+                acc + FormatMoney.roundedCents(snapshot.amount!!)
+            }
+            UiMoney(currency = currency, amount = FormatMoney.centsToPlainString(totalCents))
+        }
+    return BalanceSummary(
+        perCurrency = perCurrency,
+        updatedAt = snapshots.mapNotNull { it.checkedAt }.maxOrNull(),
+        failedProviderCount = keys.groupBy { it.providerId }.count { (_, providerKeys) ->
+            val providerSnapshots = providerKeys.mapNotNull { it.balance }
+            providerSnapshots.isNotEmpty() && providerSnapshots.all { it.failed }
+        },
     )
 }
 

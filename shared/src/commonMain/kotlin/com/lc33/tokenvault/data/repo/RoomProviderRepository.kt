@@ -117,6 +117,18 @@ class RoomProviderRepository constructor(
             calibrated = calibrated,
         )
 
+    override suspend fun updateReachability(
+        id: Long,
+        latencyMs: Long?,
+        checkedAt: Long,
+        error: String?,
+    ) = dao.updateReachability(
+        id = id,
+        latencyMs = latencyMs,
+        checkedAt = checkedAt,
+        error = error,
+    )
+
     override suspend fun calibrateQuotaPerUnit(id: Long, quotaPerUnit: Double) =
         dao.calibrateQuotaPerUnit(id, quotaPerUnit)
 

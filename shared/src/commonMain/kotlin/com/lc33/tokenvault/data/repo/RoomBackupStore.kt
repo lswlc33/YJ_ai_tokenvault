@@ -33,6 +33,7 @@ import com.lc33.tokenvault.data.entity.ProviderEntity
 import com.lc33.tokenvault.data.mapper.headersToJson
 import com.lc33.tokenvault.data.mapper.pathOverridesToJson
 import com.lc33.tokenvault.data.mapper.toCsv
+import com.lc33.tokenvault.data.mapper.csvToList
 import com.lc33.tokenvault.data.mapper.toHeaderList
 import com.lc33.tokenvault.data.mapper.toPathOverrides
 import com.lc33.tokenvault.data.mapper.toProtocolSet
@@ -115,21 +116,25 @@ class RoomBackupStore constructor(
                     probeKeyValidity = entity.probeKeyValidity,
                     probeBalance = entity.probeBalance,
                     probeModels = entity.probeModels,
+                    probeModelReachability = entity.probeModelReachability,
                 )
             } finally {
                 balanceToken?.zeroize()
             }
         }
 
+        val keySecretById = mutableMapOf<Long, String>()
         val apiKeys = keyDao.findAll().mapNotNull { entity ->
             val ref = providerRefById[entity.providerId] ?: return@mapNotNull null
             val secret = revealSecret(entity)
             try {
+                val secretText = secret.concatToString()
+                keySecretById[entity.id] = secretText
                 BackupApiKey(
                     providerName = ref.first,
                     providerApiRoot = ref.second,
                     label = entity.label,
-                    secret = secret.concatToString(),
+                    secret = secretText,
                     isDefault = entity.isDefault,
                     enabled = entity.enabled,
                     sortOrder = entity.sortOrder,
@@ -157,6 +162,7 @@ class RoomBackupStore constructor(
                     username = username?.concatToString(),
                     password = password?.concatToString(),
                     loginUrl = entity.loginUrl,
+                    loginMethods = entity.loginMethods.csvToList(),
                     note = entity.note,
                     sortOrder = entity.sortOrder,
                 )
@@ -171,6 +177,7 @@ class RoomBackupStore constructor(
             BackupModel(
                 providerName = ref.first,
                 providerApiRoot = ref.second,
+                keySecret = entity.keyId?.let { keySecretById[it] },
                 modelId = entity.modelId,
                 protocol = entity.protocol,
                 displayName = entity.displayName,
@@ -289,6 +296,7 @@ class RoomBackupStore constructor(
                 probeKeyValidity = provider.probeKeyValidity,
                 probeBalance = provider.probeBalance,
                 probeModels = provider.probeModels,
+                probeModelReachability = provider.probeModelReachability,
                 createdAt = stamp,
                 updatedAt = stamp,
             ),
@@ -352,6 +360,17 @@ class RoomBackupStore constructor(
         }
     }
 
+    override suspend fun findKeyId(providerId: Long, secret: String?): Long? {
+        if (secret == null) return keyDao.findDefault(providerId)?.id
+        val bytes = secret.toCharArray().toUtf8()
+        return try {
+            val fingerprint = cipher.fingerprint(bytes)
+            keyDao.findByProvider(providerId).firstOrNull { it.fingerprint == fingerprint }?.id
+        } finally {
+            bytes.zeroize()
+        }
+    }
+
     override suspend fun accountExists(providerId: Long, username: String?): Boolean {
         if (username == null) return false
         val bytes = username.toCharArray().toUtf8()
@@ -377,6 +396,7 @@ class RoomBackupStore constructor(
                     usernameFp = usernameFp,
                     passwordEnc = null,
                     loginUrl = account.loginUrl,
+                    loginMethods = account.loginMethods.joinToString(","),
                     note = account.note,
                     sortOrder = account.sortOrder,
                     createdAt = stamp,
@@ -395,14 +415,21 @@ class RoomBackupStore constructor(
         }
     }
 
-    override suspend fun modelExists(providerId: Long, modelId: String): Boolean =
-        modelDao.findByProvider(providerId).any { it.modelId == modelId }
+    override suspend fun modelExists(
+        providerId: Long,
+        keyId: Long?,
+        modelId: String,
+        protocol: String,
+    ): Boolean = modelDao.findByProvider(providerId).any {
+        it.keyId == keyId && it.modelId == modelId && it.protocol == protocol
+    }
 
-    override suspend fun insertModel(providerId: Long, model: BackupModel) {
+    override suspend fun insertModel(providerId: Long, keyId: Long?, model: BackupModel) {
         val stamp = now()
         modelDao.insertIgnoring(
             ModelEntity(
                 providerId = providerId,
+                keyId = keyId,
                 modelId = model.modelId,
                 protocol = model.protocol,
                 displayName = model.displayName,

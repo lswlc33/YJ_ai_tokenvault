@@ -340,7 +340,7 @@ class SettingsRepositoryTest {
     fun `默认探测值存的是 JSON 对象，键名是字段名`() = runTest {
         repo.setDefaultProbeSettings(DefaultProbeSettings())
         val raw = dao.rows.single { it.key == "defaultProbe" }.value
-        assertEquals("{\"reachability\":true,\"keys\":true,\"balance\":true,\"models\":false}", raw)
+        assertEquals("{\"reachability\":true,\"keys\":true,\"balance\":true,\"models\":false,\"modelReachability\":false}", raw)
     }
 
     @Test
@@ -354,7 +354,7 @@ class SettingsRepositoryTest {
         )
         repo.observeDefaultProbeSettings().test {
             assertEquals(
-                DefaultProbeSettings(reachability = true, keys = true, balance = true, models = true),
+                DefaultProbeSettings(reachability = true, keys = true, balance = true, models = false),
                 awaitItem(),
             )
             cancelAndIgnoreRemainingEvents()

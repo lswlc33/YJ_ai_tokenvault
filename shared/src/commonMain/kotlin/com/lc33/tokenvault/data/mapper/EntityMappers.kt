@@ -11,6 +11,7 @@ import com.lc33.tokenvault.data.entity.ProviderEntity
 import com.lc33.tokenvault.domain.AuthStyle
 import com.lc33.tokenvault.domain.BalanceKind
 import com.lc33.tokenvault.domain.KeyHealth
+import com.lc33.tokenvault.domain.LoginMethod
 import com.lc33.tokenvault.domain.ModelProbeState
 import com.lc33.tokenvault.domain.ModelSource
 import com.lc33.tokenvault.domain.ProbeOutcome
@@ -82,6 +83,25 @@ private fun ProviderEntity.balanceSnapshot(): BalanceSnapshot? {
     )
 }
 
+private fun ApiKeyEntity.balanceSnapshot(): BalanceSnapshot? {
+    if (balanceAmount == null &&
+        balanceUsed == null &&
+        balanceRaw == null &&
+        balanceCheckedAt == null &&
+        balanceError == null
+    ) {
+        return null
+    }
+    return BalanceSnapshot(
+        amount = balanceAmount,
+        used = balanceUsed,
+        currency = balanceCurrency ?: BalanceSnapshot.UNKNOWN_CURRENCY,
+        raw = balanceRaw,
+        checkedAt = balanceCheckedAt,
+        error = balanceError,
+    )
+}
+
 fun ProviderEntity.toDomain(): Provider = Provider(
     id = id,
     name = name,
@@ -108,12 +128,16 @@ fun ProviderEntity.toDomain(): Provider = Provider(
     balance = balanceSnapshot(),
     quotaCalibrated = quotaCalibrated,
     timeoutSeconds = timeoutSeconds,
+    reachabilityLatencyMs = reachabilityLatencyMs,
+    reachabilityCheckedAt = reachabilityCheckedAt,
+    reachabilityError = reachabilityError,
     probe = ProviderProbeSettings(
         enabled = probeEnabled,
         reachability = probeReachability,
         keyValidity = probeKeyValidity,
         balance = probeBalance,
         models = probeModels,
+        modelReachability = probeModelReachability,
     ),
     createdAt = createdAt,
     updatedAt = updatedAt,
@@ -151,11 +175,15 @@ fun Provider.toEntity(): ProviderEntity = ProviderEntity(
     balanceError = balance?.error,
     quotaCalibrated = quotaCalibrated,
     timeoutSeconds = timeoutSeconds,
+    reachabilityLatencyMs = reachabilityLatencyMs,
+    reachabilityCheckedAt = reachabilityCheckedAt,
+    reachabilityError = reachabilityError,
     probeEnabled = probe.enabled,
     probeReachability = probe.reachability,
     probeKeyValidity = probe.keyValidity,
     probeBalance = probe.balance,
     probeModels = probe.models,
+    probeModelReachability = probe.modelReachability,
     createdAt = createdAt,
     updatedAt = updatedAt,
 )
@@ -185,6 +213,7 @@ fun ApiKeyEntity.toDomain(): ApiKey = ApiKey(
     latencyMs = latencyMs,
     checkedAt = checkedAt,
     okAt = okAt,
+    balance = balanceSnapshot(),
     sortOrder = sortOrder,
     createdAt = createdAt,
     updatedAt = updatedAt,
@@ -205,6 +234,12 @@ fun ApiKey.toEntity(): ApiKeyEntity = ApiKeyEntity(
     latencyMs = latencyMs,
     checkedAt = checkedAt,
     okAt = okAt,
+    balanceAmount = balance?.amount,
+    balanceUsed = balance?.used,
+    balanceCurrency = balance?.currency,
+    balanceRaw = balance?.raw,
+    balanceCheckedAt = balance?.checkedAt,
+    balanceError = balance?.error,
     sortOrder = sortOrder,
     createdAt = createdAt,
     updatedAt = updatedAt,
@@ -220,6 +255,7 @@ fun ProviderAccountEntity.toDomain(): ProviderAccount = ProviderAccount(
     usernameFp = usernameFp,
     passwordEnc = passwordEnc,
     loginUrl = loginUrl,
+    loginMethods = loginMethods.toLoginMethodSet(),
     note = note,
     sortOrder = sortOrder,
     createdAt = createdAt,
@@ -234,6 +270,7 @@ fun ProviderAccount.toEntity(): ProviderAccountEntity = ProviderAccountEntity(
     usernameFp = usernameFp,
     passwordEnc = passwordEnc,
     loginUrl = loginUrl,
+    loginMethods = loginMethods.toLoginMethodsCsv(),
     note = note,
     sortOrder = sortOrder,
     createdAt = createdAt,
@@ -251,6 +288,7 @@ fun ProviderAccount.toEntity(): ProviderAccountEntity = ProviderAccountEntity(
 fun ModelEntity.toDomain(): AiModel = AiModel(
     id = id,
     providerId = providerId,
+    keyId = keyId,
     modelId = modelId,
     protocol = Protocol.fromWireName(protocol) ?: Protocol.CHAT,
     displayName = displayName,
@@ -273,6 +311,7 @@ fun ModelEntity.toDomain(): AiModel = AiModel(
 fun AiModel.toEntity(): ModelEntity = ModelEntity(
     id = id,
     providerId = providerId,
+    keyId = keyId,
     modelId = modelId,
     protocol = protocol.wireName,
     displayName = displayName,

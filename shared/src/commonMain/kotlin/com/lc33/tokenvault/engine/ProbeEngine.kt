@@ -6,6 +6,8 @@ import com.lc33.tokenvault.crypto.VaultLockedException
 import com.lc33.tokenvault.crypto.zeroize
 import com.lc33.tokenvault.domain.AuthStyle
 import com.lc33.tokenvault.domain.KeyHealth
+import com.lc33.tokenvault.domain.ModelProbeState
+import com.lc33.tokenvault.domain.ProbeLevel
 import com.lc33.tokenvault.domain.ProbeOutcome
 import com.lc33.tokenvault.domain.Protocol
 import com.lc33.tokenvault.domain.model.ApiKey
@@ -22,6 +24,9 @@ import com.lc33.tokenvault.domain.repo.ProbeRunRepository
 import com.lc33.tokenvault.domain.repo.ProviderRepository
 import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.endpoint.HeaderAssembler
+import com.lc33.tokenvault.endpoint.mergeBodyPatch
+import com.lc33.tokenvault.endpoint.NormalizeResult
+import com.lc33.tokenvault.endpoint.normalizeBaseUrl
 import com.lc33.tokenvault.endpoint.ProbeRequest
 import com.lc33.tokenvault.endpoint.ProbeRequestBuilder
 import com.lc33.tokenvault.endpoint.ProbeResponse
@@ -29,6 +34,7 @@ import com.lc33.tokenvault.net.HttpEngine
 import com.lc33.tokenvault.probe.PlannedTask
 import com.lc33.tokenvault.probe.ModelListParser
 import com.lc33.tokenvault.probe.ProbeBudget
+import com.lc33.tokenvault.probe.Classification
 import com.lc33.tokenvault.probe.ProbeClassifier
 import com.lc33.tokenvault.probe.ProbeItemResult
 import com.lc33.tokenvault.probe.ProbeOrchestrator
@@ -89,6 +95,8 @@ class ProbeEngine constructor(
 
     private var currentJob: Job? = null
     private var modelJob: Job? = null
+    private var statusJob: Job? = null
+    private var quickModelJob: Job? = null
 
     private val _progress = MutableStateFlow<ProbeProgress?>(null)
     val progress: StateFlow<ProbeProgress?> = _progress.asStateFlow()
@@ -186,7 +194,8 @@ class ProbeEngine constructor(
             .map { it.provider }
             .firstOrNull { it.id == providerId }
             ?: return
-        if (!provider.probe.enabled || !provider.probe.keyValidity) return
+        // “模型列表检测”是独立开关：关着时这里不让自动/手动拉取，用户只能手动维护模型。
+        if (!provider.probe.enabled || !provider.probe.models) return
 
         val selectedKeys = keys.observeAll().first()
             .filter { it.providerId == providerId && it.enabled && (keyId == null || it.id == keyId) }
@@ -195,7 +204,10 @@ class ProbeEngine constructor(
         val profileList = clientProfiles.observeAll().first()
         val defaultProfile = profileList.firstOrNull { it.builtinKey == "default" }
         val clientKeywords = settings.observeClientKeywords().first()
-        val plan = ProbePlanBuilder.build(listOf(provider)) { pid ->
+        // ProbePlanBuilder 会按 keyValidity 决定是否生成 L2。模型列表也需要同一条 GET，
+        // 所以这里只对计划临时打开 keyValidity；是否把结果写回密钥健康仍由真实开关控制。
+        val planProvider = provider.copy(probe = provider.probe.copy(keyValidity = true))
+        val plan = ProbePlanBuilder.build(listOf(planProvider)) { pid ->
             selectedKeys.filter { it.providerId == pid }
         }
 
@@ -211,8 +223,9 @@ class ProbeEngine constructor(
 
         var ok = 0
         var fail = 0
-        val fetchedByProtocol = mutableMapOf<Protocol, MutableSet<String>>()
+        val fetchedByKey = mutableMapOf<Long, MutableMap<Protocol, MutableSet<String>>>()
         for (task in tasks) {
+            val keyIdForTask = task.keyId ?: continue
             val response = engine.execute(
                 ProbeRequest(
                     method = "GET",
@@ -221,7 +234,7 @@ class ProbeEngine constructor(
                     body = null,
                     protocol = task.protocol,
                 ),
-                allowInsecure = false,
+                allowInsecure = provider.allowInsecure,
             )
             if (response.status == 429) {
                 engine.onRateLimited(task.host)
@@ -241,26 +254,29 @@ class ProbeEngine constructor(
                 fail++
             }
 
-            val scrubbedDetail = classification.detail?.let { redactor.scrub(it) }
-            if (classification.health != null) {
-                keys.applyProbeResult(
-                    id = task.keyId ?: continue,
-                    health = classification.health.wireName,
-                    lastOutcome = classification.outcome.wireName,
-                    detail = scrubbedDetail,
-                    httpStatus = null,
-                    latencyMs = response.latencyMs,
-                    checkedAt = now(),
-                    okAt = if (classification.outcome == ProbeOutcome.SUCCESS) now() else null,
-                )
-            } else {
-                keys.applyTransientOutcome(
-                    id = task.keyId ?: continue,
-                    lastOutcome = classification.outcome.wireName,
-                    detail = scrubbedDetail,
-                    httpStatus = null,
-                    checkedAt = now(),
-                )
+            // 模型列表拉取不该绕过用户关掉的密钥检测开关。
+            if (provider.probe.keyValidity) {
+                val scrubbedDetail = classification.detail?.let { redactor.scrub(it) }
+                if (classification.health != null) {
+                    keys.applyProbeResult(
+                        id = keyIdForTask,
+                        health = classification.health.wireName,
+                        lastOutcome = classification.outcome.wireName,
+                        detail = scrubbedDetail,
+                        httpStatus = null,
+                        latencyMs = response.latencyMs,
+                        checkedAt = now(),
+                        okAt = if (classification.outcome == ProbeOutcome.SUCCESS) now() else null,
+                    )
+                } else {
+                    keys.applyTransientOutcome(
+                        id = keyIdForTask,
+                        lastOutcome = classification.outcome.wireName,
+                        detail = scrubbedDetail,
+                        httpStatus = null,
+                        checkedAt = now(),
+                    )
+                }
             }
 
             if (classification.outcome == ProbeOutcome.SUCCESS) {
@@ -268,7 +284,8 @@ class ProbeEngine constructor(
                     fetched
                         .filter { it.protocol in provider.supportedProtocols }
                         .forEach { model ->
-                            fetchedByProtocol
+                            fetchedByKey
+                                .getOrPut(keyIdForTask) { mutableMapOf() }
                                 .getOrPut(model.protocol) { mutableSetOf() }
                                 .add(model.modelId)
                         }
@@ -276,12 +293,12 @@ class ProbeEngine constructor(
             }
         }
 
-        // 多把 Key 的可见模型可能不同（分组权限）。先按协议求并集再一次合并：
-        // 不能让“B 这把 Key 看不到 A 才有的模型”把 A 刚发现的行停用掉。
         var discovered = 0
-        fetchedByProtocol.forEach { (protocol, modelIds) ->
-            discovered += modelIds.size
-            models.applyDiscovered(providerId, protocol, modelIds.toList())
+        fetchedByKey.forEach { (currentKeyId, byProtocol) ->
+            byProtocol.forEach { (protocol, modelIds) ->
+                discovered += modelIds.size
+                models.applyDiscovered(providerId, currentKeyId, protocol, modelIds.toList())
+            }
         }
 
         audit.record(
@@ -292,6 +309,213 @@ class ProbeEngine constructor(
         )
     }
 
+    /**
+     * 只刷新供应商可达性延迟。这个入口绝不 reveal 密钥，也不更新密钥健康，
+     * 供仪表盘 / 管理页右上角的刷新按钮与余额查询并列使用。
+     */
+    fun refreshReachability(): Boolean {
+        if (statusJob?.isActive == true) return false
+        if (!session.isUnlocked) return false
+        statusJob = scope.launch {
+            autoLocker.pauseIdleLock()
+            try {
+                refreshReachabilityInner()
+            } finally {
+                autoLocker.resumeIdleLock()
+            }
+        }
+        return true
+    }
+
+    private suspend fun refreshReachabilityInner() {
+        val providerList = providers.observeSummaries().first()
+            .map { it.provider }
+            .filter { it.probe.enabled && it.probe.reachability }
+        if (providerList.isEmpty()) return
+
+        val profileList = clientProfiles.observeAll().first()
+        val defaultProfile = profileList.firstOrNull { it.builtinKey == "default" }
+        val clientKeywords = settings.observeClientKeywords().first()
+        val providerById = providerList.associateBy { it.id }
+        val plan = ProbePlanBuilder.build(providerList) { _ -> emptyList() }
+
+        // 每家只取第一个协议的一条 L1：供应商延迟是站点级信号，重复打多个协议只会
+        // 放大请求量，不会让“这家通不通”的结论更准。
+        fun profileOf(id: Long?): ClientProfile? =
+            profileList.firstOrNull { it.id == id } ?: defaultProfile
+
+        val tasks = plan.tasks
+            .filter { it.level == ProbeLevel.L1_REACHABILITY }
+            .groupBy(PlannedTask::providerId)
+            .mapValues { (_, group) -> group.first() }
+            .values
+            .mapNotNull { it.toTask(profileOf(it.clientProfileId)) }
+
+        for (task in tasks) {
+            val response = engine.execute(
+                ProbeRequest(
+                    method = "GET",
+                    url = task.url,
+                    headers = task.headers,
+                    body = null,
+                    protocol = task.protocol,
+                ),
+                allowInsecure = providerById[task.providerId]?.allowInsecure ?: false,
+            )
+            if (response.status == 429) engine.onRateLimited(task.host)
+            val classification = ProbeClassifier.classify(
+                status = response.status.takeIf { response.error == null },
+                body = response.body,
+                error = response.error,
+                level = task.level,
+                clientKeywords = clientKeywords,
+            )
+            providers.updateReachability(
+                id = task.providerId,
+                latencyMs = response.latencyMs,
+                checkedAt = now(),
+                error = classification.detail?.let { redactor.scrub(it) } ?: response.error?.message,
+            )
+        }
+
+        audit.record(
+            level = LogLevel.INFO,
+            category = LogCategory.PROBE,
+            message = "provider reachability refreshed",
+            detail = "providers=${tasks.size}",
+        )
+    }
+
+    /**
+     * 模型可达性探测（快捷）。长按模型手动触发，只发一次极短推理请求；
+     * 默认关闭，且必须同时打开全局默认值与该供应商自己的开关。
+     */
+    fun probeModel(providerId: Long, keyId: Long, modelId: String, protocol: Protocol): Boolean {
+        if (quickModelJob?.isActive == true) return false
+        if (!session.isUnlocked) return false
+        quickModelJob = scope.launch {
+            autoLocker.pauseIdleLock()
+            try {
+                probeModelInner(providerId, keyId, modelId, protocol)
+            } finally {
+                autoLocker.resumeIdleLock()
+            }
+        }
+        return true
+    }
+
+    private suspend fun probeModelInner(
+        providerId: Long,
+        keyId: Long,
+        modelId: String,
+        protocol: Protocol,
+    ) {
+        val provider = providers.find(providerId) ?: return
+        if (!provider.probe.enabled || !provider.probe.modelReachability) return
+        val endpoints = when (val result = normalizeBaseUrl(provider.apiBaseUrl, provider.pathOverrides)) {
+            is NormalizeResult.Ok -> result.endpoints
+            is NormalizeResult.Err -> return
+        }
+        val url = endpoints.byProtocol[protocol] ?: return
+
+        val secret = try {
+            keys.reveal(keyId)
+        } catch (_: Exception) {
+            return
+        }
+
+        try {
+            knownSecrets.add(secret)
+            val profileList = clientProfiles.observeAll().first()
+            val defaultProfile = profileList.firstOrNull { it.builtinKey == "default" }
+            val profile = profileList.firstOrNull { it.id == provider.clientProfileId } ?: defaultProfile
+            val baseRequest = ProbeRequestBuilder.inference(
+                url = url,
+                protocol = protocol,
+                apiKey = secret,
+                modelId = modelId,
+                authStyle = provider.authStyle,
+                prompt = ProbeRequestBuilder.QUICK_REACHABILITY_PROMPT,
+            )
+            val patchedBody = mergeBodyPatch(
+                baseRequest.body ?: "",
+                profile?.bodyPatch ?: "{}",
+            )
+            val request = baseRequest.copy(
+                headers = HeaderAssembler.assemble(
+                    baseHeaders = BASE_HEADERS,
+                    profile = profile,
+                    authHeaders = baseRequest.headers,
+                    placeholders = placeholders,
+                ).headers,
+                body = HeaderAssembler.expandPlaceholders(patchedBody, placeholders),
+            )
+            val response = engine.execute(request, allowInsecure = provider.allowInsecure)
+            if (response.status == 429) engine.onRateLimited(provider.hostOfForEngine())
+
+            val classification = ProbeClassifier.classify(
+                status = response.status.takeIf { response.error == null },
+                body = response.body,
+                error = response.error,
+                level = ProbeLevel.L3_MODEL,
+                clientKeywords = settings.observeClientKeywords().first(),
+            )
+            val detail = classification.detail?.let { redactor.scrub(it) }
+            val state = modelStateOf(classification)
+            val modelRowId = modelIdToRow(providerId, keyId, modelId, protocol)
+            if (modelRowId == 0L) return
+
+            if (state == ModelProbeState.UNKNOWN) {
+                models.applyTransientOutcome(
+                    id = modelRowId,
+                    lastOutcome = classification.outcome.wireName,
+                    detail = detail,
+                    probedAt = now(),
+                )
+            } else {
+                models.applyProbeResult(
+                    id = modelRowId,
+                    state = state.wireName,
+                    lastOutcome = classification.outcome.wireName,
+                    detail = detail,
+                    latencyMs = response.latencyMs,
+                    probedAt = now(),
+                )
+            }
+            audit.record(
+                level = if (classification.outcome == ProbeOutcome.SUCCESS) LogLevel.INFO else LogLevel.WARN,
+                category = LogCategory.PROBE,
+                message = "model quick probe finished",
+                detail = "provider=$providerId key=$keyId outcome=${classification.outcome.wireName}",
+                providerId = providerId,
+                keyId = keyId,
+            )
+        } finally {
+            secret.zeroize()
+        }
+    }
+
+    private suspend fun modelIdToRow(
+        providerId: Long,
+        keyId: Long,
+        modelId: String,
+        protocol: Protocol,
+    ): Long = models.observeByProvider(providerId).first()
+        .firstOrNull { it.keyId == keyId && it.modelId == modelId && it.protocol == protocol }
+        ?.id ?: 0L
+
+    private fun modelStateOf(classification: Classification): ModelProbeState = when {
+        classification.outcome == ProbeOutcome.SUCCESS -> ModelProbeState.OK
+        classification.modelState != null -> classification.modelState
+        classification.outcome == ProbeOutcome.CONCLUSIVE_FAIL -> when (classification.health) {
+            KeyHealth.FORBIDDEN -> ModelProbeState.NO_ACCESS
+            else -> ModelProbeState.ERROR
+        }
+        else -> ModelProbeState.UNKNOWN
+    }
+
+    private fun Provider.hostOfForEngine(): String =
+        apiRoot.substringAfter("://").substringBefore('/').substringBefore(':')
     private fun startScoped(runScope: String, filter: (PlannedTask) -> Boolean): Boolean {
         if (running) return false
         if (!session.isUnlocked) return false
@@ -314,6 +538,10 @@ class ProbeEngine constructor(
         currentJob = null
         modelJob?.cancel()
         modelJob = null
+        statusJob?.cancel()
+        statusJob = null
+        quickModelJob?.cancel()
+        quickModelJob = null
     }
 
     // ------------------------------------------------------------------ 一轮
@@ -392,6 +620,10 @@ class ProbeEngine constructor(
 
         val taskById = tasks.associateBy { it.id }
         val providerById = providerList.associateBy { it.id }
+        val providerIdByKey = tasks.mapNotNull { task ->
+            task.keyId?.let { it to task.providerId }
+        }.toMap()
+        val fetchedModels = mutableMapOf<Long, MutableMap<Protocol, MutableSet<String>>>()
 
         var done = 0
         var ok = 0
@@ -428,6 +660,25 @@ class ProbeEngine constructor(
                 } else {
                     final
                 }
+                // 模型列表检测开启时，L2 的 models 响应就是这把 Key 的模型列表，
+                // 不再额外发一遍 GET。这里只累积，真正的三路合并等本轮流结束后统一做。
+                val resultTask = taskById[result.taskId]
+                if (resultTask?.keyId != null &&
+                    resultTask.level == ProbeLevel.L2_KEY_VALIDITY &&
+                    providerById[result.providerId]?.probe?.models == true
+                ) {
+                    ModelListParser.parse(result.body, resultTask.protocol)?.let { fetched ->
+                        fetched
+                            .filter { it.protocol in providerById[result.providerId]?.supportedProtocols.orEmpty() }
+                            .forEach { model ->
+                                fetchedModels
+                                    .getOrPut(resultTask.keyId) { mutableMapOf() }
+                                    .getOrPut(model.protocol) { mutableSetOf() }
+                                    .add(model.modelId)
+                            }
+                    }
+                }
+
                 persist(scrubbed, now())
                 _results.tryEmit(scrubbed)
                 _lastRound.value = _lastRound.value + scrubbed
@@ -443,6 +694,22 @@ class ProbeEngine constructor(
             finishRun(runId, tasks.size, done, ok, fail, cancelled = true)
             return
         }
+
+        fetchedModels.forEach { (keyId, byProtocol) ->
+            val currentProviderId = providerIdByKey[keyId] ?: return@forEach
+            byProtocol.forEach { (protocol, modelIds) ->
+                models.applyDiscovered(currentProviderId, keyId, protocol, modelIds.toList())
+            }
+        }
+
+        // keyValidity 关掉时没有 L2 响应可复用；模型列表检测若单独开着，就补一次
+        // 独立的 GET。这条路径只在必要時触发，避免常见场景双倍请求。
+        providerList
+            .filter { provider ->
+                provider.probe.enabled && provider.probe.models &&
+                    tasks.none { it.providerId == provider.id && it.keyId != null }
+            }
+            .forEach { provider -> refreshModelsInner(provider.id, null) }
 
         finishRun(runId, tasks.size, done, ok, fail, cancelled = false)
     }

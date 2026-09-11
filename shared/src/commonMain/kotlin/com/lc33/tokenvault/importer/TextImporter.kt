@@ -1,6 +1,7 @@
 package com.lc33.tokenvault.importer
 
 import com.lc33.tokenvault.domain.BalanceKind
+import com.lc33.tokenvault.domain.LoginMethod
 import com.lc33.tokenvault.domain.Protocol
 
 /**
@@ -36,8 +37,24 @@ object TextImporter {
     private val FIELD_NAMES = listOf(
         "供应商名称", "支持端点类型", "API请求地址", "余额查询类型", "客户端预设", // i18n-exempt: 导入格式的字段名
         "官网链接", "模型列表", "请求地址", "访问令牌", "平台账号", "平台密码", // i18n-exempt: 导入格式的字段名
-        "账号备注", "登录地址", "用户ID", "API Key", "备注", // i18n-exempt: 导入格式的字段名
+        "账号备注", "登录方式", "登录地址", "用户ID", "API Key", "备注", // i18n-exempt: 导入格式的字段名
     )
+
+    /** 登录方式支持逗号、空格与 `/` 分隔；未知值跳过而不是让整份导入失败。 */
+    private fun parseLoginMethods(raw: String?): Set<LoginMethod> =
+        raw?.split(',', '/', ' ', '，')
+            ?.mapNotNull { rawMethod ->
+                when (rawMethod.trim().lowercase()) {
+                    "github" -> LoginMethod.GITHUB
+                    "linuxdo", "linux.do", "linux do" -> LoginMethod.LINUX_DO
+                    else -> null
+                }
+            }
+            ?.toCollection(LinkedHashSet())
+            ?: emptySet()
+
+    /** 长字段优先，避免「登录方式」被「登录」这类潜在短字段截走。 */
+    private val FIELD_NAMES_BY_LENGTH = FIELD_NAMES.sortedByDescending(String::length)
 
     /** 块条目：`- 内容`。 */
     private val LIST_ITEM = Regex("""^\s*[-•]\s*(.*)$""")
@@ -187,6 +204,10 @@ object TextImporter {
                     val acc = currentAccount ?: MutableAccount().also { accountDrafts += it; currentAccount = it }
                     acc.label = fValue ?: acc.label
                 }
+                "登录方式" -> { // i18n-exempt: 导入格式的字段名
+                    val acc = currentAccount ?: MutableAccount().also { accountDrafts += it; currentAccount = it }
+                    acc.loginMethods = parseLoginMethods(fValue)
+                }
                 "登录地址" -> { // i18n-exempt: 导入格式的字段名
                     val acc = currentAccount ?: MutableAccount().also { accountDrafts += it; currentAccount = it }
                     acc.loginUrl = fValue
@@ -271,6 +292,7 @@ object TextImporter {
         var username: CharArray? = null,
         var password: CharArray? = null,
         var loginUrl: String? = null,
+        var loginMethods: Set<LoginMethod> = emptySet(),
     )
 
     /** 是单独一行 `---`（块终止判定用）。 */
@@ -288,7 +310,7 @@ object TextImporter {
      */
     private fun fieldNameOf(line: String): String? {
         val trimmed = line.trimStart()
-        for (name in FIELD_NAMES) {
+        for (name in FIELD_NAMES_BY_LENGTH) {
             if (trimmed.startsWith(name) && isFieldNameBoundary(trimmed, name)) {
                 return name
             }

@@ -1,9 +1,12 @@
 package com.lc33.tokenvault.ui.shell
 
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -49,6 +52,7 @@ import com.lc33.tokenvault.ui.miuix.LocalAppSnackbar
 import com.lc33.tokenvault.ui.miuix.navigation.VaultNavDisplay
 import com.lc33.tokenvault.ui.miuix.rememberAppTextFieldState
 import com.lc33.tokenvault.ui.miuix.rememberSecretTextFieldState
+import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
@@ -106,13 +110,9 @@ fun VaultNavHost(
     val back: () -> Unit = {
         if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
     }
-    VaultNavDisplay(
-        backStack = backStack,
-        onBack = { back() },
-        style = style,
-        exitDirection = exitDirection,
-        modifier = modifier,
-    ) { route ->
+
+    @Composable
+    fun RouteContent(route: VaultRoute) {
         when (route) {
             is DashboardRoute -> {
             val vm: DashboardViewModel = koinViewModel()
@@ -121,13 +121,13 @@ fun VaultNavHost(
                 state = dashboard,
                 onOpenProvider = { id -> navigate(ProviderDetailRoute(id)) },
                 onOpenManage = { navigate(ManageRoute) },
-                onOpenUpdate = { navigate(UpdateRoute) },
                 onOpenProbeRun = { navigate(ProbeRunRoute) },
                 onOpenSync = { navigate(SyncRoute) },
                 onOpenBalanceBreakdown = { navigate(BalanceBreakdownRoute) },
                 onStartProbe = vm::startProbe,
                 onCancelProbe = vm::cancelProbe,
                 onRefreshBalance = vm::refreshBalance,
+                onRefreshStatus = vm::refreshStatus,
             )
         }
 
@@ -143,6 +143,7 @@ fun VaultNavHost(
                 onOpenProvider = { id -> navigate(ProviderDetailRoute(id)) },
                 onOpenGroups = { navigate(GroupsRoute) },
                 onNewProvider = { navigate(ProviderEditorRoute()) },
+                onRefreshStatus = vm::refreshStatus,
                 onImport = { navigate(ImportRoute) },
                 onQueryChange = vm::onQueryChange,
                 onSort = vm::onSort,
@@ -171,7 +172,9 @@ fun VaultNavHost(
             is AboutRoute -> {
             AboutScreen(
                 onBack = { back() },
-                onOpenUpdate = { navigate(UpdateRoute) },
+                onOpenLicenses = {
+                    openExternalUrl("https://github.com/lswlc33/YJ_ai_tokenvault")
+                },
             )
         }
 
@@ -205,9 +208,14 @@ fun VaultNavHost(
                     onProbeKey = vm::probeKey,
                     onRefreshModels = { vm.refreshModels() },
                     onRefreshKeyModels = { keyId -> vm.refreshModels(keyId) },
+                    onAddModel = vm::onAddModel,
+                    onUpdateModel = vm::onUpdateModel,
+                    onDeleteModel = vm::onDeleteModel,
+                    onProbeModel = vm::onProbeModel,
                     onRevealAccount = vm::onRevealAccount,
                     onCopyRevealedAccount = { vm.onCopyRevealedAccount(accountClipboardLabel) },
                     onCloseAccountReveal = vm::onCloseAccountSheet,
+                    onSetAccountLoginMethods = vm::onSetAccountLoginMethods,
                 )
             }
         }
@@ -272,17 +280,20 @@ fun VaultNavHost(
             val defaultProbeKeys by vm.defaultProbeKeys.collectAsStateWithLifecycle()
             val defaultProbeBalance by vm.defaultProbeBalance.collectAsStateWithLifecycle()
             val defaultProbeModels by vm.defaultProbeModels.collectAsStateWithLifecycle()
+            val defaultProbeModelReachability by vm.defaultProbeModelReachability.collectAsStateWithLifecycle()
             ProbeSettingsScreen(
                 sniffClientProfile = sniffClientProfile,
                 defaultProbeReachability = defaultProbeReachability,
                 defaultProbeKeys = defaultProbeKeys,
                 defaultProbeBalance = defaultProbeBalance,
                 defaultProbeModels = defaultProbeModels,
+                defaultProbeModelReachability = defaultProbeModelReachability,
                 onSniffClientProfileChange = vm::onSniffClientProfileChange,
                 onDefaultProbeReachabilityChange = vm::onDefaultProbeReachabilityChange,
                 onDefaultProbeKeysChange = vm::onDefaultProbeKeysChange,
                 onDefaultProbeBalanceChange = vm::onDefaultProbeBalanceChange,
                 onDefaultProbeModelsChange = vm::onDefaultProbeModelsChange,
+                onDefaultProbeModelReachabilityChange = vm::onDefaultProbeModelReachabilityChange,
                 onBack = back,
                 onOpenManage = { navigate(ManageRoute) },
                 onEditThresholds = { navigate(BalanceThresholdsRoute) },
@@ -463,6 +474,46 @@ fun VaultNavHost(
                 onOpenProvider = { id -> navigate(ProviderDetailRoute(id)) },
             )
         }
+        }
+    }
+
+    val topLevelRoutes = listOf(DashboardRoute, ManageRoute, SettingsRoute)
+    val currentPage = topLevelPageIndex(backStack.lastOrNull())
+    if (currentPage >= 0) {
+        val pagerState = rememberPagerState(initialPage = currentPage) { topLevelRoutes.size }
+        LaunchedEffect(currentPage) {
+            if (pagerState.currentPage != currentPage) pagerState.animateScrollToPage(currentPage)
+        }
+        LaunchedEffect(pagerState) {
+            snapshotFlow { pagerState.currentPage }.collect { page ->
+                selectTopLevelPage(backStack, page)
+            }
+        }
+        HorizontalPager(
+            state = pagerState,
+            beyondViewportPageCount = 2,
+            modifier = modifier,
+        ) { page ->
+            val pageRoute = topLevelRoutes[page]
+            VaultNavDisplay(
+                backStack = listOf(pageRoute),
+                onBack = {},
+                style = style,
+                exitDirection = exitDirection,
+                modifier = Modifier.fillMaxSize(),
+            ) { route ->
+                RouteContent(route)
+            }
+        }
+    } else {
+        VaultNavDisplay(
+            backStack = backStack,
+            onBack = { back() },
+            style = style,
+            exitDirection = exitDirection,
+            modifier = modifier,
+        ) { route ->
+            RouteContent(route)
         }
     }
 }
@@ -747,6 +798,24 @@ private fun SyncRouteContent(
             webDavRestoreModePicker = false
         }
     }
+
+}
+
+private fun topLevelPageIndex(route: VaultRoute?): Int = when (route) {
+    DashboardRoute -> 0
+    ManageRoute -> 1
+    SettingsRoute -> 2
+    else -> -1
+}
+
+private fun selectTopLevelPage(backStack: MutableList<VaultRoute>, index: Int) {
+    val route = when (index) {
+        0 -> DashboardRoute
+        1 -> ManageRoute
+        else -> SettingsRoute
+    }
+    while (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
+    if (backStack.lastOrNull() != route) backStack.add(route)
 }
 
 @Composable

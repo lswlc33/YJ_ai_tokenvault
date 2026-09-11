@@ -1,6 +1,7 @@
 package com.lc33.tokenvault.domain.repo
 
 import com.lc33.tokenvault.domain.model.ApiKey
+import com.lc33.tokenvault.domain.model.BalanceSnapshot
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -86,6 +87,12 @@ interface ApiKeyRepository {
         detail: String?,
         httpStatus: Int?,
         checkedAt: Long,
+    )
+
+    /** 只写这张 Key 的余额快照。供应商余额由 UI 层对所有 Key 求和。 */
+    suspend fun updateBalance(
+        id: Long,
+        snapshot: BalanceSnapshot,
     )
 
     /** 重置所有密钥的探测字段（health/lastOutcome/详情/时间戳），密钥本身保留。 */

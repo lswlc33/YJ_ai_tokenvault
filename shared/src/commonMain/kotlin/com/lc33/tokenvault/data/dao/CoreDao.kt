@@ -79,7 +79,7 @@ interface ProviderDao {
         SELECT p.*,
                (SELECT COUNT(*) FROM api_keys k WHERE k.providerId = p.id AND k.enabled = 1) AS keyCount,
                (SELECT COUNT(*) FROM api_keys k WHERE k.providerId = p.id AND k.enabled = 1 AND k.health = 'ok') AS okKeyCount,
-               (SELECT COUNT(*) FROM models m WHERE m.providerId = p.id AND m.enabled = 1) AS modelCount,
+               (SELECT COUNT(DISTINCT m.modelId) FROM models m WHERE m.providerId = p.id AND m.enabled = 1) AS modelCount,
                (SELECT COUNT(*) FROM provider_accounts a WHERE a.providerId = p.id) AS accountCount
         FROM providers p
         ORDER BY p.pinned DESC, p.sortOrder, p.id
@@ -138,6 +138,26 @@ interface ProviderDao {
         checkedAt: Long,
         error: String?,
         calibrated: Boolean,
+    )
+
+    /**
+     * 只写供应商可达性结果。这里的延迟来自不带密钥的 L1 请求，不能混进任何 Key 的
+     * 探测延迟——两者语义不同：站点通不代表钥匙有效。
+     */
+    @Query(
+        """
+        UPDATE providers SET
+            reachabilityLatencyMs = :latencyMs,
+            reachabilityCheckedAt = :checkedAt,
+            reachabilityError = :error
+        WHERE id = :id
+        """,
+    )
+    suspend fun updateReachability(
+        id: Long,
+        latencyMs: Long?,
+        checkedAt: Long,
+        error: String?,
     )
 
     /** `quotaPerUnit` 被 `/api/status` 校准之后单独写，这样校准失败时不会把余额一起清掉。 */
@@ -249,6 +269,26 @@ interface ApiKeyDao {
         detail: String?,
         httpStatus: Int?,
         checkedAt: Long,
+    )
+
+    /** 只写这一张 Key 的余额快照；供应商展示值由 ViewModel 对所有 Key 求和。 */
+    @Query(
+        """
+        UPDATE api_keys SET
+            balanceAmount = :amount, balanceUsed = :used, balanceCurrency = :currency,
+            balanceRaw = :raw, balanceCheckedAt = :checkedAt, balanceError = :error,
+            updatedAt = :checkedAt
+        WHERE id = :id
+        """,
+    )
+    suspend fun updateBalance(
+        id: Long,
+        amount: Double?,
+        used: Double?,
+        currency: String?,
+        raw: String?,
+        checkedAt: Long,
+        error: String?,
     )
 
     /**

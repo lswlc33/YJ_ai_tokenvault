@@ -39,6 +39,9 @@ data class ProviderAccountEntity(
     val passwordEnc: ByteArray? = null,
 
     val loginUrl: String? = null,
+
+    /** CSV：`github,linuxdo`。 */
+    val loginMethods: String = "",
     val note: String? = null,
     val sortOrder: Int = 0,
     val createdAt: Long,
@@ -104,15 +107,26 @@ data class ClientProfileEntity(
             childColumns = ["providerId"],
             onDelete = ForeignKey.CASCADE,
         ),
+        ForeignKey(
+            entity = ApiKeyEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["keyId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
     ],
     indices = [
-        Index(value = ["providerId", "modelId", "protocol"], unique = true),
+        Index(value = ["providerId", "keyId", "modelId", "protocol"], unique = true),
+        Index(value = ["keyId"]),
         Index(value = ["catalogKey"]),
     ],
 )
 data class ModelEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val providerId: Long,
+
+    /** 这份模型列表属于哪张 Key。旧数据迁移时会挂到默认 Key。 */
+    val keyId: Long? = null,
+
     val modelId: String,
     val protocol: String,
     val displayName: String? = null,

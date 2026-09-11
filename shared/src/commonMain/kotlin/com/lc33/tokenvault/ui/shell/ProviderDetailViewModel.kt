@@ -5,6 +5,8 @@ import com.lc33.tokenvault.platform.nowMillis
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lc33.tokenvault.crypto.zeroize
+import com.lc33.tokenvault.domain.LoginMethod
+import com.lc33.tokenvault.domain.Protocol
 import com.lc33.tokenvault.domain.SecretMask
 import com.lc33.tokenvault.domain.model.AiModel
 import com.lc33.tokenvault.domain.model.ApiKey
@@ -20,6 +22,7 @@ import com.lc33.tokenvault.platform.SecureClipboard
 import com.lc33.tokenvault.screens.model.ProviderDetailUiState
 import com.lc33.tokenvault.screens.model.UiHealth
 import com.lc33.tokenvault.screens.model.UiKeyRow
+import com.lc33.tokenvault.screens.model.UiModelRow
 import com.lc33.tokenvault.screens.model.UiProviderRow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,6 +30,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -95,6 +99,7 @@ class ProviderDetailViewModel constructor(
     /** 展开一条账号时给界面的东西。两段都可能为 null（只记了一半，§11.2）。 */
     data class AccountRevealState(
         val accountId: Long,
+        val loginMethods: Set<LoginMethod> = emptySet(),
         val label: String,
         val username: String?,
         val password: String?,
@@ -145,10 +150,17 @@ class ProviderDetailViewModel constructor(
                 account.toRow(accountMaskMap[account.id] ?: SecretMask.ELLIPSIS)
             }
             ProviderDetailUiState(
-                provider = provider.toDetailRow(keyRows, modelRows.size, accountRows.size),
+                provider = provider.toDetailRow(
+                    keyRows,
+                    data.keys,
+                    modelCount = modelRows.filter { it.enabled }.distinctBy { it.modelId }.size,
+                    accountCount = accountRows.size,
+                ),
                 keys = keyRows,
                 models = modelRows,
                 accounts = accountRows,
+                modelListEnabled = provider.probe.models,
+                modelReachabilityEnabled = provider.probe.modelReachability,
                 nowMs = nowMillis(),
             )
         }
@@ -277,6 +289,12 @@ class ProviderDetailViewModel constructor(
             plain.password?.let(knownSecrets::add)
             _revealedAccount.value = AccountRevealState(
                 accountId = accountId,
+                loginMethods = state.value?.accounts
+                    ?.firstOrNull { it.id == accountId }
+                    ?.loginMethods
+                    ?.mapNotNull { LoginMethod.fromWireName(it) }
+                    ?.toSet()
+                    .orEmpty(),
                 label = state.value?.accounts?.firstOrNull { it.id == accountId }?.label.orEmpty(),
                 username = plain.username?.let { it.concatToString() },
                 password = plain.password?.let { it.concatToString() },
@@ -295,6 +313,65 @@ class ProviderDetailViewModel constructor(
         revealedAccountPlain?.zeroize()
         revealedAccountPlain = null
         _revealedAccount.value = null
+    }
+
+    /** 手动添加模型。模型列表自动检测关闭时，这是唯一入口。 */
+    fun onAddModel(keyId: Long, modelId: String, protocol: Protocol) {
+        viewModelScope.launch {
+            runCatching {
+                models.add(
+                    providerId = providerId,
+                    keyId = keyId,
+                    modelId = modelId,
+                    protocol = protocol,
+                    needsReview = modelId.any { it.isWhitespace() || it.isUpperCase() },
+                )
+            }
+        }
+    }
+
+    /** 手动编辑模型。只改明文元数据，不触发网络请求。 */
+    fun onUpdateModel(
+        id: Long,
+        modelId: String,
+        protocol: Protocol,
+        displayName: String?,
+        enabled: Boolean,
+    ) {
+        viewModelScope.launch {
+            val existing = models.observeByProvider(providerId).first()
+                .firstOrNull { it.id == id } ?: return@launch
+            models.update(
+                existing.copy(
+                    modelId = modelId.trim(),
+                    protocol = protocol,
+                    displayName = displayName?.trim()?.ifEmpty { null },
+                    enabled = enabled,
+                ),
+            )
+        }
+    }
+
+    fun onDeleteModel(id: Long) {
+        viewModelScope.launch { models.delete(id) }
+    }
+
+    /** 模型可达性探测（快捷）：长按模型行手动触发。 */
+    fun onProbeModel(keyId: Long, modelId: String, protocol: Protocol) {
+        probeEngine.probeModel(providerId, keyId, modelId, protocol)
+    }
+
+    /** 登录方式是明文元数据，可以在展开账号时直接修改。 */
+    fun onSetAccountLoginMethods(accountId: Long, methods: Set<LoginMethod>) {
+        viewModelScope.launch {
+            // 先落库再更新展开层，失败时不让 chip 假装已经生效。
+            runCatching { accounts.setLoginMethods(accountId, methods) }
+                .onSuccess {
+                    _revealedAccount.value = _revealedAccount.value
+                        ?.takeIf { it.accountId == accountId }
+                        ?.copy(loginMethods = methods)
+                }
+        }
     }
 
     /** 详情页「查余额」。结果经 observeProvider 那条订阅流回，不用手动刷新（红线 10）。 */
@@ -321,26 +398,30 @@ class ProviderDetailViewModel constructor(
 
     private fun Provider.toDetailRow(
         rows: List<UiKeyRow>,
+        keyList: List<ApiKey>,
         modelCount: Int,
         accountCount: Int,
-    ): UiProviderRow = UiProviderRow(
-        id = id,
-        name = name,
-        note = note,
-        host = hostOf(apiRoot),
-        protocols = protocolWireNames(),
-        colorIndex = color ?: 0,
-        pinned = pinned,
-        groupId = groupId,
-        keyCount = rows.size,
-        okKeyCount = rows.count { it.health == UiHealth.Ok },
-        modelCount = modelCount,
-        accountCount = accountCount,
-        balance = balance.toUiMoney(),
-        balanceFailed = balance?.failed == true,
-        health = aggregateOf(rows),
-        staleThisRound = false,
-    )
+    ): UiProviderRow {
+        val aggregateBalance = aggregateBalanceOf(keyList)
+        return UiProviderRow(
+            id = id,
+            name = name,
+            note = note,
+            host = hostOf(apiRoot),
+            protocols = protocolWireNames(),
+            colorIndex = color ?: 0,
+            pinned = pinned,
+            groupId = groupId,
+            keyCount = rows.size,
+            okKeyCount = rows.count { it.health == UiHealth.Ok },
+            modelCount = modelCount,
+            accountCount = accountCount,
+            balance = aggregateBalance.toUiMoney(),
+            balanceFailed = aggregateBalance?.failed == true,
+            health = aggregateOf(rows),
+            staleThisRound = false,
+        )
+    }
 
     /** 有一把可用就算可用（§5.3 末尾）；一把都没录是未探测，不是出错。 */
     private fun aggregateOf(rows: List<UiKeyRow>): UiHealth = when {

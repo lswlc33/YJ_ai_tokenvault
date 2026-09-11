@@ -64,6 +64,11 @@ import tokenvault.shared.generated.resources.editor_probe_enabled_summary
 import tokenvault.shared.generated.resources.editor_probe_keys
 import tokenvault.shared.generated.resources.editor_probe_keys_summary
 import tokenvault.shared.generated.resources.editor_probe_models
+import tokenvault.shared.generated.resources.editor_probe_model_reachability
+import tokenvault.shared.generated.resources.editor_probe_model_reachability_summary
+import tokenvault.shared.generated.resources.editor_probe_models_confirm_action
+import tokenvault.shared.generated.resources.editor_probe_models_confirm_body
+import tokenvault.shared.generated.resources.editor_probe_models_confirm_title
 import tokenvault.shared.generated.resources.editor_probe_models_summary
 import tokenvault.shared.generated.resources.editor_probe_reachability
 import tokenvault.shared.generated.resources.editor_probe_reachability_summary
@@ -492,10 +497,11 @@ private fun BalanceFields(
  * 这一段刻意不写"从设置继承而来"：用户在这里看到的应该是"这一家现在是什么样"，
  * 而不是"它从哪儿继承来的"——继承那件事只在设置那一页说一次。
  *
- * 总闸关掉时下面四项全部灰掉而不是隐藏：藏起来会让人以为设置丢了。
+ * 总闸关掉时下面五项全部灰掉而不是隐藏：藏起来会让人以为设置丢了。
  */
 @Composable
 private fun ProbeBlock(draft: ProviderDraft, onChange: (ProviderDraft) -> Unit) {
+    var showModelsConfirm by remember { mutableStateOf(false) }
     val tokens = LocalAppTokens.current
     val palette = LocalStatusPalette.current
     AppPreferenceGroup {
@@ -526,15 +532,40 @@ private fun ProbeBlock(draft: ProviderDraft, onChange: (ProviderDraft) -> Unit) 
             onCheckedChange = { onChange(draft.copy(probeBalance = it)) },
             enabled = draft.probeEnabled,
         )
-        // 这一项要钱，所以副文案不是"要不要自动跑"而是"这一家允不允许被这样测"
+        // 开启自动同步前必须确认：合并规则会把这家旧模型列表清空。
         AppSwitchRow(
             title = stringResource(Res.string.editor_probe_models),
             summary = stringResource(Res.string.editor_probe_models_summary),
             checked = draft.probeModels,
-            onCheckedChange = { onChange(draft.copy(probeModels = it)) },
+            onCheckedChange = { enabled ->
+                if (enabled && !draft.probeModels) {
+                    showModelsConfirm = true
+                } else {
+                    onChange(draft.copy(probeModels = enabled))
+                }
+            },
+            enabled = draft.probeEnabled,
+        )
+        AppSwitchRow(
+            title = stringResource(Res.string.editor_probe_model_reachability),
+            summary = stringResource(Res.string.editor_probe_model_reachability_summary),
+            checked = draft.probeModelReachability,
+            onCheckedChange = { onChange(draft.copy(probeModelReachability = it)) },
             enabled = draft.probeEnabled,
         )
     }
+
+    AppDialog(
+        show = showModelsConfirm,
+        onDismissRequest = { showModelsConfirm = false },
+        title = stringResource(Res.string.editor_probe_models_confirm_title),
+        summary = stringResource(Res.string.editor_probe_models_confirm_body),
+        confirmText = stringResource(Res.string.editor_probe_models_confirm_action),
+        onConfirm = {
+            showModelsConfirm = false
+            onChange(draft.copy(probeModels = true))
+        },
+    )
     if (!draft.probeEnabled) {
         AppText(
             text = stringResource(Res.string.editor_probe_disabled_note),

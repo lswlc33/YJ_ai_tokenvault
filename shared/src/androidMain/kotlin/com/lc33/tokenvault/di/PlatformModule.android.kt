@@ -35,6 +35,7 @@ actual val platformModule: Module = module {
                     }
                 },
             )
+            .addMigrations(VaultDatabase.MIGRATION_1_2)
             .build()
     }
 

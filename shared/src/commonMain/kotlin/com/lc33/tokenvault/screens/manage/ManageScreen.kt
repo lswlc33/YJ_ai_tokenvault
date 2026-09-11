@@ -44,6 +44,7 @@ import tokenvault.shared.generated.resources.manage_sort_last_probe
 import tokenvault.shared.generated.resources.manage_sort_manual
 import tokenvault.shared.generated.resources.manage_sort_name
 import tokenvault.shared.generated.resources.manage_title
+import tokenvault.shared.generated.resources.refresh_status_cd
 import com.lc33.tokenvault.screens.model.ManageUiState
 import com.lc33.tokenvault.screens.model.ProviderSort
 import com.lc33.tokenvault.ui.common.EmptyState
@@ -56,6 +57,7 @@ import com.lc33.tokenvault.ui.miuix.AppIconButton
 import com.lc33.tokenvault.ui.miuix.AppScaffold
 import com.lc33.tokenvault.ui.miuix.AppSearchField
 import com.lc33.tokenvault.ui.miuix.AppActionRow
+import com.lc33.tokenvault.ui.miuix.AppDialogTextButton
 import com.lc33.tokenvault.ui.miuix.AppTopBar
 import com.lc33.tokenvault.ui.miuix.appTopBarScroll
 import com.lc33.tokenvault.ui.miuix.rememberAppTextFieldState
@@ -82,6 +84,7 @@ fun ManageScreen(
     onOpenProvider: (Long) -> Unit,
     onOpenGroups: () -> Unit,
     onNewProvider: () -> Unit,
+    onRefreshStatus: () -> Unit,
     onImport: () -> Unit,
     onQueryChange: (String) -> Unit,
     onSort: (ProviderSort) -> Unit,
@@ -146,6 +149,11 @@ fun ManageScreen(
                             },
                         )
                     } else {
+                        AppIconButton(
+                            icon = AppIcon.Refresh,
+                            contentDescription = stringResource(Res.string.refresh_status_cd),
+                            onClick = onRefreshStatus,
+                        )
                         AppIconButton(
                             icon = AppIcon.Tune,
                             contentDescription = stringResource(Res.string.manage_groups_cd),
@@ -215,15 +223,16 @@ fun ManageScreen(
         onDismissRequest = { showCreateSheet = false },
         title = stringResource(Res.string.add_cd),
     ) {
-        AppActionRow(
+        AppDialogTextButton(
             text = stringResource(Res.string.dashboard_empty_new),
             onClick = {
                 showCreateSheet = false
                 onNewProvider()
             },
             modifier = Modifier.fillMaxWidth(),
+            primary = true,
         )
-        AppActionRow(
+        AppDialogTextButton(
             text = stringResource(Res.string.dashboard_empty_import),
             onClick = {
                 showCreateSheet = false

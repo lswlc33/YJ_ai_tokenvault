@@ -1,6 +1,7 @@
 package com.lc33.tokenvault.importer
 
 import com.lc33.tokenvault.domain.BalanceKind
+import com.lc33.tokenvault.domain.LoginMethod
 import com.lc33.tokenvault.domain.Protocol
 import com.lc33.tokenvault.domain.model.AiModel
 import com.lc33.tokenvault.domain.model.Provider
@@ -101,6 +102,7 @@ object TextExporter {
         val username: String,
         val password: String?,
         val loginUrl: String? = null,
+        val loginMethods: Set<LoginMethod> = emptySet(),
     )
 
     /** 明文导出时插在文件开头的警告注释（§11.3）。 */

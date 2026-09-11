@@ -13,8 +13,8 @@ import kotlinx.coroutines.launch
 /**
  * 探测设置页（§13.4）里**已经接真**的状态源。
  *
- * 两项：客户端嗅探开关（权威 `app_settings.sniffClientProfile`）与「新建供应商默认探测值」
- * 四个开关（权威 `app_settings.defaultProbe`，红线 31）。后者不是总开关——只在新供应商
+ * 客户端嗅探开关的权威是 `app_settings.sniffClientProfile`；新建供应商的五个默认探测开关
+ * 存在 `app_settings.defaultProbe`（红线 31）。后者不是总开关——只在新供应商
  * 落进编辑页草稿那一刻被读一次，之后每家独立（红线 36）。
  */
 class ProbeSettingsViewModel constructor(
@@ -25,7 +25,7 @@ class ProbeSettingsViewModel constructor(
     val sniffClientProfile: StateFlow<Boolean> = settings.observeSniffClientProfile()
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
-    /** 新建供应商时的默认探测值（4 个布尔）。 */
+    /** 新建供应商时的默认探测值（5 个布尔）。 */
     val defaultProbe: StateFlow<DefaultProbeSettings> = settings.observeDefaultProbeSettings()
         .stateIn(viewModelScope, SharingStarted.Eagerly, DefaultProbeSettings())
 
@@ -41,6 +41,9 @@ class ProbeSettingsViewModel constructor(
     val defaultProbeModels: StateFlow<Boolean> = defaultProbe.map { it.models }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    val defaultProbeModelReachability: StateFlow<Boolean> = defaultProbe.map { it.modelReachability }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     fun onSniffClientProfileChange(enabled: Boolean) {
         viewModelScope.launch { settings.setSniffClientProfile(enabled) }
     }
@@ -53,6 +56,9 @@ class ProbeSettingsViewModel constructor(
     fun onDefaultProbeBalanceChange(enabled: Boolean) = patch { it.copy(balance = enabled) }
 
     fun onDefaultProbeModelsChange(enabled: Boolean) = patch { it.copy(models = enabled) }
+
+    fun onDefaultProbeModelReachabilityChange(enabled: Boolean) =
+        patch { it.copy(modelReachability = enabled) }
 
     private fun patch(transform: (DefaultProbeSettings) -> DefaultProbeSettings) {
         val next = transform(defaultProbe.value)
