@@ -150,6 +150,9 @@ abstract class VaultDatabase : RoomDatabase() {
                     """.trimIndent(),
                 )
 
+                // Room 的 schema 校验会把手写的部分唯一索引当作 Found 侧多出来的
+                // index_*。迁移结束前先删掉它，校验通过后 onOpen 会用同一条 DDL 重建。
+                connection.execSQL("DROP INDEX IF EXISTS idx_keys_default")
                 connection.execSQL("ALTER TABLE provider_accounts ADD COLUMN loginMethods TEXT NOT NULL DEFAULT ''")
                 connection.execSQL(
                     "ALTER TABLE models ADD COLUMN keyId INTEGER REFERENCES api_keys(id) " +
