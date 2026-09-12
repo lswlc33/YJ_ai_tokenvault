@@ -105,15 +105,25 @@ import tokenvault.shared.generated.resources.sync_webdav_username_label
 @Composable
 fun VaultNavHost(
     backStack: MutableList<VaultRoute>,
+    revision: Int,
+    onBackStackChanged: () -> Unit,
     style: PredictiveBackStyle,
     exitDirection: PredictiveBackExitDirection,
     modifier: Modifier = Modifier,
 ) {
-    val navigate: (VaultRoute) -> Unit = { route -> backStack.add(route) }
+    val routeSnapshot = remember(revision, backStack.size) { backStack.toList() }
+
+    val navigate: (VaultRoute) -> Unit = { route ->
+        backStack.add(route)
+        onBackStackChanged()
+    }
 
     // 统一处理二级页返回：根页面不消费返回事件，交给系统退出应用。
     val back: () -> Unit = {
-        if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
+        if (backStack.size > 1) {
+            backStack.removeAt(backStack.lastIndex)
+            onBackStackChanged()
+        }
     }
 
     @Composable
@@ -532,7 +542,7 @@ fun VaultNavHost(
     // 第一段经过“管理”时就会把 currentPage 写回 backStack，动画随即被重定向到中间页。
     // NavDisplay 直接比较初始/目标 scene，既能一步到达，也保留二级页的进出动画。
     VaultNavDisplay(
-        backStack = backStack,
+        backStack = routeSnapshot,
         onBack = { back() },
         style = style,
         exitDirection = exitDirection,

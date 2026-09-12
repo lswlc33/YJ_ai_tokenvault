@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
@@ -41,6 +43,7 @@ import com.lc33.tokenvault.ui.miuix.rememberAppSnackbarState
 @Composable
 fun VaultShell() {
     val backStack = rememberVaultBackStack()
+    var backStackRevision by remember { mutableIntStateOf(0) }
     val snackbar = rememberAppSnackbarState()
 
     // 底栏模糊与返回动画都来自 app_settings：外观页改完，这里和导航层看到的是同一条流。
@@ -58,7 +61,7 @@ fun VaultShell() {
         AppNavBarItem(label = stringResource(Res.string.nav_manage), icon = AppIcon.Manage),
         AppNavBarItem(label = stringResource(Res.string.nav_settings), icon = AppIcon.Settings),
     )
-    val selectedIndex = topLevelIndexOf(backStack.lastOrNull())
+    val selectedIndex = backStackRevision.let { topLevelIndexOf(backStack.lastOrNull()) }
 
     AppScaffold(
         bottomBar = {
@@ -78,6 +81,7 @@ fun VaultShell() {
                         // 否则首屏加载也会震一下。
                         if (selectedIndex >= 0) Haptics.tap()
                         navigateTopLevel(backStack, index)
+                        backStackRevision++
                     },
                     blur = blurNavBar,
                     blurBackdrop = backdrop,
@@ -91,6 +95,8 @@ fun VaultShell() {
             // 顶部与状态栏由页面自己的 Scaffold + TopAppBar 处理（计划.md §15.16）。
             VaultNavHost(
                 backStack = backStack,
+                revision = backStackRevision,
+                onBackStackChanged = { backStackRevision++ },
                 style = backStyle,
                 exitDirection = backExitDirection,
                 modifier = Modifier

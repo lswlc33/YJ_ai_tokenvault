@@ -171,6 +171,8 @@ internal fun IosLiquidGlassNavigationBar(
     val tabContentColor = MiuixTheme.colorScheme.onSurface
     val surfaceContainer = MiuixTheme.colorScheme.surfaceContainer
     val containerColor = if (isBlurActive) surfaceContainer.copy(alpha = 0.4f) else surfaceContainer
+    // 底栏最外层一直铺满到窗口底部，系统导航区不再露出透明的黑色断层。
+    val barBackgroundColor = surfaceContainer
 
     val tabsBackdrop = rememberLayerBackdrop()
     val density = LocalDensity.current
@@ -250,11 +252,14 @@ internal fun IosLiquidGlassNavigationBar(
     }
 
     LaunchedEffect(selectedIndex) {
-        if (currentIndex != selectedIndex) currentIndex = selectedIndex
+        if (selectedIndex in items.indices && currentIndex != selectedIndex) {
+            currentIndex = selectedIndex
+        }
     }
     val onItemClickUpdated by rememberUpdatedState(onItemClick)
     LaunchedEffect(dampedDrag) {
         snapshotFlow { currentIndex }.drop(1).collectLatest { index ->
+            if (index !in items.indices) return@collectLatest
             dampedDrag.animateToValue(index.toFloat())
             onItemClickUpdated(index)
         }
@@ -329,7 +334,7 @@ internal fun IosLiquidGlassNavigationBar(
         }
     }
 
-    Column(modifier = modifier.fillMaxWidth()) {
+    Column(modifier = modifier.fillMaxWidth().background(barBackgroundColor)) {
         Box(
             modifier = Modifier
                 .padding(bottom = bottomPaddingValue, start = 24.dp, end = 24.dp)
