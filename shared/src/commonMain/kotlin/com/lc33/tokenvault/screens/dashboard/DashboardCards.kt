@@ -91,10 +91,9 @@ internal fun BalanceCard(
     balance: BalanceSummary,
     nowMs: Long,
     onRefresh: () -> Unit,
-    onOpenBreakdown: () -> Unit,
 ) {
     val tokens = LocalAppTokens.current
-    AppAccentCard(modifier = cardModifier(), onClick = onOpenBreakdown) {
+    AppAccentCard(modifier = cardModifier()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -175,7 +174,6 @@ internal fun CountsCard(counts: ContentCounts, onOpenManage: () -> Unit) {
             StatTile(value = counts.providers.toString(), label = stringResource(Res.string.count_providers))
             StatTile(value = counts.keys.toString(), label = stringResource(Res.string.count_keys))
             StatTile(value = counts.models.toString(), label = stringResource(Res.string.count_models))
-            StatTile(value = counts.accounts.toString(), label = stringResource(Res.string.count_accounts))
         }
     }
 }
@@ -276,7 +274,6 @@ internal fun ProbeCard(
     state: DashboardUiState,
     onStart: () -> Unit,
     onCancel: () -> Unit,
-    onOpenDetail: () -> Unit,
 ) {
     val tokens = LocalAppTokens.current
     val progress = state.progress
@@ -348,15 +345,7 @@ internal fun ProbeCard(
                 modifier = Modifier.padding(top = 2.dp, bottom = tokens.itemSpacing),
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing)) {
-            AppActionRow(text = stringResource(Res.string.dashboard_probe_start), onClick = onStart)
-            if (lastRun != null) {
-                AppActionRow(
-                    text = stringResource(Res.string.dashboard_probe_detail),
-                    onClick = onOpenDetail,
-                )
-            }
-        }
+        AppActionRow(text = stringResource(Res.string.dashboard_probe_start), onClick = onStart)
     }
 }
 

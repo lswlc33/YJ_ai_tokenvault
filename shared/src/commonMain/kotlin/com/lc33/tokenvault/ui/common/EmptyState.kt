@@ -9,6 +9,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import com.lc33.tokenvault.ui.miuix.AppText
+import com.lc33.tokenvault.ui.miuix.AppTextButton
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
@@ -24,6 +25,8 @@ fun EmptyState(
     title: String,
     description: String,
     modifier: Modifier = Modifier,
+    actionText: String? = null,
+    onAction: (() -> Unit)? = null,
 ) {
     val tokens = LocalAppTokens.current
     Column(
@@ -40,5 +43,8 @@ fun EmptyState(
             color = appSecondaryTextColor,
             textAlign = TextAlign.Center,
         )
+        if (actionText != null && onAction != null) {
+            AppTextButton(text = actionText, onClick = onAction)
+        }
     }
 }

@@ -110,6 +110,18 @@ fun ImportScreen(
                         onClick = onBack,
                     )
                 },
+                actions = {
+                    AppIconButton(
+                        icon = AppIcon.Ok,
+                        contentDescription = pluralStringResource(
+                            Res.plurals.import_confirm,
+                            previews.count { it.selected },
+                            previews.count { it.selected },
+                        ),
+                        onClick = onConfirm,
+                        enabled = !importing && previews.any { it.selected },
+                    )
+                },
             )
         },
     ) { padding ->
@@ -188,21 +200,6 @@ fun ImportScreen(
 
             item { SectionTitle(text = stringResource(Res.string.import_section_preview)) }
             items(previews.size) { index -> PreviewCard(previews[index]) { onToggle(index) } }
-            item {
-                AppActionRow(
-                    text = pluralStringResource(
-                        Res.plurals.import_confirm,
-                        previews.count { it.selected },
-                        previews.count { it.selected },
-                    ),
-                    enabled = !importing && previews.any { it.selected },
-                    onClick = onConfirm,
-                    modifier = Modifier.padding(
-                        horizontal = tokens.screenPadding,
-                        vertical = tokens.itemSpacing,
-                    ),
-                )
-            }
             item { Spacer(modifier = Modifier.height(tokens.sectionSpacing)) }
         }
     }

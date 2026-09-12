@@ -53,21 +53,20 @@ import tokenvault.shared.generated.resources.detail_balance_refresh
 import tokenvault.shared.generated.resources.detail_edit_cd
 import tokenvault.shared.generated.resources.detail_key_delete_body
 import tokenvault.shared.generated.resources.detail_key_delete_title
-import tokenvault.shared.generated.resources.detail_key_label
-import tokenvault.shared.generated.resources.detail_key_label_hint
 import tokenvault.shared.generated.resources.detail_key_reveal_hint
 import tokenvault.shared.generated.resources.detail_key_secret
-import tokenvault.shared.generated.resources.detail_key_secret_hint
 import tokenvault.shared.generated.resources.detail_key_set_default
 import tokenvault.shared.generated.resources.detail_key_sheet_title
 import tokenvault.shared.generated.resources.detail_keys_empty
 import tokenvault.shared.generated.resources.detail_models_refresh
-import tokenvault.shared.generated.resources.detail_probe_provider
+import tokenvault.shared.generated.resources.refresh_cd
 import tokenvault.shared.generated.resources.detail_section_accounts
 import tokenvault.shared.generated.resources.detail_section_keys
 import tokenvault.shared.generated.resources.editor_note
 import tokenvault.shared.generated.resources.editor_save
 import tokenvault.shared.generated.resources.groups_delete
+import tokenvault.shared.generated.resources.import_manual
+import tokenvault.shared.generated.resources.import_title
 import tokenvault.shared.generated.resources.secret_copy_cd
 import com.lc33.tokenvault.domain.LoginMethod
 import com.lc33.tokenvault.domain.Protocol
@@ -86,7 +85,6 @@ import com.lc33.tokenvault.ui.miuix.AppFilterChip
 import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppIconButton
 import com.lc33.tokenvault.ui.miuix.AppScaffold
-import com.lc33.tokenvault.ui.miuix.AppSecretTextField
 import com.lc33.tokenvault.ui.miuix.AppSwitchRow
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppDialogTextButton
@@ -98,7 +96,6 @@ import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
 import com.lc33.tokenvault.ui.miuix.appTopBarScroll
 import com.lc33.tokenvault.ui.miuix.rememberAppTextFieldState
 import com.lc33.tokenvault.ui.miuix.rememberAppTopBarScrollState
-import com.lc33.tokenvault.ui.miuix.rememberSecretTextFieldState
 import com.lc33.tokenvault.ui.shell.ProviderDetailViewModel
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
 import com.lc33.tokenvault.ui.theme.LocalStatusPalette
@@ -113,9 +110,8 @@ import com.lc33.tokenvault.ui.theme.LocalStatusPalette
  * **这是全应用唯一显示密钥明文的页面**（§6.1 推论 3）：
  * 遮蔽串是解密后现算的，展开那一层还会显示完整明文。列表页拿不到明文，想画也画不出来。
  *
- * 新增密钥那一层的输入框用 `rememberSecretTextFieldState`（不进 saved instance state）
- * 与密码键盘：默认键盘会把内容喂给输入法的联想与"个性化学习"，于是这段明文之后会以
- * 候选词的形式出现在任何人面前。
+ * 新增密钥先进入导入方式选择，再复用 cURL 导入或密钥编辑页；这里不再内嵌密钥输入框，
+ * 避免同一条明文出现两套生命周期与保存路径。
  */
 @Composable
 fun ProviderDetailScreen(
@@ -123,10 +119,10 @@ fun ProviderDetailScreen(
     revealedAccount: ProviderDetailViewModel.AccountRevealState?,
     onBack: () -> Unit,
     onEdit: () -> Unit,
-    onAddKey: (String, String, CharArray) -> Unit,
+    onCurlImport: () -> Unit,
+    onManualAddKey: () -> Unit,
     onOpenKey: (Long) -> Unit,
     onRefreshBalance: () -> Unit,
-    onProbeProvider: () -> Unit,
     onProbeKey: (Long) -> Unit,
     onRefreshKeyModels: (Long) -> Unit,
     onAddModel: (Long, String, Protocol) -> Unit,
@@ -160,9 +156,9 @@ fun ProviderDetailScreen(
                 },
                 actions = {
                     AppIconButton(
-                        icon = AppIcon.Probe,
-                        contentDescription = stringResource(Res.string.detail_probe_provider),
-                        onClick = onProbeProvider,
+                        icon = AppIcon.Refresh,
+                        contentDescription = stringResource(Res.string.refresh_cd),
+                        onClick = onRefreshBalance,
                     )
                     AppIconButton(
                         icon = AppIcon.Edit,
@@ -257,9 +253,13 @@ fun ProviderDetailScreen(
     AddKeyDialog(
         show = showAddDialog,
         onDismiss = { showAddDialog = false },
-        onConfirm = { label, note, secret ->
+        onCurlImport = {
             showAddDialog = false
-            onAddKey(label, note, secret)
+            onCurlImport()
+        },
+        onManualAddKey = {
+            showAddDialog = false
+            onManualAddKey()
         },
     )
 
@@ -325,76 +325,33 @@ private fun HintCard(text: String, actionText: String, onAction: () -> Unit) {
     }
 }
 
-/** 新增密钥：标准 OverlayDialog + MIUIX 按钮，不再贴到屏幕底部。 */
+/** 新增密钥：先选导入方式，再进入对应流程。 */
 @Composable
 private fun AddKeyDialog(
     show: Boolean,
     onDismiss: () -> Unit,
-    onConfirm: (String, String, CharArray) -> Unit,
+    onCurlImport: () -> Unit,
+    onManualAddKey: () -> Unit,
 ) {
     val tokens = LocalAppTokens.current
-    val label = rememberAppTextFieldState()
-    val note = rememberAppTextFieldState()
-    val secret = rememberSecretTextFieldState()
 
     AppDialog(
         show = show,
-        onDismissRequest = {
-            secret.clear()
-            label.clear()
-            note.clear()
-            onDismiss()
-        },
+        onDismissRequest = onDismiss,
         title = stringResource(Res.string.detail_add_key),
     ) {
-        AppTextField(
-            state = label,
-            label = stringResource(Res.string.detail_key_label),
-            supportingText = stringResource(Res.string.detail_key_label_hint),
+        AppActionRow(
+            text = stringResource(Res.string.import_title),
+            onClick = onCurlImport,
+            modifier = Modifier.fillMaxWidth(),
         )
-        AppTextField(
-            state = note,
-            label = stringResource(Res.string.editor_note),
-            modifier = Modifier.padding(top = tokens.itemSpacing),
-        )
-        AppSecretTextField(
-            state = secret,
-            label = stringResource(Res.string.detail_key_secret),
-            supportingText = stringResource(Res.string.detail_key_secret_hint),
-            modifier = Modifier.padding(top = tokens.itemSpacing),
-        )
-        Row(
+        AppActionRow(
+            text = stringResource(Res.string.import_manual),
+            onClick = onManualAddKey,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = tokens.itemSpacing),
-            horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
-        ) {
-            AppDialogTextButton(
-                text = stringResource(Res.string.dialog_cancel),
-                onClick = {
-                    secret.clear()
-                    label.clear()
-                    note.clear()
-                    onDismiss()
-                },
-                modifier = Modifier.weight(1f),
-            )
-            AppDialogTextButton(
-                text = stringResource(Res.string.editor_save),
-                onClick = {
-                    val chars = secret.chars
-                    if (chars.isEmpty()) return@AppDialogTextButton
-                    val text = label.text
-                    val noteText = note.text
-                    secret.clear()
-                    label.clear()
-                    note.clear()
-                    onConfirm(text, noteText, chars)
-                },
-                modifier = Modifier.weight(1f),
-                primary = true,
-            )
-        }
+        )
     }
 }
 

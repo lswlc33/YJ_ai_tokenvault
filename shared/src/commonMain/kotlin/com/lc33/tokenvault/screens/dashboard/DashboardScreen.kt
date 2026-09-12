@@ -29,21 +29,13 @@ import com.lc33.tokenvault.ui.theme.LocalAppTokens
 /**
  * 仪表盘 —— **只读**总览（计划.md §13.4）。
  *
- * 这一页不提供任何编辑入口：每一行的点击结果都是"跳到管理页的某个详情"，
- * 由 [onOpenProvider] / [onOpenManageTab] 往外抛。它自己也不弹编辑器。
- * 这条分工是硬规则——一旦这里长出编辑能力，同一份数据就有两个改动入口，
- * 而两个入口迟早各自维护一套校验。
- *
- * 六块卡的顺序是"先结论后细节"：钱 → 有多少东西 → 健康 → 要动手的 → 上次探测 → 备份。
+ * 这一页不提供编辑入口，只保留三块：余额、内容概览和探测。失败明细与处理入口都回到
+ * 管理页，避免首页同时承担"看总览"和"修问题"两种职责。
  */
 @Composable
 fun DashboardScreen(
     state: DashboardUiState,
-    onOpenProvider: (Long) -> Unit,
     onOpenManage: () -> Unit,
-    onOpenProbeRun: () -> Unit,
-    onOpenSync: () -> Unit,
-    onOpenBalanceBreakdown: () -> Unit,
     onStartProbe: () -> Unit,
     onCancelProbe: () -> Unit,
     onRefreshBalance: () -> Unit,
@@ -80,14 +72,10 @@ fun DashboardScreen(
                     balance = state.balance,
                     nowMs = state.nowMs,
                     onRefresh = onRefreshBalance,
-                    onOpenBreakdown = onOpenBalanceBreakdown,
                 )
             }
             item { CountsCard(state.counts, onOpenManage) }
-            item { HealthCard(state.health) }
-            item { AttentionCard(state.attention, onOpenProvider) }
-            item { ProbeCard(state, onStartProbe, onCancelProbe, onOpenProbeRun) }
-            item { BackupCard(state.backup, onOpenSync) }
+            item { ProbeCard(state, onStartProbe, onCancelProbe) }
             item { Spacer(modifier = Modifier.height(tokens.sectionSpacing)) }
         }
     }

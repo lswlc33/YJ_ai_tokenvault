@@ -71,6 +71,7 @@ import tokenvault.shared.generated.resources.editor_probe_model_reachability
 import tokenvault.shared.generated.resources.editor_probe_model_reachability_summary
 import tokenvault.shared.generated.resources.editor_probe_models
 import tokenvault.shared.generated.resources.editor_probe_models_summary
+import tokenvault.shared.generated.resources.editor_section_endpoint
 import tokenvault.shared.generated.resources.detail_key_secret
 import tokenvault.shared.generated.resources.editor_discard_confirm
 import tokenvault.shared.generated.resources.editor_discard_summary
@@ -176,11 +177,9 @@ fun KeyEditorScreen(
                 ) {
                     AppTextField(state = label, label = stringResource(Res.string.editor_name))
                     AppTextField(state = note, label = stringResource(Res.string.editor_note))
-                    AppTextField(
-                        state = baseUrl,
-                        label = stringResource(Res.string.editor_base_url),
-                        supportingText = stringResource(Res.string.editor_base_url_hint),
-                        errorText = baseUrlError,
+                    AppSecretTextField(
+                        state = secret,
+                        label = stringResource(Res.string.detail_key_secret),
                     )
                 }
             }
@@ -194,22 +193,30 @@ fun KeyEditorScreen(
                 }
             }
 
-            item { SectionTitle(text = stringResource(Res.string.editor_section_protocols)) }
+            item { SectionTitle(text = stringResource(Res.string.editor_section_endpoint)) }
             item {
-                Row(
+                Column(
                     modifier = Modifier.padding(horizontal = tokens.screenPadding),
-                    horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
+                    verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
                 ) {
-                    Protocol.entries.forEach { protocol ->
-                        val selected = protocol in draft.protocols
-                        AppFilterChip(
-                            text = protocolLabel(protocol),
-                            selected = selected,
-                            onClick = {
-                                val next = if (selected) draft.protocols - protocol else draft.protocols + protocol
-                                onChange(draft.copy(protocols = next))
-                            },
-                        )
+                    AppTextField(
+                        state = baseUrl,
+                        label = stringResource(Res.string.editor_base_url),
+                        supportingText = stringResource(Res.string.editor_base_url_hint),
+                        errorText = baseUrlError,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing)) {
+                        Protocol.entries.forEach { protocol ->
+                            val selected = protocol in draft.protocols
+                            AppFilterChip(
+                                text = protocolLabel(protocol),
+                                selected = selected,
+                                onClick = {
+                                    val next = if (selected) draft.protocols - protocol else draft.protocols + protocol
+                                    onChange(draft.copy(protocols = next))
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -242,10 +249,6 @@ fun KeyEditorScreen(
                         label = stringResource(Res.string.editor_timeout),
                         supportingText = stringResource(Res.string.editor_timeout_hint),
                     )
-                    AppSecretTextField(
-                        state = secret,
-                        label = stringResource(Res.string.detail_key_secret),
-                    )
                 }
             }
             item {
@@ -268,12 +271,21 @@ fun KeyEditorScreen(
             item { SectionTitle(text = stringResource(Res.string.editor_section_balance)) }
             item {
                 AppPreferenceGroup {
+                    AppSwitchRow(
+                        title = stringResource(Res.string.editor_balance_kind),
+                        summary = stringResource(Res.string.editor_balance_kind_summary),
+                        checked = draft.balanceKindIndex != 0,
+                        onCheckedChange = { enabled ->
+                            onChange(draft.copy(balanceKindIndex = if (enabled) 1 else 0))
+                        },
+                    )
                     AppDropdownRow(
                         title = stringResource(Res.string.editor_balance_kind),
                         summary = stringResource(Res.string.editor_balance_kind_summary),
                         items = stringArrayResource(Res.array.balance_kinds).toList(),
                         selectedIndex = draft.balanceKindIndex,
                         onSelect = { onChange(draft.copy(balanceKindIndex = it)) },
+                        enabled = draft.balanceKindIndex != 0,
                     )
                 }
             }

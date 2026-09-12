@@ -61,7 +61,7 @@
     <string name="dashboard_empty_title">还没有内容</string>
     <string name="dashboard_empty_desc">可以手动新建，也可以粘贴一段文本，一次性导入密钥、端点、模型列表与余额配置。</string>
     <string name="dashboard_empty_import">粘贴导入</string>
-    <string name="dashboard_empty_new">手动新建</string>
+    <string name="dashboard_empty_new">添加供应商</string>
 
     <!-- Manage -->
     <string name="manage_title">管理</string>
@@ -134,7 +134,7 @@
     <!-- Sample content for the two screens that still have no data source (import preview, client profiles). -->
     <string name="group_all">全部</string>
     <string name="manage_search_hint">搜索供应商</string>
-    <string name="manage_groups_cd">分组管理</string>
+    <string name="manage_groups_cd">编辑供应商列表</string>
     <string name="manage_sort_manual">手动排序</string>
     <string name="manage_sort_name">名称</string>
     <string name="manage_sort_balance">余额</string>
@@ -403,6 +403,7 @@
     <string name="editor_color">色块</string>
     <string name="editor_pinned">置顶</string>
     <string name="editor_section_protocols">协议</string>
+    <string name="editor_section_endpoint">端点与协议</string>
     <string name="editor_section_balance">余额</string>
     <string name="editor_balance_kind">查询类型</string>
     <string name="editor_balance_kind_summary">去问哪个管理接口</string>
@@ -449,13 +450,14 @@
     <string name="groups_delete_note">删除分组不会删掉里面的供应商——它们会落回「全部」。</string>
 
     <!-- Import -->
-    <string name="import_title">cURL 导入</string>
+    <string name="import_title">密钥 cURL 导入</string>
+    <string name="import_manual">手动导入</string>
     <string name="import_section_paste">cURL 命令</string>
     <string name="import_paste_label">cURL 命令</string>
-    <string name="import_paste_hint">每个命令提取请求地址、鉴权 Key、模型与端点协议。可连续粘贴多条命令，同地址会合并为一家供应商。</string>
+    <string name="import_paste_hint">粘贴一条 cURL 命令，首次识别会提取请求地址、鉴权 Key、模型与端点协议。</string>
     <string name="import_from_clipboard">从剪贴板填充</string>
-    <string name="import_parse">解析</string>
-    <string name="import_no_preview">还没有解析结果。粘贴 cURL 命令再点解析。</string>
+    <string name="import_parse">一键识别</string>
+    <string name="import_no_preview">还没有识别结果。粘贴 cURL 命令再点一键识别。</string>
     <string name="import_section_preview">预览</string>
     <string name="import_selected">将导入</string>
     <string name="import_skipped">跳过</string>

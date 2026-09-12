@@ -198,21 +198,36 @@ fun AppArrowRow(
 @Composable
 fun AppAccentCard(
     modifier: Modifier = Modifier,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val tokens = LocalAppTokens.current
-    Surface(
-        onClick = onClick,
-        modifier = modifier,
-        shape = RoundedCornerShape(tokens.cardRadius),
-        color = appPrimaryColor,
-        contentColor = appOnPrimaryColor,
-    ) {
-        Column(
-            modifier = Modifier.padding(tokens.sectionSpacing),
-            content = content,
-        )
+    val shape = RoundedCornerShape(tokens.cardRadius)
+    if (onClick == null) {
+        Surface(
+            modifier = modifier,
+            shape = shape,
+            color = appPrimaryColor,
+            contentColor = appOnPrimaryColor,
+        ) {
+            Column(
+                modifier = Modifier.padding(tokens.sectionSpacing),
+                content = content,
+            )
+        }
+    } else {
+        Surface(
+            onClick = onClick,
+            modifier = modifier,
+            shape = shape,
+            color = appPrimaryColor,
+            contentColor = appOnPrimaryColor,
+        ) {
+            Column(
+                modifier = Modifier.padding(tokens.sectionSpacing),
+                content = content,
+            )
+        }
     }
 }
 

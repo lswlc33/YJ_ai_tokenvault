@@ -62,7 +62,7 @@
     <string name="dashboard_empty_title">Nothing here yet</string>
     <string name="dashboard_empty_desc">Add a provider by hand, or paste a block of text to import keys, endpoints, models and balance settings at once.</string>
     <string name="dashboard_empty_import">Paste to import</string>
-    <string name="dashboard_empty_new">Add by hand</string>
+    <string name="dashboard_empty_new">Add provider</string>
 
     <!-- Manage -->
     <string name="manage_title">Manage</string>
@@ -135,7 +135,7 @@
     <!-- Sample content for the two screens that still have no data source (import preview, client profiles). -->
     <string name="group_all">All</string>
     <string name="manage_search_hint">Search providers</string>
-    <string name="manage_groups_cd">Manage groups</string>
+    <string name="manage_groups_cd">Edit provider list</string>
     <string name="manage_sort_manual">Manual</string>
     <string name="manage_sort_name">Name</string>
     <string name="manage_sort_balance">Balance</string>
@@ -404,6 +404,7 @@
     <string name="editor_color">Colour</string>
     <string name="editor_pinned">Pin to the top</string>
     <string name="editor_section_protocols">Protocols</string>
+    <string name="editor_section_endpoint">Endpoint and protocols</string>
     <string name="editor_section_balance">Balance</string>
     <string name="editor_balance_kind">Query type</string>
     <string name="editor_balance_kind_summary">Which management API to ask</string>
@@ -451,13 +452,14 @@
     <string name="groups_delete_note">Deleting a group does not delete its providers — they fall back to All.</string>
 
     <!-- Import -->
-    <string name="import_title">Import from cURL</string>
+    <string name="import_title">Key cURL import</string>
+    <string name="import_manual">Manual import</string>
     <string name="import_section_paste">cURL commands</string>
     <string name="import_paste_label">cURL command</string>
-    <string name="import_paste_hint">Each command extracts the base URL, auth key, model, and endpoint protocol. Paste multiple commands; the same base URL is merged into one provider.</string>
+    <string name="import_paste_hint">Paste one cURL command; the first parse extracts the base URL, auth key, model, and endpoint protocol.</string>
     <string name="import_from_clipboard">Fill from clipboard</string>
-    <string name="import_parse">Parse</string>
-    <string name="import_no_preview">Nothing parsed yet. Paste a cURL command and press Parse.</string>
+    <string name="import_parse">Recognize</string>
+    <string name="import_no_preview">Nothing recognized yet. Paste a cURL command and press Recognize.</string>
     <string name="import_section_preview">Preview</string>
     <string name="import_selected">Will import</string>
     <string name="import_skipped">Skipped</string>

@@ -20,7 +20,6 @@ import androidx.compose.ui.Modifier
 import org.jetbrains.compose.resources.stringResource
 import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.add_cd
-import tokenvault.shared.generated.resources.dashboard_empty_import
 import tokenvault.shared.generated.resources.dashboard_empty_new
 import tokenvault.shared.generated.resources.group_all
 import tokenvault.shared.generated.resources.manage_batch_change_group
@@ -41,14 +40,9 @@ import tokenvault.shared.generated.resources.manage_groups_cd
 import tokenvault.shared.generated.resources.manage_search_hint
 import tokenvault.shared.generated.resources.manage_select_all
 import tokenvault.shared.generated.resources.manage_selected_count
-import tokenvault.shared.generated.resources.manage_sort_balance
-import tokenvault.shared.generated.resources.manage_sort_last_probe
-import tokenvault.shared.generated.resources.manage_sort_manual
-import tokenvault.shared.generated.resources.manage_sort_name
 import tokenvault.shared.generated.resources.manage_title
 import tokenvault.shared.generated.resources.refresh_status_cd
 import com.lc33.tokenvault.screens.model.ManageUiState
-import com.lc33.tokenvault.screens.model.ProviderSort
 import com.lc33.tokenvault.ui.common.EmptyState
 import com.lc33.tokenvault.ui.miuix.AppBottomSheet
 import com.lc33.tokenvault.ui.miuix.AppDialog
@@ -59,7 +53,6 @@ import com.lc33.tokenvault.ui.miuix.AppIconButton
 import com.lc33.tokenvault.ui.miuix.AppScaffold
 import com.lc33.tokenvault.ui.miuix.AppSearchField
 import com.lc33.tokenvault.ui.miuix.AppActionRow
-import com.lc33.tokenvault.ui.miuix.AppDialogTextButton
 import com.lc33.tokenvault.ui.miuix.AppTopBar
 import com.lc33.tokenvault.ui.miuix.appTopBarScroll
 import com.lc33.tokenvault.ui.miuix.rememberAppTextFieldState
@@ -87,9 +80,7 @@ fun ManageScreen(
     onOpenGroups: () -> Unit,
     onNewProvider: () -> Unit,
     onRefreshStatus: () -> Unit,
-    onImport: () -> Unit,
     onQueryChange: (String) -> Unit,
-    onSort: (ProviderSort) -> Unit,
     onEnterSelection: (Long) -> Unit,
     onToggleSelect: (Long) -> Unit,
     onSelectAll: (List<Long>) -> Unit,
@@ -100,7 +91,6 @@ fun ManageScreen(
     val scrollState = rememberAppTopBarScrollState()
     val tokens = LocalAppTokens.current
     val query = rememberAppTextFieldState()
-    var showCreateSheet by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showGroupPicker by remember { mutableStateOf(false) }
 
@@ -178,7 +168,7 @@ fun ManageScreen(
                 AppFab(
                     icon = AppIcon.Add,
                     contentDescription = stringResource(Res.string.add_cd),
-                    onClick = { showCreateSheet = true },
+                    onClick = onNewProvider,
                 )
             }
         },
@@ -202,10 +192,6 @@ fun ManageScreen(
                 state = state,
                 onSelectGroup = onSelectGroup,
             )
-            SortRow(
-                sort = state.sort,
-                onSort = onSort,
-            )
             ProviderList(
                 state = state,
                 scrollState = scrollState,
@@ -213,36 +199,10 @@ fun ManageScreen(
                 onOpenProvider = onOpenProvider,
                 onEnterSelection = onEnterSelection,
                 onToggleSelect = onToggleSelect,
-                onSelectGroup = onSelectGroup,
                 onNewProvider = onNewProvider,
-                onImport = onImport,
                 onBatchSetGroup = { showGroupPicker = true },
             )
         }
-    }
-
-    AppBottomSheet(
-        show = showCreateSheet,
-        onDismissRequest = { showCreateSheet = false },
-        title = stringResource(Res.string.add_cd),
-    ) {
-        AppDialogTextButton(
-            text = stringResource(Res.string.dashboard_empty_new),
-            onClick = {
-                showCreateSheet = false
-                onNewProvider()
-            },
-            modifier = Modifier.fillMaxWidth(),
-            primary = true,
-        )
-        AppDialogTextButton(
-            text = stringResource(Res.string.dashboard_empty_import),
-            onClick = {
-                showCreateSheet = false
-                onImport()
-            },
-            modifier = Modifier.fillMaxWidth(),
-        )
     }
 
     // 批量删除二次确认。文案里写清连带删掉什么（§13.4）。
@@ -300,43 +260,6 @@ private fun GroupFilterRow(
     }
 }
 
-/** 排序 chip（名称 / 余额 / 最近探测 / 手动）。 */
-@Composable
-private fun SortRow(
-    sort: ProviderSort,
-    onSort: (ProviderSort) -> Unit,
-) {
-    val tokens = LocalAppTokens.current
-    val labels = mapOf(
-        ProviderSort.MANUAL to stringResource(Res.string.manage_sort_manual),
-        ProviderSort.NAME to stringResource(Res.string.manage_sort_name),
-        ProviderSort.BALANCE to stringResource(Res.string.manage_sort_balance),
-        ProviderSort.LAST_PROBE to stringResource(Res.string.manage_sort_last_probe),
-    )
-    val order = listOf(
-        ProviderSort.MANUAL,
-        ProviderSort.NAME,
-        ProviderSort.BALANCE,
-        ProviderSort.LAST_PROBE,
-    )
-    LazyRow(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = tokens.itemSpacing),
-        contentPadding = PaddingValues(horizontal = tokens.screenPadding),
-        horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
-    ) {
-        items(order.size) { index ->
-            val key = order[index]
-            AppFilterChip(
-                text = labels.getValue(key),
-                selected = sort == key,
-                onClick = { onSort(key) },
-            )
-        }
-    }
-}
-
 /** 批量改分组面板：第一项「未分组」，其余是自定义分组。 */
 @Composable
 private fun GroupPickerSheet(
@@ -367,9 +290,7 @@ private fun ProviderList(
     onOpenProvider: (Long) -> Unit,
     onEnterSelection: (Long) -> Unit,
     onToggleSelect: (Long) -> Unit,
-    onSelectGroup: (Long?) -> Unit,
     onNewProvider: () -> Unit,
-    onImport: () -> Unit,
     onBatchSetGroup: () -> Unit,
 ) {
     val tokens = LocalAppTokens.current
@@ -387,6 +308,8 @@ private fun ProviderList(
             EmptyState(
                 title = stringResource(Res.string.manage_empty_providers_title),
                 description = stringResource(Res.string.manage_empty_providers_desc),
+                actionText = stringResource(Res.string.dashboard_empty_new),
+                onAction = onNewProvider,
             )
         } else {
             EmptyState(

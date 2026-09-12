@@ -1,7 +1,10 @@
 package com.lc33.tokenvault.ui.miuix
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
@@ -9,6 +12,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
@@ -22,6 +26,15 @@ import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.blur.textureBlur
+
+/**
+ * 浮层底栏给页面内容预留的透明 inset。
+ *
+ * 外层 Shell 的底栏覆盖在页面之上，不参与页面 Scaffold 的测量；页面如果不知道
+ * 这部分高度，列表末项和 FAB 会压进药丸。Shell 把真实底栏高度写进来，[AppScaffold]
+ * 再用一个透明的 bottomBar 占位，既保留内容穿透绘制，也让内容与 FAB 正确避让。
+ */
+internal val LocalAppBottomBarInset = staticCompositionLocalOf { 0.dp }
 
 /**
  * MIUIX `Scaffold` 的包装。
@@ -41,10 +54,20 @@ fun AppScaffold(
     snackbarHost: @Composable () -> Unit = {},
     content: @Composable (PaddingValues) -> Unit,
 ) {
+    val bottomBarInset = LocalAppBottomBarInset.current
     Scaffold(
         modifier = modifier,
         topBar = topBar,
-        bottomBar = bottomBar,
+        bottomBar = {
+            if (bottomBarInset > 0.dp) {
+                Column {
+                    bottomBar()
+                    Spacer(modifier = Modifier.height(bottomBarInset))
+                }
+            } else {
+                bottomBar()
+            }
+        },
         floatingActionButton = floatingActionButton,
         snackbarHost = snackbarHost,
         content = content,

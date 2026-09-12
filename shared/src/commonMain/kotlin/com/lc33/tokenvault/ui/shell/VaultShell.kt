@@ -3,7 +3,6 @@ package com.lc33.tokenvault.ui.shell
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -26,6 +25,7 @@ import com.lc33.tokenvault.ui.miuix.AppLiquidNavBar
 import com.lc33.tokenvault.ui.miuix.AppNavBarItem
 import com.lc33.tokenvault.ui.miuix.AppScaffold
 import com.lc33.tokenvault.ui.miuix.AppSnackbarHost
+import com.lc33.tokenvault.ui.miuix.LocalAppBottomBarInset
 import com.lc33.tokenvault.ui.miuix.LocalAppSnackbar
 import com.lc33.tokenvault.ui.miuix.navigation.rememberVaultBackStack
 import com.lc33.tokenvault.ui.miuix.appLayerBackdrop
@@ -90,8 +90,12 @@ fun VaultShell() {
         },
         snackbarHost = { AppSnackbarHost(snackbar) },
     ) { padding ->
-        CompositionLocalProvider(LocalAppSnackbar provides snackbar) {
-            // 只取底部：底栏高度不是 inset，页面自己的 Scaffold 无从得知，必须由这里让出来。
+        CompositionLocalProvider(
+            LocalAppSnackbar provides snackbar,
+            LocalAppBottomBarInset provides padding.calculateBottomPadding(),
+        ) {
+            // 内容必须绘制到窗口底部，才能透过浮层玻璃被采样；底栏高度改为通过
+            // LocalAppBottomBarInset 传给页面，由页面自己的 Scaffold 透明避让。
             // 顶部与状态栏由页面自己的 Scaffold + TopAppBar 处理（计划.md §15.16）。
             VaultNavHost(
                 backStack = backStack,
@@ -99,9 +103,7 @@ fun VaultShell() {
                 onBackStackChanged = { backStackRevision++ },
                 style = backStyle,
                 exitDirection = backExitDirection,
-                modifier = Modifier
-                    .padding(bottom = padding.calculateBottomPadding())
-                    .appLayerBackdrop(backdrop),
+                modifier = Modifier.appLayerBackdrop(backdrop),
             )
         }
     }
