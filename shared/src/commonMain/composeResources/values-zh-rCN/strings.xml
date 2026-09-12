@@ -445,19 +445,19 @@
     <string name="groups_delete_note">删除分组不会删掉里面的供应商——它们会落回「全部」。</string>
 
     <!-- Import -->
-    <string name="import_title">粘贴导入</string>
-    <string name="import_section_paste">粘贴</string>
-    <string name="import_paste_label">文本块</string>
-    <string name="import_paste_hint">名称、密钥、请求地址、支持的协议、模型列表、余额配置。一家一块，块与块之间用一行三个短横线隔开。</string>
+    <string name="import_title">cURL 导入</string>
+    <string name="import_section_paste">cURL 命令</string>
+    <string name="import_paste_label">cURL 命令</string>
+    <string name="import_paste_hint">每个命令提取请求地址、鉴权 Key、模型与端点协议。可连续粘贴多条命令，同地址会合并为一家供应商。</string>
     <string name="import_from_clipboard">从剪贴板填充</string>
     <string name="import_parse">解析</string>
-    <string name="import_no_preview">还没有解析结果。粘贴一段文本再点解析。</string>
+    <string name="import_no_preview">还没有解析结果。粘贴 cURL 命令再点解析。</string>
     <string name="import_section_preview">预览</string>
     <string name="import_selected">将导入</string>
     <string name="import_skipped">跳过</string>
     <string name="import_counts">%1$d 张密钥 · %2$d 个模型 · %3$d 个账号</string>
     <plurals name="import_parse_errors">
-        <item quantity="other">%1$d 块解析失败被跳过——通常是缺了供应商名称。</item>
+        <item quantity="other">%1$d 条 cURL 命令解析失败被跳过——通常是缺 URL 或鉴权 Key。</item>
     </plurals>
     <plurals name="import_confirm">
         <item quantity="other">导入 %1$d 家</item>
