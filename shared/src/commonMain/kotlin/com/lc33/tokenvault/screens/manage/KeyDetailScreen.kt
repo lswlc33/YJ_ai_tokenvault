@@ -43,7 +43,10 @@ import tokenvault.shared.generated.resources.back_cd
 import tokenvault.shared.generated.resources.detail_edit_cd
 import tokenvault.shared.generated.resources.detail_key_reveal_hint
 import tokenvault.shared.generated.resources.detail_models_refresh
+import tokenvault.shared.generated.resources.detail_key_balance_value
 import tokenvault.shared.generated.resources.detail_models_section
+import tokenvault.shared.generated.resources.detail_key_actions
+import tokenvault.shared.generated.resources.detail_key_connection
 import tokenvault.shared.generated.resources.detail_probe_key
 import tokenvault.shared.generated.resources.editor_note
 import tokenvault.shared.generated.resources.groups_delete
@@ -138,7 +141,11 @@ fun KeyDetailScreen(
                     }
                     key.balance?.let {
                         AppText(
-                            text = "${it.currency} ${it.amount}",
+                            text = stringResource(
+                                Res.string.detail_key_balance_value,
+                                it.currency,
+                                it.amount,
+                            ),
                             style = AppTextStyle.Title,
                             modifier = Modifier.padding(top = tokens.itemSpacing),
                         )
@@ -146,7 +153,7 @@ fun KeyDetailScreen(
                 }
             }
 
-            item { SectionTitle(text = stringResource(Res.string.detail_probe_key)) }
+            item { SectionTitle(text = stringResource(Res.string.detail_key_connection)) }
             item {
                 AppCard(
                     modifier = Modifier
@@ -158,7 +165,7 @@ fun KeyDetailScreen(
                         modifier = Modifier.padding(top = tokens.itemSpacing),
                         horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
                     ) {
-                        key.settings.protocols.forEach { AppChip(text = it) }
+                        key.settings.protocols.forEach { AppChip(text = protocolLabel(it)) }
                     }
                     AppText(
                         text = key.settings.authStyle,
@@ -212,7 +219,7 @@ fun KeyDetailScreen(
             }
 
             item {
-                SectionTitle(text = stringResource(Res.string.detail_probe_key))
+                SectionTitle(text = stringResource(Res.string.detail_key_actions))
             }
             item {
                 AppCard(

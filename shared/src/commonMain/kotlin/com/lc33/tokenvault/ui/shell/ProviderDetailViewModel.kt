@@ -152,8 +152,6 @@ class ProviderDetailViewModel constructor(
                 keys = keyRows,
                 models = modelRows,
                 accounts = accountRows,
-                modelListEnabled = data.keys.any { it.settings.probe.models },
-                modelReachabilityEnabled = data.keys.any { it.settings.probe.modelReachability },
                 nowMs = nowMillis(),
             )
         }

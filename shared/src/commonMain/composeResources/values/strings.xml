@@ -79,6 +79,7 @@
     <string name="manage_keys_ratio">%1$d / %2$d keys</string>
     <string name="manage_models_count">%1$d models</string>
     <string name="manage_latency">%1$d ms</string>
+    <string name="manage_latency_time">%1$s · %2$s</string>
     <string name="manage_context">Context %1$s</string>
     <string name="manage_empty_providers_title">No providers yet</string>
     <string name="manage_empty_providers_desc">Add one by hand, or paste a block of text to import everything at once.</string>
@@ -151,7 +152,10 @@
     <string name="manage_batch_ungrouped">No group</string>
     <string name="manage_empty_group_title">Nothing in this group</string>
     <string name="manage_empty_group_desc">No provider is assigned to this group yet. Assign one in the provider editor, or go back to All.</string>
+    <string name="manage_empty_search_title">No matching providers</string>
+    <string name="manage_empty_search_desc">Try another keyword, or clear the search.</string>
     <string name="groups_title">Groups</string>
+    <string name="groups_add_failed">Couldn\'t save the group. A group with this name may already exist.</string>
     <string name="provider_editor_title">Edit provider</string>
     <string name="detail_edit_cd">Edit</string>
     <string name="detail_section_keys">Keys</string>
@@ -585,7 +589,15 @@
     <string name="detail_account_reveal_hint">Copy puts the password on the clipboard and clears it after a while. Leaving this sheet wipes the plain text.</string>
     <string name="detail_balance_refresh">Check balance</string>
     <string name="detail_probe_provider">Probe this provider</string>
-    <string name="detail_probe_key">Long-press a key to probe just that one</string>
+    <string name="detail_key_connection">Connection</string>
+    <string name="detail_key_actions">Actions</string>
+    <string name="detail_probe_key">Probe this key</string>
+    <string name="detail_probe_model_cd">Probe this model</string>
+    <string name="detail_provider_balance_total">Provider total</string>
+    <string name="detail_key_balance_value">This key: %1$s %2$s</string>
+    <string name="protocol_chat">Chat</string>
+    <string name="protocol_responses">Responses</string>
+    <string name="protocol_anthropic">Anthropic</string>
     <string name="clipboard_label_api_key">YuanJi key</string>
     <string name="clipboard_label_account">YuanJi password</string>
     <string name="editor_group_none">Ungrouped</string>

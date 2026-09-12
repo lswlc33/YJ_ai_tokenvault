@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lc33.tokenvault.crypto.zeroize
 import com.lc33.tokenvault.domain.model.PredictiveBackExitDirection
+import com.lc33.tokenvault.endpoint.EndpointError
 import com.lc33.tokenvault.domain.model.PredictiveBackStyle
 import com.lc33.tokenvault.engine.RestoreMode
 import com.lc33.tokenvault.platform.openAppLocaleSettings
@@ -60,8 +61,13 @@ import org.koin.core.parameter.parametersOf
 import tokenvault.shared.generated.resources.clipboard_label_account
 import tokenvault.shared.generated.resources.clipboard_label_api_key
 import tokenvault.shared.generated.resources.editor_group_none
+import tokenvault.shared.generated.resources.editor_url_err_empty
+import tokenvault.shared.generated.resources.editor_url_err_host
+import tokenvault.shared.generated.resources.editor_url_err_query
+import tokenvault.shared.generated.resources.editor_url_err_scheme
 import tokenvault.shared.generated.resources.editor_profile_default
 import tokenvault.shared.generated.resources.group_all
+import tokenvault.shared.generated.resources.groups_add_failed
 import tokenvault.shared.generated.resources.profile_name_default
 import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.sync_confirm
@@ -195,7 +201,6 @@ fun VaultNavHost(
                     onRefreshBalance = vm::refreshBalance,
                     onProbeProvider = vm::probeProvider,
                     onProbeKey = vm::probeKey,
-                    onRefreshModels = { vm.refreshModels() },
                     onRefreshKeyModels = { keyId -> vm.refreshModels(keyId) },
                     onAddModel = vm::onAddModel,
                     onUpdateModel = vm::onUpdateModel,
@@ -240,16 +245,26 @@ fun VaultNavHost(
                 val draft by vm.draft.collectAsStateWithLifecycle()
                 val profiles by vm.profiles.collectAsStateWithLifecycle()
                 val loaded by vm.loaded.collectAsStateWithLifecycle()
+                val urlError by vm.urlError.collectAsStateWithLifecycle()
                 LaunchedEffect(vm) { vm.saved.collect { back() } }
                 val keyProfileDefaultLabel = stringResource(Res.string.profile_name_default)
                 val keyEditorProfileDefault = stringResource(Res.string.editor_profile_default)
+                val baseUrlError = when (urlError) {
+                    null -> null
+                    EndpointError.Empty -> stringResource(Res.string.editor_url_err_empty)
+                    EndpointError.UnsupportedScheme -> stringResource(Res.string.editor_url_err_scheme)
+                    EndpointError.HasQueryOrFragment -> stringResource(Res.string.editor_url_err_query)
+                    EndpointError.NoHost -> stringResource(Res.string.editor_url_err_host)
+                }
                 if (loaded) {
                     KeyEditorScreen(
                         draft = draft,
                         profileNames = listOf(keyEditorProfileDefault) + profiles.map { profile ->
                             if (profile.builtinKey == "default") keyProfileDefaultLabel else profile.name
                         },
+                        baseUrlError = baseUrlError,
                         onChange = vm::onChange,
+                        onBaseUrlChange = vm::clearUrlError,
                         onBack = back,
                         onSave = vm::save,
                     )
@@ -467,6 +482,11 @@ fun VaultNavHost(
             is GroupsRoute -> {
             val vm: ManageViewModel = koinViewModel()
             val manage by vm.state.collectAsStateWithLifecycle()
+            val snackbar = LocalAppSnackbar.current
+            val groupAddFailed = stringResource(Res.string.groups_add_failed)
+            LaunchedEffect(vm, groupAddFailed) {
+                vm.groupError.collect { snackbar?.show(groupAddFailed) }
+            }
             GroupsScreen(
                 // 「全部」那一枚由页面自己过滤掉（它不入库，也就没有重命名这种操作）
                 groups = manage.groups,

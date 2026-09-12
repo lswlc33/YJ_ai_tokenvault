@@ -78,6 +78,7 @@
     <string name="manage_keys_ratio">%1$d / %2$d 张可用</string>
     <string name="manage_models_count">%1$d 个模型</string>
     <string name="manage_latency">%1$d 毫秒</string>
+    <string name="manage_latency_time">%1$s · %2$s</string>
     <string name="manage_context">上下文 %1$s</string>
     <string name="manage_empty_providers_title">还没有供应商</string>
     <string name="manage_empty_providers_desc">可以手动新建，也可以粘贴一段文本一次性导入。</string>
@@ -150,7 +151,10 @@
     <string name="manage_batch_ungrouped">未分组</string>
     <string name="manage_empty_group_title">这个分组下没有供应商</string>
     <string name="manage_empty_group_desc">还没有供应商归到这个分组。可以在供应商编辑页里改分组，或者回到「全部」。</string>
+    <string name="manage_empty_search_title">没有匹配的供应商</string>
+    <string name="manage_empty_search_desc">换个关键词，或者清空搜索后再看。</string>
     <string name="groups_title">分组</string>
+    <string name="groups_add_failed">分组没保存成功，可能已经有同名分组。</string>
     <string name="provider_editor_title">编辑供应商</string>
     <string name="detail_edit_cd">编辑</string>
     <string name="detail_section_keys">密钥</string>
@@ -580,7 +584,15 @@
     <string name="detail_account_reveal_hint">复制会把密码放进剪贴板并在一段时间后自动清除。离开这一层就擦掉明文。</string>
     <string name="detail_balance_refresh">查余额</string>
     <string name="detail_probe_provider">探测这一家</string>
-    <string name="detail_probe_key">长按密钥可只探测这一张</string>
+    <string name="detail_key_connection">连接设置</string>
+    <string name="detail_key_actions">操作</string>
+    <string name="detail_probe_key">探测这一张</string>
+    <string name="detail_probe_model_cd">探测这个模型</string>
+    <string name="detail_provider_balance_total">供应商余额合计</string>
+    <string name="detail_key_balance_value">本 Key：%1$s %2$s</string>
+    <string name="protocol_chat">Chat</string>
+    <string name="protocol_responses">Responses</string>
+    <string name="protocol_anthropic">Anthropic</string>
     <string name="clipboard_label_api_key">元记密钥</string>
     <string name="clipboard_label_account">元记密码</string>
     <string name="editor_group_none">未分组</string>

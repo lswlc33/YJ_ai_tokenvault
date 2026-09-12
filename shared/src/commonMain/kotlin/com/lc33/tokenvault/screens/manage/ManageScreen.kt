@@ -32,6 +32,8 @@ import tokenvault.shared.generated.resources.manage_batch_ungrouped
 import tokenvault.shared.generated.resources.manage_deselect_all
 import tokenvault.shared.generated.resources.manage_empty_group_desc
 import tokenvault.shared.generated.resources.manage_empty_group_title
+import tokenvault.shared.generated.resources.manage_empty_search_desc
+import tokenvault.shared.generated.resources.manage_empty_search_title
 import tokenvault.shared.generated.resources.manage_empty_providers_desc
 import tokenvault.shared.generated.resources.manage_empty_providers_title
 import tokenvault.shared.generated.resources.manage_exit_selection_cd
@@ -194,6 +196,7 @@ fun ManageScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = tokens.screenPadding, vertical = tokens.itemSpacing),
+                onValueChange = onQueryChange,
             )
             GroupFilterRow(
                 state = state,
@@ -375,7 +378,12 @@ private fun ProviderList(
     if (rows.isEmpty()) {
         // 整库空 vs 某个分组筛空，是两件事：后者不给"新建"CTA，
         // 否则用户会以为整个库都空了。
-        if (state.providers.isEmpty()) {
+        if (state.query.isNotBlank()) {
+            EmptyState(
+                title = stringResource(Res.string.manage_empty_search_title),
+                description = stringResource(Res.string.manage_empty_search_desc),
+            )
+        } else if (state.providers.isEmpty()) {
             EmptyState(
                 title = stringResource(Res.string.manage_empty_providers_title),
                 description = stringResource(Res.string.manage_empty_providers_desc),

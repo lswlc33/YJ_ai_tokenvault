@@ -146,10 +146,12 @@ fun ImportScreen(
                                     onParse(text)
                                 }
                             },
+                            modifier = Modifier.weight(1f),
                         )
                         AppActionRow(
                             text = stringResource(Res.string.import_parse),
                             onClick = { onParse(textFieldState.text) },
+                            modifier = Modifier.weight(1f),
                         )
                     }
                 }
@@ -255,7 +257,7 @@ private fun PreviewCard(preview: ImportPreview, onToggle: () -> Unit) {
             modifier = Modifier.padding(top = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            preview.protocols.forEach { AppChip(text = it) }
+            preview.protocols.forEach { AppChip(text = protocolLabel(it)) }
         }
         AppText(
             text = stringResource(

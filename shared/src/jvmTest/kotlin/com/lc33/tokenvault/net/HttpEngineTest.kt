@@ -1,13 +1,20 @@
 package com.lc33.tokenvault.net
 
 import com.lc33.tokenvault.endpoint.ProbeRequest
+import com.lc33.tokenvault.endpoint.ProbeResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.yield
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -104,6 +111,34 @@ class HttpEngineTest {
         assertEquals(401, response.status)
         assertEquals("Invalid token", response.body)
         assertNull(response.error)
+    }
+
+    @Test
+    fun `取消挂在请求上时不会被吞成失败响应`() = runBlocking {
+        val mock = MockEngine { awaitCancellation() }
+        val engine = HttpEngine(
+            HttpClient(mock),
+            HostGate(defaultMinIntervalMs = 0, nowMillis = { 0L }),
+        )
+        val completed = CompletableDeferred<ProbeResponse?>()
+        val job = launch {
+            completed.complete(
+                runCatching {
+                    engine.execute(
+                        ProbeRequest(
+                            method = "GET",
+                            url = "https://example.com/v1/models",
+                            headers = emptyList(),
+                        ),
+                        allowInsecure = true,
+                    )
+                }.getOrNull(),
+            )
+        }
+
+        yield()
+        job.cancelAndJoin()
+        assertNull(withTimeout(1_000) { completed.await() })
     }
 
     @Test

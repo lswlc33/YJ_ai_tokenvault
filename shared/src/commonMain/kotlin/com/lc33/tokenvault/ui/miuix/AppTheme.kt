@@ -4,6 +4,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import com.lc33.tokenvault.platform.PlatformStatusBarAppearance
 import com.lc33.tokenvault.ui.theme.AppColorSchemeMode
 import com.lc33.tokenvault.ui.theme.AppTokens
@@ -17,6 +18,14 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.ThemeController
 
 private val DefaultTokens = AppTokens()
+
+/**
+ * 解析后的暗色判定（由 [AppTheme] 提供）。
+ *
+ * 不能直接用 isSystemInDarkTheme()：用户把配色强制成 Light 而系统处于深色时，
+ * 液态玻璃底栏会错误地取深色那套表面色。和状态色一样，必须按**解析后的模式**走。
+ */
+val LocalAppDarkTheme = staticCompositionLocalOf { false }
 
 /**
  * 全应用唯一的主题入口。
@@ -46,6 +55,7 @@ fun AppTheme(
             LocalAppTokens provides DefaultTokens,
             LocalStatusPalette provides statusPalette,
             LocalProviderPalette provides providerPalette,
+            LocalAppDarkTheme provides dark,
             content = content,
         )
     }

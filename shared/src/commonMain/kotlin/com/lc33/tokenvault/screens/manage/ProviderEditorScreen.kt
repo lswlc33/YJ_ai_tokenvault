@@ -68,7 +68,9 @@ fun ProviderEditorScreen(
     val note = rememberAppTextFieldState(draft.note)
     val website = rememberAppTextFieldState(draft.website)
     val currentDraft by rememberUpdatedState(draft)
-    val dirty = name.text != draft.name || note.text != draft.note || website.text != draft.website
+    val initialDraft = remember { draft }
+    val dirty = name.text != draft.name || note.text != draft.note || website.text != draft.website ||
+        draft != initialDraft
 
     fun submit() = onSave(
         currentDraft.copy(

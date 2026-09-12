@@ -181,7 +181,7 @@ abstract class VaultDatabase : RoomDatabase() {
                     """.trimIndent(),
                 )
                 connection.execSQL(
-                    "CREATE INDEX IF NOT EXISTS index_key_settings_keyId ON key_settings(keyId)",
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_key_settings_keyId ON key_settings(keyId)",
                 )
                 connection.execSQL(
                     "CREATE INDEX IF NOT EXISTS index_key_settings_clientProfileId " +

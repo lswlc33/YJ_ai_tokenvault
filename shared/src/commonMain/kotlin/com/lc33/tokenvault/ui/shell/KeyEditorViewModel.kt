@@ -6,6 +6,7 @@ import com.lc33.tokenvault.crypto.zeroize
 import com.lc33.tokenvault.domain.model.ApiKey
 import com.lc33.tokenvault.domain.repo.ApiKeyRepository
 import com.lc33.tokenvault.domain.repo.ClientProfileRepository
+import com.lc33.tokenvault.endpoint.EndpointError
 import com.lc33.tokenvault.endpoint.NormalizeResult
 import com.lc33.tokenvault.endpoint.normalizeBaseUrl
 import com.lc33.tokenvault.screens.model.KeyDraft
@@ -43,11 +44,8 @@ class KeyEditorViewModel constructor(
     )
     val saved: SharedFlow<Unit> = _saved.asSharedFlow()
 
-    private val _urlRejected = MutableSharedFlow<Unit>(
-        extraBufferCapacity = 1,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST,
-    )
-    val urlRejected: SharedFlow<Unit> = _urlRejected.asSharedFlow()
+    private val _urlError = MutableStateFlow<EndpointError?>(null)
+    val urlError: StateFlow<EndpointError?> = _urlError.asStateFlow()
 
     private var currentKey: ApiKey? = null
 
@@ -67,6 +65,10 @@ class KeyEditorViewModel constructor(
         _draft.value = next
     }
 
+    fun clearUrlError() {
+        _urlError.value = null
+    }
+
     fun save(
         draft: KeyDraft,
         secret: CharArray?,
@@ -81,9 +83,10 @@ class KeyEditorViewModel constructor(
         if (normalized !is NormalizeResult.Ok) {
             secret?.zeroize()
             balanceToken?.zeroize()
-            _urlRejected.tryEmit(Unit)
+            _urlError.value = (normalized as NormalizeResult.Err).error
             return
         }
+        _urlError.value = null
 
         viewModelScope.launch {
             try {

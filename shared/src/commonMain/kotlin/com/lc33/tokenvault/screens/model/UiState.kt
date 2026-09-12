@@ -173,6 +173,4 @@ data class ProviderDetailUiState(
      * 两行的"3 小时前"必须以同一个基准算，否则滚动时它们会各自漂移。
      */
     val nowMs: Long = 0,
-    val modelListEnabled: Boolean = false,
-    val modelReachabilityEnabled: Boolean = false,
 )

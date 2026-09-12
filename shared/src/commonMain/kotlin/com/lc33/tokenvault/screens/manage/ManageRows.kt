@@ -21,11 +21,13 @@ import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.health_stale_this_round
 import tokenvault.shared.generated.resources.balance_failed_section
 import tokenvault.shared.generated.resources.manage_context
+import tokenvault.shared.generated.resources.detail_key_balance_value
 import tokenvault.shared.generated.resources.detail_key_models_refresh
 import tokenvault.shared.generated.resources.manage_default_key
 import tokenvault.shared.generated.resources.manage_disabled
 import tokenvault.shared.generated.resources.manage_keys_ratio
 import tokenvault.shared.generated.resources.manage_latency
+import tokenvault.shared.generated.resources.manage_latency_time
 import tokenvault.shared.generated.resources.manage_local_only
 import tokenvault.shared.generated.resources.manage_models_count
 import tokenvault.shared.generated.resources.manage_pinned
@@ -33,7 +35,13 @@ import tokenvault.shared.generated.resources.manage_source_discovered
 import tokenvault.shared.generated.resources.login_method_github
 import tokenvault.shared.generated.resources.login_method_linuxdo
 import tokenvault.shared.generated.resources.manage_source_manual
+import tokenvault.shared.generated.resources.detail_probe_key
+import tokenvault.shared.generated.resources.detail_probe_model_cd
+import tokenvault.shared.generated.resources.protocol_anthropic
+import tokenvault.shared.generated.resources.protocol_chat
+import tokenvault.shared.generated.resources.protocol_responses
 import com.lc33.tokenvault.domain.LoginMethod
+import com.lc33.tokenvault.domain.Protocol
 import com.lc33.tokenvault.screens.model.UiAccountRow
 import com.lc33.tokenvault.screens.model.UiHealth
 import com.lc33.tokenvault.screens.model.UiKeyRow
@@ -44,6 +52,7 @@ import com.lc33.tokenvault.ui.common.StatusDot
 import com.lc33.tokenvault.ui.common.colorOf
 import com.lc33.tokenvault.ui.common.labelOf
 import com.lc33.tokenvault.ui.common.relativeLabel
+import com.lc33.tokenvault.ui.miuix.AppBasicRow
 import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppChip
 import com.lc33.tokenvault.ui.miuix.AppIcon
@@ -62,6 +71,20 @@ import com.lc33.tokenvault.ui.theme.LocalProviderPalette
 private fun rowModifier(): Modifier = Modifier
     .fillMaxWidth()
     .padding(horizontal = LocalAppTokens.current.screenPadding)
+
+/** 协议 chip 的展示文案。底层的 wireName 不直接给用户看。 */
+@Composable
+internal fun protocolLabel(protocol: Protocol): String = stringResource(
+    when (protocol) {
+        Protocol.CHAT -> Res.string.protocol_chat
+        Protocol.RESPONSES -> Res.string.protocol_responses
+        Protocol.ANTHROPIC -> Res.string.protocol_anthropic
+    },
+)
+
+@Composable
+internal fun protocolLabel(wireName: String): String =
+    Protocol.fromWireName(wireName)?.let { protocolLabel(it) } ?: wireName
 
 /** 色块 + 首字母。长列表里认行靠它，不承担任何状态语义。 */
 @Composable
@@ -173,7 +196,7 @@ internal fun ProviderRow(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            row.protocols.forEach { protocol -> AppChip(text = protocol) }
+            row.protocols.forEach { protocol -> AppChip(text = protocolLabel(protocol)) }
         }
         Row(
             modifier = Modifier
@@ -231,78 +254,73 @@ internal fun KeyRow(
     row: UiKeyRow,
     nowMs: Long,
     onClick: () -> Unit,
-    onLongPress: (() -> Unit)? = null,
-    onRefreshModels: (() -> Unit)? = null,
+    onProbe: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val tokens = LocalAppTokens.current
-    AppCard(modifier = rowModifier(), onClick = onClick, onLongPress = onLongPress) {
+    val latencyText = row.latencyMs?.let { stringResource(Res.string.manage_latency, it) }
+    val checkedText = row.checkedAt?.let { relativeLabel(nowMs, it) }
+    val timingText = when {
+        latencyText != null && checkedText != null ->
+            stringResource(Res.string.manage_latency_time, latencyText, checkedText)
+        latencyText != null -> latencyText
+        else -> checkedText
+    }
+
+    AppBasicRow(
+        modifier = modifier,
+        onClick = onClick,
+        endActions = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                AppIconButton(
+                    icon = AppIcon.Probe,
+                    contentDescription = stringResource(Res.string.detail_probe_key),
+                    onClick = onProbe,
+                )
+                AppIconTint(icon = AppIcon.Forward, size = 18.dp, tint = appSecondaryTextColor)
+            }
+        },
+    ) {
+        AppText(text = row.label, style = AppTextStyle.Body, maxLines = 1)
+        AppText(
+            text = row.masked,
+            style = AppTextStyle.Footnote,
+            color = appSecondaryTextColor,
+            fontFamily = tokens.monoFontFamily,
+            maxLines = 1,
+        )
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
+            modifier = Modifier.padding(top = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    AppText(
-                        text = row.label,
-                        style = AppTextStyle.Body,
-                        maxLines = 1,
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
-                    AppChip(text = row.sortOrder.toString())
-                }
-                // 只有遮蔽串。明文是借 DEK 现算的（§6.1 推论 3），UiKeyRow 里没有明文字段，
-                // 所以这里连"想画明文"都做不到。
-                AppText(
-                    text = row.masked,
+            StatusDot(color = colorOf(row.health), label = labelOf(row.health))
+            val balance = row.balance
+            when {
+                balance != null -> AppText(
+                    text = stringResource(
+                        Res.string.detail_key_balance_value,
+                        balance.currency,
+                        balance.amount,
+                    ),
+                    style = AppTextStyle.Footnote,
+                )
+                row.balanceFailed -> AppText(
+                    text = stringResource(Res.string.balance_failed_section),
                     style = AppTextStyle.Footnote,
                     color = appSecondaryTextColor,
-                    fontFamily = tokens.monoFontFamily,
-                    maxLines = 1,
                 )
             }
-            Column(horizontalAlignment = Alignment.End) {
-                StatusDot(color = colorOf(row.health), label = labelOf(row.health))
-                val latencyMs = row.latencyMs
-                if (latencyMs != null) {
-                    AppText(
-                        text = stringResource(Res.string.manage_latency, latencyMs),
-                        style = AppTextStyle.Footnote,
-                        color = appSecondaryTextColor,
-                    )
-                }
-                val balance = row.balance
-                if (balance != null) {
-                    AppText(
-                        text = "${balance.currency} ${balance.amount}",
-                        style = AppTextStyle.Footnote,
-                    )
-                } else if (row.balanceFailed) {
-                    AppText(
-                        text = stringResource(Res.string.balance_failed_section),
-                        style = AppTextStyle.Footnote,
-                        color = appSecondaryTextColor,
-                    )
-                }
-                val checkedAt = row.checkedAt
-                if (checkedAt != null) {
-                    // 分档是纯函数、文案在资源里，所以"算"在这里而不是在 ViewModel（它拿不到资源）
-                    AppText(
-                        text = relativeLabel(nowMs, checkedAt),
-                        style = AppTextStyle.Footnote,
-                        color = appSecondaryTextColor,
-                    )
-                }
-            }
-            if (onRefreshModels != null) {
-                AppIconButton(
-                    icon = AppIcon.Refresh,
-                    contentDescription = stringResource(Res.string.detail_key_models_refresh),
-                    onClick = onRefreshModels,
-                )
-            }
+        }
+        if (timingText != null) {
+            AppText(
+                text = timingText,
+                style = AppTextStyle.Footnote,
+                color = appSecondaryTextColor,
+            )
         }
     }
 }
@@ -311,48 +329,63 @@ internal fun KeyRow(
 internal fun ModelRow(
     row: UiModelRow,
     onClick: (() -> Unit)? = null,
-    onLongPress: (() -> Unit)? = null,
+    onProbe: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
 ) {
     val tokens = LocalAppTokens.current
-    AppCard(modifier = rowModifier(), onClick = onClick, onLongPress = onLongPress) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                AppText(
-                    text = row.modelId,
-                    style = AppTextStyle.Body,
-                    fontFamily = tokens.monoFontFamily,
-                    color = if (row.enabled) Color.Unspecified else appSecondaryTextColor,
-                    maxLines = 1,
-                )
-                Row(
-                    modifier = Modifier.padding(top = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    AppChip(text = row.protocol)
-                    AppChip(
-                        text = stringResource(
-                            when (row.source) {
-                                UiModelSource.Manual -> Res.string.manage_source_manual
-                                UiModelSource.Discovered -> Res.string.manage_source_discovered
-                            },
-                        ),
+    AppBasicRow(
+        modifier = modifier,
+        onClick = onClick,
+        endActions = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                if (onProbe != null) {
+                    AppIconButton(
+                        icon = AppIcon.Probe,
+                        contentDescription = stringResource(Res.string.detail_probe_model_cd),
+                        onClick = onProbe,
                     )
-                    if (!row.enabled) AppChip(text = stringResource(Res.string.manage_disabled))
                 }
+                AppIconTint(icon = AppIcon.Forward, size = 18.dp, tint = appSecondaryTextColor)
             }
-            Column(horizontalAlignment = Alignment.End) {
-                StatusDot(color = colorOf(row.health), label = labelOf(row.health))
-                val contextLabel = row.contextLabel
-                if (contextLabel != null) {
-                    AppText(
-                        text = stringResource(Res.string.manage_context, contextLabel),
-                        style = AppTextStyle.Footnote,
-                        color = appSecondaryTextColor,
-                    )
-                }
+        },
+    ) {
+        AppText(
+            text = row.modelId,
+            style = AppTextStyle.Body,
+            fontFamily = tokens.monoFontFamily,
+            color = if (row.enabled) Color.Unspecified else appSecondaryTextColor,
+            maxLines = 1,
+        )
+        Row(
+            modifier = Modifier.padding(top = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            AppChip(text = protocolLabel(row.protocol))
+            AppChip(
+                text = stringResource(
+                    when (row.source) {
+                        UiModelSource.Manual -> Res.string.manage_source_manual
+                        UiModelSource.Discovered -> Res.string.manage_source_discovered
+                    },
+                ),
+            )
+            if (!row.enabled) AppChip(text = stringResource(Res.string.manage_disabled))
+        }
+        Row(
+            modifier = Modifier.padding(top = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            StatusDot(color = colorOf(row.health), label = labelOf(row.health))
+            row.contextLabel?.let { context ->
+                AppText(
+                    text = stringResource(Res.string.manage_context, context),
+                    style = AppTextStyle.Footnote,
+                    color = appSecondaryTextColor,
+                )
             }
         }
     }
@@ -363,38 +396,43 @@ private fun loginMethodLabel(method: LoginMethod): String = when (method) {
     LoginMethod.GITHUB -> stringResource(Res.string.login_method_github)
     LoginMethod.LINUX_DO -> stringResource(Res.string.login_method_linuxdo)
 }@Composable
-internal fun AccountRow(row: UiAccountRow, onClick: (() -> Unit)? = null) {
+internal fun AccountRow(
+    row: UiAccountRow,
+    onClick: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
     val tokens = LocalAppTokens.current
-    AppCard(modifier = rowModifier(), onClick = onClick) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                AppText(text = row.label, style = AppTextStyle.Body, maxLines = 1)
-                // 账号给遮蔽串，密码**连遮蔽串都不给**——它只在展开时现算（红线 21）
-                AppText(
-                    text = row.maskedUsername,
-                    style = AppTextStyle.Footnote,
-                    color = appSecondaryTextColor,
-                    fontFamily = tokens.monoFontFamily,
-                    maxLines = 1,
-                )
-                if (row.loginMethods.isNotEmpty()) {
-                    Row(
-                        modifier = Modifier.padding(top = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        row.loginMethods.forEach { wire ->
-                        LoginMethod.fromWireName(wire)?.let { method -> AppChip(text = loginMethodLabel(method)) }
-                    }
+    AppBasicRow(
+        modifier = modifier,
+        onClick = onClick,
+        endActions = {
+            AppChip(text = stringResource(Res.string.manage_local_only))
+            AppIconTint(icon = AppIcon.Forward, size = 18.dp, tint = appSecondaryTextColor)
+        },
+    ) {
+        AppText(text = row.label, style = AppTextStyle.Body, maxLines = 1)
+        AppText(
+            text = row.maskedUsername,
+            style = AppTextStyle.Footnote,
+            color = appSecondaryTextColor,
+            fontFamily = tokens.monoFontFamily,
+            maxLines = 1,
+        )
+        if (row.loginMethods.isNotEmpty()) {
+            Row(
+                modifier = Modifier.padding(top = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                row.loginMethods.forEach { wire ->
+                    LoginMethod.fromWireName(wire)?.let { method ->
+                        AppChip(text = loginMethodLabel(method))
                     }
                 }
             }
-            AppChip(text = stringResource(Res.string.manage_local_only))
         }
     }
 }
+
 @Composable
 private fun KeySummaryRow(key: UiKeyRow) {
     val tokens = LocalAppTokens.current

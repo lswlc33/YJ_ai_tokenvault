@@ -10,9 +10,13 @@ import com.lc33.tokenvault.engine.BalanceEngine
 import com.lc33.tokenvault.engine.ProbeEngine
 import com.lc33.tokenvault.screens.model.ManageUiState
 import com.lc33.tokenvault.screens.model.ProviderSort
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -48,6 +52,13 @@ class ManageViewModel constructor(
 
     /** 多选模式的选中集合。空集合 = 非多选态。 */
     private val selection = MutableStateFlow<Set<Long>>(emptySet())
+
+    /** 分组新增 / 重命名的失败提示。同名会被唯一索引挡住，不能静默吞掉。 */
+    private val _groupError = MutableSharedFlow<Unit>(
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    val groupError: SharedFlow<Unit> = _groupError.asSharedFlow()
 
     /**
      * 「全部」那一枚 chip 的名字。
@@ -122,6 +133,7 @@ class ManageViewModel constructor(
         // 搜索 → 排序，都发生在内存里（红线 10：数据从 Flow 来，不回数据层重查）。
         val filtered = rows.filter { matchesQuery(it, groupNameOf(snap.groups, it.groupId), ctrl.query) }
         ManageUiState(
+            query = ctrl.query,
             groups = groupChips(ctrl.label, snap.groups, rows),
             selectedGroupId = ctrl.selected,
             providers = sortProviders(filtered, ctrl.sort),
@@ -191,12 +203,16 @@ class ManageViewModel constructor(
 
     fun onAddGroup(name: String) {
         // 同名会被唯一索引挡住。这里不预先查一遍再插：查与插之间有窗口，
-        // 而唯一索引本来就是那条保证。失败就什么都不发生——列表没多一行，用户看得见
-        viewModelScope.launch { runCatching { groups.add(name) } }
+        // 而唯一索引本来就是那条保证；失败通过 groupError 提示，不能静默吞掉。
+        viewModelScope.launch {
+            runCatching { groups.add(name) }.onFailure { _groupError.tryEmit(Unit) }
+        }
     }
 
     fun onRenameGroup(id: Long, name: String) {
-        viewModelScope.launch { runCatching { groups.rename(id, name) } }
+        viewModelScope.launch {
+            runCatching { groups.rename(id, name) }.onFailure { _groupError.tryEmit(Unit) }
+        }
     }
 
     /** 删分组**不删供应商**：外键是 SET NULL，那些供应商落回「全部」。 */

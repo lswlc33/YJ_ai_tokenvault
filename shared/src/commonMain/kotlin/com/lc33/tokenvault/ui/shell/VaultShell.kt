@@ -20,7 +20,7 @@ import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.nav_dashboard
 import tokenvault.shared.generated.resources.nav_manage
 import tokenvault.shared.generated.resources.nav_settings
-import com.lc33.tokenvault.ui.miuix.AppNavBar
+import com.lc33.tokenvault.ui.miuix.AppLiquidNavBar
 import com.lc33.tokenvault.ui.miuix.AppNavBarItem
 import com.lc33.tokenvault.ui.miuix.AppScaffold
 import com.lc33.tokenvault.ui.miuix.AppSnackbarHost
@@ -70,7 +70,7 @@ fun VaultShell() {
                 enter = slideInVertically { it },
                 exit = slideOutVertically { it },
             ) {
-                AppNavBar(
+                AppLiquidNavBar(
                     items = items,
                     selectedIndex = selectedIndex,
                     onSelect = { index ->

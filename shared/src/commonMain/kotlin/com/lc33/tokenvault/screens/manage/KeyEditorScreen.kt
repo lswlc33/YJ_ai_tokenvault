@@ -11,10 +11,13 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import com.lc33.tokenvault.domain.Protocol
 import com.lc33.tokenvault.platform.PlatformBackHandler
@@ -89,7 +92,9 @@ import tokenvault.shared.generated.resources.settings_profiles
 fun KeyEditorScreen(
     draft: KeyDraft,
     profileNames: List<String>,
+    baseUrlError: String?,
     onChange: (KeyDraft) -> Unit,
+    onBaseUrlChange: () -> Unit,
     onBack: () -> Unit,
     onSave: (KeyDraft, CharArray?, CharArray?) -> Unit,
 ) {
@@ -105,10 +110,15 @@ fun KeyEditorScreen(
     val secret = rememberSecretTextFieldState()
     val balanceToken = rememberSecretTextFieldState()
     val currentDraft by rememberUpdatedState(draft)
-    var showDiscard by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    val initialDraft = remember { draft }
+    var showDiscard by remember { mutableStateOf(false) }
     val dirty = label.text != draft.label || note.text != draft.note || baseUrl.text != draft.baseUrl ||
         override.text != draft.pathOverrideAnthropic || timeout.text != draft.timeoutSeconds ||
-        balanceUserId.text != draft.balanceUserId
+        balanceUserId.text != draft.balanceUserId || draft != initialDraft
+
+    LaunchedEffect(baseUrl.state) {
+        snapshotFlow { baseUrl.text }.collect { onBaseUrlChange() }
+    }
 
     PlatformBackHandler(enabled = dirty) { showDiscard = true }
 
@@ -170,6 +180,7 @@ fun KeyEditorScreen(
                         state = baseUrl,
                         label = stringResource(Res.string.editor_base_url),
                         supportingText = stringResource(Res.string.editor_base_url_hint),
+                        errorText = baseUrlError,
                     )
                 }
             }
@@ -192,7 +203,7 @@ fun KeyEditorScreen(
                     Protocol.entries.forEach { protocol ->
                         val selected = protocol in draft.protocols
                         AppFilterChip(
-                            text = protocol.name,
+                            text = protocolLabel(protocol),
                             selected = selected,
                             onClick = {
                                 val next = if (selected) draft.protocols - protocol else draft.protocols + protocol

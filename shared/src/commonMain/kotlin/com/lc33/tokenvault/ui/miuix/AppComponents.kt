@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -18,17 +19,21 @@ import androidx.compose.foundation.text.input.clearText
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.FloatingActionButton
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
@@ -209,6 +214,31 @@ fun AppAccentCard(
             content = content,
         )
     }
+}
+
+/**
+ * 自定义可点击行。底层用 MIUIX [BasicComponent]，和 preference 行共享触控、间距与无障碍语义，
+ * 但不强塞 Card，适合放在已有卡片内部的 Key / 模型 / 账号行。
+ */
+@Composable
+fun AppBasicRow(
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    endActions: @Composable RowScope.() -> Unit = {},
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    BasicComponent(
+        modifier = modifier.fillMaxWidth(),
+        onClick = onClick?.let { action ->
+            {
+                Haptics.tap()
+                action()
+            }
+        },
+        role = Role.Button.takeIf { onClick != null },
+        endActions = endActions,
+        content = content,
+    )
 }
 
 /**
@@ -690,7 +720,11 @@ fun AppSearchField(
     state: AppTextFieldState,
     hint: String,
     modifier: Modifier = Modifier,
+    onValueChange: (String) -> Unit = {},
 ) {
+    LaunchedEffect(state.state) {
+        snapshotFlow { state.text }.collect { onValueChange(it) }
+    }
     TextField(
         state = state.state,
         modifier = modifier,

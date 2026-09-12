@@ -15,6 +15,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.contentType
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 
 /**
@@ -81,6 +82,9 @@ class HttpEngine(
                 body = response.bodyAsText(),
                 latencyMs = latencyMs,
             )
+        } catch (cancelled: CancellationException) {
+            // 取消不是一次失败响应：必须原样上抛，否则调用方的 Job.cancel 会一直等网络超时。
+            throw cancelled
         } catch (t: Throwable) {
             ProbeResponse(status = 0, error = t)
         }

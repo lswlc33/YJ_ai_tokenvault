@@ -2,6 +2,7 @@ package com.lc33.tokenvault.screens.manage
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -40,16 +41,12 @@ import tokenvault.shared.generated.resources.detail_model_id
 import tokenvault.shared.generated.resources.detail_model_protocol
 import tokenvault.shared.generated.resources.detail_models_empty_auto
 import tokenvault.shared.generated.resources.detail_models_empty_manual
-import tokenvault.shared.generated.resources.detail_models_quick_hint
 import tokenvault.shared.generated.resources.detail_models_section
+import tokenvault.shared.generated.resources.detail_provider_balance_total
 import tokenvault.shared.generated.resources.detail_reachability_latency
 import tokenvault.shared.generated.resources.dialog_cancel
 import tokenvault.shared.generated.resources.login_method_github
 import tokenvault.shared.generated.resources.login_method_linuxdo
-import tokenvault.shared.generated.resources.manage_context
-import tokenvault.shared.generated.resources.manage_disabled
-import tokenvault.shared.generated.resources.manage_source_discovered
-import tokenvault.shared.generated.resources.manage_source_manual
 import tokenvault.shared.generated.resources.detail_accounts_empty
 import tokenvault.shared.generated.resources.detail_add_key
 import tokenvault.shared.generated.resources.detail_balance_refresh
@@ -65,7 +62,6 @@ import tokenvault.shared.generated.resources.detail_key_set_default
 import tokenvault.shared.generated.resources.detail_key_sheet_title
 import tokenvault.shared.generated.resources.detail_keys_empty
 import tokenvault.shared.generated.resources.detail_models_refresh
-import tokenvault.shared.generated.resources.detail_probe_key
 import tokenvault.shared.generated.resources.detail_probe_provider
 import tokenvault.shared.generated.resources.detail_section_accounts
 import tokenvault.shared.generated.resources.detail_section_keys
@@ -76,17 +72,15 @@ import tokenvault.shared.generated.resources.secret_copy_cd
 import com.lc33.tokenvault.domain.LoginMethod
 import com.lc33.tokenvault.domain.Protocol
 import com.lc33.tokenvault.screens.model.ProviderDetailUiState
+import com.lc33.tokenvault.screens.model.UiKeyRow
 import com.lc33.tokenvault.screens.model.UiModelRow
-import com.lc33.tokenvault.screens.model.UiModelSource
-import com.lc33.tokenvault.ui.common.StatusDot
-import com.lc33.tokenvault.ui.common.colorOf
-import com.lc33.tokenvault.ui.common.labelOf
 import com.lc33.tokenvault.ui.common.relativeLabel
 import com.lc33.tokenvault.ui.miuix.AppBottomSheet
 import com.lc33.tokenvault.ui.miuix.AppActionRow
 import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppChip
 import com.lc33.tokenvault.ui.miuix.AppDialog
+import com.lc33.tokenvault.ui.miuix.AppDivider
 import com.lc33.tokenvault.ui.miuix.AppDropdownRow
 import com.lc33.tokenvault.ui.miuix.AppFilterChip
 import com.lc33.tokenvault.ui.miuix.AppIcon
@@ -134,7 +128,6 @@ fun ProviderDetailScreen(
     onRefreshBalance: () -> Unit,
     onProbeProvider: () -> Unit,
     onProbeKey: (Long) -> Unit,
-    onRefreshModels: () -> Unit,
     onRefreshKeyModels: (Long) -> Unit,
     onAddModel: (Long, String, Protocol) -> Unit,
     onUpdateModel: (Long, String, Protocol, String?, Boolean) -> Unit,
@@ -167,7 +160,7 @@ fun ProviderDetailScreen(
                 },
                 actions = {
                     AppIconButton(
-                        icon = AppIcon.Refresh,
+                        icon = AppIcon.Probe,
                         contentDescription = stringResource(Res.string.detail_probe_provider),
                         onClick = onProbeProvider,
                     )
@@ -190,30 +183,25 @@ fun ProviderDetailScreen(
             item { HeaderCard(state, onRefreshBalance) }
 
             item {
-                AppCard(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = tokens.screenPadding),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        SectionTitle(
-                            text = stringResource(Res.string.detail_section_keys),
-                            modifier = Modifier.weight(1f),
-                        )
-                        AppIconButton(
-                            icon = AppIcon.Add,
-                            contentDescription = stringResource(Res.string.detail_add_key),
-                            onClick = { showAddDialog = true },
-                        )
-                    }
+                    SectionTitle(
+                        text = stringResource(Res.string.detail_section_keys),
+                        modifier = Modifier.weight(1f),
+                    )
+                    AppIconButton(
+                        icon = AppIcon.Add,
+                        contentDescription = stringResource(Res.string.detail_add_key),
+                        onClick = { showAddDialog = true },
+                    )
                 }
             }
             if (state.keys.isEmpty()) {
                 item {
-                    // 空态给的是后果而不是"暂无数据"：没有密钥这家就探不了、也查不了余额
                     HintCard(
                         text = stringResource(Res.string.detail_keys_empty),
                         actionText = stringResource(Res.string.detail_add_key),
@@ -221,32 +209,18 @@ fun ProviderDetailScreen(
                     )
                 }
             } else {
-                item {
-                    // 长按是隐藏手势，不提示用户永远不知道能单 Key 探测（§8.6）
-                    AppText(
-                        text = stringResource(Res.string.detail_probe_key),
-                        style = AppTextStyle.Footnote,
-                        color = appSecondaryTextColor,
-                        modifier = Modifier.padding(horizontal = tokens.screenPadding),
-                    )
-                }
                 items(state.keys.size) { index ->
                     val row = state.keys[index]
-                    KeyRow(
+                    KeyCard(
                         row = row,
-                        nowMs = state.nowMs,
-                        onClick = { onOpenKey(row.id) },
-                        onLongPress = { onProbeKey(row.id) },
-                    )
-                    KeyModelsCard(
-                        keyId = row.id,
                         models = state.models.filter { it.keyId == row.id },
-                        modelListEnabled = state.modelListEnabled,
-                        modelReachabilityEnabled = state.modelReachabilityEnabled,
-                        onRefresh = { onRefreshKeyModels(row.id) },
-                        onAdd = { addModelKeyId = row.id },
-                        onEdit = { editingModel = it },
-                        onQuickProbe = onProbeModel,
+                        nowMs = state.nowMs,
+                        onOpen = { onOpenKey(row.id) },
+                        onProbeKey = { onProbeKey(row.id) },
+                        onRefreshModels = { onRefreshKeyModels(row.id) },
+                        onAddModel = { addModelKeyId = row.id },
+                        onEditModel = { editingModel = it },
+                        onProbeModel = onProbeModel,
                     )
                 }
             }
@@ -256,11 +230,23 @@ fun ProviderDetailScreen(
             if (state.accounts.isEmpty()) {
                 item { AccountsEmptyHint() }
             } else {
-                items(state.accounts.size) { index ->
-                    AccountRow(
-                        row = state.accounts[index],
-                        onClick = { onRevealAccount(state.accounts[index].id) },
-                    )
+                item {
+                    AppCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = tokens.screenPadding),
+                        insideMargin = PaddingValues(0.dp),
+                    ) {
+                        state.accounts.forEachIndexed { index, account ->
+                            AccountRow(
+                                row = account,
+                                onClick = { onRevealAccount(account.id) },
+                            )
+                            if (index != state.accounts.lastIndex) {
+                                AppDivider()
+                            }
+                        }
+                    }
                 }
             }
 
@@ -456,7 +442,7 @@ private fun ModelDialog(
         )
         AppDropdownRow(
             title = stringResource(Res.string.detail_model_protocol),
-            items = protocols.map { it.wireName },
+            items = protocols.map { protocolLabel(it) },
             selectedIndex = protocols.indexOf(protocol).coerceAtLeast(0),
             onSelect = { index -> protocol = protocols.getOrElse(index) { protocols.first() } },
             modifier = Modifier.padding(top = tokens.itemSpacing),
@@ -504,26 +490,43 @@ private fun ModelDialog(
     }
 }
 
-/** 一张 Key 自己的模型列表。列表与余额一样绑定在 Key 上。 */
+/**
+ * 一张 Key 卡：Key 本身与绑定到它的模型共用一个容器。
+ * 模型列表不另起卡片，避免在详情页里出现"卡片套卡片"的层级噪音。
+ */
 @Composable
-private fun KeyModelsCard(
-    keyId: Long,
+private fun KeyCard(
+    row: UiKeyRow,
     models: List<UiModelRow>,
-    modelListEnabled: Boolean,
-    modelReachabilityEnabled: Boolean,
-    onRefresh: () -> Unit,
-    onAdd: () -> Unit,
-    onEdit: (UiModelRow) -> Unit,
-    onQuickProbe: (Long, String, Protocol) -> Unit,
+    nowMs: Long,
+    onOpen: () -> Unit,
+    onProbeKey: () -> Unit,
+    onRefreshModels: () -> Unit,
+    onAddModel: () -> Unit,
+    onEditModel: (UiModelRow) -> Unit,
+    onProbeModel: (Long, String, Protocol) -> Unit,
 ) {
     val tokens = LocalAppTokens.current
     AppCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = tokens.screenPadding),
+        insideMargin = PaddingValues(0.dp),
     ) {
+        KeyRow(
+            row = row,
+            nowMs = nowMs,
+            onClick = onOpen,
+            onProbe = onProbeKey,
+        )
+        AppDivider()
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    horizontal = tokens.screenPadding,
+                    vertical = tokens.itemSpacing,
+                ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AppText(
@@ -531,24 +534,24 @@ private fun KeyModelsCard(
                 style = AppTextStyle.Subtitle,
                 modifier = Modifier.weight(1f),
             )
-            if (modelListEnabled) {
+            if (row.settings.probeModels) {
                 AppIconButton(
                     icon = AppIcon.Refresh,
                     contentDescription = stringResource(Res.string.detail_models_refresh),
-                    onClick = onRefresh,
+                    onClick = onRefreshModels,
                 )
             }
             AppIconButton(
                 icon = AppIcon.Add,
                 contentDescription = stringResource(Res.string.detail_add_model),
-                onClick = onAdd,
+                onClick = onAddModel,
             )
         }
 
         if (models.isEmpty()) {
             AppText(
                 text = stringResource(
-                    if (modelListEnabled) {
+                    if (row.settings.probeModels) {
                         Res.string.detail_models_empty_auto
                     } else {
                         Res.string.detail_models_empty_manual
@@ -556,81 +559,31 @@ private fun KeyModelsCard(
                 ),
                 style = AppTextStyle.Secondary,
                 color = appSecondaryTextColor,
-                modifier = Modifier.padding(top = 4.dp),
+                modifier = Modifier.padding(
+                    horizontal = tokens.screenPadding,
+                    vertical = tokens.itemSpacing,
+                ),
             )
         } else {
-            Column(
-                modifier = Modifier.padding(top = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                models.forEach { model ->
-                    BoundModelRow(
-                        row = model,
-                        onClick = { onEdit(model) },
-                        onLongPress = if (modelReachabilityEnabled && model.keyId != null) {
-                            { onQuickProbe(keyId, model.modelId, protocolOf(model.protocol)) }
-                        } else {
-                            null
-                        },
-                    )
-                }
-            }
-        }
-
-        if (modelReachabilityEnabled) {
-            AppText(
-                text = stringResource(Res.string.detail_models_quick_hint),
-                style = AppTextStyle.Footnote,
-                color = appSecondaryTextColor,
-                modifier = Modifier.padding(top = tokens.itemSpacing),
-            )
-        }
-    }
-}
-
-private fun protocolOf(wireName: String): Protocol = Protocol.fromWireName(wireName) ?: Protocol.CHAT
-
-@Composable
-private fun BoundModelRow(
-    row: UiModelRow,
-    onClick: () -> Unit,
-    onLongPress: (() -> Unit)?,
-) {
-    AppCard(
-        modifier = Modifier.fillMaxWidth(),
-        onClick = onClick,
-        onLongPress = onLongPress,
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(LocalAppTokens.current.itemSpacing),
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                AppText(text = row.modelId, style = AppTextStyle.Body, maxLines = 1)
-                Row(
-                    modifier = Modifier.padding(top = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    AppChip(text = row.protocol)
-                    AppChip(
-                        text = stringResource(
-                            when (row.source) {
-                                UiModelSource.Manual -> Res.string.manage_source_manual
-                                UiModelSource.Discovered -> Res.string.manage_source_discovered
-                            },
-                        ),
-                    )
-                    if (!row.enabled) AppChip(text = stringResource(Res.string.manage_disabled))
-                }
-            }
-            Column(horizontalAlignment = Alignment.End) {
-                StatusDot(color = colorOf(row.health), label = labelOf(row.health))
-                row.contextLabel?.let { context ->
-                    AppText(
-                        text = stringResource(Res.string.manage_context, context),
-                        style = AppTextStyle.Footnote,
-                        color = appSecondaryTextColor,
-                    )
+            models.forEachIndexed { index, model ->
+                val modelKeyId = model.keyId
+                ModelRow(
+                    row = model,
+                    onClick = { onEditModel(model) },
+                    onProbe = if (row.settings.probeModelReachability && modelKeyId != null) {
+                        {
+                            onProbeModel(
+                                modelKeyId,
+                                model.modelId,
+                                Protocol.fromWireName(model.protocol) ?: Protocol.CHAT,
+                            )
+                        }
+                    } else {
+                        null
+                    },
+                )
+                if (index != models.lastIndex) {
+                    AppDivider()
                 }
             }
         }
@@ -725,7 +678,9 @@ private fun RevealAccountSheet(
 private fun loginMethodLabel(method: LoginMethod): String = when (method) {
     LoginMethod.GITHUB -> stringResource(Res.string.login_method_github)
     LoginMethod.LINUX_DO -> stringResource(Res.string.login_method_linuxdo)
-}@Composable
+}
+
+@Composable
 private fun HeaderCard(
     state: ProviderDetailUiState,
     onRefreshBalance: () -> Unit,
@@ -751,7 +706,7 @@ private fun HeaderCard(
             modifier = Modifier.padding(top = tokens.itemSpacing),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            provider.protocols.forEach { protocol -> AppChip(text = protocol) }
+            provider.protocols.forEach { protocol -> AppChip(text = protocolLabel(protocol)) }
         }
         provider.reachabilityLatencyMs?.let { latency ->
             AppText(
@@ -768,16 +723,22 @@ private fun HeaderCard(
             modifier = Modifier.padding(top = tokens.itemSpacing),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            AppText(
-                text = when {
-                    balance != null -> balance.toDisplay()
-                    balanceFailed -> stringResource(Res.string.balance_failed_section)
-                    else -> stringResource(Res.string.dashboard_balance_none)
-                },
-                style = if (balanceFailed) AppTextStyle.Secondary else AppTextStyle.Title,
-                color = if (balanceFailed) LocalStatusPalette.current.warn else Color.Unspecified,
-                modifier = Modifier.weight(1f),
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                AppText(
+                    text = stringResource(Res.string.detail_provider_balance_total),
+                    style = AppTextStyle.Footnote,
+                    color = appSecondaryTextColor,
+                )
+                AppText(
+                    text = when {
+                        balance != null -> balance.toDisplay()
+                        balanceFailed -> stringResource(Res.string.balance_failed_section)
+                        else -> stringResource(Res.string.dashboard_balance_none)
+                    },
+                    style = if (balanceFailed) AppTextStyle.Secondary else AppTextStyle.Title,
+                    color = if (balanceFailed) LocalStatusPalette.current.warn else Color.Unspecified,
+                )
+            }
             AppIconButton(
                 icon = AppIcon.Refresh,
                 contentDescription = stringResource(Res.string.detail_balance_refresh),
