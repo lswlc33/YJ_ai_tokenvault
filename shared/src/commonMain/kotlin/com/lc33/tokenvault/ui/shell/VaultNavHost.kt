@@ -451,7 +451,6 @@ fun VaultNavHost(
             is ImportRoute -> {
             val vm: ImportViewModel = koinViewModel()
             val previews by vm.previews.collectAsStateWithLifecycle()
-            val curlForm by vm.curlForm.collectAsStateWithLifecycle()
             val parseErrors by vm.parseErrorCount.collectAsStateWithLifecycle()
             val importing by vm.importing.collectAsStateWithLifecycle()
             ImportScreen(
@@ -461,9 +460,7 @@ fun VaultNavHost(
                 onBack = back,
                 onParse = vm::parse,
                 onToggle = vm::toggle,
-                curlForm = curlForm,
                 onConfirm = { vm.confirm { back() } },
-                onConfirmCurl = { vm.confirmCurl(it) { back() } },
                 readClipboard = vm::readClipboard,
             )
         }

@@ -33,13 +33,12 @@ object CurlParser {
     )
 
     fun parse(text: String): CurlResult {
-        val tokens = tokenize(text)
+        val normalized = normalizeMarkdownLinks(text)
+        val tokens = tokenize(normalized)
         val headers = mutableListOf<Pair<String, String>>()
         var userAgent: String? = null
         var method: String? = null
         var dataBody: String? = null
-        var url: String? = null
-        var apiKey: String? = null
         val dropped = mutableListOf<String>()
 
         var i = 0
@@ -64,22 +63,18 @@ object CurlParser {
                     i += 2
                 }
                 tok == "--compressed" -> i += 1
-                tok.startsWith("http://") || tok.startsWith("https://") -> {
-                    url = tok
-                    i += 1
-                }
                 else -> i += 1
             }
         }
+
+        val url = tokens.firstOrNull { it.startsWith("http://", ignoreCase = true) || it.startsWith("https://", ignoreCase = true) }
+        val apiKey = headers.firstNotNullOfOrNull { (key, value) -> apiKeyOf(key, value) }
+        val model = dataBody?.let(::modelOf)
 
         // 剔除代码 / OkHttp 接管的头，并记下剔除的键（供预览页告知）
         val kept = mutableListOf<Pair<String, String>>()
         for ((key, value) in headers) {
             if (key.lowercase() in DROPPED_HEADERS) {
-                when (key.lowercase()) {
-                    "authorization" -> apiKey = value.substringAfter("Bearer ", value).trim().ifEmpty { null }
-                    "x-api-key" -> apiKey = value.trim().ifEmpty { null }
-                }
                 dropped += key
             } else {
                 kept += key to value
@@ -91,14 +86,42 @@ object CurlParser {
         return CurlResult(
             url = url,
             apiKey = apiKey,
+            model = model,
             userAgent = userAgent,
             method = method,
+            dataBody = dataBody,
             headers = kept,
             bodyPatch = bodyPatch,
             droppedHeaders = dropped,
         )
     }
 
+    /** 聊天工具复制出来的 Markdown 链接（`[https://x](https://x)`）先还原成裸 URL。 */
+    private fun normalizeMarkdownLinks(text: String): String =
+        text.replace(MARKDOWN_URL) { it.groupValues[1] }
+
+    /** 鉴权头 → API Key；Bearer 去前缀，其余风格原样保留。 */
+    private fun apiKeyOf(key: String, value: String): CharArray? {
+        return when (key.lowercase()) {
+            "authorization" -> value
+                .removePrefix("Bearer ")
+                .removePrefix("bearer ")
+                .trim()
+                .takeIf { it.isNotEmpty() }
+                ?.toCharArray()
+            "x-api-key" -> value.trim().takeIf { it.isNotEmpty() }?.toCharArray()
+            else -> null
+        }
+    }
+
+    /** body 里的 `model` 字段。不是合法 JSON 对象时静略过——cURL 里也可能带表单。 */
+    private fun modelOf(body: String): String? {
+        val obj = runCatching { patchJson.parseToJsonElement(body) }.getOrNull()
+            as? kotlinx.serialization.json.JsonObject ?: return null
+        return (obj["model"] as? kotlinx.serialization.json.JsonPrimitive)?.takeIf { it.isString }?.content
+    }
+
+    private val MARKDOWN_URL = Regex("""\[[^\]]*\]\((https?://[^)\s]+)\)""")
     // ------------------------------------------------------------------ 词法
 
     /**
@@ -125,7 +148,13 @@ object CurlParser {
             val ch = joined[i]
             when {
                 quote != null -> {
-                    if (ch == quote) {
+                    // Bash 双引号里 `\"` / `\\` / `\$` 会被 shell 还原；JSON body 最常见的是 `\"`。
+                    if (quote == '"' && ch == '\\' && i + 1 < joined.length &&
+                        joined[i + 1] in "\"\\\$`"
+                    ) {
+                        current.append(joined[i + 1])
+                        i++
+                    } else if (ch == quote) {
                         quote = null
                     } else {
                         current.append(ch)
@@ -222,14 +251,17 @@ object CurlParser {
 
 /** cURL 解析结果：一个客户端预设草稿，还没落库。 */
 data class CurlResult(
-    /** cURL 中的请求 URL；没有则 null（表单让用户补）。 */
+    /** 请求 URL。没有 URL 时为 null（导入器据此把这条命令记成解析失败）。 */
     val url: String? = null,
 
-    /** `Authorization: Bearer …` 或 `x-api-key` 提取出的 API Key；没有则 null。 */
-    val apiKey: String? = null,
+    /** Authorization / x-api-key 提取的明文密钥；没有则为 null。 */
+    val apiKey: CharArray? = null,
+
+    /** body 里的 `model` 字段；不是字符串或没有 body 时为 null。 */
+    val model: String? = null,
 
     /** `-A/--user-agent` 提取的 UA；没有则 null（预览页让用户补）。 */
-    val userAgent: String?,
+    val userAgent: String? = null,
 
     /** `-X/--request` 提取的方法（如 POST）。仅供参考，不参与预设落库。 */
     val method: String?,
@@ -240,6 +272,36 @@ data class CurlResult(
     /** 从 body 推断出的 merge patch；没有可保留字段时为 `"{}"`。 */
     val bodyPatch: String,
 
+    /** 原始 data body。客户端预设只吃 bodyPatch，供应商导入还要读 model。 */
+    val dataBody: String? = null,
+
     /** 被自动剔除的请求头键，供预览页"剔除了哪些"告知。 */
     val droppedHeaders: List<String>,
-)
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is CurlResult) return false
+        return url == other.url &&
+            apiKey.contentEquals(other.apiKey) &&
+            model == other.model &&
+            userAgent == other.userAgent &&
+            method == other.method &&
+            headers == other.headers &&
+            bodyPatch == other.bodyPatch &&
+            dataBody == other.dataBody &&
+            droppedHeaders == other.droppedHeaders
+    }
+
+    override fun hashCode(): Int {
+        var result = url?.hashCode() ?: 0
+        result = 31 * result + (apiKey?.contentHashCode() ?: 0)
+        result = 31 * result + (model?.hashCode() ?: 0)
+        result = 31 * result + (userAgent?.hashCode() ?: 0)
+        result = 31 * result + (method?.hashCode() ?: 0)
+        result = 31 * result + headers.hashCode()
+        result = 31 * result + bodyPatch.hashCode()
+        result = 31 * result + (dataBody?.hashCode() ?: 0)
+        result = 31 * result + droppedHeaders.hashCode()
+        return result
+    }
+}

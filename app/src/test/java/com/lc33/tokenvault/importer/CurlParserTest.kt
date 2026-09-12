@@ -30,15 +30,16 @@ class CurlParserTest {
         val curl = "curl -H 'Authorization: Bearer sk-abc123' https://api.example.com/v1/chat/completions"
         val result = CurlParser.parse(curl)
         assertEquals("https://api.example.com/v1/chat/completions", result.url)
-        assertEquals("sk-abc123", result.apiKey)
+        assertEquals("sk-abc123", result.apiKey!!.concatToString())
     }
 
     @Test
     fun `提取 x-api-key 作为 API Key`() {
         val curl = "curl -H 'x-api-key: sk-xyz789' https://api.example.com/v1/messages"
         val result = CurlParser.parse(curl)
-        assertEquals("sk-xyz789", result.apiKey)
+        assertEquals("sk-xyz789", result.apiKey!!.concatToString())
     }
+
     @Test
     fun `长选项形式也解析`() {
         val curl = "curl --user-agent 'UA/2.0' --header 'x-custom: v' --request POST https://x.com"
@@ -133,6 +134,23 @@ class CurlParserTest {
         val curl = "curl -d 'not-json' https://x.com"
         val result = CurlParser.parse(curl)
         assertEquals("{}", result.bodyPatch)
+    }
+
+    @Test
+    fun `提取 URL 密钥与模型`() {
+        val curl = """
+            curl https://api.example.com/v1/chat/completions \
+            -H "Authorization: Bearer sk-TEST0000000000000000000000000000000000000000000000000001" \
+            -d '{"model":"gpt-5.6-terra"}'
+        """.trimIndent()
+        val result = CurlParser.parse(curl)
+        assertEquals("https://api.example.com/v1/chat/completions", result.url)
+        assertEquals(
+            "sk-TEST0000000000000000000000000000000000000000000000000001",
+            result.apiKey!!.concatToString(),
+        )
+        assertEquals("gpt-5.6-terra", result.model)
+        assertEquals("""{"model":"gpt-5.6-terra"}""", result.dataBody)
     }
 
     @Test

@@ -447,20 +447,20 @@
     <string name="groups_delete_note">Deleting a group does not delete its providers — they fall back to All.</string>
 
     <!-- Import -->
-    <string name="import_title">Paste to import</string>
-    <string name="import_section_paste">Paste</string>
-    <string name="import_paste_label">Text block</string>
-    <string name="import_paste_hint">Name, key, base URL, protocols, model list, balance settings. One provider per block, blocks separated by a line of three dashes.</string>
+    <string name="import_title">Import from cURL</string>
+    <string name="import_section_paste">cURL commands</string>
+    <string name="import_paste_label">cURL command</string>
+    <string name="import_paste_hint">Each command extracts the base URL, auth key, model, and endpoint protocol. Paste multiple commands; the same base URL is merged into one provider.</string>
     <string name="import_from_clipboard">Fill from clipboard</string>
     <string name="import_parse">Parse</string>
-    <string name="import_no_preview">Nothing parsed yet. Paste something and press Parse.</string>
+    <string name="import_no_preview">Nothing parsed yet. Paste a cURL command and press Parse.</string>
     <string name="import_section_preview">Preview</string>
     <string name="import_selected">Will import</string>
     <string name="import_skipped">Skipped</string>
     <string name="import_counts">%1$d keys · %2$d models · %3$d accounts</string>
     <plurals name="import_parse_errors">
-        <item quantity="one">%1$d block could not be parsed and was skipped — usually a missing provider name.</item>
-        <item quantity="other">%1$d blocks could not be parsed and were skipped — usually a missing provider name.</item>
+        <item quantity="one">%1$d cURL command could not be parsed and was skipped — usually a missing URL or auth key.</item>
+        <item quantity="other">%1$d cURL commands could not be parsed and were skipped — usually missing a URL or auth key.</item>
     </plurals>
     <plurals name="import_confirm">
         <item quantity="one">Import 1 provider</item>
