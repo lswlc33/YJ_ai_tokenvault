@@ -62,7 +62,9 @@ object CurlImporter {
         for (draft in drafts.values) {
             if (draft.keys.isEmpty()) continue
             val baseName = providerNameOf(draft.host)
-            val seen = usedNames.merge(baseName, 1, Int::plus)!! - 1
+            // Kotlin/Native 没有 MutableMap.merge；这里手写计数，保持 common 代码零平台分支。
+            val seen = usedNames[baseName] ?: 0
+            usedNames[baseName] = seen + 1
             val name = if (seen == 0) baseName else "$baseName ${seen + 1}"
             val modelIssues = draft.models.values
                 .filter { it.needsReview }
