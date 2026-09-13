@@ -126,4 +126,5 @@ data class KeyProbeSettings(
     val balance: Boolean = true,
     val models: Boolean = false,
     val modelReachability: Boolean = false,
+    val quickModelProbe: Boolean = false,
 )

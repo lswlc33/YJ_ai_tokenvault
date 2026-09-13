@@ -112,6 +112,7 @@ data class UiKeySettingsSummary(
     val protocols: List<String> = emptyList(),
     val authStyle: String = "auto",
     val clientProfileId: Long? = null,
+    val clientProfileName: String? = null,
     val timeoutSeconds: Int? = null,
     val allowInsecure: Boolean = false,
     val balanceKind: String = "none",
@@ -121,6 +122,7 @@ data class UiKeySettingsSummary(
     val probeBalance: Boolean = true,
     val probeModels: Boolean = false,
     val probeModelReachability: Boolean = false,
+    val probeQuickModel: Boolean = false,
 )
 
 enum class UiModelSource {
@@ -139,6 +141,8 @@ data class UiModelRow(
     val health: UiHealth,
     val enabled: Boolean,
     val contextLabel: String?,
+    val lastSeenAt: Long? = null,
+    val probedAt: Long? = null,
 )
 
 data class UiAccountRow(
@@ -148,4 +152,6 @@ data class UiAccountRow(
     /** 只给遮蔽串。密码连遮蔽串都不给——它只在展开时现算（红线 21）。 */
     val maskedUsername: String,
     val loginMethods: List<String> = emptyList(),
+    val note: String? = null,
+    val hasPassword: Boolean = false,
 )

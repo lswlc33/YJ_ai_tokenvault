@@ -258,6 +258,7 @@ class BackupEngine constructor(
         probeBalance = provider.probeBalance,
         probeModels = provider.probeModels,
         probeModelReachability = provider.probeModelReachability,
+        probeQuickModel = provider.probeModelReachability,
     )
     private suspend fun restoreAccounts(
         payload: BackupPayload,

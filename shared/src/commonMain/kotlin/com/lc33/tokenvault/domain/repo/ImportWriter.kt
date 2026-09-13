@@ -18,6 +18,24 @@ class ImportWriter constructor(
     private val models: ModelRepository,
     private val transactions: TransactionRunner,
 ) {
+    /** 把一条 cURL 解析结果写入已有供应商；只取第一把 Key 与解析出的模型。 */
+    suspend fun writeKeyToProvider(providerId: Long, record: ParsedRecord): Long? {
+        val parsedKey = record.keys.firstOrNull() ?: return null
+        val settings = record.toKeySettings()
+        val keyId = keys.add(
+            providerId = providerId,
+            label = parsedKey.label,
+            note = "",
+            secret = parsedKey.secret,
+            settings = settings,
+            balanceToken = record.balanceToken,
+        )
+        record.models.forEach { model ->
+            models.add(providerId, keyId, model.modelId, model.protocol, model.needsReview)
+        }
+        return keyId
+    }
+
     suspend fun write(records: List<ParsedRecord>): Int {
         var count = 0
         transactions.inTransaction {

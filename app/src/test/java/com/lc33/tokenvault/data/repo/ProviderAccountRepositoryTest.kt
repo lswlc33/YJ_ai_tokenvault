@@ -164,6 +164,64 @@ class ProviderAccountRepositoryTest {
     }
 
     @Test
+    fun `更新账号元数据并保留未修改的凭据`() = runTest {
+        val id = repo.add(
+            providerId = 1,
+            label = "旧名称",
+            username = "u@example.com".toCharArray(),
+            password = "old-pass".toCharArray(),
+            loginUrl = null,
+        )
+
+        repo.update(
+            id = id,
+            label = "新名称",
+            username = null,
+            password = null,
+            loginUrl = "https://new.example.com",
+            loginMethods = emptySet(),
+            note = "新备注",
+        )
+
+        val row = dao.rows.single()
+        assertEquals("新名称", row.label)
+        assertEquals("新备注", row.note)
+        assertEquals("u@example.com", open("usernameEnc", id))
+        assertEquals("old-pass", open("passwordEnc", id))
+    }
+
+    @Test
+    fun `更新时用空数组清空凭据`() = runTest {
+        val id = repo.add(
+            providerId = 1,
+            label = "x",
+            username = "u@example.com".toCharArray(),
+            password = "p".toCharArray(),
+            loginUrl = null,
+        )
+
+        repo.update(
+            id = id,
+            label = "x",
+            username = CharArray(0),
+            password = CharArray(0),
+            loginUrl = null,
+            loginMethods = emptySet(),
+            note = null,
+        )
+
+        assertNull(dao.rows.single().usernameEnc)
+        assertNull(dao.rows.single().passwordEnc)
+    }
+
+    @Test
+    fun `删除账号会移除整行`() = runTest {
+        val id = repo.add(1, "x", "u".toCharArray(), "p".toCharArray(), null)
+        repo.delete(id)
+        assertNull(dao.findById(id))
+    }
+
+    @Test
     fun `没记密码时 revealPassword 返回 null`() = runTest {
         val id = repo.add(
             providerId = 1,

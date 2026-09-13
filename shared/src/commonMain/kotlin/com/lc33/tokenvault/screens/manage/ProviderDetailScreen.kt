@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -48,6 +50,13 @@ import tokenvault.shared.generated.resources.dialog_cancel
 import tokenvault.shared.generated.resources.login_method_github
 import tokenvault.shared.generated.resources.login_method_linuxdo
 import tokenvault.shared.generated.resources.detail_accounts_empty
+import tokenvault.shared.generated.resources.detail_add_account
+import tokenvault.shared.generated.resources.detail_account_keep_secret
+import tokenvault.shared.generated.resources.detail_account_view
+import tokenvault.shared.generated.resources.detail_account_delete
+import tokenvault.shared.generated.resources.detail_account_delete_title
+import tokenvault.shared.generated.resources.detail_account_delete_body
+import tokenvault.shared.generated.resources.login_method_password
 import tokenvault.shared.generated.resources.detail_add_key
 import tokenvault.shared.generated.resources.detail_balance_refresh
 import tokenvault.shared.generated.resources.detail_edit_cd
@@ -62,6 +71,7 @@ import tokenvault.shared.generated.resources.detail_models_refresh
 import tokenvault.shared.generated.resources.refresh_cd
 import tokenvault.shared.generated.resources.detail_section_accounts
 import tokenvault.shared.generated.resources.detail_section_keys
+import tokenvault.shared.generated.resources.editor_name
 import tokenvault.shared.generated.resources.editor_note
 import tokenvault.shared.generated.resources.editor_save
 import tokenvault.shared.generated.resources.groups_delete
@@ -85,6 +95,7 @@ import com.lc33.tokenvault.ui.miuix.AppFilterChip
 import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppIconButton
 import com.lc33.tokenvault.ui.miuix.AppScaffold
+import com.lc33.tokenvault.ui.miuix.AppSecretTextField
 import com.lc33.tokenvault.ui.miuix.AppSwitchRow
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppDialogTextButton
@@ -96,9 +107,11 @@ import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
 import com.lc33.tokenvault.ui.miuix.appTopBarScroll
 import com.lc33.tokenvault.ui.miuix.rememberAppTextFieldState
 import com.lc33.tokenvault.ui.miuix.rememberAppTopBarScrollState
+import com.lc33.tokenvault.ui.miuix.rememberSecretTextFieldState
 import com.lc33.tokenvault.ui.shell.ProviderDetailViewModel
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
 import com.lc33.tokenvault.ui.theme.LocalStatusPalette
+import kotlinx.coroutines.delay
 
 /**
  * 供应商详情 —— 这一家的密钥 / 模型 / 平台账号都在这里看、也在这里改
@@ -133,6 +146,9 @@ fun ProviderDetailScreen(
     onCopyRevealedAccount: (String) -> Unit,
     onCloseAccountReveal: () -> Unit,
     onSetAccountLoginMethods: (Long, Set<LoginMethod>) -> Unit,
+    onAddAccount: (String, String, CharArray?, CharArray?, Set<LoginMethod>) -> Unit,
+    onUpdateAccount: (Long, String, String, CharArray?, CharArray?, Set<LoginMethod>, Boolean) -> Unit,
+    onDeleteAccount: (Long) -> Unit,
 ) {
     val scrollState = rememberAppTopBarScrollState()
     val tokens = LocalAppTokens.current
@@ -141,6 +157,15 @@ fun ProviderDetailScreen(
     var addModelKeyId by remember { mutableStateOf<Long?>(null) }
     var editingModel by remember { mutableStateOf<UiModelRow?>(null) }
     var pendingDeleteModelId by remember { mutableStateOf<Long?>(null) }
+    var accountEditor by remember { mutableStateOf<AccountEditorTarget?>(null) }
+    var pendingDeleteAccountId by remember { mutableStateOf<Long?>(null) }
+
+    LaunchedEffect(revealedAccount?.accountId) {
+        if (revealedAccount != null) {
+            delay(30_000)
+            onCloseAccountReveal()
+        }
+    }
 
     AppScaffold(
         topBar = {
@@ -222,9 +247,32 @@ fun ProviderDetailScreen(
             }
 
 
-            item { SectionTitle(text = stringResource(Res.string.detail_section_accounts)) }
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = tokens.screenPadding),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    SectionTitle(
+                        text = stringResource(Res.string.detail_section_accounts),
+                        modifier = Modifier.weight(1f),
+                    )
+                    AppIconButton(
+                        icon = AppIcon.Add,
+                        contentDescription = stringResource(Res.string.detail_add_account),
+                        onClick = { accountEditor = AccountEditorTarget.New },
+                    )
+                }
+            }
             if (state.accounts.isEmpty()) {
-                item { AccountsEmptyHint() }
+                item {
+                    HintCard(
+                        text = stringResource(Res.string.detail_accounts_empty),
+                        actionText = stringResource(Res.string.detail_add_account),
+                        onAction = { accountEditor = AccountEditorTarget.New },
+                    )
+                }
             } else {
                 item {
                     AppCard(
@@ -236,7 +284,7 @@ fun ProviderDetailScreen(
                         state.accounts.forEachIndexed { index, account ->
                             AccountRow(
                                 row = account,
-                                onClick = { onRevealAccount(account.id) },
+                                onClick = { accountEditor = AccountEditorTarget.Edit(account) },
                             )
                             if (index != state.accounts.lastIndex) {
                                 AppDivider()
@@ -288,6 +336,35 @@ fun ProviderDetailScreen(
         },
     )
 
+    AccountEditorSheet(
+        target = accountEditor,
+        onDismiss = { accountEditor = null },
+        onSave = { label, note, username, password, methods, usesPassword ->
+            when (val current = accountEditor) {
+                is AccountEditorTarget.New -> onAddAccount(label, note, username, password, methods)
+                is AccountEditorTarget.Edit -> onUpdateAccount(
+                    current.account.id,
+                    label,
+                    note,
+                    username,
+                    password,
+                    methods,
+                    usesPassword,
+                )
+                null -> Unit
+            }
+            accountEditor = null
+        },
+        onDelete = { id ->
+            accountEditor = null
+            pendingDeleteAccountId = id
+        },
+        onReveal = { id ->
+            accountEditor = null
+            onRevealAccount(id)
+        },
+    )
+
     RevealAccountSheet(
         account = revealedAccount,
         onCopy = { label -> onCopyRevealedAccount(label) },
@@ -303,6 +380,18 @@ fun ProviderDetailScreen(
         onConfirm = {
             pendingDeleteModelId?.let(onDeleteModel)
             pendingDeleteModelId = null
+        },
+    )
+
+    AppDialog(
+        show = pendingDeleteAccountId != null,
+        onDismissRequest = { pendingDeleteAccountId = null },
+        title = stringResource(Res.string.detail_account_delete_title),
+        summary = stringResource(Res.string.detail_account_delete_body),
+        confirmText = stringResource(Res.string.detail_account_delete),
+        onConfirm = {
+            pendingDeleteAccountId?.let(onDeleteAccount)
+            pendingDeleteAccountId = null
         },
     )
 }
@@ -355,9 +444,133 @@ private fun AddKeyDialog(
     }
 }
 
+private sealed interface AccountEditorTarget {
+    data object New : AccountEditorTarget
+    data class Edit(val account: com.lc33.tokenvault.screens.model.UiAccountRow) : AccountEditorTarget
+}
+
+/** 账号编辑底部表单：新增与编辑共用，避免两套字段顺序和校验。 */
+@Composable
+private fun AccountEditorSheet(
+    target: AccountEditorTarget?,
+    onDismiss: () -> Unit,
+    onSave: (String, String, CharArray?, CharArray?, Set<LoginMethod>, Boolean) -> Unit,
+    onDelete: (Long) -> Unit,
+    onReveal: (Long) -> Unit,
+) {
+    val tokens = LocalAppTokens.current
+    val account = (target as? AccountEditorTarget.Edit)?.account
+    val label = rememberAppTextFieldState(account?.label.orEmpty())
+    val note = rememberAppTextFieldState(account?.note.orEmpty())
+    val username = rememberSecretTextFieldState()
+    val password = rememberSecretTextFieldState()
+    var methods by remember(target) {
+        mutableStateOf(
+            account?.loginMethods
+                ?.mapNotNull(LoginMethod::fromWireName)
+                ?.toSet()
+                .orEmpty(),
+        )
+    }
+    var usesPassword by remember(target) { mutableStateOf(account?.hasPassword == true) }
+
+    AppBottomSheet(
+        show = target != null,
+        onDismissRequest = {
+            username.clear()
+            password.clear()
+            onDismiss()
+        },
+        title = account?.label?.takeIf { it.isNotBlank() }
+            ?: stringResource(Res.string.detail_add_account),
+    ) {
+        if (target == null) return@AppBottomSheet
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
+        ) {
+        AppTextField(
+            state = label,
+            label = stringResource(Res.string.editor_name),
+        )
+        AppTextField(
+            state = note,
+            label = stringResource(Res.string.editor_note),
+            modifier = Modifier.padding(top = tokens.itemSpacing),
+        )
+        AppText(
+            text = stringResource(Res.string.detail_account_login_methods),
+            style = AppTextStyle.Footnote,
+            color = appSecondaryTextColor,
+            modifier = Modifier.padding(top = tokens.itemSpacing),
+        )
+        Row(
+            modifier = Modifier.padding(top = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
+        ) {
+            LoginMethod.entries.forEach { method ->
+                val selected = method in methods
+                AppFilterChip(
+                    text = loginMethodLabel(method),
+                    selected = selected,
+                    onClick = {
+                        methods = if (selected) methods - method else methods + method
+                    },
+                )
+            }
+            AppFilterChip(
+                text = stringResource(Res.string.login_method_password),
+                selected = usesPassword,
+                onClick = { usesPassword = !usesPassword },
+            )
+        }
+        if (usesPassword) {
+            AppSecretTextField(
+                state = username,
+                label = stringResource(Res.string.detail_account_username),
+                supportingText = account?.let { stringResource(Res.string.detail_account_keep_secret) },
+                modifier = Modifier.padding(top = tokens.itemSpacing),
+            )
+            AppSecretTextField(
+                state = password,
+                label = stringResource(Res.string.detail_account_password),
+                supportingText = account?.let { stringResource(Res.string.detail_account_keep_secret) },
+                modifier = Modifier.padding(top = tokens.itemSpacing),
+            )
+        }
+        AppActionRow(
+            text = stringResource(Res.string.editor_save),
+            onClick = {
+                val usernameChars = username.chars.takeIf { it.isNotEmpty() }
+                val passwordChars = password.chars.takeIf { it.isNotEmpty() }
+                username.clear()
+                password.clear()
+                onSave(label.text, note.text, usernameChars, passwordChars, methods, usesPassword)
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = tokens.itemSpacing),
+        )
+        account?.let { row ->
+            AppActionRow(
+                text = stringResource(Res.string.detail_account_view),
+                onClick = { onReveal(row.id) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            AppActionRow(
+                text = stringResource(Res.string.detail_account_delete),
+                onClick = { onDelete(row.id) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        }
+    }
+}
+
 /** 手动添加 / 编辑模型。模型是明文元数据，不需要密码键盘。 */
 @Composable
-private fun ModelDialog(
+internal fun ModelDialog(
     keyId: Long?,
     editing: UiModelRow?,
     protocols: List<Protocol>,

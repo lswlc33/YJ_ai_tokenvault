@@ -45,7 +45,25 @@ interface ProviderAccountDao {
      * 把密码密文、`loginUrl`、`label` 一起覆盖掉。
      */
     @Query("UPDATE provider_accounts SET usernameEnc = :enc, usernameFp = :fp, updatedAt = :now WHERE id = :id")
-    suspend fun setUsername(id: Long, enc: ByteArray, fp: String, now: Long)
+    suspend fun setUsername(id: Long, enc: ByteArray?, fp: String?, now: Long)
+
+    /** 编辑明文元数据；凭据列单独写，避免整行替换触碰密文。 */
+    @Query(
+        """
+        UPDATE provider_accounts
+        SET label = :label, loginUrl = :loginUrl, loginMethods = :loginMethods,
+            note = :note, updatedAt = :now
+        WHERE id = :id
+        """,
+    )
+    suspend fun setMeta(
+        id: Long,
+        label: String,
+        loginUrl: String?,
+        loginMethods: String,
+        note: String?,
+        now: Long,
+    )
 
     /** 登录方式是明文元数据，单独写，避免整行替换把两段密文一起暴露给编辑路径。 */
     @Query("UPDATE provider_accounts SET loginMethods = :loginMethods, updatedAt = :now WHERE id = :id")
@@ -53,7 +71,7 @@ interface ProviderAccountDao {
 
     /** 回填密码密文，同理只动密码列。 */
     @Query("UPDATE provider_accounts SET passwordEnc = :enc, updatedAt = :now WHERE id = :id")
-    suspend fun setPassword(id: Long, enc: ByteArray, now: Long)
+    suspend fun setPassword(id: Long, enc: ByteArray?, now: Long)
 }
 
 @Dao

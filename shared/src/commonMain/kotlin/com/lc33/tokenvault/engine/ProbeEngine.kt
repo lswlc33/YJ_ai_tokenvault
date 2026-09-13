@@ -388,7 +388,7 @@ class ProbeEngine constructor(
         protocol: Protocol,
     ) {
         val key = keys.find(keyId) ?: return
-        if (!key.settings.probe.enabled || !key.settings.probe.modelReachability) return
+        if (!key.settings.probe.enabled || !key.settings.probe.modelReachability || !key.settings.probe.quickModelProbe) return
         val keySettings = key.settings
         val endpoints = when (val result = normalizeBaseUrl(keySettings.apiBaseUrl, keySettings.pathOverrides)) {
             is NormalizeResult.Ok -> result.endpoints
@@ -572,12 +572,46 @@ class ProbeEngine constructor(
             planned.toTask(profileOf(planned.clientProfileId))?.let { tasks += it }
         }
 
+        val providerTotal = tasks.count { it.level == ProbeLevel.L1_REACHABILITY }
+        val keyTotal = tasks.count { it.level == ProbeLevel.L2_KEY_VALIDITY }
+        var done = 0
+        var ok = 0
+        var fail = 0
+        var providerDone = 0
+        var providerOk = 0
+        var providerFail = 0
+        var keyDone = 0
+        var keyOk = 0
+        var keyFail = 0
+
         if (tasks.isEmpty()) {
-            finishRun(runId, total = 0, done = 0, ok = 0, fail = 0, cancelled = false)
+            finishRun(
+                runId = runId,
+                total = 0,
+                done = 0,
+                ok = 0,
+                fail = 0,
+                providerTotal = 0,
+                providerDone = 0,
+                providerOk = 0,
+                providerFail = 0,
+                keyTotal = 0,
+                keyDone = 0,
+                keyOk = 0,
+                keyFail = 0,
+                cancelled = false,
+            )
             return
         }
 
-        _progress.value = ProbeProgress(runId = runId, running = true, done = 0, total = tasks.size)
+        _progress.value = ProbeProgress(
+            runId = runId,
+            running = true,
+            done = 0,
+            total = tasks.size,
+            providerTotal = providerTotal,
+            keyTotal = keyTotal,
+        )
 
         val transport = ProbeTransport { request, allowInsecure ->
             engine.execute(request, allowInsecure)
@@ -602,9 +636,6 @@ class ProbeEngine constructor(
         }.toMap()
         val fetchedModels = mutableMapOf<Long, MutableMap<Protocol, MutableSet<String>>>()
 
-        var done = 0
-        var ok = 0
-        var fail = 0
         try {
             orchestrator.run(tasks, plan.perHostKeyAndModelCount).collect { result ->
                 // 客户端被拦（手动探测）→ 先换鉴权头再按序试预设（§8.2）。修正成功就用
@@ -627,6 +658,25 @@ class ProbeEngine constructor(
                     ProbeOutcome.SUCCESS -> ok++
                     ProbeOutcome.SKIPPED, ProbeOutcome.CANCELLED -> Unit
                     else -> fail++
+                }
+                when (taskById[result.taskId]?.level) {
+                    ProbeLevel.L1_REACHABILITY -> {
+                        providerDone++
+                        when (final.outcome) {
+                            ProbeOutcome.SUCCESS -> providerOk++
+                            ProbeOutcome.SKIPPED, ProbeOutcome.CANCELLED -> Unit
+                            else -> providerFail++
+                        }
+                    }
+                    ProbeLevel.L2_KEY_VALIDITY -> {
+                        keyDone++
+                        when (final.outcome) {
+                            ProbeOutcome.SUCCESS -> keyOk++
+                            ProbeOutcome.SKIPPED, ProbeOutcome.CANCELLED -> Unit
+                            else -> keyFail++
+                        }
+                    }
+                    else -> Unit
                 }
                 // 红线 32：detail 是上游 message 前 200 字符，上游会回显 key 前缀 / 后缀 4 位 /
                 // base64 访问令牌，落库与推流前必须脱敏。在这里统一脱敏一次，`persist`、
@@ -663,11 +713,34 @@ class ProbeEngine constructor(
                     running = true,
                     done = done,
                     total = tasks.size,
+                    providerDone = providerDone,
+                    providerTotal = providerTotal,
+                    providerOk = providerOk,
+                    providerFail = providerFail,
+                    keyDone = keyDone,
+                    keyTotal = keyTotal,
+                    keyOk = keyOk,
+                    keyFail = keyFail,
                 )
             }
         } catch (_: CancellationException) {
             // 取消：已落库的结果保留，probe_runs 标 cancelled。
-            finishRun(runId, tasks.size, done, ok, fail, cancelled = true)
+            finishRun(
+                runId = runId,
+                total = tasks.size,
+                done = done,
+                ok = ok,
+                fail = fail,
+                providerTotal = providerTotal,
+                providerDone = providerDone,
+                providerOk = providerOk,
+                providerFail = providerFail,
+                keyTotal = keyTotal,
+                keyDone = keyDone,
+                keyOk = keyOk,
+                keyFail = keyFail,
+                cancelled = true,
+            )
             return
         }
 
@@ -687,7 +760,22 @@ class ProbeEngine constructor(
             }
             .forEach { key -> refreshModelsInner(key.providerId, key.id) }
 
-        finishRun(runId, tasks.size, done, ok, fail, cancelled = false)
+        finishRun(
+            runId = runId,
+            total = tasks.size,
+            done = done,
+            ok = ok,
+            fail = fail,
+            providerTotal = providerTotal,
+            providerDone = providerDone,
+            providerOk = providerOk,
+            providerFail = providerFail,
+            keyTotal = keyTotal,
+            keyDone = keyDone,
+            keyOk = keyOk,
+            keyFail = keyFail,
+            cancelled = false,
+        )
     }
 
     private suspend fun finishRun(
@@ -696,6 +784,14 @@ class ProbeEngine constructor(
         done: Int,
         ok: Int,
         fail: Int,
+        providerTotal: Int,
+        providerDone: Int,
+        providerOk: Int,
+        providerFail: Int,
+        keyTotal: Int,
+        keyDone: Int,
+        keyOk: Int,
+        keyFail: Int,
         cancelled: Boolean,
     ) {
         runRepository.update(
@@ -708,6 +804,14 @@ class ProbeEngine constructor(
                 done = done,
                 okCount = ok,
                 failCount = fail,
+                providerTotal = providerTotal,
+                providerDone = providerDone,
+                providerOk = providerOk,
+                providerFail = providerFail,
+                keyTotal = keyTotal,
+                keyDone = keyDone,
+                keyOk = keyOk,
+                keyFail = keyFail,
                 cancelled = cancelled,
             ),
         )

@@ -41,6 +41,8 @@ class RoomProviderRepository constructor(
     override suspend fun setGroup(ids: List<Long>, groupId: Long?) =
         dao.setGroup(ids, groupId, now())
 
+    override suspend fun reorder(idsInOrder: List<Long>) = dao.reorder(idsInOrder, now())
+
     override suspend fun updateWebsiteStatus(
         id: Long,
         latencyMs: Long?,

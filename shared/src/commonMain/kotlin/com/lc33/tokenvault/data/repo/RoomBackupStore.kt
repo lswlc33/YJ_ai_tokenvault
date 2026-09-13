@@ -134,6 +134,7 @@ class RoomBackupStore constructor(
                             probeBalance = entity.probeBalance,
                             probeModels = entity.probeModels,
                             probeModelReachability = entity.probeModelReachability,
+                            probeQuickModel = entity.probeQuickModel,
                         )
                     },
                 )
@@ -487,6 +488,7 @@ class RoomBackupStore constructor(
             balance = probeBalance,
             models = probeModels,
             modelReachability = probeModelReachability,
+            quickModelProbe = probeQuickModel,
         ),
     )
 

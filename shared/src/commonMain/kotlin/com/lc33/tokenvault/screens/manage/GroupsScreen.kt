@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -21,6 +22,7 @@ import org.jetbrains.compose.resources.stringResource
 import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.back_cd
 import tokenvault.shared.generated.resources.editor_save
+import tokenvault.shared.generated.resources.group_all
 import tokenvault.shared.generated.resources.groups_add
 import tokenvault.shared.generated.resources.groups_add_title
 import tokenvault.shared.generated.resources.groups_count
@@ -33,19 +35,33 @@ import tokenvault.shared.generated.resources.groups_empty_title
 import tokenvault.shared.generated.resources.groups_name_label
 import tokenvault.shared.generated.resources.groups_rename
 import tokenvault.shared.generated.resources.groups_rename_title
+import tokenvault.shared.generated.resources.groups_section_manage
+import tokenvault.shared.generated.resources.groups_section_providers
+import tokenvault.shared.generated.resources.groups_sort_hint
+import tokenvault.shared.generated.resources.groups_sort_providers
 import tokenvault.shared.generated.resources.groups_title
+import tokenvault.shared.generated.resources.key_sort_down
+import tokenvault.shared.generated.resources.key_sort_up
+import tokenvault.shared.generated.resources.manage_batch_ungrouped
+import tokenvault.shared.generated.resources.manage_empty_providers_desc
+import tokenvault.shared.generated.resources.manage_empty_providers_title
 import com.lc33.tokenvault.screens.model.UiGroup
+import com.lc33.tokenvault.screens.model.UiProviderRow
 import com.lc33.tokenvault.ui.common.EmptyState
+import com.lc33.tokenvault.ui.miuix.AppActionRow
 import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppDialog
+import com.lc33.tokenvault.ui.miuix.AppDropdownRow
 import com.lc33.tokenvault.ui.miuix.AppFab
 import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppIconButton
+import com.lc33.tokenvault.ui.miuix.AppPreferenceGroup
 import com.lc33.tokenvault.ui.miuix.AppScaffold
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppTextField
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.AppTopBar
+import com.lc33.tokenvault.ui.miuix.SectionTitle
 import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
 import com.lc33.tokenvault.ui.miuix.appTopBarScroll
 import com.lc33.tokenvault.ui.miuix.rememberAppTextFieldState
@@ -53,32 +69,49 @@ import com.lc33.tokenvault.ui.miuix.rememberAppTopBarScrollState
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
 
 /**
- * 分组管理（计划.md §13.4）。
+ * 编辑供应商列表：分组维护、供应商分组和手动排序。
  *
- * 「全部」不出现在这里：它是筛选条上的伪分组，不入库，也就没有"重命名全部"这种操作。
- *
- * 删除分组**不删供应商**，只是把它们的 `groupId` 清空落回「全部」——这一点必须写在
- * 确认文案里，否则"删分组"看起来像"删掉这一组供应商"。
- *
- * 新建与重命名共用一个弹层：两者的差别只有标题与初值，而分成两个的表现是
- * 同一个输入框的行为在两处慢慢长歪。
+ * 「全部」是不可编辑、不可删除、不可拖动的伪分组。删除真实分组只把供应商落回
+ * 未分组，不删除供应商。
  */
 @Composable
 fun GroupsScreen(
     groups: List<UiGroup>,
+    providers: List<UiProviderRow>,
     onBack: () -> Unit,
     onAdd: (String) -> Unit,
     onRename: (Long, String) -> Unit,
     onDelete: (Long) -> Unit,
+    onSetProviderGroup: (Long, Long?) -> Unit,
+    onReorderProviders: (List<Long>) -> Unit,
 ) {
     val scrollState = rememberAppTopBarScrollState()
     val tokens = LocalAppTokens.current
-    val real = groups.filter { it.id != null }
+    val realGroups = groups.filter { it.id != null }
+    val allLabel = stringResource(Res.string.group_all)
+    val ungrouped = stringResource(Res.string.manage_batch_ungrouped)
+    val groupChoices = listOf(UiGroup(id = null, name = ungrouped, providerCount = 0)) + realGroups
 
-    // null = 不显示；id 为 null 的那一项表示"新建"
     var editing by remember { mutableStateOf<UiGroup?>(null) }
     var pendingDelete by remember { mutableStateOf<UiGroup?>(null) }
+    var sorting by remember { mutableStateOf(false) }
+    var ordered by remember(providers) { mutableStateOf(providers.sortedBy { it.sortOrder }) }
     val newGroup = UiGroup(id = null, name = "", providerCount = 0)
+
+    fun leaveSorting() {
+        sorting = false
+        ordered = providers.sortedBy { it.sortOrder }
+    }
+
+    fun move(index: Int, delta: Int) {
+        val target = index + delta
+        if (index !in ordered.indices || target !in ordered.indices) return
+        val next = ordered.toMutableList()
+        val current = next[index]
+        next[index] = next[target]
+        next[target] = current
+        ordered = next
+    }
 
     AppScaffold(
         topBar = {
@@ -89,8 +122,26 @@ fun GroupsScreen(
                     AppIconButton(
                         icon = AppIcon.Back,
                         contentDescription = stringResource(Res.string.back_cd),
-                        onClick = onBack,
+                        onClick = { if (sorting) leaveSorting() else onBack() },
                     )
+                },
+                actions = {
+                    if (sorting) {
+                        AppIconButton(
+                            icon = AppIcon.Ok,
+                            contentDescription = stringResource(Res.string.editor_save),
+                            onClick = {
+                                onReorderProviders(ordered.map { it.id })
+                                leaveSorting()
+                            },
+                        )
+                    } else {
+                        AppIconButton(
+                            icon = AppIcon.Sort,
+                            contentDescription = stringResource(Res.string.groups_sort_providers),
+                            onClick = { sorting = true; ordered = providers.sortedBy { it.sortOrder } },
+                        )
+                    }
                 },
             )
         },
@@ -102,14 +153,6 @@ fun GroupsScreen(
             )
         },
     ) { padding ->
-        if (real.isEmpty()) {
-            EmptyState(
-                title = stringResource(Res.string.groups_empty_title),
-                description = stringResource(Res.string.groups_empty_desc),
-                modifier = Modifier.padding(padding),
-            )
-            return@AppScaffold
-        }
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -117,42 +160,149 @@ fun GroupsScreen(
             contentPadding = padding,
             verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
         ) {
-            items(real.size) { index ->
-                val group = real[index]
+            item { SectionTitle(text = stringResource(Res.string.groups_section_manage)) }
+            item {
                 AppCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = tokens.screenPadding),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        AppText(
-                            text = group.name,
-                            style = AppTextStyle.Body,
-                            maxLines = 1,
-                            modifier = Modifier.weight(1f),
-                        )
+                        AppText(text = allLabel, style = AppTextStyle.Body, modifier = Modifier.weight(1f))
                         AppText(
                             text = pluralStringResource(
                                 Res.plurals.groups_count,
-                                group.providerCount,
-                                group.providerCount,
+                                providers.size,
+                                providers.size,
                             ),
                             style = AppTextStyle.Footnote,
                             color = appSecondaryTextColor,
                         )
-                        AppIconButton(
-                            icon = AppIcon.Edit,
-                            contentDescription = stringResource(Res.string.groups_rename),
-                            onClick = { editing = group },
-                        )
-                        AppIconButton(
-                            icon = AppIcon.Delete,
-                            contentDescription = stringResource(Res.string.groups_delete),
-                            onClick = { pendingDelete = group },
-                        )
                     }
                 }
             }
+            if (realGroups.isEmpty()) {
+                item {
+                    EmptyState(
+                        title = stringResource(Res.string.groups_empty_title),
+                        description = stringResource(Res.string.groups_empty_desc),
+                        modifier = Modifier.padding(horizontal = tokens.screenPadding),
+                    )
+                }
+            } else {
+                items(realGroups.size) { index ->
+                    val group = realGroups[index]
+                    AppCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = tokens.screenPadding),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            AppText(
+                                text = group.name,
+                                style = AppTextStyle.Body,
+                                maxLines = 1,
+                                modifier = Modifier.weight(1f),
+                            )
+                            AppText(
+                                text = pluralStringResource(
+                                    Res.plurals.groups_count,
+                                    group.providerCount,
+                                    group.providerCount,
+                                ),
+                                style = AppTextStyle.Footnote,
+                                color = appSecondaryTextColor,
+                            )
+                            AppIconButton(
+                                icon = AppIcon.Edit,
+                                contentDescription = stringResource(Res.string.groups_rename),
+                                onClick = { editing = group },
+                            )
+                            AppIconButton(
+                                icon = AppIcon.Delete,
+                                contentDescription = stringResource(Res.string.groups_delete),
+                                onClick = { pendingDelete = group },
+                            )
+                        }
+                    }
+                }
+            }
+            item {
+                AppActionRow(
+                    text = stringResource(Res.string.groups_add),
+                    onClick = { editing = newGroup },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = tokens.screenPadding),
+                )
+            }
+
+            item { SectionTitle(text = stringResource(Res.string.groups_section_providers)) }
+            if (providers.isEmpty()) {
+                item {
+                    EmptyState(
+                        title = stringResource(Res.string.manage_empty_providers_title),
+                        description = stringResource(Res.string.manage_empty_providers_desc),
+                        modifier = Modifier.padding(horizontal = tokens.screenPadding),
+                    )
+                }
+            } else if (sorting) {
+                item {
+                    AppText(
+                        text = stringResource(Res.string.groups_sort_hint),
+                        style = AppTextStyle.Footnote,
+                        color = appSecondaryTextColor,
+                        modifier = Modifier.padding(horizontal = tokens.screenPadding),
+                    )
+                }
+                items(ordered.size) { index ->
+                    val provider = ordered[index]
+                    AppCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = tokens.screenPadding),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            AppText(
+                                text = provider.name,
+                                style = AppTextStyle.Body,
+                                maxLines = 1,
+                                modifier = Modifier.weight(1f),
+                            )
+                            AppIconButton(
+                                icon = AppIcon.Back,
+                                contentDescription = stringResource(Res.string.key_sort_up),
+                                onClick = { move(index, -1) },
+                                enabled = index > 0,
+                            )
+                            AppIconButton(
+                                icon = AppIcon.Forward,
+                                contentDescription = stringResource(Res.string.key_sort_down),
+                                onClick = { move(index, 1) },
+                                enabled = index < ordered.lastIndex,
+                            )
+                        }
+                    }
+                }
+            } else {
+                item {
+                    AppPreferenceGroup(
+                        modifier = Modifier.padding(horizontal = tokens.screenPadding),
+                    ) {
+                        providers.forEach { provider ->
+                            val selected = groupChoices.indexOfFirst { it.id == provider.groupId }
+                                .coerceAtLeast(0)
+                            AppDropdownRow(
+                                title = provider.name,
+                                items = groupChoices.map { it.name },
+                                selectedIndex = selected,
+                                onSelect = { index -> onSetProviderGroup(provider.id, groupChoices[index].id) },
+                            )
+                        }
+                    }
+                }
+            }
+
             item {
                 AppText(
                     text = stringResource(Res.string.groups_delete_note),
@@ -170,8 +320,6 @@ fun GroupsScreen(
 
     val target = editing
     if (target != null) {
-        // key(target) 让重命名不同分组时输入框重新取初值：不加的话 remember 会保留
-        // 上一个分组的名字，于是"改 B 组"打开时框里是 A 组的名字
         key(target) {
             NameDialog(
                 title = stringResource(
@@ -201,7 +349,7 @@ fun GroupsScreen(
     )
 }
 
-/** 新建 / 重命名共用的取名弹层。空名字不许提交——一个没有名字的分组在筛选条上是个空 chip。 */
+/** 新建 / 重命名共用的取名弹层。空名字不许提交。 */
 @Composable
 private fun NameDialog(
     title: String,

@@ -109,6 +109,14 @@ interface ProviderDao {
         checkedAt: Long,
         error: String?,
     )
+
+    @Query("UPDATE providers SET sortOrder = :sortOrder, updatedAt = :now WHERE id = :id")
+    suspend fun setSortOrder(id: Long, sortOrder: Int, now: Long)
+
+    @Transaction
+    suspend fun reorder(idsInOrder: List<Long>, now: Long) {
+        idsInOrder.forEachIndexed { index, id -> setSortOrder(id, index, now) }
+    }
 }
 
 data class ApiKeyWithSettingsRow(
@@ -141,6 +149,9 @@ interface ApiKeyDao {
 
     @Query("SELECT * FROM api_keys WHERE id = :id")
     suspend fun findRaw(id: Long): ApiKeyEntity?
+
+    @Query("SELECT COUNT(*) FROM api_keys WHERE providerId = :providerId AND fingerprint = :fingerprint")
+    suspend fun countFingerprint(providerId: Long, fingerprint: String): Int
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertRaw(key: ApiKeyEntity): Long

@@ -86,14 +86,34 @@ data class ProbeRunSummary(
     val succeeded: Int,
     val failed: Int,
     val skipped: Int,
+    val providerTotal: Int = 0,
+    val providerSucceeded: Int = 0,
+    val providerFailed: Int = 0,
+    val providerSkipped: Int = 0,
+    val keyTotal: Int = 0,
+    val keySucceeded: Int = 0,
+    val keyFailed: Int = 0,
+    val keySkipped: Int = 0,
 )
 
 data class ProbeProgress(
     val done: Int,
     val total: Int,
     val currentLabel: String,
+    val providerDone: Int = 0,
+    val providerTotal: Int = 0,
+    val providerSucceeded: Int = 0,
+    val providerFailed: Int = 0,
+    val keyDone: Int = 0,
+    val keyTotal: Int = 0,
+    val keySucceeded: Int = 0,
+    val keyFailed: Int = 0,
 ) {
     val fraction: Float get() = if (total <= 0) 0f else done.toFloat() / total.toFloat()
+    val providerFraction: Float
+        get() = if (providerTotal <= 0) 0f else providerDone.toFloat() / providerTotal.toFloat()
+    val keyFraction: Float
+        get() = if (keyTotal <= 0) 0f else keyDone.toFloat() / keyTotal.toFloat()
 }
 
 data class BackupStatus(
@@ -128,6 +148,7 @@ data class DashboardUiState(
  * 等于把详情页的信息拆碎摊在四个地方。
  */
 data class ManageUiState(
+    val loading: Boolean = false,
     val query: String = "",
     /** 第一枚固定是「全部」（`id == null`），其余是用户自定义分组。 */
     val groups: List<UiGroup> = emptyList(),

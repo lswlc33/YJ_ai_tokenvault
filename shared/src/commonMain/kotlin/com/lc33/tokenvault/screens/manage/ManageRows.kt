@@ -23,6 +23,7 @@ import tokenvault.shared.generated.resources.balance_failed_section
 import tokenvault.shared.generated.resources.manage_context
 import tokenvault.shared.generated.resources.detail_key_balance_value
 import tokenvault.shared.generated.resources.detail_key_models_refresh
+import tokenvault.shared.generated.resources.detail_account_password
 import tokenvault.shared.generated.resources.manage_default_key
 import tokenvault.shared.generated.resources.manage_disabled
 import tokenvault.shared.generated.resources.manage_keys_ratio
@@ -330,12 +331,14 @@ internal fun ModelRow(
     row: UiModelRow,
     onClick: (() -> Unit)? = null,
     onProbe: (() -> Unit)? = null,
+    onLongPress: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val tokens = LocalAppTokens.current
     AppBasicRow(
         modifier = modifier,
         onClick = onClick,
+        onLongPress = onLongPress,
         endActions = {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -418,7 +421,15 @@ internal fun AccountRow(
             fontFamily = tokens.monoFontFamily,
             maxLines = 1,
         )
-        if (row.loginMethods.isNotEmpty()) {
+        row.note?.let { note ->
+            AppText(
+                text = note,
+                style = AppTextStyle.Footnote,
+                color = appSecondaryTextColor,
+                maxLines = 1,
+            )
+        }
+        if (row.loginMethods.isNotEmpty() || row.hasPassword) {
             Row(
                 modifier = Modifier.padding(top = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -428,6 +439,7 @@ internal fun AccountRow(
                         AppChip(text = loginMethodLabel(method))
                     }
                 }
+                if (row.hasPassword) AppChip(text = stringResource(Res.string.detail_account_password))
             }
         }
     }

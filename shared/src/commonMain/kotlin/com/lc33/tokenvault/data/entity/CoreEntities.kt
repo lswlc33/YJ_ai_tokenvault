@@ -175,6 +175,7 @@ data class KeySettingsEntity(
     val probeBalance: Boolean = true,
     val probeModels: Boolean = false,
     val probeModelReachability: Boolean = false,
+    val probeQuickModel: Boolean = false,
     val updatedAt: Long,
 ) {
     override fun equals(other: Any?): Boolean {

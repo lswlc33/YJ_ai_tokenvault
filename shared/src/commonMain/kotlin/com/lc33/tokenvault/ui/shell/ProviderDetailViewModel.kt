@@ -235,6 +235,71 @@ class ProviderDetailViewModel constructor(
         }
     }
 
+    /** 新增平台账号。凭据字段用 CharArray 进入仓库，成功后由调用方与仓库共同擦除。 */
+    fun onAddAccount(
+        label: String,
+        note: String,
+        username: CharArray?,
+        password: CharArray?,
+        loginMethods: Set<LoginMethod>,
+    ) {
+        viewModelScope.launch {
+            try {
+                accounts.add(
+                    providerId = providerId,
+                    label = label,
+                    username = username,
+                    password = password,
+                    loginUrl = null,
+                    loginMethods = loginMethods,
+                    note = note,
+                )
+            } finally {
+                username?.zeroize()
+                password?.zeroize()
+            }
+        }
+    }
+
+    /**
+     * 编辑平台账号。空数组表示清空该凭据；null 表示用户没有改这一格、保留原值。
+     * 非密码登录会显式传空数组清掉用户名和密码。
+     */
+    fun onUpdateAccount(
+        id: Long,
+        label: String,
+        note: String,
+        username: CharArray?,
+        password: CharArray?,
+        loginMethods: Set<LoginMethod>,
+        usesPassword: Boolean,
+    ) {
+        viewModelScope.launch {
+            try {
+                val clear = CharArray(0)
+                accounts.update(
+                    id = id,
+                    label = label,
+                    username = if (usesPassword) username else clear,
+                    password = if (usesPassword) password else clear,
+                    loginUrl = null,
+                    loginMethods = loginMethods,
+                    note = note,
+                )
+            } finally {
+                username?.zeroize()
+                password?.zeroize()
+            }
+        }
+    }
+
+    fun onDeleteAccount(id: Long) {
+        viewModelScope.launch {
+            runCatching { accounts.delete(id) }
+            if (_revealedAccount.value?.accountId == id) onCloseAccountSheet()
+        }
+    }
+
     /** 手动添加模型。模型列表自动检测关闭时，这是唯一入口。 */
     fun onAddModel(keyId: Long, modelId: String, protocol: Protocol) {
         viewModelScope.launch {

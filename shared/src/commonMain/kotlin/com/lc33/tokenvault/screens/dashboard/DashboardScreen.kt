@@ -18,6 +18,7 @@ import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.dashboard_title
 import tokenvault.shared.generated.resources.refresh_status_cd
 import com.lc33.tokenvault.screens.model.DashboardUiState
+import com.lc33.tokenvault.ui.common.LoadingState
 import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppIconButton
 import com.lc33.tokenvault.ui.miuix.AppScaffold
@@ -59,6 +60,10 @@ fun DashboardScreen(
             )
         },
     ) { padding ->
+        if (state.loading && state.counts.providers == 0 && state.lastRun == null && state.progress == null) {
+            LoadingState(modifier = Modifier.padding(padding))
+            return@AppScaffold
+        }
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()

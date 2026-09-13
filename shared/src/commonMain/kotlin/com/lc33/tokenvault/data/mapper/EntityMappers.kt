@@ -109,6 +109,7 @@ fun KeySettingsEntity.toDomain(): KeySettings = KeySettings(
         balance = probeBalance,
         models = probeModels,
         modelReachability = probeModelReachability,
+        quickModelProbe = probeQuickModel,
     ),
 )
 
@@ -136,6 +137,7 @@ fun KeySettings.toEntity(keyId: Long, updatedAt: Long): KeySettingsEntity = KeyS
     probeBalance = probe.balance,
     probeModels = probe.models,
     probeModelReachability = probe.modelReachability,
+    probeQuickModel = probe.quickModelProbe,
     updatedAt = updatedAt,
 )
 

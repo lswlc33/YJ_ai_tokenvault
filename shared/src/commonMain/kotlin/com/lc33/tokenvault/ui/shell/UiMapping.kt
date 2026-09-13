@@ -201,7 +201,7 @@ fun groupChips(allLabel: String, groups: List<Group>, providers: List<UiProvider
  * 密钥行。[masked] 必须由调用方解密后现算（§6.1 推论 3），所以它是参数而不是从 [ApiKey] 取——
  * 那个类型上**没有任何能拿到明文的方法**，这一点是刻意的。
  */
-fun ApiKey.toRow(masked: String): UiKeyRow = UiKeyRow(
+fun ApiKey.toRow(masked: String, clientProfileName: String? = null): UiKeyRow = UiKeyRow(
     id = id,
     label = label,
     note = note,
@@ -220,6 +220,7 @@ fun ApiKey.toRow(masked: String): UiKeyRow = UiKeyRow(
         protocols = settings.supportedProtocols.map { it.wireName },
         authStyle = settings.authStyle.wireName,
         clientProfileId = settings.clientProfileId,
+        clientProfileName = clientProfileName,
         timeoutSeconds = settings.timeoutSeconds,
         allowInsecure = settings.allowInsecure,
         balanceKind = settings.balanceKind.wireName,
@@ -229,6 +230,7 @@ fun ApiKey.toRow(masked: String): UiKeyRow = UiKeyRow(
         probeBalance = settings.probe.balance,
         probeModels = settings.probe.models,
         probeModelReachability = settings.probe.modelReachability,
+        probeQuickModel = settings.probe.quickModelProbe,
     ),
 )
 
@@ -259,6 +261,8 @@ fun AiModel.toRow(): UiModelRow = UiModelRow(
     },
     enabled = enabled,
     contextLabel = displayName,
+    lastSeenAt = lastSeenAt,
+    probedAt = probedAt,
 )
 
 /**
@@ -271,6 +275,8 @@ fun ProviderAccount.toRow(maskedUsername: String): UiAccountRow = UiAccountRow(
     providerId = providerId,
     maskedUsername = maskedUsername,
     loginMethods = loginMethods.map { it.wireName },
+    note = note,
+    hasPassword = passwordEnc != null,
 )
 
 /**
@@ -529,4 +535,12 @@ fun ProbeRun.toSummary(): ProbeRunSummary = ProbeRunSummary(
     failed = failCount,
     // 未探测 = total - done（§8.5：超预算 / 撞 host 预算 / 锁定被标 SKIPPED 的不算 done）。
     skipped = total - done,
+    providerTotal = providerTotal,
+    providerSucceeded = providerOk,
+    providerFailed = providerFail,
+    providerSkipped = (providerTotal - providerDone).coerceAtLeast(0),
+    keyTotal = keyTotal,
+    keySucceeded = keyOk,
+    keyFailed = keyFail,
+    keySkipped = (keyTotal - keyDone).coerceAtLeast(0),
 )

@@ -1,5 +1,6 @@
 package com.lc33.tokenvault.ui.shell
 
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -14,10 +15,12 @@ import com.lc33.tokenvault.domain.model.PredictiveBackExitDirection
 import com.lc33.tokenvault.endpoint.EndpointError
 import com.lc33.tokenvault.domain.model.PredictiveBackStyle
 import com.lc33.tokenvault.engine.RestoreMode
+import com.lc33.tokenvault.platform.nowMillis
 import com.lc33.tokenvault.platform.openAppLocaleSettings
 import com.lc33.tokenvault.platform.openExternalUrl
 import com.lc33.tokenvault.platform.rememberBackupFilePicker
 import com.lc33.tokenvault.screens.dashboard.BalanceBreakdownScreen
+import com.lc33.tokenvault.ui.common.LoadingState
 import com.lc33.tokenvault.screens.dashboard.DashboardScreen
 import com.lc33.tokenvault.screens.lock.ChangePinScreen
 import com.lc33.tokenvault.screens.manage.GroupsScreen
@@ -188,67 +191,82 @@ fun VaultNavHost(
 
             is ProviderDetailRoute -> {
                 val route = route
-            val vm: ProviderDetailViewModel = koinViewModel(parameters = { parametersOf(route.id) })
-            val detail by vm.state.collectAsStateWithLifecycle()
-            val revealedAccount by vm.revealedAccount.collectAsStateWithLifecycle()
-            val accountClipboardLabel = stringResource(Res.string.clipboard_label_account)
-            // 这一家可能刚被删掉（详情页还在栈上）。detail 为 null 时什么都不画：
-            // 画一个空壳会让用户以为数据丢了，而真相是这一行已经不存在
-            detail?.let { state ->
-                ProviderDetailScreen(
-                    state = state,
-                    revealedAccount = revealedAccount,
-                    onBack = back,
-                    onEdit = { navigate(ProviderEditorRoute(route.id)) },
-                    onCurlImport = { navigate(ImportRoute) },
-                    onManualAddKey = { navigate(KeyEditorRoute(route.id, 0L)) },
-                    onOpenKey = { keyId -> navigate(KeyDetailRoute(route.id, keyId)) },
-                    onRefreshBalance = vm::refreshBalance,
-                    onProbeKey = vm::probeKey,
-                    onRefreshKeyModels = { keyId -> vm.refreshModels(keyId) },
-                    onAddModel = vm::onAddModel,
-                    onUpdateModel = vm::onUpdateModel,
-                    onDeleteModel = vm::onDeleteModel,
-                    onProbeModel = vm::onProbeModel,
-                    onRevealAccount = vm::onRevealAccount,
-                    onCopyRevealedAccount = { vm.onCopyRevealedAccount(accountClipboardLabel) },
-                    onCloseAccountReveal = vm::onCloseAccountSheet,
-                    onSetAccountLoginMethods = vm::onSetAccountLoginMethods,
-                )
+                val vm: ProviderDetailViewModel = koinViewModel(parameters = { parametersOf(route.id) })
+                val detail by vm.state.collectAsStateWithLifecycle()
+                val detailState = detail
+                val revealedAccount by vm.revealedAccount.collectAsStateWithLifecycle()
+                val accountClipboardLabel = stringResource(Res.string.clipboard_label_account)
+                if (detailState == null) {
+                    LoadingState(Modifier.fillMaxSize())
+                } else {
+                    detailState.let { state ->
+                        ProviderDetailScreen(
+                            state = state,
+                            revealedAccount = revealedAccount,
+                            onBack = back,
+                            onEdit = { navigate(ProviderEditorRoute(route.id)) },
+                            onCurlImport = { navigate(ImportRoute(route.id)) },
+                            onManualAddKey = { navigate(KeyEditorRoute(route.id, 0L)) },
+                            onOpenKey = { keyId -> navigate(KeyDetailRoute(route.id, keyId)) },
+                            onRefreshBalance = vm::refreshBalance,
+                            onProbeKey = vm::probeKey,
+                            onRefreshKeyModels = { keyId -> vm.refreshModels(keyId) },
+                            onAddModel = vm::onAddModel,
+                            onUpdateModel = vm::onUpdateModel,
+                            onDeleteModel = vm::onDeleteModel,
+                            onProbeModel = vm::onProbeModel,
+                            onRevealAccount = vm::onRevealAccount,
+                            onCopyRevealedAccount = { vm.onCopyRevealedAccount(accountClipboardLabel) },
+                            onCloseAccountReveal = vm::onCloseAccountSheet,
+                            onSetAccountLoginMethods = vm::onSetAccountLoginMethods,
+                            onAddAccount = vm::onAddAccount,
+                            onUpdateAccount = vm::onUpdateAccount,
+                            onDeleteAccount = vm::onDeleteAccount,
+                        )
+                    }
+                }
             }
-        }
 
             is KeyDetailRoute -> {
                 val vm: KeyDetailViewModel = koinViewModel(
                     parameters = { parametersOf(route.providerId, route.keyId) },
                 )
                 val state by vm.state.collectAsStateWithLifecycle()
+                val keyState = state
                 val revealed by vm.revealed.collectAsStateWithLifecycle()
                 LaunchedEffect(vm) { vm.deleted.collect { back() } }
                 val keyClipboardLabel = stringResource(Res.string.clipboard_label_api_key)
-                state?.let { keyState ->
-                    KeyDetailScreen(
-                        state = keyState,
-                        revealedText = revealed?.text,
-                        onBack = back,
-                        onEdit = { navigate(KeyEditorRoute(route.providerId, route.keyId)) },
-                        onReveal = vm::reveal,
-                        onCopyRevealed = { vm.copyRevealed(keyClipboardLabel) },
-                        onCloseReveal = vm::closeReveal,
-                        onProbe = vm::probeKey,
-                        onRefreshModels = vm::refreshModels,
-                        onMoveUp = vm::moveUp,
-                        onMoveDown = vm::moveDown,
-                        onDelete = vm::delete,
-                    )
+                if (keyState == null) {
+                    LoadingState(Modifier.fillMaxSize())
+                } else {
+                    keyState.let { stateValue ->
+                        KeyDetailScreen(
+                            state = stateValue,
+                            revealedText = revealed?.text,
+                            onBack = back,
+                            onEdit = { navigate(KeyEditorRoute(route.providerId, route.keyId)) },
+                            onReveal = vm::reveal,
+                            onCopyRevealed = { vm.copyRevealed(keyClipboardLabel) },
+                            onCloseReveal = vm::closeReveal,
+                            onProbe = vm::probeKey,
+                            onProbeModel = vm::probeModel,
+                            onRefreshModels = vm::refreshModels,
+                            onMoveUp = vm::moveUp,
+                            onMoveDown = vm::moveDown,
+                            onDelete = vm::delete,
+                        )
+                    }
                 }
             }
 
             is KeyEditorRoute -> {
-                val vm: KeyEditorViewModel = koinViewModel(parameters = { parametersOf(route.keyId) })
+                val vm: KeyEditorViewModel = koinViewModel(parameters = { parametersOf(route.providerId, route.keyId) })
                 val draft by vm.draft.collectAsStateWithLifecycle()
                 val profiles by vm.profiles.collectAsStateWithLifecycle()
                 val loaded by vm.loaded.collectAsStateWithLifecycle()
+                val models by vm.models.collectAsStateWithLifecycle()
+                val saving by vm.saving.collectAsStateWithLifecycle()
+                val saveError by vm.saveError.collectAsStateWithLifecycle()
                 val urlError by vm.urlError.collectAsStateWithLifecycle()
                 LaunchedEffect(vm) { vm.saved.collect { back() } }
                 val keyProfileDefaultLabel = stringResource(Res.string.profile_name_default)
@@ -260,15 +278,25 @@ fun VaultNavHost(
                     EndpointError.HasQueryOrFragment -> stringResource(Res.string.editor_url_err_query)
                     EndpointError.NoHost -> stringResource(Res.string.editor_url_err_host)
                 }
-                if (loaded) {
+                if (!loaded) {
+                    LoadingState(Modifier.fillMaxSize())
+                } else {
                     KeyEditorScreen(
                         draft = draft,
                         profileNames = listOf(keyEditorProfileDefault) + profiles.map { profile ->
                             if (profile.builtinKey == "default") keyProfileDefaultLabel else profile.name
                         },
+                        models = models,
+                        nowMs = nowMillis(),
                         baseUrlError = baseUrlError,
+                        saveError = saveError,
+                        saving = saving,
                         onChange = vm::onChange,
                         onBaseUrlChange = vm::clearUrlError,
+                        onAddModel = vm::addModel,
+                        onUpdateModel = vm::updateModel,
+                        onDeleteModel = vm::deleteModel,
+                        onRefreshModels = vm::refreshModels,
                         onBack = back,
                         onSave = vm::save,
                     )
@@ -468,18 +496,24 @@ fun VaultNavHost(
             }
         }
             is ImportRoute -> {
-            val vm: ImportViewModel = koinViewModel()
-            val previews by vm.previews.collectAsStateWithLifecycle()
-            val parseErrors by vm.parseErrorCount.collectAsStateWithLifecycle()
+            val route = route
+            val vm: ImportViewModel = koinViewModel(
+                parameters = { parametersOf(route.providerId) },
+            )
+            val preview by vm.preview.collectAsStateWithLifecycle()
+            val error by vm.error.collectAsStateWithLifecycle()
             val importing by vm.importing.collectAsStateWithLifecycle()
+            val duplicatePrompt by vm.duplicatePrompt.collectAsStateWithLifecycle()
             ImportScreen(
-                previews = previews,
-                parseErrors = parseErrors,
+                preview = preview,
+                error = error,
                 importing = importing,
+                duplicatePrompt = duplicatePrompt,
                 onBack = back,
                 onParse = vm::parse,
-                onToggle = vm::toggle,
                 onConfirm = { vm.confirm { back() } },
+                onConfirmDuplicate = { vm.confirmDuplicate { back() } },
+                onDismissDuplicate = vm::dismissDuplicate,
                 readClipboard = vm::readClipboard,
             )
         }
@@ -492,12 +526,14 @@ fun VaultNavHost(
                 vm.groupError.collect { snackbar?.show(groupAddFailed) }
             }
             GroupsScreen(
-                // 「全部」那一枚由页面自己过滤掉（它不入库，也就没有重命名这种操作）
                 groups = manage.groups,
+                providers = manage.providers,
                 onBack = back,
                 onAdd = vm::onAddGroup,
                 onRename = vm::onRenameGroup,
                 onDelete = vm::onDeleteGroup,
+                onSetProviderGroup = vm::setProviderGroup,
+                onReorderProviders = vm::reorderProviders,
             )
         }
         // 探测明细。入口在仪表盘的"查看明细"（有过一轮探测才画）。这一页只读：

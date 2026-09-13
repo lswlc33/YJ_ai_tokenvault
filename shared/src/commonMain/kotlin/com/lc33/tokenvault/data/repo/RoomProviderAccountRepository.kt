@@ -42,6 +42,7 @@ class RoomProviderAccountRepository constructor(
         password: CharArray?,
         loginUrl: String?,
         loginMethods: Set<LoginMethod>,
+        note: String?,
     ): Long {
         val usernameBytes = username?.toUtf8()
         val passwordBytes = password?.toUtf8()
@@ -60,6 +61,7 @@ class RoomProviderAccountRepository constructor(
                         passwordEnc = null,
                         loginUrl = loginUrl,
                         loginMethods = loginMethods.toLoginMethodsCsv(),
+                        note = note?.trim()?.takeIf { it.isNotEmpty() },
                         sortOrder = dao.findAll().count { it.providerId == providerId },
                         createdAt = stamp,
                         updatedAt = stamp,
@@ -78,6 +80,58 @@ class RoomProviderAccountRepository constructor(
             passwordBytes?.zeroize()
         }
     }
+
+    override suspend fun update(
+        id: Long,
+        label: String,
+        username: CharArray?,
+        password: CharArray?,
+        loginUrl: String?,
+        loginMethods: Set<LoginMethod>,
+        note: String?,
+    ) {
+        requireNotNull(dao.findById(id)) { "provider account $id not found" }
+        val usernameBytes = username?.toUtf8()
+        val passwordBytes = password?.toUtf8()
+        try {
+            val usernameFp = usernameBytes
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { cipher.fingerprint(it) }
+            val stamp = now()
+            transactions.inTransaction {
+                dao.setMeta(
+                    id = id,
+                    label = label.trim(),
+                    loginUrl = loginUrl,
+                    loginMethods = loginMethods.toLoginMethodsCsv(),
+                    note = note?.trim()?.takeIf { it.isNotEmpty() },
+                    now = stamp,
+                )
+                username?.let {
+                    val bytes = usernameBytes ?: ByteArray(0)
+                    dao.setUsername(
+                        id = id,
+                        enc = if (bytes.isEmpty()) null else cipher.seal(bytes, aadUsername(id)),
+                        fp = usernameFp,
+                        now = stamp,
+                    )
+                }
+                password?.let {
+                    val bytes = passwordBytes ?: ByteArray(0)
+                    dao.setPassword(
+                        id = id,
+                        enc = if (bytes.isEmpty()) null else cipher.seal(bytes, aadPassword(id)),
+                        now = stamp,
+                    )
+                }
+            }
+        } finally {
+            usernameBytes?.zeroize()
+            passwordBytes?.zeroize()
+        }
+    }
+
+    override suspend fun delete(id: Long) = dao.delete(id)
 
     override suspend fun revealUsername(id: Long): CharArray? {
         val row = requireNotNull(dao.findById(id)) { "provider account $id not found" }

@@ -133,6 +133,7 @@ class ManageViewModel constructor(
         // 搜索 → 排序，都发生在内存里（红线 10：数据从 Flow 来，不回数据层重查）。
         val filtered = rows.filter { matchesQuery(it, groupNameOf(snap.groups, it.groupId), ctrl.query) }
         ManageUiState(
+            loading = false,
             query = ctrl.query,
             groups = groupChips(ctrl.label, snap.groups, rows),
             selectedGroupId = ctrl.selected,
@@ -140,7 +141,7 @@ class ManageViewModel constructor(
             sort = ctrl.sort,
             selection = ctrl.selection,
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), ManageUiState())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), ManageUiState(loading = true))
 
     /** 顶栏刷新：只更新余额与供应商可达性延迟，不碰密钥与模型探测。 */
     fun refreshStatus() {
@@ -226,6 +227,16 @@ class ManageViewModel constructor(
 
     fun onDeleteProvider(id: Long) {
         viewModelScope.launch { providers.delete(id) }
+    }
+
+    /** 编辑供应商列表页：逐个修改分组。 */
+    fun setProviderGroup(id: Long, groupId: Long?) {
+        batchSetGroup(setOf(id), groupId)
+    }
+
+    /** 编辑供应商列表页：保存手动拖动后的顺序。 */
+    fun reorderProviders(idsInOrder: List<Long>) {
+        viewModelScope.launch { runCatching { providers.reorder(idsInOrder) } }
     }
 
     private companion object {

@@ -10,6 +10,11 @@ import com.lc33.tokenvault.domain.model.KeySettings
 import com.lc33.tokenvault.endpoint.NormalizeResult
 import com.lc33.tokenvault.endpoint.normalizeBaseUrl
 import com.lc33.tokenvault.screens.model.KeyDraft
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 
 val KEY_BALANCE_KINDS: List<BalanceKind> = listOf(
     BalanceKind.NONE,
@@ -39,12 +44,18 @@ fun ApiKey.toDraft(profiles: List<ClientProfile>): KeyDraft = KeyDraft(
     allowInsecure = settings.allowInsecure,
     balanceKindIndex = KEY_BALANCE_KINDS.indexOf(settings.balanceKind).coerceAtLeast(0),
     balanceUserId = settings.balanceUserId.orEmpty(),
+    balanceMethod = settings.balanceConfig.jsonString("method").ifBlank { "GET" },
+    balancePath = settings.balanceConfig.jsonString("path"),
+    balanceValuePath = settings.balanceConfig.jsonString("valuePath"),
+    balanceUsedPath = settings.balanceConfig.jsonString("usedPath"),
+    balanceCurrency = settings.balanceConfig.jsonString("currency"),
     probeEnabled = settings.probe.enabled,
     probeReachability = settings.probe.reachability,
     probeKeys = settings.probe.keyValidity,
     probeBalance = settings.probe.balance,
     probeModels = settings.probe.models,
     probeModelReachability = settings.probe.modelReachability,
+    probeQuickModel = settings.probe.quickModelProbe,
 )
 
 fun KeyDraft.toSettings(
@@ -72,6 +83,17 @@ fun KeyDraft.toSettings(
         timeoutSeconds = timeoutSeconds.trim().toIntOrNull(),
         balanceKind = KEY_BALANCE_KINDS.getOrElse(balanceKindIndex) { BalanceKind.NONE },
         balanceUserId = balanceUserId.ifBlank { null },
+        balanceConfig = if (KEY_BALANCE_KINDS.getOrElse(balanceKindIndex) { BalanceKind.NONE } == BalanceKind.CUSTOM_JSON) {
+            buildJsonObject {
+                put("method", balanceMethod.ifBlank { "GET" }.uppercase())
+                put("path", balancePath.trim())
+                put("valuePath", balanceValuePath.trim())
+                put("usedPath", balanceUsedPath.trim())
+                put("currency", balanceCurrency.trim())
+            }.toString()
+        } else {
+            existing?.balanceConfig ?: "{}"
+        },
         probe = KeyProbeSettings(
             enabled = probeEnabled,
             reachability = probeReachability,
@@ -79,6 +101,7 @@ fun KeyDraft.toSettings(
             balance = probeBalance,
             models = probeModels,
             modelReachability = probeModelReachability,
+            quickModelProbe = probeQuickModel,
         ),
     )
 }
@@ -88,3 +111,9 @@ private fun profileIndexOf(clientProfileId: Long?, profiles: List<ClientProfile>
     val index = profiles.indexOfFirst { it.id == clientProfileId }
     return if (index < 0) 0 else index + 1
 }
+
+private val balanceJson = Json { ignoreUnknownKeys = true }
+
+private fun String.jsonString(key: String): String = runCatching {
+    balanceJson.parseToJsonElement(this).jsonObject[key]?.jsonPrimitive?.content
+}.getOrNull().orEmpty()

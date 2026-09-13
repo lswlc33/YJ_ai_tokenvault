@@ -18,6 +18,9 @@ interface ProviderRepository {
 
     suspend fun setGroup(ids: List<Long>, groupId: Long?)
 
+    /** 手动排序落库。只写 `sortOrder`，不改变置顶标记。 */
+    suspend fun reorder(idsInOrder: List<Long>)
+
     /** 保存官网连通性检测结果。只说明网站可达，不推断 API Key 是否有效。 */
     suspend fun updateWebsiteStatus(
         id: Long,

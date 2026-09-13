@@ -6,6 +6,7 @@ import com.lc33.tokenvault.crypto.KnownSecrets
 import com.lc33.tokenvault.crypto.zeroize
 import com.lc33.tokenvault.domain.SecretMask
 import com.lc33.tokenvault.domain.repo.ApiKeyRepository
+import com.lc33.tokenvault.domain.repo.ClientProfileRepository
 import com.lc33.tokenvault.domain.repo.ModelRepository
 import com.lc33.tokenvault.engine.ProbeEngine
 import com.lc33.tokenvault.platform.SecureClipboard
@@ -28,6 +29,7 @@ import kotlinx.coroutines.withContext
 /** Key 展示页：查看一把 Key、它的模型与探测结果；设置入口从这里进。 */
 class KeyDetailViewModel constructor(
     private val keys: ApiKeyRepository,
+    private val clientProfiles: ClientProfileRepository,
     private val models: ModelRepository,
     private val probeEngine: ProbeEngine,
     private val clipboard: SecureClipboard,
@@ -53,11 +55,15 @@ class KeyDetailViewModel constructor(
     val state: StateFlow<KeyDetailUiState?> = combine(
         keys.observeByProvider(providerId),
         models.observeByProvider(providerId),
+        clientProfiles.observeAll(),
         mask,
-    ) { keyList, modelList, masked ->
+    ) { keyList, modelList, profileList, masked ->
         val key = keyList.firstOrNull { it.id == keyId } ?: return@combine null
+        val profileName = key.settings.clientProfileId?.let { id ->
+            profileList.firstOrNull { it.id == id }?.name ?: "#$id"
+        }
         KeyDetailUiState(
-            key = key.toRow(masked),
+            key = key.toRow(masked, clientProfileName = profileName),
             models = modelList.filter { it.keyId == keyId }.map { it.toRow() },
             nowMs = nowMillis(),
         )
@@ -74,6 +80,10 @@ class KeyDetailViewModel constructor(
     fun refreshModels() {
         val providerId = state.value?.key?.providerId ?: return
         probeEngine.refreshModels(providerId, keyId)
+    }
+
+    fun probeModel(modelId: String, protocol: com.lc33.tokenvault.domain.Protocol) {
+        probeEngine.probeModel(providerId, keyId, modelId, protocol)
     }
 
     fun reveal() {

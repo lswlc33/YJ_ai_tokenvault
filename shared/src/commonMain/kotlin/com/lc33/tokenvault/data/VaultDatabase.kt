@@ -63,7 +63,7 @@ abstract class VaultDatabase : RoomDatabase() {
     abstract fun appSettingDao(): AppSettingDao
 
     companion object {
-        const val VERSION = 3
+        const val VERSION = 4
         const val FILE_NAME = "vault.db"
 
         val MIGRATION_1_2: Migration = object : Migration(1, 2) {
@@ -310,6 +310,28 @@ abstract class VaultDatabase : RoomDatabase() {
                 )
 
                 connection.execSQL("PRAGMA foreign_keys = ON")
+            }
+        }
+
+        /** v4：把最近一轮探测拆成供应商级与密钥级两组进度，首页分别展示。 */
+        val MIGRATION_3_4: Migration = object : Migration(3, 4) {
+            override fun migrate(connection: SQLiteConnection) {
+                listOf(
+                    "providerTotal",
+                    "providerDone",
+                    "providerOk",
+                    "providerFail",
+                    "keyTotal",
+                    "keyDone",
+                    "keyOk",
+                    "keyFail",
+                ).forEach { column ->
+                    connection.execSQL("ALTER TABLE probe_runs ADD COLUMN $column INTEGER NOT NULL DEFAULT 0")
+                }
+                connection.execSQL(
+                    "ALTER TABLE key_settings ADD COLUMN probeQuickModel INTEGER NOT NULL DEFAULT 0",
+                )
+                connection.execSQL("UPDATE key_settings SET probeQuickModel = probeModelReachability")
             }
         }
     }

@@ -32,6 +32,18 @@ class RoomApiKeyRepository constructor(
 
     override suspend fun find(id: Long): ApiKey? = dao.findById(id)?.toDomain()
 
+    override suspend fun fingerprintOf(secret: CharArray): String {
+        val bytes = secret.toUtf8()
+        return try {
+            cipher.fingerprint(bytes)
+        } finally {
+            bytes.zeroize()
+        }
+    }
+
+    override suspend fun existsFingerprint(providerId: Long, fingerprint: String): Boolean =
+        dao.countFingerprint(providerId, fingerprint) > 0
+
     override suspend fun add(
         providerId: Long,
         label: String,

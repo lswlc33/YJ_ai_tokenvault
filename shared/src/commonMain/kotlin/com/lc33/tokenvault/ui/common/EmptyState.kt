@@ -13,6 +13,9 @@ import com.lc33.tokenvault.ui.miuix.AppTextButton
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
+import org.jetbrains.compose.resources.stringResource
+import tokenvault.shared.generated.resources.Res
+import tokenvault.shared.generated.resources.common_loading
 
 /**
  * 空态只描述状态，不放行动入口。
@@ -46,5 +49,24 @@ fun EmptyState(
         if (actionText != null && onAction != null) {
             AppTextButton(text = actionText, onClick = onAction)
         }
+    }
+}
+
+@Composable
+fun LoadingState(
+    modifier: Modifier = Modifier,
+) {
+    val tokens = LocalAppTokens.current
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = tokens.screenPadding, vertical = tokens.sectionSpacing),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        AppText(
+            text = stringResource(Res.string.common_loading),
+            style = AppTextStyle.Secondary,
+            color = appSecondaryTextColor,
+        )
     }
 }

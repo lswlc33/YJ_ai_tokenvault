@@ -134,6 +134,9 @@ internal class FakeProviderDao : ProviderDao {
         ids.forEach { id -> replace(id) { it.copy(groupId = groupId, updatedAt = now) } }
     }
 
+    override suspend fun setSortOrder(id: Long, sortOrder: Int, now: Long) =
+        replace(id) { it.copy(sortOrder = sortOrder, updatedAt = now) }
+
     override suspend fun updateWebsiteStatus(
         id: Long,
         latencyMs: Long?,
@@ -243,6 +246,9 @@ internal class FakeApiKeyDao(
         store.firstOrNull { it.id == id }?.let(::row)
 
     override suspend fun findRaw(id: Long): ApiKeyEntity? = store.firstOrNull { it.id == id }
+
+    override suspend fun countFingerprint(providerId: Long, fingerprint: String): Int =
+        store.count { it.providerId == providerId && it.fingerprint == fingerprint }
 
     override suspend fun insertRaw(key: ApiKeyEntity): Long {
         val id = nextId++
@@ -401,10 +407,27 @@ internal class FakeProviderAccountDao : ProviderAccountDao {
         revision.value++
     }
 
-    override suspend fun setUsername(id: Long, enc: ByteArray, fp: String, now: Long) =
+    override suspend fun setUsername(id: Long, enc: ByteArray?, fp: String?, now: Long) =
         replace(id) { it.copy(usernameEnc = enc, usernameFp = fp, updatedAt = now) }
 
-    override suspend fun setPassword(id: Long, enc: ByteArray, now: Long) =
+    override suspend fun setMeta(
+        id: Long,
+        label: String,
+        loginUrl: String?,
+        loginMethods: String,
+        note: String?,
+        now: Long,
+    ) = replace(id) {
+        it.copy(
+            label = label,
+            loginUrl = loginUrl,
+            loginMethods = loginMethods,
+            note = note,
+            updatedAt = now,
+        )
+    }
+
+    override suspend fun setPassword(id: Long, enc: ByteArray?, now: Long) =
         replace(id) { it.copy(passwordEnc = enc, updatedAt = now) }
 
     override suspend fun setLoginMethods(id: Long, loginMethods: String, now: Long) =

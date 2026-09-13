@@ -28,6 +28,7 @@
     <string name="dashboard_balance_failed">%1$d 个供应商的余额查询失败</string>
     <string name="dashboard_balance_none">还没有配置余额查询</string>
     <string name="dashboard_counts_title">内容</string>
+    <string name="common_loading">加载中…</string>
     <string name="count_providers">供应商</string>
     <string name="count_keys">密钥</string>
     <string name="count_models">模型</string>
@@ -45,6 +46,9 @@
     <string name="attention_client_blocked">被客户端校验拦下，换个 User-Agent 就能过</string>
     <string name="attention_config_error">端点或参数不被接受。去检查这家的配置。</string>
     <string name="attention_low_balance">余额低于该币种的提醒阈值</string>
+    <string name="dashboard_probe_provider_label">供应商</string>
+    <string name="dashboard_probe_key_label">密钥</string>
+    <string name="dashboard_probe_last_updated">上次更新：%1$s</string>
     <string name="dashboard_probe_title">上次探测</string>
     <string name="dashboard_probe_never">还没探测过</string>
     <string name="dashboard_probe_start">开始探测</string>
@@ -404,7 +408,25 @@
     <string name="editor_pinned">置顶</string>
     <string name="editor_section_protocols">协议</string>
     <string name="editor_section_endpoint">端点与协议</string>
+    <string name="editor_models_auto">自动获取</string>
+    <string name="editor_models_auto_summary">开启后不显示手动模型编辑区。</string>
+    <string name="editor_models_last_sync">最近同步：%1$s</string>
+    <string name="editor_models_sync_now">立即同步</string>
+    <string name="editor_models_manual_hint">自动获取关闭时，可手动添加和删除模型。</string>
+    <string name="editor_balance_custom_method">请求方法</string>
+    <string name="editor_balance_custom_path">请求路径</string>
+    <string name="editor_balance_custom_value_path">余额字段路径</string>
+    <string name="editor_balance_custom_used_path">已用字段路径</string>
+    <string name="editor_balance_custom_currency">币种</string>
+    <string name="editor_error_missing_secret">请填写 API Key。</string>
+    <string name="editor_error_invalid_timeout">超时时间必须是正整数，或留空。</string>
+    <string name="editor_error_no_protocols">至少选择一个协议。</string>
+    <string name="editor_error_save_failed">保存失败，输入内容已保留。</string>
+    <string name="editor_probe_quick_model">快捷测试模型</string>
+    <string name="editor_probe_quick_model_summary">允许在密钥详情页的模型列表中长按快速探测该模型。</string>
     <string name="editor_section_balance">余额</string>
+    <string name="editor_balance_enabled">余额查询</string>
+    <string name="editor_balance_enabled_summary">开启后可选择查询方式并填写对应参数。</string>
     <string name="editor_balance_kind">查询类型</string>
     <string name="editor_balance_kind_summary">去问哪个管理接口</string>
     <string name="editor_balance_token">访问令牌</string>
@@ -445,11 +467,27 @@
     <plurals name="groups_count">
         <item quantity="other">%1$d 个供应商</item>
     </plurals>
+    <string name="groups_section_manage">分组设置</string>
+    <string name="groups_section_providers">供应商分组</string>
+    <string name="groups_sort_providers">排序供应商</string>
+    <string name="groups_sort_hint">使用上下箭头调整供应商顺序；退出排序不会保存。</string>
     <string name="groups_empty_title">还没有分组</string>
     <string name="groups_empty_desc">分组就是管理页上那排筛选 chip。供应商多到一屏放不下时再建几个。</string>
     <string name="groups_delete_note">删除分组不会删掉里面的供应商——它们会落回「全部」。</string>
 
     <!-- Import -->
+    <string name="import_action">导入</string>
+    <string name="import_error_no_command">没有识别到可导入的 cURL 命令。</string>
+    <string name="import_error_multiple_commands">一次只能识别一条 cURL 命令。</string>
+    <string name="import_error_missing_key">这条 cURL 里没有可识别的 API Key。</string>
+    <string name="import_result_base_url">Base URL</string>
+    <string name="import_result_protocol">协议</string>
+    <string name="import_result_api_key">API Key</string>
+    <string name="import_result_models">模型</string>
+    <string name="import_models_none">没有识别到模型</string>
+    <string name="import_duplicate_title">这个密钥已经存在</string>
+    <string name="import_duplicate_body">当前供应商下已有相同密钥，仍然继续导入吗？</string>
+    <string name="import_duplicate_continue">继续导入</string>
     <string name="import_title">密钥 cURL 导入</string>
     <string name="import_manual">手动导入</string>
     <string name="import_section_paste">cURL 命令</string>
@@ -586,6 +624,17 @@
     <string name="detail_account_reveal_hint">复制会把密码放进剪贴板并在一段时间后自动清除。离开这一层就擦掉明文。</string>
     <string name="detail_balance_refresh">查余额</string>
     <string name="detail_probe_provider">探测这一家</string>
+    <string name="detail_key_view">查看</string>
+    <string name="detail_key_connection_base_url">Base URL</string>
+    <string name="detail_key_connection_protocol">协议</string>
+    <string name="detail_key_connection_auth">鉴权风格</string>
+    <string name="detail_key_connection_profile">客户端预设</string>
+    <string name="detail_key_connection_timeout">超时</string>
+    <string name="detail_key_connection_allow_http">允许 HTTP</string>
+    <string name="detail_key_timeout_value">%1$d 秒</string>
+    <string name="common_on">开启</string>
+    <string name="common_off">关闭</string>
+    <string name="detail_key_timeout_default">默认</string>
     <string name="detail_key_connection">连接设置</string>
     <string name="detail_key_actions">操作</string>
     <string name="detail_probe_key">探测这一张</string>
@@ -605,6 +654,7 @@
     <string name="groups_delete_title">删掉这个分组？</string>
     <string name="groups_delete_body">里面的供应商不会被删——它们会落回「全部」。</string>
     <!-- 绑定密钥的模型、快捷模型探测与账号登录方式。 -->
+    <string name="detail_models_source">来源</string>
     <string name="detail_models_section">模型</string>
     <string name="detail_models_empty_auto">还没有模型。刷新这把密钥，或等下一轮探测自动更新。</string>
     <string name="detail_models_empty_manual">还没有模型。请手动添加。</string>
@@ -619,6 +669,13 @@
     <string name="detail_models_quick_hint">长按模型可发送一次简短请求。</string>
     <string name="detail_reachability_latency">供应商延迟：%1$d ms</string>
     <string name="detail_account_login_methods">登录方式</string>
+    <string name="detail_add_account">添加账号</string>
+    <string name="login_method_password">密码登录</string>
+    <string name="detail_account_keep_secret">留空表示保留原值。</string>
+    <string name="detail_account_view">查看并复制凭据</string>
+    <string name="detail_account_delete">删除账号</string>
+    <string name="detail_account_delete_title">删除这个账号？</string>
+    <string name="detail_account_delete_body">加密保存的账号和密码会一并删除。</string>
     <string name="login_method_github">GitHub</string>
     <string name="login_method_linuxdo">LINUX DO</string>
     <string name="refresh_status_cd">刷新余额和供应商延迟</string>

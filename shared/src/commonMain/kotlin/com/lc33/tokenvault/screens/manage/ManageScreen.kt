@@ -44,6 +44,7 @@ import tokenvault.shared.generated.resources.manage_title
 import tokenvault.shared.generated.resources.refresh_status_cd
 import com.lc33.tokenvault.screens.model.ManageUiState
 import com.lc33.tokenvault.ui.common.EmptyState
+import com.lc33.tokenvault.ui.common.LoadingState
 import com.lc33.tokenvault.ui.miuix.AppBottomSheet
 import com.lc33.tokenvault.ui.miuix.AppDialog
 import com.lc33.tokenvault.ui.miuix.AppFab
@@ -173,6 +174,10 @@ fun ManageScreen(
             }
         },
     ) { padding ->
+        if (state.loading) {
+            LoadingState(modifier = Modifier.padding(padding))
+            return@AppScaffold
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize()

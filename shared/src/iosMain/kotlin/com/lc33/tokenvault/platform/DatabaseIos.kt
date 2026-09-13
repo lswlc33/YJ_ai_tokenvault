@@ -48,6 +48,6 @@ fun createVaultDatabase(): VaultDatabase {
                 }
             },
         )
-        .addMigrations(VaultDatabase.MIGRATION_1_2, VaultDatabase.MIGRATION_2_3)
+        .addMigrations(VaultDatabase.MIGRATION_1_2, VaultDatabase.MIGRATION_2_3, VaultDatabase.MIGRATION_3_4)
             .build()
 }

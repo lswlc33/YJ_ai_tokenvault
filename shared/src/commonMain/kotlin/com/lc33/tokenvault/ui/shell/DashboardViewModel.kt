@@ -68,7 +68,7 @@ class DashboardViewModel constructor(
             progress = progress?.toUiProgress(),
             lastRun = lastRun?.toSummary(),
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), DashboardUiState())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), DashboardUiState(loading = true))
 
     /**
      * 余额明细那个二级页要的行。
@@ -128,6 +128,7 @@ class DashboardViewModel constructor(
         progress: com.lc33.tokenvault.screens.model.ProbeProgress?,
         lastRun: ProbeRunSummary?,
     ): DashboardUiState = DashboardUiState(
+        loading = false,
         balance = keyBalanceSummaryOf(keys),
         counts = contentCountsOf(summaries),
         health = healthBreakdownOf(keys),
@@ -156,6 +157,14 @@ class DashboardViewModel constructor(
             // currentHost 是 host 名，展示"正在探测哪家"；空时退到"进行中"的占位。
             // ViewModel 读不到资源（红线 19），所以这里给 host 名，文案由页面兜底。
             currentLabel = currentHost ?: "",
+            providerDone = providerDone,
+            providerTotal = providerTotal,
+            providerSucceeded = providerOk,
+            providerFailed = providerFail,
+            keyDone = keyDone,
+            keyTotal = keyTotal,
+            keySucceeded = keyOk,
+            keyFailed = keyFail,
         )
 
     private companion object {

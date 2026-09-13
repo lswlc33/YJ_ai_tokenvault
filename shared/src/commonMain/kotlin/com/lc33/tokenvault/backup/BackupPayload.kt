@@ -107,6 +107,7 @@ data class BackupKeySettings(
     val probeBalance: Boolean = true,
     val probeModels: Boolean = false,
     val probeModelReachability: Boolean = false,
+    val probeQuickModel: Boolean = false,
 )
 
 /** API 密钥。明文。不搬 health / lastOutcome / checkedAt / okAt。 */

@@ -34,6 +34,9 @@ import tokenvault.shared.generated.resources.dashboard_health_empty
 import tokenvault.shared.generated.resources.dashboard_health_title
 import tokenvault.shared.generated.resources.dashboard_probe_cancel
 import tokenvault.shared.generated.resources.dashboard_probe_counts
+import tokenvault.shared.generated.resources.dashboard_probe_key_label
+import tokenvault.shared.generated.resources.dashboard_probe_last_updated
+import tokenvault.shared.generated.resources.dashboard_probe_provider_label
 import tokenvault.shared.generated.resources.dashboard_probe_detail
 import tokenvault.shared.generated.resources.dashboard_probe_finished
 import tokenvault.shared.generated.resources.dashboard_probe_never
@@ -290,11 +293,23 @@ internal fun ProbeCard(
                 style = AppTextStyle.Secondary,
                 modifier = Modifier.padding(top = tokens.itemSpacing),
             )
-            AppLinearProgress(
-                progress = progress.fraction,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = tokens.itemSpacing),
+            ProbeProgressBlock(
+                label = stringResource(Res.string.dashboard_probe_provider_label),
+                fraction = progress.providerFraction,
+                total = progress.providerTotal,
+                succeeded = progress.providerSucceeded,
+                failed = progress.providerFailed,
+                skipped = (progress.providerTotal - progress.providerDone).coerceAtLeast(0),
+                modifier = Modifier.padding(top = tokens.itemSpacing),
+            )
+            ProbeProgressBlock(
+                label = stringResource(Res.string.dashboard_probe_key_label),
+                fraction = progress.keyFraction,
+                total = progress.keyTotal,
+                succeeded = progress.keySucceeded,
+                failed = progress.keyFailed,
+                skipped = (progress.keyTotal - progress.keyDone).coerceAtLeast(0),
+                modifier = Modifier.padding(top = tokens.itemSpacing),
             )
             // §7.4：探测进行中要暂停前台空闲锁定，而这件事必须让用户看见，
             // 否则"为什么它没锁"会被当成 bug。
@@ -302,6 +317,7 @@ internal fun ProbeCard(
                 text = stringResource(Res.string.dashboard_probe_no_autolock),
                 style = AppTextStyle.Footnote,
                 color = appSecondaryTextColor,
+                modifier = Modifier.padding(top = tokens.itemSpacing),
             )
             AppActionRow(
                 text = stringResource(Res.string.dashboard_probe_cancel),
@@ -319,34 +335,68 @@ internal fun ProbeCard(
                 modifier = Modifier.padding(vertical = tokens.itemSpacing),
             )
         } else {
-            // 相对时间与耗时在页面层现算（红线 19：ViewModel 给时间戳，不拼文案）。
             AppText(
                 text = stringResource(
-                    Res.string.dashboard_probe_finished,
+                    Res.string.dashboard_probe_last_updated,
                     relativeLabel(state.nowMs, lastRun.finishedAtMs),
-                    stringResource(
-                        Res.string.time_duration_seconds,
-                        durationSeconds(lastRun.durationMs),
-                    ),
                 ),
                 style = AppTextStyle.Secondary,
                 modifier = Modifier.padding(top = tokens.itemSpacing),
             )
-            AppText(
-                text = stringResource(
-                    Res.string.dashboard_probe_counts,
-                    lastRun.total,
-                    lastRun.succeeded,
-                    lastRun.failed,
-                    lastRun.skipped,
-                ),
-                style = AppTextStyle.Footnote,
-                color = appSecondaryTextColor,
-                modifier = Modifier.padding(top = 2.dp, bottom = tokens.itemSpacing),
+            ProbeProgressBlock(
+                label = stringResource(Res.string.dashboard_probe_provider_label),
+                fraction = if (lastRun.providerTotal <= 0) 0f else {
+                    lastRun.providerSucceeded.toFloat() / lastRun.providerTotal.toFloat()
+                },
+                total = lastRun.providerTotal,
+                succeeded = lastRun.providerSucceeded,
+                failed = lastRun.providerFailed,
+                skipped = lastRun.providerSkipped,
+                modifier = Modifier.padding(top = tokens.itemSpacing),
+            )
+            ProbeProgressBlock(
+                label = stringResource(Res.string.dashboard_probe_key_label),
+                fraction = if (lastRun.keyTotal <= 0) 0f else {
+                    lastRun.keySucceeded.toFloat() / lastRun.keyTotal.toFloat()
+                },
+                total = lastRun.keyTotal,
+                succeeded = lastRun.keySucceeded,
+                failed = lastRun.keyFailed,
+                skipped = lastRun.keySkipped,
+                modifier = Modifier.padding(top = tokens.itemSpacing),
             )
         }
-        AppActionRow(text = stringResource(Res.string.dashboard_probe_start), onClick = onStart)
+        AppActionRow(
+            text = stringResource(Res.string.dashboard_probe_start),
+            onClick = onStart,
+            modifier = Modifier.padding(top = tokens.itemSpacing),
+        )
     }
+}
+
+@Composable
+private fun ProbeProgressBlock(
+    label: String,
+    fraction: Float,
+    total: Int,
+    succeeded: Int,
+    failed: Int,
+    skipped: Int,
+    modifier: Modifier = Modifier,
+) {
+    AppText(text = label, style = AppTextStyle.Subtitle, modifier = modifier)
+    AppText(
+        text = stringResource(Res.string.dashboard_probe_counts, total, succeeded, failed, skipped),
+        style = AppTextStyle.Footnote,
+        color = appSecondaryTextColor,
+        modifier = Modifier.padding(top = 2.dp),
+    )
+    AppLinearProgress(
+        progress = fraction,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 6.dp),
+    )
 }
 
 @Composable

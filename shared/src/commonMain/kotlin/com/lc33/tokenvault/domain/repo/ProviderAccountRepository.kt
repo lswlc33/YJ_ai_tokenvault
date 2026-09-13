@@ -34,7 +34,27 @@ interface ProviderAccountRepository {
         password: CharArray?,
         loginUrl: String?,
         loginMethods: Set<LoginMethod> = emptySet(),
+        note: String? = null,
     ): Long
+
+    /**
+     * 更新一条账号的明文元数据与可选凭据。
+     *
+     * [username] / [password] 为 null 表示保留原值；空数组表示清空该字段。调用方交出后
+     * 仍负责擦除自己的数组，仓库会在写完密文后擦掉中间 UTF-8 字节。
+     */
+    suspend fun update(
+        id: Long,
+        label: String,
+        username: CharArray?,
+        password: CharArray?,
+        loginUrl: String?,
+        loginMethods: Set<LoginMethod>,
+        note: String?,
+    )
+
+    /** 删除一条平台账号。 */
+    suspend fun delete(id: Long)
 
     /**
      * 解出这条账号的**用户名明文**（遮蔽串要现算，红线 21）。返回的 [CharArray] 归调用方擦。

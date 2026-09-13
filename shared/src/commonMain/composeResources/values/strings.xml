@@ -28,6 +28,7 @@
     <string name="dashboard_balance_failed">%1$d provider(s) failed the balance query</string>
     <string name="dashboard_balance_none">No balance query configured yet</string>
     <string name="dashboard_counts_title">Content</string>
+    <string name="common_loading">Loading…</string>
     <string name="count_providers">Providers</string>
     <string name="count_keys">Keys</string>
     <string name="count_models">Models</string>
@@ -46,6 +47,9 @@
     <string name="attention_client_blocked">Blocked by client check — a different User-Agent gets through</string>
     <string name="attention_config_error">Endpoint or parameters not accepted. Check the provider settings.</string>
     <string name="attention_low_balance">Balance below the threshold for this currency</string>
+    <string name="dashboard_probe_provider_label">Providers</string>
+    <string name="dashboard_probe_key_label">Keys</string>
+    <string name="dashboard_probe_last_updated">Last updated: %1$s</string>
     <string name="dashboard_probe_title">Last probe</string>
     <string name="dashboard_probe_never">Never probed</string>
     <string name="dashboard_probe_start">Start probe</string>
@@ -405,7 +409,25 @@
     <string name="editor_pinned">Pin to the top</string>
     <string name="editor_section_protocols">Protocols</string>
     <string name="editor_section_endpoint">Endpoint and protocols</string>
+    <string name="editor_models_auto">Auto fetch</string>
+    <string name="editor_models_auto_summary">When enabled, the manual model editor is hidden.</string>
+    <string name="editor_models_last_sync">Last sync: %1$s</string>
+    <string name="editor_models_sync_now">Sync now</string>
+    <string name="editor_models_manual_hint">When auto fetch is off, models can be added and removed manually.</string>
+    <string name="editor_balance_custom_method">Request method</string>
+    <string name="editor_balance_custom_path">Request path</string>
+    <string name="editor_balance_custom_value_path">Balance field path</string>
+    <string name="editor_balance_custom_used_path">Used field path</string>
+    <string name="editor_balance_custom_currency">Currency</string>
+    <string name="editor_error_missing_secret">Enter an API key.</string>
+    <string name="editor_error_invalid_timeout">Timeout must be a positive integer, or blank.</string>
+    <string name="editor_error_no_protocols">Select at least one protocol.</string>
+    <string name="editor_error_save_failed">Save failed. Your input is preserved.</string>
+    <string name="editor_probe_quick_model">Quick model test</string>
+    <string name="editor_probe_quick_model_summary">Allow long-pressing a model in the key detail list to probe it immediately.</string>
     <string name="editor_section_balance">Balance</string>
+    <string name="editor_balance_enabled">Balance query</string>
+    <string name="editor_balance_enabled_summary">Turn this on to choose a provider and fill in its parameters.</string>
     <string name="editor_balance_kind">Query type</string>
     <string name="editor_balance_kind_summary">Which management API to ask</string>
     <string name="editor_balance_token">Access token</string>
@@ -447,11 +469,27 @@
         <item quantity="one">1 provider</item>
         <item quantity="other">%1$d providers</item>
     </plurals>
+    <string name="groups_section_manage">Group settings</string>
+    <string name="groups_section_providers">Provider groups</string>
+    <string name="groups_sort_providers">Sort providers</string>
+    <string name="groups_sort_hint">Use the up and down arrows to reorder providers; leaving this mode does not save.</string>
     <string name="groups_empty_title">No groups yet</string>
     <string name="groups_empty_desc">Groups are the filter chips on the manage page. Create a couple once you have more than a handful of providers.</string>
     <string name="groups_delete_note">Deleting a group does not delete its providers — they fall back to All.</string>
 
     <!-- Import -->
+    <string name="import_action">Import</string>
+    <string name="import_error_no_command">No importable cURL command was recognized.</string>
+    <string name="import_error_multiple_commands">Only one cURL command can be recognized at a time.</string>
+    <string name="import_error_missing_key">No API key could be recognized in this cURL command.</string>
+    <string name="import_result_base_url">Base URL</string>
+    <string name="import_result_protocol">Protocols</string>
+    <string name="import_result_api_key">API key</string>
+    <string name="import_result_models">Models</string>
+    <string name="import_models_none">No model discovered</string>
+    <string name="import_duplicate_title">This key already exists</string>
+    <string name="import_duplicate_body">A key with the same value already exists under this provider. Import it anyway?</string>
+    <string name="import_duplicate_continue">Import anyway</string>
     <string name="import_title">Key cURL import</string>
     <string name="import_manual">Manual import</string>
     <string name="import_section_paste">cURL commands</string>
@@ -591,6 +629,17 @@
     <string name="detail_account_reveal_hint">Copy puts the password on the clipboard and clears it after a while. Leaving this sheet wipes the plain text.</string>
     <string name="detail_balance_refresh">Check balance</string>
     <string name="detail_probe_provider">Probe this provider</string>
+    <string name="detail_key_view">View</string>
+    <string name="detail_key_connection_base_url">Base URL</string>
+    <string name="detail_key_connection_protocol">Protocols</string>
+    <string name="detail_key_connection_auth">Auth style</string>
+    <string name="detail_key_connection_profile">Client preset</string>
+    <string name="detail_key_connection_timeout">Timeout</string>
+    <string name="detail_key_connection_allow_http">Allow HTTP</string>
+    <string name="detail_key_timeout_value">%1$d s</string>
+    <string name="common_on">On</string>
+    <string name="common_off">Off</string>
+    <string name="detail_key_timeout_default">Default</string>
     <string name="detail_key_connection">Connection</string>
     <string name="detail_key_actions">Actions</string>
     <string name="detail_probe_key">Probe this key</string>
@@ -610,6 +659,7 @@
     <string name="groups_delete_title">Delete this group?</string>
     <string name="groups_delete_body">The providers in it are not deleted — they fall back to All.</string>
     <!-- Key-bound models, quick model probing, and account login methods. -->
+    <string name="detail_models_source">Source</string>
     <string name="detail_models_section">Models</string>
     <string name="detail_models_empty_auto">No model yet. Refresh this key or wait for the next probe.</string>
     <string name="detail_models_empty_manual">No model yet. Add one manually.</string>
@@ -624,6 +674,13 @@
     <string name="detail_models_quick_hint">Long-press a model to send one short request.</string>
     <string name="detail_reachability_latency">Provider latency: %1$d ms</string>
     <string name="detail_account_login_methods">Login methods</string>
+    <string name="detail_add_account">Add account</string>
+    <string name="login_method_password">Password login</string>
+    <string name="detail_account_keep_secret">Leave blank to keep the current value.</string>
+    <string name="detail_account_view">View and copy secrets</string>
+    <string name="detail_account_delete">Delete account</string>
+    <string name="detail_account_delete_title">Delete this account?</string>
+    <string name="detail_account_delete_body">The encrypted username and password are deleted with it.</string>
     <string name="login_method_github">GitHub</string>
     <string name="login_method_linuxdo">LINUX DO</string>
     <string name="refresh_status_cd">Refresh balance and provider latency</string>

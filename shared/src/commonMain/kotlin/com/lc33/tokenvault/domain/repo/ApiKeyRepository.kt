@@ -10,6 +10,12 @@ interface ApiKeyRepository {
     fun observeAll(): Flow<List<ApiKey>>
     suspend fun find(id: Long): ApiKey?
 
+    /** 计算与落库相同的本机指纹；不落库、不泄露明文。 */
+    suspend fun fingerprintOf(secret: CharArray): String
+
+    /** 同一供应商内是否已存在相同指纹。用于 cURL 导入的重复密钥提示。 */
+    suspend fun existsFingerprint(providerId: Long, fingerprint: String): Boolean
+
     /**
      * 新增一张 Key。
      *

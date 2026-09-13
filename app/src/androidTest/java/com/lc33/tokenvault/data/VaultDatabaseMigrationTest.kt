@@ -30,6 +30,18 @@ class VaultDatabaseMigrationTest {
     }
 
     @Test
+    fun migrate3To4KeepsRoomSchemaValid() {
+        val dbName = "migration-3-4-test.db"
+        helper.createDatabase(dbName, 3).close()
+        helper.runMigrationsAndValidate(
+            dbName,
+            4,
+            true,
+            VaultDatabase.MIGRATION_3_4,
+        ).close()
+    }
+
+    @Test
     fun migrate2To3KeepsRoomSchemaValid() {
         val dbName = "migration-2-3-test.db"
         helper.createDatabase(dbName, 2).close()

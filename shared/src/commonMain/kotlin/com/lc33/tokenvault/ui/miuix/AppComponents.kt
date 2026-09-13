@@ -2,6 +2,8 @@ package com.lc33.tokenvault.ui.miuix
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -239,21 +241,45 @@ fun AppAccentCard(
 fun AppBasicRow(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
+    onLongPress: (() -> Unit)? = null,
     endActions: @Composable RowScope.() -> Unit = {},
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    BasicComponent(
-        modifier = modifier.fillMaxWidth(),
-        onClick = onClick?.let { action ->
-            {
-                Haptics.tap()
-                action()
-            }
-        },
-        role = Role.Button.takeIf { onClick != null },
-        endActions = endActions,
-        content = content,
-    )
+    val tapAction = onClick?.let { action ->
+        {
+            Haptics.tap()
+            action()
+        }
+    }
+    if (onLongPress == null) {
+        BasicComponent(
+            modifier = modifier.fillMaxWidth(),
+            onClick = tapAction,
+            role = Role.Button.takeIf { onClick != null },
+            endActions = endActions,
+            content = content,
+        )
+    } else {
+        Box(
+            modifier = modifier
+                .fillMaxWidth()
+                .combinedClickable(
+                    onClick = { tapAction?.invoke() },
+                    onLongClick = {
+                        Haptics.tap()
+                        onLongPress()
+                    },
+                ),
+        ) {
+            BasicComponent(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = null,
+                role = Role.Button,
+                endActions = endActions,
+                content = content,
+            )
+        }
+    }
 }
 
 /**

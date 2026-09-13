@@ -34,6 +34,14 @@ class RoomProbeRunRepository constructor(
         done = done,
         okCount = okCount,
         failCount = failCount,
+        providerTotal = providerTotal,
+        providerDone = providerDone,
+        providerOk = providerOk,
+        providerFail = providerFail,
+        keyTotal = keyTotal,
+        keyDone = keyDone,
+        keyOk = keyOk,
+        keyFail = keyFail,
         cancelled = cancelled,
     )
 
@@ -46,6 +54,14 @@ class RoomProbeRunRepository constructor(
         done = done,
         okCount = okCount,
         failCount = failCount,
+        providerTotal = providerTotal,
+        providerDone = providerDone,
+        providerOk = providerOk,
+        providerFail = providerFail,
+        keyTotal = keyTotal,
+        keyDone = keyDone,
+        keyOk = keyOk,
+        keyFail = keyFail,
         cancelled = cancelled,
     )
 }

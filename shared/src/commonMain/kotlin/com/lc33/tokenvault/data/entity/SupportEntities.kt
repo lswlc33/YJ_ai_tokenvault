@@ -195,6 +195,14 @@ data class ProbeRunEntity(
     val done: Int = 0,
     val okCount: Int = 0,
     val failCount: Int = 0,
+    val providerTotal: Int = 0,
+    val providerDone: Int = 0,
+    val providerOk: Int = 0,
+    val providerFail: Int = 0,
+    val keyTotal: Int = 0,
+    val keyDone: Int = 0,
+    val keyOk: Int = 0,
+    val keyFail: Int = 0,
     val cancelled: Boolean = false,
 )
 
