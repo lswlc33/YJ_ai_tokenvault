@@ -145,6 +145,7 @@ fun ProviderSummary.toRow(
         id = provider.id,
         name = provider.name,
         note = provider.note,
+        websiteUrl = provider.websiteUrl,
         host = host,
         // 协议 chips 用 wireName：它稳定，而且这一排不是给人读的散文
         protocols = protocols,
@@ -473,6 +474,7 @@ fun matchesQuery(row: UiProviderRow, groupName: String?, query: String): Boolean
     val haystacks = listOfNotNull(
         row.name,
         row.note,
+        row.websiteUrl,
         row.host,
         groupName,
     ).map { it.trim().lowercase() }

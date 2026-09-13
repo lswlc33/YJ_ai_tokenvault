@@ -156,7 +156,7 @@ internal fun ProviderRow(
                     )
                 }
                 AppText(
-                    text = row.host,
+                    text = row.websiteUrl ?: row.host,
                     style = AppTextStyle.Footnote,
                     color = appSecondaryTextColor,
                     maxLines = 1,

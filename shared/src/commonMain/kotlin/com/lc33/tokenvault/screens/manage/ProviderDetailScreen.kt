@@ -73,12 +73,14 @@ import tokenvault.shared.generated.resources.detail_section_accounts
 import tokenvault.shared.generated.resources.detail_section_keys
 import tokenvault.shared.generated.resources.editor_name
 import tokenvault.shared.generated.resources.editor_note
+import tokenvault.shared.generated.resources.editor_website
 import tokenvault.shared.generated.resources.editor_save
 import tokenvault.shared.generated.resources.groups_delete
 import tokenvault.shared.generated.resources.import_manual
 import tokenvault.shared.generated.resources.import_title
 import tokenvault.shared.generated.resources.secret_copy_cd
 import com.lc33.tokenvault.domain.LoginMethod
+import com.lc33.tokenvault.platform.openExternalUrl
 import com.lc33.tokenvault.domain.Protocol
 import com.lc33.tokenvault.screens.model.ProviderDetailUiState
 import com.lc33.tokenvault.screens.model.UiKeyRow
@@ -872,6 +874,13 @@ private fun HeaderCard(
             color = appSecondaryTextColor,
             fontFamily = tokens.monoFontFamily,
         )
+        provider.websiteUrl?.takeIf { it.isNotBlank() }?.let { website ->
+            AppActionRow(
+                text = stringResource(Res.string.editor_website) + ": " + website,
+                onClick = { openExternalUrl(website) },
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
         Row(
             modifier = Modifier.padding(top = tokens.itemSpacing),
             horizontalArrangement = Arrangement.spacedBy(6.dp),

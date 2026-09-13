@@ -36,6 +36,7 @@ data class UiProviderRow(
     val id: Long,
     val name: String,
     val note: String?,
+    val websiteUrl: String? = null,
     val host: String,
     val protocols: List<String>,
     val colorIndex: Int,

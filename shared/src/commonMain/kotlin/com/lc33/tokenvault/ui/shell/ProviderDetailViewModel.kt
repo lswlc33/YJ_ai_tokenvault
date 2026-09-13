@@ -427,6 +427,7 @@ class ProviderDetailViewModel constructor(
             id = id,
             name = name,
             note = note,
+            websiteUrl = websiteUrl,
             host = firstSettings?.apiRoot?.let { hostOf(it) }.orEmpty(),
             protocols = firstSettings?.supportedProtocols?.map { it.wireName } ?: emptyList(),
             colorIndex = color ?: 0,
