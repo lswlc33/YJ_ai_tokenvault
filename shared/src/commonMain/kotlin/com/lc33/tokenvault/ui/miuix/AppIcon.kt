@@ -25,7 +25,6 @@ import top.yukonga.miuix.kmp.icon.extended.Ok
 import top.yukonga.miuix.kmp.icon.extended.Paste
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.icon.extended.Report
-import top.yukonga.miuix.kmp.icon.extended.Scan
 import top.yukonga.miuix.kmp.icon.extended.Search
 import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.icon.extended.Show
@@ -71,7 +70,6 @@ enum class AppIcon {
     Search,
     Filter,
     Sort,
-    Probe,
     Reveal,
     Conceal,
     OpenLink,
@@ -120,7 +118,6 @@ internal fun AppIcon.imageVector(): ImageVector = when (this) {
     AppIcon.Search -> MiuixIcons.Search
     AppIcon.Filter -> MiuixIcons.Filter
     AppIcon.Sort -> MiuixIcons.Sort
-    AppIcon.Probe -> MiuixIcons.Scan
     AppIcon.Reveal -> MiuixIcons.Show
     AppIcon.Conceal -> MiuixIcons.Hide
     AppIcon.OpenLink -> MiuixIcons.Link

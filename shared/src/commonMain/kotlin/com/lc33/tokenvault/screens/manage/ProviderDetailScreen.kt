@@ -104,6 +104,7 @@ import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppDialogTextButton
 import com.lc33.tokenvault.ui.miuix.AppTextField
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
+import com.lc33.tokenvault.ui.miuix.AppValueRow
 import com.lc33.tokenvault.ui.miuix.AppTopBar
 import com.lc33.tokenvault.ui.miuix.SectionTitle
 import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
@@ -139,12 +140,10 @@ fun ProviderDetailScreen(
     onManualAddKey: () -> Unit,
     onOpenKey: (Long) -> Unit,
     onRefreshBalance: () -> Unit,
-    onProbeKey: (Long) -> Unit,
     onRefreshKeyModels: (Long) -> Unit,
     onAddModel: (Long, String, Protocol) -> Unit,
     onUpdateModel: (Long, String, Protocol, String?, Boolean) -> Unit,
     onDeleteModel: (Long) -> Unit,
-    onProbeModel: (Long, String, Protocol) -> Unit,
     onRevealAccount: (Long) -> Unit,
     onCopyRevealedAccount: (String) -> Unit,
     onCloseAccountReveal: () -> Unit,
@@ -244,11 +243,9 @@ fun ProviderDetailScreen(
                         models = state.models.filter { it.keyId == row.id },
                         nowMs = state.nowMs,
                         onOpen = { onOpenKey(row.id) },
-                        onProbeKey = { onProbeKey(row.id) },
                         onRefreshModels = { onRefreshKeyModels(row.id) },
                         onAddModel = { addModelKeyId = row.id },
                         onEditModel = { editingModel = it },
-                        onProbeModel = onProbeModel,
                     )
                 }
             }
@@ -571,16 +568,25 @@ private fun AccountEditorSheet(
             primary = true,
         )
         account?.let { row ->
-            AppActionRow(
-                text = stringResource(Res.string.detail_account_view),
-                onClick = { onReveal(row.id) },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            AppActionRow(
-                text = stringResource(Res.string.detail_account_delete),
-                onClick = { onDelete(row.id) },
-                modifier = Modifier.fillMaxWidth(),
-            )
+            // 查看与删除是 action 行，包成一组：裸铺在弹层里既没有容器背景，
+            // 也和页面里同一类行的形态对不上。
+            AppPreferenceGroup(
+                modifier = Modifier.padding(top = tokens.itemSpacing),
+                inset = false,
+            ) {
+                AppActionRow(
+                    text = stringResource(Res.string.detail_account_view),
+                    onClick = { onReveal(row.id) },
+                    modifier = Modifier.fillMaxWidth(),
+                    inset = false,
+                )
+                AppActionRow(
+                    text = stringResource(Res.string.detail_account_delete),
+                    onClick = { onDelete(row.id) },
+                    modifier = Modifier.fillMaxWidth(),
+                    inset = false,
+                )
+            }
         }
         }
     }
@@ -688,11 +694,9 @@ private fun KeyCard(
     models: List<UiModelRow>,
     nowMs: Long,
     onOpen: () -> Unit,
-    onProbeKey: () -> Unit,
     onRefreshModels: () -> Unit,
     onAddModel: () -> Unit,
     onEditModel: (UiModelRow) -> Unit,
-    onProbeModel: (Long, String, Protocol) -> Unit,
 ) {
     val tokens = LocalAppTokens.current
     AppCard(
@@ -705,7 +709,6 @@ private fun KeyCard(
             row = row,
             nowMs = nowMs,
             onClick = onOpen,
-            onProbe = onProbeKey,
         )
         AppDivider()
         Row(
@@ -754,21 +757,9 @@ private fun KeyCard(
             )
         } else {
             models.forEachIndexed { index, model ->
-                val modelKeyId = model.keyId
                 ModelRow(
                     row = model,
                     onClick = { onEditModel(model) },
-                    onProbe = if (row.settings.probeModelReachability && modelKeyId != null) {
-                        {
-                            onProbeModel(
-                                modelKeyId,
-                                model.modelId,
-                                Protocol.fromWireName(model.protocol) ?: Protocol.CHAT,
-                            )
-                        }
-                    } else {
-                        null
-                    },
                 )
                 if (index != models.lastIndex) {
                     AppDivider()
@@ -805,40 +796,35 @@ private fun RevealAccountSheet(
             style = AppTextStyle.Footnote,
             color = appSecondaryTextColor,
         )
-        AppText(
-            text = account.username ?: stringResource(Res.string.detail_account_none),
-            style = AppTextStyle.Body,
-            fontFamily = tokens.monoFontFamily,
-        )
+        // 用户名与密码是一组只读字段，包进 group；裸铺就是两段悬空文本。
+        AppPreferenceGroup(inset = false) {
+            AppValueRow(
+                title = stringResource(Res.string.detail_account_username),
+                value = account.username ?: stringResource(Res.string.detail_account_none),
+                stacked = true,
+                mono = true,
+            )
+            AppValueRow(
+                title = stringResource(Res.string.detail_account_password),
+                value = account.password ?: stringResource(Res.string.detail_account_none),
+                stacked = true,
+                mono = true,
+            )
+        }
 
-        // 密码
-        AppText(
-            text = stringResource(Res.string.detail_account_password),
-            style = AppTextStyle.Footnote,
-            color = appSecondaryTextColor,
+        // 登录方式与添加账号那一层保持一致：都是独立的是非题，用开关而不是 chip。
+        AppPreferenceGroup(
             modifier = Modifier.padding(top = tokens.itemSpacing),
-        )
-        AppText(
-            text = account.password ?: stringResource(Res.string.detail_account_none),
-            style = AppTextStyle.Body,
-            fontFamily = tokens.monoFontFamily,
-        )
-
-        AppText(
-            text = stringResource(Res.string.detail_account_login_methods),
-            style = AppTextStyle.Footnote,
-            color = appSecondaryTextColor,
-            modifier = Modifier.padding(top = tokens.itemSpacing),
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing)) {
+            inset = false,
+        ) {
             LoginMethod.entries.forEach { method ->
                 val selected = method in account.loginMethods
-                AppFilterChip(
-                    text = loginMethodLabel(method),
-                    selected = selected,
-                    onClick = {
-                        val next = if (selected) account.loginMethods - method
-                        else account.loginMethods + method
+                AppSwitchRow(
+                    title = loginMethodLabel(method),
+                    checked = selected,
+                    onCheckedChange = { enabled ->
+                        val next = if (enabled) account.loginMethods + method
+                        else account.loginMethods - method
                         onSetLoginMethods(account.accountId, next)
                     },
                 )
@@ -851,13 +837,17 @@ private fun RevealAccountSheet(
             color = appSecondaryTextColor,
             modifier = Modifier.padding(top = tokens.itemSpacing),
         )
-        AppActionRow(
-            text = stringResource(Res.string.secret_copy_cd),
-            onClick = { onCopy(account.label) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = tokens.itemSpacing),
-        )
+        AppPreferenceGroup(
+            modifier = Modifier.padding(top = tokens.itemSpacing),
+            inset = false,
+        ) {
+            AppActionRow(
+                text = stringResource(Res.string.secret_copy_cd),
+                onClick = { onCopy(account.label) },
+                modifier = Modifier.fillMaxWidth(),
+                inset = false,
+            )
+        }
     }
 }
 

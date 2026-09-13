@@ -298,8 +298,6 @@ fun VaultNavHost(
                 val accountSaved = stringResource(Res.string.feedback_account_saved)
                 val balanceRefreshed = stringResource(Res.string.feedback_balance_refreshed)
                 val modelsRefreshed = stringResource(Res.string.feedback_models_refreshed)
-                val keyProbed = stringResource(Res.string.feedback_probe_key_sent)
-                val modelProbed = stringResource(Res.string.feedback_model_probed)
                 LaunchedEffect(vm) {
                     vm.events.collect { event ->
                         // 删除留当前页（不像删密钥要退出页面），所以只投提示；
@@ -323,12 +321,6 @@ fun VaultNavHost(
                             }
                             ProviderDetailViewModel.Event.ModelsRefreshed -> {
                                 feedback?.post(AppFeedback(modelsRefreshed)); return@collect
-                            }
-                            ProviderDetailViewModel.Event.KeyProbed -> {
-                                feedback?.post(AppFeedback(keyProbed)); return@collect
-                            }
-                            ProviderDetailViewModel.Event.ModelProbed -> {
-                                feedback?.post(AppFeedback(modelProbed)); return@collect
                             }
                         }
                         feedback?.post(
@@ -359,12 +351,10 @@ fun VaultNavHost(
                             onManualAddKey = { navigate(KeyEditorRoute(route.id, 0L)) },
                             onOpenKey = { keyId -> navigate(KeyDetailRoute(route.id, keyId)) },
                             onRefreshBalance = vm::refreshBalance,
-                            onProbeKey = vm::probeKey,
                             onRefreshKeyModels = { keyId -> vm.refreshModels(keyId) },
                             onAddModel = vm::onAddModel,
                             onUpdateModel = vm::onUpdateModel,
                             onDeleteModel = vm::onDeleteModel,
-                            onProbeModel = vm::onProbeModel,
                             onRevealAccount = vm::onRevealAccount,
                             onCopyRevealedAccount = { vm.onCopyRevealedAccount(accountClipboardLabel) },
                             onCloseAccountReveal = vm::onCloseAccountSheet,

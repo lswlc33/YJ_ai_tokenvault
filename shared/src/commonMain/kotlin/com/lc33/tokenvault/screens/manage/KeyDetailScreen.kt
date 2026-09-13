@@ -68,6 +68,7 @@ import tokenvault.shared.generated.resources.manage_source_discovered
 import tokenvault.shared.generated.resources.manage_source_manual
 import tokenvault.shared.generated.resources.detail_edit_cd
 import tokenvault.shared.generated.resources.detail_key_reveal_hint
+import tokenvault.shared.generated.resources.detail_key_secret
 import tokenvault.shared.generated.resources.detail_models_refresh
 import tokenvault.shared.generated.resources.detail_key_balance_value
 import tokenvault.shared.generated.resources.detail_models_section
@@ -324,7 +325,6 @@ fun KeyDetailScreen(
                             ModelRow(
                                 row = model,
                                 onClick = { selectedModel = model },
-                                onProbe = null,
                                 onLongPress = if (key.settings.probeQuickModel) {
                                     {
                                         Protocol.fromWireName(model.protocol)?.let { protocol ->
@@ -352,17 +352,32 @@ fun KeyDetailScreen(
         onDismissRequest = onCloseReveal,
         title = key.label.ifBlank { key.masked },
     ) {
-        AppText(text = revealedText.orEmpty(), style = AppTextStyle.Body)
+        // 明文是这一层的正文；复制是动作行，包进 group，与页面里的行入口同形。
+        AppPreferenceGroup(inset = false) {
+            AppValueRow(
+                title = stringResource(Res.string.detail_key_secret),
+                value = revealedText.orEmpty(),
+                stacked = true,
+                mono = true,
+            )
+        }
         AppText(
             text = stringResource(Res.string.detail_key_reveal_hint),
             style = AppTextStyle.Footnote,
             color = appSecondaryTextColor,
+            modifier = Modifier.padding(top = tokens.itemSpacing),
         )
-        AppActionRow(
-            text = stringResource(Res.string.secret_copy_cd),
-            onClick = onCopyRevealed,
-            modifier = Modifier.fillMaxWidth(),
-        )
+        AppPreferenceGroup(
+            modifier = Modifier.padding(top = tokens.itemSpacing),
+            inset = false,
+        ) {
+            AppActionRow(
+                text = stringResource(Res.string.secret_copy_cd),
+                onClick = onCopyRevealed,
+                modifier = Modifier.fillMaxWidth(),
+                inset = false,
+            )
+        }
     }
     AppDialog(
         show = pendingDelete,
@@ -381,25 +396,36 @@ fun KeyDetailScreen(
         title = selectedModel?.modelId.orEmpty(),
     ) {
         val model = selectedModel ?: return@AppBottomSheet
-        AppValueRow(
-            title = stringResource(Res.string.detail_model_protocol),
-            value = protocolLabel(model.protocol),
-        )
-        AppValueRow(
-            title = stringResource(Res.string.detail_models_source),
-            value = stringResource(
-                if (model.source == com.lc33.tokenvault.screens.model.UiModelSource.Manual) {
-                    Res.string.manage_source_manual
-                } else {
-                    Res.string.manage_source_discovered
-                },
-            ),
-        )
-        Row(
-            modifier = Modifier.padding(top = tokens.itemSpacing),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            StatusDot(color = colorOf(model.health), label = labelOf(model.health))
+        // 两行只读字段与状态同属"这个模型的一组属性"，包进同一个 group；
+        // 摊在弹层上是几行悬空文本，没有容器边界。
+        AppPreferenceGroup(inset = false) {
+            AppValueRow(
+                title = stringResource(Res.string.detail_model_protocol),
+                value = protocolLabel(model.protocol),
+            )
+            AppValueRow(
+                title = stringResource(Res.string.detail_models_source),
+                value = stringResource(
+                    if (model.source == com.lc33.tokenvault.screens.model.UiModelSource.Manual) {
+                        Res.string.manage_source_manual
+                    } else {
+                        Res.string.manage_source_discovered
+                    },
+                ),
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        start = tokens.screenPadding,
+                        end = tokens.screenPadding,
+                        top = tokens.itemSpacing,
+                        bottom = tokens.itemSpacing,
+                    ),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                StatusDot(color = colorOf(model.health), label = labelOf(model.health))
+            }
         }
     }
 }

@@ -273,6 +273,12 @@ internal fun AttentionCard(items: List<AttentionItem>, onOpenProvider: (Long) ->
     }
 }
 
+/**
+ * 探测区。**拆成多张卡**：状态卡（上次探测）与两张进度卡（供应商 / 密钥）。
+ *
+ * 以前三块挤在一张卡里，标签、计数、细进度条一行接一行，读起来分不清哪条属于谁；
+ * 拆开之后每张卡只讲一件事，各自有完整的卡片内边距。
+ */
 @Composable
 internal fun ProbeCard(
     state: DashboardUiState,
@@ -281,125 +287,144 @@ internal fun ProbeCard(
 ) {
     val tokens = LocalAppTokens.current
     val progress = state.progress
-    AppCard(modifier = cardModifier()) {
-        CardTitle(stringResource(Res.string.dashboard_probe_title))
-        if (progress != null) {
-            AppText(
-                text = stringResource(
-                    Res.string.dashboard_probe_running,
-                    progress.done,
-                    progress.total,
-                    progress.currentLabel,
-                ),
-                style = AppTextStyle.Secondary,
-                modifier = Modifier.padding(top = tokens.itemSpacing),
-            )
-            ProbeProgressBlock(
-                label = stringResource(Res.string.dashboard_probe_provider_label),
-                fraction = progress.providerFraction,
-                total = progress.providerTotal,
-                succeeded = progress.providerSucceeded,
-                failed = progress.providerFailed,
-                skipped = (progress.providerTotal - progress.providerDone).coerceAtLeast(0),
-                modifier = Modifier.padding(top = tokens.itemSpacing),
-            )
-            ProbeProgressBlock(
-                label = stringResource(Res.string.dashboard_probe_key_label),
-                fraction = progress.keyFraction,
-                total = progress.keyTotal,
-                succeeded = progress.keySucceeded,
-                failed = progress.keyFailed,
-                skipped = (progress.keyTotal - progress.keyDone).coerceAtLeast(0),
-                modifier = Modifier.padding(top = tokens.itemSpacing),
-            )
-            // §7.4：探测进行中要暂停前台空闲锁定，而这件事必须让用户看见，
-            // 否则"为什么它没锁"会被当成 bug。
-            AppText(
-                text = stringResource(Res.string.dashboard_probe_no_autolock),
-                style = AppTextStyle.Footnote,
-                color = appSecondaryTextColor,
-                modifier = Modifier.padding(top = tokens.itemSpacing),
-            )
-            AppActionRow(
-                text = stringResource(Res.string.dashboard_probe_cancel),
-                onClick = onCancel,
-                inset = false,
-                modifier = Modifier.padding(top = tokens.itemSpacing),
-            )
-            return@AppCard
+    val lastRun = state.lastRun
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
+    ) {
+        AppCard(modifier = cardModifier()) {
+            CardTitle(stringResource(Res.string.dashboard_probe_title))
+            when {
+                progress != null -> {
+                    AppText(
+                        text = stringResource(
+                            Res.string.dashboard_probe_running,
+                            progress.done,
+                            progress.total,
+                            progress.currentLabel,
+                        ),
+                        style = AppTextStyle.Secondary,
+                        modifier = Modifier.padding(top = tokens.itemSpacing),
+                    )
+                    // §7.4：探测进行中要暂停前台空闲锁定，而这件事必须让用户看见，
+                    // 否则"为什么它没锁"会被当成 bug。
+                    AppText(
+                        text = stringResource(Res.string.dashboard_probe_no_autolock),
+                        style = AppTextStyle.Footnote,
+                        color = appSecondaryTextColor,
+                        modifier = Modifier.padding(top = tokens.itemSpacing),
+                    )
+                    AppActionRow(
+                        text = stringResource(Res.string.dashboard_probe_cancel),
+                        onClick = onCancel,
+                        inset = false,
+                        modifier = Modifier.padding(top = tokens.itemSpacing),
+                    )
+                }
+                lastRun == null -> {
+                    AppText(
+                        text = stringResource(Res.string.dashboard_probe_never),
+                        style = AppTextStyle.Secondary,
+                        color = appSecondaryTextColor,
+                        modifier = Modifier.padding(top = tokens.itemSpacing),
+                    )
+                    AppActionRow(
+                        text = stringResource(Res.string.dashboard_probe_start),
+                        onClick = onStart,
+                        inset = false,
+                        modifier = Modifier.padding(top = tokens.itemSpacing),
+                    )
+                }
+                else -> {
+                    AppText(
+                        text = stringResource(
+                            Res.string.dashboard_probe_last_updated,
+                            relativeLabel(state.nowMs, lastRun.finishedAtMs),
+                        ),
+                        style = AppTextStyle.Secondary,
+                        modifier = Modifier.padding(top = tokens.itemSpacing),
+                    )
+                    AppActionRow(
+                        text = stringResource(Res.string.dashboard_probe_start),
+                        onClick = onStart,
+                        inset = false,
+                        modifier = Modifier.padding(top = tokens.itemSpacing),
+                    )
+                }
+            }
         }
-        val lastRun = state.lastRun
-        if (lastRun == null) {
-            AppText(
-                text = stringResource(Res.string.dashboard_probe_never),
-                style = AppTextStyle.Secondary,
-                color = appSecondaryTextColor,
-                modifier = Modifier.padding(vertical = tokens.itemSpacing),
-            )
-        } else {
-            AppText(
-                text = stringResource(
-                    Res.string.dashboard_probe_last_updated,
-                    relativeLabel(state.nowMs, lastRun.finishedAtMs),
-                ),
-                style = AppTextStyle.Secondary,
-                modifier = Modifier.padding(top = tokens.itemSpacing),
-            )
-            ProbeProgressBlock(
-                label = stringResource(Res.string.dashboard_probe_provider_label),
-                fraction = if (lastRun.providerTotal <= 0) 0f else {
-                    lastRun.providerSucceeded.toFloat() / lastRun.providerTotal.toFloat()
-                },
-                total = lastRun.providerTotal,
-                succeeded = lastRun.providerSucceeded,
-                failed = lastRun.providerFailed,
-                skipped = lastRun.providerSkipped,
-                modifier = Modifier.padding(top = tokens.itemSpacing),
-            )
-            ProbeProgressBlock(
-                label = stringResource(Res.string.dashboard_probe_key_label),
-                fraction = if (lastRun.keyTotal <= 0) 0f else {
-                    lastRun.keySucceeded.toFloat() / lastRun.keyTotal.toFloat()
-                },
-                total = lastRun.keyTotal,
-                succeeded = lastRun.keySucceeded,
-                failed = lastRun.keyFailed,
-                skipped = lastRun.keySkipped,
-                modifier = Modifier.padding(top = tokens.itemSpacing),
+
+        // 从未探测过时不铺两张全 0 的进度卡——那只是噪音，用户还没有可以看的结果。
+        val providerData = progress?.let {
+            ProbeMetric(it.providerFraction, it.providerTotal, it.providerSucceeded, it.providerFailed, (it.providerTotal - it.providerDone).coerceAtLeast(0))
+        } ?: lastRun?.let {
+            ProbeMetric(
+                fraction = if (it.providerTotal <= 0) 0f else it.providerSucceeded.toFloat() / it.providerTotal.toFloat(),
+                total = it.providerTotal,
+                succeeded = it.providerSucceeded,
+                failed = it.providerFailed,
+                skipped = it.providerSkipped,
             )
         }
-        AppActionRow(
-            text = stringResource(Res.string.dashboard_probe_start),
-            onClick = onStart,
-            inset = false,
-            modifier = Modifier.padding(top = tokens.itemSpacing),
-        )
+        val keyData = progress?.let {
+            ProbeMetric(it.keyFraction, it.keyTotal, it.keySucceeded, it.keyFailed, (it.keyTotal - it.keyDone).coerceAtLeast(0))
+        } ?: lastRun?.let {
+            ProbeMetric(
+                fraction = if (it.keyTotal <= 0) 0f else it.keySucceeded.toFloat() / it.keyTotal.toFloat(),
+                total = it.keyTotal,
+                succeeded = it.keySucceeded,
+                failed = it.keyFailed,
+                skipped = it.keySkipped,
+            )
+        }
+        providerData?.let {
+            ProbeMetricCard(
+                title = stringResource(Res.string.dashboard_probe_provider_label),
+                metric = it,
+            )
+        }
+        keyData?.let {
+            ProbeMetricCard(
+                title = stringResource(Res.string.dashboard_probe_key_label),
+                metric = it,
+            )
+        }
     }
 }
 
+/** 一张进度卡的数据。拆出来是为了让"进行中"与"上一轮结果"两条路径共用同一个渲染。 */
+private data class ProbeMetric(
+    val fraction: Float,
+    val total: Int,
+    val succeeded: Int,
+    val failed: Int,
+    val skipped: Int,
+)
+
 @Composable
-private fun ProbeProgressBlock(
-    label: String,
-    fraction: Float,
-    total: Int,
-    succeeded: Int,
-    failed: Int,
-    skipped: Int,
-    modifier: Modifier = Modifier,
-) {
-    AppText(text = label, style = AppTextStyle.Subtitle, modifier = modifier)
-    AppText(
-        text = stringResource(Res.string.dashboard_probe_counts, total, succeeded, failed, skipped),
-        style = AppTextStyle.Footnote,
-        color = appSecondaryTextColor,
-        modifier = Modifier.padding(top = 2.dp),
-    )
-    AppLinearProgress(
-        progress = fraction,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 6.dp),
-    )
+private fun ProbeMetricCard(title: String, metric: ProbeMetric) {
+    val tokens = LocalAppTokens.current
+    AppCard(modifier = cardModifier()) {
+        CardTitle(title)
+        AppText(
+            text = stringResource(
+                Res.string.dashboard_probe_counts,
+                metric.total,
+                metric.succeeded,
+                metric.failed,
+                metric.skipped,
+            ),
+            style = AppTextStyle.Footnote,
+            color = appSecondaryTextColor,
+            modifier = Modifier.padding(top = 2.dp),
+        )
+        AppLinearProgress(
+            progress = metric.fraction,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 6.dp),
+        )
+    }
 }
 
 @Composable

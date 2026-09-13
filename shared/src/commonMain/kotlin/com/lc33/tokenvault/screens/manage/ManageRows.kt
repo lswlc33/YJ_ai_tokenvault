@@ -36,8 +36,6 @@ import tokenvault.shared.generated.resources.manage_source_discovered
 import tokenvault.shared.generated.resources.login_method_github
 import tokenvault.shared.generated.resources.login_method_linuxdo
 import tokenvault.shared.generated.resources.manage_source_manual
-import tokenvault.shared.generated.resources.detail_probe_key
-import tokenvault.shared.generated.resources.detail_probe_model_cd
 import tokenvault.shared.generated.resources.protocol_anthropic
 import tokenvault.shared.generated.resources.protocol_chat
 import tokenvault.shared.generated.resources.protocol_responses
@@ -255,7 +253,6 @@ internal fun KeyRow(
     row: UiKeyRow,
     nowMs: Long,
     onClick: () -> Unit,
-    onProbe: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val tokens = LocalAppTokens.current
@@ -272,17 +269,7 @@ internal fun KeyRow(
         modifier = modifier,
         onClick = onClick,
         endActions = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                AppIconButton(
-                    icon = AppIcon.Probe,
-                    contentDescription = stringResource(Res.string.detail_probe_key),
-                    onClick = onProbe,
-                )
-                AppIconTint(icon = AppIcon.Forward, size = 18.dp, tint = appSecondaryTextColor)
-            }
+            AppIconTint(icon = AppIcon.Forward, size = 18.dp, tint = appSecondaryTextColor)
         },
     ) {
         AppText(text = row.label, style = AppTextStyle.Body, maxLines = 1)
@@ -330,7 +317,6 @@ internal fun KeyRow(
 internal fun ModelRow(
     row: UiModelRow,
     onClick: (() -> Unit)? = null,
-    onProbe: (() -> Unit)? = null,
     onLongPress: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -340,19 +326,7 @@ internal fun ModelRow(
         onClick = onClick,
         onLongPress = onLongPress,
         endActions = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                if (onProbe != null) {
-                    AppIconButton(
-                        icon = AppIcon.Probe,
-                        contentDescription = stringResource(Res.string.detail_probe_model_cd),
-                        onClick = onProbe,
-                    )
-                }
-                AppIconTint(icon = AppIcon.Forward, size = 18.dp, tint = appSecondaryTextColor)
-            }
+            AppIconTint(icon = AppIcon.Forward, size = 18.dp, tint = appSecondaryTextColor)
         },
     ) {
         AppText(

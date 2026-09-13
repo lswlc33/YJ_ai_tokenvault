@@ -393,7 +393,6 @@ fun KeyEditorScreen(
                                     ModelRow(
                                         row = model,
                                         onClick = { editingModel = model },
-                                        onProbe = null,
                                     )
                                     if (index != models.lastIndex) AppDivider()
                                 }

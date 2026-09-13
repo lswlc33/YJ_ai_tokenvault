@@ -98,8 +98,6 @@ class ProviderDetailViewModel constructor(
         /** 一次性动作已发出（结果本身由状态流回填）。 */
         data object BalanceRefreshed : Event
         data object ModelsRefreshed : Event
-        data object KeyProbed : Event
-        data object ModelProbed : Event
     }
 
     private val _events = Channel<Event>(Channel.BUFFERED)
@@ -378,12 +376,6 @@ class ProviderDetailViewModel constructor(
         }
     }
 
-    /** 模型可达性探测（快捷）：长按模型行手动触发。 */
-    fun onProbeModel(keyId: Long, modelId: String, protocol: Protocol) {
-        probeEngine.probeModel(providerId, keyId, modelId, protocol)
-        _events.trySend(Event.ModelProbed)
-    }
-
     fun onRevealAccount(accountId: Long) {
         viewModelScope.launch {
             val plain = withContext(Dispatchers.Default) {
@@ -443,12 +435,6 @@ class ProviderDetailViewModel constructor(
     /** 详情页「探测这一家」。只发 L1+L2（零成本，红线 36），结果流回 `probe_runs` 与明细页。 */
     fun probeProvider() {
         probeEngine.probeProvider(providerId)
-    }
-
-    /** 详情页 Key 行「单 Key 探测」。只发一次 L2（零成本），验证这一张 Key 是否有效。 */
-    fun probeKey(keyId: Long) {
-        probeEngine.probeKey(keyId)
-        _events.trySend(Event.KeyProbed)
     }
 
     /** 手动拉模型列表。null = 这家全部启用 Key；指定 id = 只拉那一张 Key。 */

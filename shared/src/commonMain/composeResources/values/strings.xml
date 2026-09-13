@@ -753,4 +753,5 @@
     <string name="key_enabled">Enabled</string>
     <string name="key_settings_title">Key settings</string>    <string name="licenses_title">Open-source licenses</string>
     <string name="licenses_intro">Libraries included in this app and their licenses.</string>
+    <string name="licenses_copyright_label">Copyright</string>
     <string name="licenses_license_label">License</string></resources>

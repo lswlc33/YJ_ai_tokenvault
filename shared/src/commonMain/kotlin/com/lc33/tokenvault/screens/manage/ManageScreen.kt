@@ -54,6 +54,7 @@ import com.lc33.tokenvault.ui.miuix.AppIconButton
 import com.lc33.tokenvault.ui.miuix.AppScaffold
 import com.lc33.tokenvault.ui.miuix.AppSearchField
 import com.lc33.tokenvault.ui.miuix.AppActionRow
+import com.lc33.tokenvault.ui.miuix.AppPreferenceGroup
 import com.lc33.tokenvault.ui.miuix.AppTopBar
 import com.lc33.tokenvault.ui.miuix.appTopBarScroll
 import com.lc33.tokenvault.ui.miuix.rememberAppTextFieldState
@@ -271,19 +272,25 @@ private fun GroupPickerSheet(
     groups: List<com.lc33.tokenvault.screens.model.UiGroup>,
     onPick: (Long?) -> Unit,
 ) {
-    // 第一枚是「全部」伪分组（id == null），这里要的是「未分组」（groupId = null），
-    // 语义不同：把它过滤掉，另放一枚「未分组」在最前。
-    AppActionRow(
-        text = stringResource(Res.string.manage_batch_ungrouped),
-        onClick = { onPick(null) },
-        modifier = Modifier.fillMaxWidth(),
-    )
-    groups.filter { it.id != null }.forEach { group ->
+    // 行入口都要包在 group 里：弹层内容和页面一样是"一组设置行"，
+    // 直接铺裸行会缺了容器背景与圆角，跟页面里的同一类行看起来不是一套。
+    AppPreferenceGroup(inset = false) {
+        // 第一枚是「全部」伪分组（id == null），这里要的是「未分组」（groupId = null），
+        // 语义不同：把它过滤掉，另放一枚「未分组」在最前。
         AppActionRow(
-            text = group.name,
-            onClick = { onPick(group.id) },
+            text = stringResource(Res.string.manage_batch_ungrouped),
+            onClick = { onPick(null) },
             modifier = Modifier.fillMaxWidth(),
+            inset = false,
         )
+        groups.filter { it.id != null }.forEach { group ->
+            AppActionRow(
+                text = group.name,
+                onClick = { onPick(group.id) },
+                modifier = Modifier.fillMaxWidth(),
+                inset = false,
+            )
+        }
     }
 }
 

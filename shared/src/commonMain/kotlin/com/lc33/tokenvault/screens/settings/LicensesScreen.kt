@@ -19,6 +19,7 @@ import com.lc33.tokenvault.ui.miuix.AppScaffold
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.AppTopBar
+import com.lc33.tokenvault.ui.miuix.AppValueRow
 import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
 import com.lc33.tokenvault.ui.miuix.appTopBarScroll
 import com.lc33.tokenvault.ui.miuix.rememberAppTopBarScrollState
@@ -26,6 +27,7 @@ import com.lc33.tokenvault.ui.theme.LocalAppTokens
 import org.jetbrains.compose.resources.stringResource
 import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.back_cd
+import tokenvault.shared.generated.resources.licenses_copyright_label
 import tokenvault.shared.generated.resources.licenses_intro
 import tokenvault.shared.generated.resources.licenses_license_label
 import tokenvault.shared.generated.resources.licenses_title
@@ -115,18 +117,18 @@ fun LicensesScreen(onBack: () -> Unit) {
         title = selected?.name,
     ) {
         selected?.let { entry ->
-            AppText(text = entry.name, style = AppTextStyle.Title)
-            AppText(
-                text = stringResource(Res.string.licenses_license_label) + ": " + entry.license,
-                style = AppTextStyle.Body,
-                modifier = Modifier.fillMaxWidth().padding(top = tokens.itemSpacing),
-            )
-            AppText(
-                text = entry.copyright,
-                style = AppTextStyle.Footnote,
-                color = appSecondaryTextColor,
-                modifier = Modifier.padding(top = tokens.itemSpacing),
-            )
+            // 许可证与版权是一组只读字段，包进 group 与页面的行形态一致。
+            AppPreferenceGroup(inset = false) {
+                AppValueRow(
+                    title = stringResource(Res.string.licenses_license_label),
+                    value = entry.license,
+                )
+                AppValueRow(
+                    title = stringResource(Res.string.licenses_copyright_label),
+                    value = entry.copyright,
+                    stacked = true,
+                )
+            }
         }
     }
 }
