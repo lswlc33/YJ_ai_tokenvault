@@ -41,6 +41,7 @@ import com.lc33.tokenvault.ui.miuix.AppIconButton
 import com.lc33.tokenvault.ui.miuix.AppScaffold
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppActionRow
+import com.lc33.tokenvault.ui.miuix.AppPreferenceGroup
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.AppTopBar
 import com.lc33.tokenvault.ui.miuix.SectionTitle
@@ -118,7 +119,12 @@ fun ProbeRunScreen(
             verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
         ) {
             if (lastRun != null) {
-                item { SummaryCard(lastRun, nowMs, failed.isNotEmpty() || skipped.isNotEmpty(), onRetryFailed) }
+                // 描述与入口分开：本轮结果是一场"读取"，重试是一条"动作"。
+                // 摆在同一张卡里，读起来像"点这一行才会看到结果"。
+                item { SummaryCard(lastRun, nowMs) }
+                if (failed.isNotEmpty() || skipped.isNotEmpty()) {
+                    item { RetryGroup(onRetryFailed) }
+                }
             }
             if (failed.isNotEmpty()) {
                 item { SectionTitle(text = stringResource(Res.string.probe_run_failed)) }
@@ -137,13 +143,9 @@ fun ProbeRunScreen(
     }
 }
 
+/** 只描述上一轮结果，不放任何可点入口。 */
 @Composable
-private fun SummaryCard(
-    run: ProbeRunSummary,
-    nowMs: Long,
-    hasRetryable: Boolean,
-    onRetry: () -> Unit,
-) {
+private fun SummaryCard(run: ProbeRunSummary, nowMs: Long) {
     val tokens = LocalAppTokens.current
     AppCard(
         modifier = Modifier
@@ -170,14 +172,19 @@ private fun SummaryCard(
             color = appSecondaryTextColor,
             modifier = Modifier.padding(top = 4.dp),
         )
-        if (hasRetryable) {
-            AppActionRow(
-                text = stringResource(Res.string.probe_run_retry),
-                onClick = onRetry,
-                modifier = Modifier.padding(top = tokens.itemSpacing),
-                inset = false,
-            )
-        }
+    }
+}
+
+/** 重试入口单独成组，与上面的结果描述分开。 */
+@Composable
+private fun RetryGroup(onRetry: () -> Unit) {
+    AppPreferenceGroup(inset = true) {
+        AppActionRow(
+            text = stringResource(Res.string.probe_run_retry),
+            onClick = onRetry,
+            modifier = Modifier.fillMaxWidth(),
+            inset = false,
+        )
     }
 }
 

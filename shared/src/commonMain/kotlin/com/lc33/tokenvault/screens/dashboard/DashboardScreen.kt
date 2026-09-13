@@ -37,6 +37,7 @@ import com.lc33.tokenvault.ui.theme.LocalAppTokens
 fun DashboardScreen(
     state: DashboardUiState,
     onOpenManage: () -> Unit,
+    onOpenProbeDetail: () -> Unit,
     onStartProbe: () -> Unit,
     onCancelProbe: () -> Unit,
     onRefreshBalance: () -> Unit,
@@ -80,7 +81,7 @@ fun DashboardScreen(
                 )
             }
             item { CountsCard(state.counts, onOpenManage) }
-            item { ProbeCard(state, onStartProbe, onCancelProbe) }
+            item { ProbeCard(state, onOpenProbeDetail, onStartProbe, onCancelProbe) }
             item { Spacer(modifier = Modifier.height(tokens.sectionSpacing)) }
         }
     }

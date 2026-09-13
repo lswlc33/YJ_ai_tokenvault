@@ -179,6 +179,7 @@ fun VaultNavHost(
                 // 总览与管理的入口是「切到管理的某一页」，不是往栈上压一条管理路由：
                 // 三个一级页平级，压在栈上会让返回语义变成"回到总览"。
                 onOpenManage = { pager.animateToPage(topLevelIndexOf(ManageRoute)) },
+                onOpenProbeDetail = { navigate(ProbeRunRoute) },
                 // 探测是异步长动作，卡片本身有进度；这里只确认"动作确实发出去了"，
                 // 否则点了按钮到进度出现之间有一段没有任何反馈的空档。
                 onStartProbe = {

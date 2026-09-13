@@ -154,6 +154,7 @@ fun ProbeSettingsScreen(
 @Composable
 private fun DefaultsNoticeCard(onOpenManage: () -> Unit) {
     val tokens = LocalAppTokens.current
+    // 说明与入口分开：说明是一段提示，入口是一条动作行。
     AppCard(
         modifier = Modifier
             .fillMaxWidth()
@@ -164,10 +165,15 @@ private fun DefaultsNoticeCard(onOpenManage: () -> Unit) {
             style = AppTextStyle.Secondary,
             color = appSecondaryTextColor,
         )
+    }
+    AppPreferenceGroup(
+        modifier = Modifier.padding(horizontal = tokens.screenPadding, vertical = tokens.itemSpacing),
+        inset = false,
+    ) {
         AppActionRow(
             text = stringResource(Res.string.probe_defaults_goto_manage),
             onClick = onOpenManage,
-            modifier = Modifier.padding(top = tokens.itemSpacing),
+            modifier = Modifier.fillMaxWidth(),
             inset = false,
         )
     }

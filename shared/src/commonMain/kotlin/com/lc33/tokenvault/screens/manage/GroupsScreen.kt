@@ -228,13 +228,16 @@ fun GroupsScreen(
                 }
             }
             item {
-                AppActionRow(
-                    text = stringResource(Res.string.groups_add),
-                    onClick = { editing = newGroup },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = tokens.screenPadding),
-                )
+                // 「新建分组」是一个入口行，必须包在 group 里：裸行没有容器背景与圆角，
+                // 和上面那些分组卡片（都是 AppCard）摆在一起不像同一种东西。
+                AppPreferenceGroup(inset = true) {
+                    AppActionRow(
+                        text = stringResource(Res.string.groups_add),
+                        onClick = { editing = newGroup },
+                        modifier = Modifier.fillMaxWidth(),
+                        inset = false,
+                    )
+                }
             }
 
             item { SectionTitle(text = stringResource(Res.string.groups_section_providers)) }

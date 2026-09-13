@@ -232,10 +232,16 @@ fun KeyDetailScreen(
                             modifier = Modifier.padding(top = tokens.itemSpacing),
                         )
                     }
+                }
+            }
+            // 「查看」是一条动作入口，单独成组：混在描述卡里，
+            // 整张卡（含遮蔽串、状态、余额）看起来都能点。
+            item {
+                AppPreferenceGroup {
                     AppActionRow(
                         text = stringResource(Res.string.detail_key_view),
                         onClick = onReveal,
-                        modifier = Modifier.padding(top = tokens.itemSpacing),
+                        modifier = Modifier.fillMaxWidth(),
                         inset = false,
                     )
                 }

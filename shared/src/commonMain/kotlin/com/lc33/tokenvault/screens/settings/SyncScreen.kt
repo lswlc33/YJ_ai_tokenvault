@@ -136,6 +136,8 @@ fun SyncScreen(
 private fun StatusCard(backup: BackupStatus, onExport: () -> Unit) {
     val tokens = LocalAppTokens.current
     val palette = LocalStatusPalette.current
+    // 备份状态与「立即备份」分开：描述卡只讲状态，入口单独一行，
+    // 免得整张卡看起来都可点。
     AppCard(
         modifier = Modifier
             .fillMaxWidth()
@@ -148,7 +150,7 @@ private fun StatusCard(backup: BackupStatus, onExport: () -> Unit) {
                 text = stringResource(Res.string.dashboard_backup_never),
                 style = AppTextStyle.Secondary,
                 color = palette.warn,
-                modifier = Modifier.padding(vertical = tokens.itemSpacing),
+                modifier = Modifier.padding(top = tokens.itemSpacing),
             )
         } else {
             AppText(
@@ -159,12 +161,18 @@ private fun StatusCard(backup: BackupStatus, onExport: () -> Unit) {
                 ),
                 style = AppTextStyle.Secondary,
                 color = appSecondaryTextColor,
-                modifier = Modifier.padding(vertical = tokens.itemSpacing),
+                modifier = Modifier.padding(top = tokens.itemSpacing),
             )
         }
+    }
+    AppPreferenceGroup(
+        modifier = Modifier.padding(horizontal = tokens.screenPadding),
+        inset = false,
+    ) {
         AppActionRow(
             text = stringResource(Res.string.dashboard_backup_now),
             onClick = onExport,
+            modifier = Modifier.fillMaxWidth(),
             inset = false,
         )
     }

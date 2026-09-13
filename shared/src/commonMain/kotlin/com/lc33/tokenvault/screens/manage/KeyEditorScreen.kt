@@ -352,6 +352,7 @@ fun KeyEditorScreen(
                         )
                     }
                 }
+                // 说明与模型列表/入口分开：说明讲的是规则，列表与「同步 / 添加」是内容与动作。
                 item {
                     AppCard(
                         modifier = Modifier
@@ -369,12 +370,6 @@ fun KeyEditorScreen(
                                 style = AppTextStyle.Secondary,
                                 color = appSecondaryTextColor,
                             )
-                            AppActionRow(
-                                text = stringResource(Res.string.editor_models_sync_now),
-                                onClick = onRefreshModels,
-                                modifier = Modifier.padding(top = tokens.itemSpacing),
-                                inset = false,
-                            )
                         } else {
                             AppText(
                                 text = stringResource(Res.string.editor_models_manual_hint),
@@ -388,7 +383,25 @@ fun KeyEditorScreen(
                                     color = appSecondaryTextColor,
                                     modifier = Modifier.padding(top = tokens.itemSpacing),
                                 )
-                            } else {
+                            }
+                        }
+                    }
+                }
+                // 模型行单独成组：自动获取时是「立即同步」，手动时是列表 + 「添加模型」。
+                item {
+                    AppPreferenceGroup(
+                        modifier = Modifier.padding(horizontal = tokens.screenPadding),
+                        inset = false,
+                    ) {
+                        if (draft.probeModels) {
+                            AppActionRow(
+                                text = stringResource(Res.string.editor_models_sync_now),
+                                onClick = onRefreshModels,
+                                modifier = Modifier.fillMaxWidth(),
+                                inset = false,
+                            )
+                        } else {
+                            if (models.isNotEmpty()) {
                                 models.forEachIndexed { index, model ->
                                     ModelRow(
                                         row = model,
@@ -400,7 +413,7 @@ fun KeyEditorScreen(
                             AppActionRow(
                                 text = stringResource(Res.string.detail_add_model),
                                 onClick = { addModel = true },
-                                modifier = Modifier.padding(top = tokens.itemSpacing),
+                                modifier = Modifier.fillMaxWidth(),
                                 inset = false,
                             )
                         }

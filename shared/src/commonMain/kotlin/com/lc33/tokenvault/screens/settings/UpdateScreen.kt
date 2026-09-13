@@ -68,11 +68,37 @@ fun UpdateScreen(
 ) {
     SettingsSubPage(titleRes = Res.string.update_title, onBack = onBack) {
         item {
-            VersionCard(
-                updateState = updateState,
-                onCheckNow = onCheckNow,
-                onOpenDownload = onOpenDownload,
-            )
+            // 描述与入口分开：版本信息是一段"读取"，检查与下载才是"动作"。
+            // 摆在一起会让人以为点版本号才会检查。
+            VersionCard(updateState = updateState)
+        }
+        item {
+            AppPreferenceGroup {
+                AppActionRow(
+                    text = stringResource(Res.string.update_check_now),
+                    onClick = onCheckNow,
+                    // 检查中禁用，防连点；其余时候都能再点一次。
+                    enabled = updateState.phase != UpdateViewModel.Phase.CHECKING,
+                    modifier = Modifier.fillMaxWidth(),
+                    inset = false,
+                )
+            }
+        }
+        // 有可下载的版本时，下载入口单独成组，不塞进上面的版本卡。
+        val downloadUrl = updateState.latest
+            ?.takeIf { updateState.phase == UpdateViewModel.Phase.UPDATE_AVAILABLE }
+            ?.htmlUrl
+        if (downloadUrl != null) {
+            item {
+                AppPreferenceGroup {
+                    AppActionRow(
+                        text = stringResource(Res.string.update_open_download),
+                        onClick = { onOpenDownload(downloadUrl) },
+                        modifier = Modifier.fillMaxWidth(),
+                        inset = false,
+                    )
+                }
+            }
         }
 
         item { SectionTitle(text = stringResource(Res.string.update_section_channel)) }
@@ -93,12 +119,9 @@ fun UpdateScreen(
     }
 }
 
+/** 只描述当前版本与检查状态，不放任何可点入口（入口在页面主体里单独成组）。 */
 @Composable
-private fun VersionCard(
-    updateState: UpdateViewModel.UiState,
-    onCheckNow: () -> Unit,
-    onOpenDownload: (String) -> Unit,
-) {
+private fun VersionCard(updateState: UpdateViewModel.UiState) {
     val tokens = LocalAppTokens.current
     AppCard(
         modifier = Modifier
@@ -114,7 +137,7 @@ private fun VersionCard(
             ),
             style = AppTextStyle.Secondary,
             color = appSecondaryTextColor,
-            modifier = Modifier.padding(vertical = tokens.itemSpacing),
+            modifier = Modifier.padding(top = tokens.itemSpacing),
         )
 
         when (updateState.phase) {
@@ -123,13 +146,13 @@ private fun VersionCard(
                     text = stringResource(Res.string.update_checking),
                     style = AppTextStyle.Secondary,
                     color = appSecondaryTextColor,
-                    modifier = Modifier.padding(vertical = tokens.itemSpacing),
+                    modifier = Modifier.padding(top = tokens.itemSpacing),
                 )
             }
 
             UpdateViewModel.Phase.UPDATE_AVAILABLE -> {
                 updateState.latest?.let { latest ->
-                    CheckResultCard(latest = latest, onOpenDownload = onOpenDownload)
+                    CheckResultBody(latest = latest)
                 }
             }
 
@@ -138,7 +161,7 @@ private fun VersionCard(
                     text = stringResource(Res.string.update_up_to_date),
                     style = AppTextStyle.Secondary,
                     color = appSecondaryTextColor,
-                    modifier = Modifier.padding(vertical = tokens.itemSpacing),
+                    modifier = Modifier.padding(top = tokens.itemSpacing),
                 )
             }
 
@@ -151,28 +174,19 @@ private fun VersionCard(
                     text = message,
                     style = AppTextStyle.Secondary,
                     color = appSecondaryTextColor,
-                    modifier = Modifier.padding(vertical = tokens.itemSpacing),
+                    modifier = Modifier.padding(top = tokens.itemSpacing),
                 )
             }
 
             UpdateViewModel.Phase.IDLE -> Unit
         }
-
-        // 检查中禁用按钮，防连点；其余时候都能再点一次。
-        AppActionRow(
-            text = stringResource(Res.string.update_check_now),
-            onClick = onCheckNow,
-            enabled = updateState.phase != UpdateViewModel.Phase.CHECKING,
-            inset = false,
-        )
     }
 }
 
-/** 有更新时的结果区：版本号 + 发布时间 + 更新日志 + 去下载。 */
+/** 有更新时的结果描述：版本号 + 发布时间 + 更新日志。**不含下载入口。** */
 @Composable
-private fun CheckResultCard(
+private fun CheckResultBody(
     latest: com.lc33.tokenvault.update.ReleaseInfo,
-    onOpenDownload: (String) -> Unit,
 ) {
     val tokens = LocalAppTokens.current
     // 页面级时间快照（与 LogScreen 同款）：重组时不要重复读时钟，相对时间用同一基准。
@@ -185,7 +199,7 @@ private fun CheckResultCard(
     AppText(
         text = stringResource(Res.string.update_available, versionLabel),
         style = AppTextStyle.Body,
-        modifier = Modifier.padding(vertical = tokens.itemSpacing),
+        modifier = Modifier.padding(top = tokens.itemSpacing),
     )
 
     latest.publishedAt?.let { iso ->
@@ -203,15 +217,6 @@ private fun CheckResultCard(
             text = body,
             style = AppTextStyle.Footnote,
             color = appSecondaryTextColor,
-            modifier = Modifier.padding(top = tokens.itemSpacing),
-        )
-    }
-
-    // 去下载：打开 release 的网页地址（API 直接给的 html_url）。
-    latest.htmlUrl?.let { url ->
-        AppActionRow(
-            text = stringResource(Res.string.update_open_download),
-            onClick = { onOpenDownload(url) },
             modifier = Modifier.padding(top = tokens.itemSpacing),
         )
     }

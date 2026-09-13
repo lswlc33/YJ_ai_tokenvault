@@ -282,6 +282,7 @@ internal fun AttentionCard(items: List<AttentionItem>, onOpenProvider: (Long) ->
 @Composable
 internal fun ProbeCard(
     state: DashboardUiState,
+    onOpenDetail: () -> Unit,
     onStart: () -> Unit,
     onCancel: () -> Unit,
 ) {
@@ -292,6 +293,8 @@ internal fun ProbeCard(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
     ) {
+        // 状态卡只讲状态；开始/取消探测是一条独立入口，不塞进描述里，
+        // 否则整张卡看起来像"点它才会开始探测"。
         AppCard(modifier = cardModifier()) {
             CardTitle(stringResource(Res.string.dashboard_probe_title))
             when {
@@ -314,24 +317,12 @@ internal fun ProbeCard(
                         color = appSecondaryTextColor,
                         modifier = Modifier.padding(top = tokens.itemSpacing),
                     )
-                    AppActionRow(
-                        text = stringResource(Res.string.dashboard_probe_cancel),
-                        onClick = onCancel,
-                        inset = false,
-                        modifier = Modifier.padding(top = tokens.itemSpacing),
-                    )
                 }
                 lastRun == null -> {
                     AppText(
                         text = stringResource(Res.string.dashboard_probe_never),
                         style = AppTextStyle.Secondary,
                         color = appSecondaryTextColor,
-                        modifier = Modifier.padding(top = tokens.itemSpacing),
-                    )
-                    AppActionRow(
-                        text = stringResource(Res.string.dashboard_probe_start),
-                        onClick = onStart,
-                        inset = false,
                         modifier = Modifier.padding(top = tokens.itemSpacing),
                     )
                 }
@@ -344,13 +335,36 @@ internal fun ProbeCard(
                         style = AppTextStyle.Secondary,
                         modifier = Modifier.padding(top = tokens.itemSpacing),
                     )
-                    AppActionRow(
-                        text = stringResource(Res.string.dashboard_probe_start),
-                        onClick = onStart,
-                        inset = false,
-                        modifier = Modifier.padding(top = tokens.itemSpacing),
-                    )
                 }
+            }
+        }
+
+        // 探测入口单独成组：进行中是「取消」，其余是「开始」；有上一轮结果时
+        // 再给一条「查看明细」。这三者都是动作，不塞进上面的状态卡。
+        AppCard(modifier = cardModifier()) {
+            if (progress != null) {
+                AppActionRow(
+                    text = stringResource(Res.string.dashboard_probe_cancel),
+                    onClick = onCancel,
+                    modifier = Modifier.fillMaxWidth(),
+                    inset = false,
+                )
+            } else {
+                AppActionRow(
+                    text = stringResource(Res.string.dashboard_probe_start),
+                    onClick = onStart,
+                    modifier = Modifier.fillMaxWidth(),
+                    inset = false,
+                )
+            }
+            // 从未探测过时没有明细可看，不给这条入口（点进去只有空态）。
+            if (lastRun != null && progress == null) {
+                AppActionRow(
+                    text = stringResource(Res.string.dashboard_probe_detail),
+                    onClick = onOpenDetail,
+                    modifier = Modifier.fillMaxWidth(),
+                    inset = false,
+                )
             }
         }
 
@@ -431,6 +445,8 @@ private fun ProbeMetricCard(title: String, metric: ProbeMetric) {
 internal fun BackupCard(backup: BackupStatus, onOpenSync: () -> Unit) {
     val tokens = LocalAppTokens.current
     val palette = LocalStatusPalette.current
+    // 备份状态卡与「立即备份」入口分开：描述与动作混在一张卡里，
+    // 整张卡看起来都像入口。
     AppCard(modifier = cardModifier()) {
         CardTitle(stringResource(Res.string.dashboard_backup_title))
         val lastBackupAgo = backup.lastBackupAgo
@@ -439,7 +455,7 @@ internal fun BackupCard(backup: BackupStatus, onOpenSync: () -> Unit) {
                 text = stringResource(Res.string.dashboard_backup_never),
                 style = AppTextStyle.Secondary,
                 color = appOnPrimaryColor,
-                modifier = Modifier.padding(vertical = tokens.itemSpacing),
+                modifier = Modifier.padding(top = tokens.itemSpacing),
             )
         } else {
             AppText(
@@ -449,12 +465,15 @@ internal fun BackupCard(backup: BackupStatus, onOpenSync: () -> Unit) {
                     backup.targetLabel ?: "",
                 ),
                 style = AppTextStyle.Secondary,
-                modifier = Modifier.padding(vertical = tokens.itemSpacing),
+                modifier = Modifier.padding(top = tokens.itemSpacing),
             )
         }
+    }
+    AppCard(modifier = cardModifier()) {
         AppActionRow(
             text = stringResource(Res.string.dashboard_backup_now),
             onClick = onOpenSync,
+            modifier = Modifier.fillMaxWidth(),
             inset = false,
         )
     }
