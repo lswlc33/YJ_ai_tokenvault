@@ -2,6 +2,7 @@ package com.lc33.tokenvault.ui.shell
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
@@ -110,6 +111,7 @@ fun VaultNavHost(
     backStack: MutableList<VaultRoute>,
     revision: Int,
     onBackStackChanged: () -> Unit,
+    pager: TopLevelPagerState,
     style: PredictiveBackStyle,
     exitDirection: PredictiveBackExitDirection,
     modifier: Modifier = Modifier,
@@ -130,14 +132,16 @@ fun VaultNavHost(
     }
 
     @Composable
-    fun RouteContent(route: VaultRoute) {
+    fun PageContent(route: VaultRoute) {
         when (route) {
             is DashboardRoute -> {
             val vm: DashboardViewModel = koinViewModel()
             val dashboard by vm.state.collectAsStateWithLifecycle()
             DashboardScreen(
                 state = dashboard,
-                onOpenManage = { navigate(ManageRoute) },
+                // 总览与管理的入口是「切到管理的某一页」，不是往栈上压一条管理路由：
+                // 三个一级页平级，压在栈上会让返回语义变成"回到总览"。
+                onOpenManage = { pager.animateToPage(topLevelIndexOf(ManageRoute)) },
                 onStartProbe = vm::startProbe,
                 onCancelProbe = vm::cancelProbe,
                 onRefreshBalance = vm::refreshBalance,
@@ -378,7 +382,12 @@ fun VaultNavHost(
                 onDefaultProbeModelsChange = vm::onDefaultProbeModelsChange,
                 onDefaultProbeModelReachabilityChange = vm::onDefaultProbeModelReachabilityChange,
                 onBack = back,
-                onOpenManage = { navigate(ManageRoute) },
+                // 探测设置是二级页：先让 pager 翻到管理，再退回一级页，露出来就是管理。
+                // 顺序反过来的话用户会先看到原来那一页 tab 再滑过去。
+                onOpenManage = {
+                    pager.animateToPage(topLevelIndexOf(ManageRoute))
+                    back()
+                },
                 onEditThresholds = { navigate(BalanceThresholdsRoute) },
                 onEditKeywords = { navigate(ClientKeywordsRoute) },
                 onEditProxy = { navigate(ProxyRoute) },
@@ -576,9 +585,14 @@ fun VaultNavHost(
         }
     }
 
-    // 一级页也走同一个 NavDisplay：Pager 会把“首页 → 设置”拆成两段相邻滚动，
-    // 第一段经过“管理”时就会把 currentPage 写回 backStack，动画随即被重定向到中间页。
-    // NavDisplay 直接比较初始/目标 scene，既能一步到达，也保留二级页的进出动画。
+    // 一级页由 pager 承载：栈底那一条的内容就是整台 pager（三个 tab 平级、可左右滑），
+    // 二级页照旧压栈盖在它上面。pager 留在组合里（栈底 scene 一直在场），所以从管理页
+    // 压详情页走的还是同一个 NavDisplay 的进场动画，返回也直接落回原来那一页 tab。
+    //
+    // 这里不再有"一级页也走 NavDisplay 的横向过渡"那条路：tab 之间的位移由 pager 产生，
+    // 栈底路由从头到尾不变，scene 不切换，也就不会出现"点设置却停在管理"那种中途重定向。
+    val baseRoute = backStack.firstOrNull()
+
     VaultNavDisplay(
         backStack = routeSnapshot,
         onBack = { back() },
@@ -586,7 +600,19 @@ fun VaultNavHost(
         exitDirection = exitDirection,
         modifier = modifier,
     ) { route ->
-        RouteContent(route)
+        if (route == baseRoute && topLevelIndexOf(route) >= 0) {
+            HorizontalPager(
+                state = pager.pagerState,
+                modifier = Modifier.fillMaxSize(),
+            ) { page ->
+                // 每页的 rememberSaveable 由 pager 自己隔离：Pager 建在 LazyLayout 上，
+                // 每个 item 都被 LazyLayoutItemContentFactory 包了一层 SaveableStateProvider，
+                // 所以不需要再手工隔离。
+                PageContent(TopLevelRoutes[page])
+            }
+        } else {
+            PageContent(route)
+        }
     }
 }
 

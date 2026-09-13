@@ -3,8 +3,10 @@ package com.lc33.tokenvault.ui.shell
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -17,6 +19,7 @@ import com.lc33.tokenvault.domain.model.PredictiveBackExitDirection
 import com.lc33.tokenvault.domain.model.PredictiveBackStyle
 import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.platform.Haptics
+import com.lc33.tokenvault.platform.PlatformBackHandler
 import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.nav_dashboard
 import tokenvault.shared.generated.resources.nav_manage
@@ -61,7 +64,34 @@ fun VaultShell() {
         AppNavBarItem(label = stringResource(Res.string.nav_manage), icon = AppIcon.Manage),
         AppNavBarItem(label = stringResource(Res.string.nav_settings), icon = AppIcon.Settings),
     )
-    val selectedIndex = backStackRevision.let { topLevelIndexOf(backStack.lastOrNull()) }
+
+    // 一级页是一台可左右滑的 pager，三个 tab 平级。权威的选中页在 [TopLevelPagerState]，
+    // 底栏高亮和页面内容都读它——不再从 backStack 反推 tab，因为切 tab 根本不压栈了。
+    // 初始页从栈底还原：进程恢复后用户停在哪一页，栈底就是哪个路由。
+    val pagerState = rememberPagerState(
+        initialPage = topLevelIndexOf(backStack.firstOrNull()).coerceAtLeast(0),
+    ) { TopLevelRoutes.size }
+    val pager = rememberTopLevelPagerState(pagerState)
+
+    // 手指滑出来的页要收回来。底栏点击不经过这里：animateToPage 起手就认过目标页了。
+    LaunchedEffect(pagerState.currentPage) { pager.syncPage() }
+
+    // 二级页压在 pager 之上（底栏退场）；一级页时底栏高亮由 pager 决定。
+    val showingTopLevel = topLevelIndexOf(backStack.lastOrNull()) >= 0
+    val selectedIndex = if (showingTopLevel) pager.selectedPage else -1
+
+    // 系统返回手势 = 回第一页（照 MIUIX 的 MainScreenBackHandler 规则）。
+    // 系统返回是**边缘手势**，那一窄条在分发阶段就被系统截走，应用收不到，所以不可能让 pager
+    // 去跟手；做法是让两者同向：一级页上且不在第一页时消费返回、滑回总览，于是从边缘滑和
+    // 从中间滑表达的是同一件事。已经在第一页就不再消费，交给系统退出应用；二级页时 enabled
+    // 为 false，返回交回 NavDisplay 处理。
+    PlatformBackHandler(
+        enabled = backStack.size == 1 &&
+            topLevelIndexOf(backStack.lastOrNull()) >= 0 &&
+            pager.selectedPage != 0,
+    ) {
+        pager.animateToPage(0)
+    }
 
     AppScaffold(
         bottomBar = {
@@ -80,8 +110,7 @@ fun VaultShell() {
                         // 切 tab 给轻触反馈（问题 5）。只在本页已经在底栏可见时触发，
                         // 否则首屏加载也会震一下。
                         if (selectedIndex >= 0) Haptics.tap()
-                        navigateTopLevel(backStack, index)
-                        backStackRevision++
+                        pager.animateToPage(index)
                     },
                     blur = blurNavBar,
                     blurBackdrop = backdrop,
@@ -101,29 +130,11 @@ fun VaultShell() {
                 backStack = backStack,
                 revision = backStackRevision,
                 onBackStackChanged = { backStackRevision++ },
+                pager = pager,
                 style = backStyle,
                 exitDirection = backExitDirection,
                 modifier = Modifier.appLayerBackdrop(backdrop),
             )
         }
     }
-}
-
-/** 一级页返回 0/1/2，二级页返回 -1（此时不显示底栏）。 */
-private fun topLevelIndexOf(route: VaultRoute?): Int = when (route) {
-    null, DashboardRoute -> 0
-    ManageRoute -> 1
-    SettingsRoute -> 2
-    else -> -1
-}
-
-/** 三个 tab 都是 Dashboard 后的一层；系统返回永远回到总览，不在 tab 间绕圈。 */
-private fun navigateTopLevel(backStack: MutableList<VaultRoute>, index: Int) {
-    val route = when (index) {
-        0 -> DashboardRoute
-        1 -> ManageRoute
-        else -> SettingsRoute
-    }
-    while (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
-    if (backStack.lastOrNull() != route) backStack.add(route)
 }
