@@ -62,10 +62,16 @@ class KeyDetailViewModel constructor(
         val profileName = key.settings.clientProfileId?.let { id ->
             profileList.firstOrNull { it.id == id }?.name ?: "#$id"
         }
+        // 排序次序与 reorder() 用的是同一套（sortOrder 升序），这样菜单里"能不能上移"
+        // 和按下之后实际的边界判断不会各说各话。
+        val order = keyList.sortedBy { it.sortOrder }
+        val position = order.indexOfFirst { it.id == keyId }
         KeyDetailUiState(
             key = key.toRow(masked, clientProfileName = profileName),
             models = modelList.filter { it.keyId == keyId }.map { it.toRow() },
             nowMs = nowMillis(),
+            canMoveUp = position > 0,
+            canMoveDown = position >= 0 && position < order.lastIndex,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 

@@ -95,7 +95,7 @@
 
     <!-- Settings hub -->
     <string name="settings_title">设置</string>
-    <string name="settings_group_settings">设置</string>
+    <string name="settings_group_settings">通用</string>
     <string name="settings_group_sync">同步</string>
     <string name="settings_group_about">关于</string>
     <string name="settings_group_update">更新</string>
@@ -263,9 +263,9 @@
     <string name="data_clear_probe_confirm_body">所有密钥回到「未探测」，密钥、模型与账号保留。</string>
     <string name="data_clear_log_confirm_title">清空整份日志？</string>
     <string name="data_clear_log_confirm_body">所有日志条目都会被删除，不可撤销。</string>
-    <string name="log_filter_title">最低等级</string>
+    <string name="log_settings_cd">日志设置</string>
+    <string name="log_clear_cd">清空日志</string>
     <string name="log_filter_summary">显示所选等级及以上的日志。</string>
-    <string name="log_retention_summary">超过保留时间的日志会自动清理。</string>
     <string name="log_retention">保留时间</string>
     <string-array name="log_retention_options">
         <item>7 天</item>
@@ -273,7 +273,6 @@
         <item>90 天</item>
         <item>永久保留</item>
     </string-array>
-    <string name="log_auto_scroll_summary">新日志到达时自动回到最新一条。</string>
     <string name="log_auto_scroll">自动滚动</string>
     <string name="log_clear">清空日志</string>
     <string name="log_clear_confirm_title">清空全部日志？</string>
@@ -654,7 +653,7 @@
     <string name="common_off">关闭</string>
     <string name="detail_key_timeout_default">默认</string>
     <string name="detail_key_connection">连接设置</string>
-    <string name="detail_key_actions">操作</string>
+    <string name="detail_key_more_cd">更多操作</string>
     <string name="detail_probe_key">探测这把密钥</string>
     <string name="detail_probe_model_cd">探测这个模型</string>
     <string name="detail_provider_balance_total">供应商余额合计</string>

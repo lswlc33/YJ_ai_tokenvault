@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -29,7 +28,6 @@ import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.back_cd
 import tokenvault.shared.generated.resources.dialog_cancel
 import tokenvault.shared.generated.resources.log_auto_scroll
-import tokenvault.shared.generated.resources.log_auto_scroll_summary
 import tokenvault.shared.generated.resources.log_category_account
 import tokenvault.shared.generated.resources.log_category_backup
 import tokenvault.shared.generated.resources.log_category_balance
@@ -39,19 +37,19 @@ import tokenvault.shared.generated.resources.log_category_lock
 import tokenvault.shared.generated.resources.log_category_probe
 import tokenvault.shared.generated.resources.log_category_vault
 import tokenvault.shared.generated.resources.log_clear
+import tokenvault.shared.generated.resources.log_clear_cd
 import tokenvault.shared.generated.resources.log_clear_confirm_body
 import tokenvault.shared.generated.resources.log_clear_confirm_title
 import tokenvault.shared.generated.resources.log_empty
 import tokenvault.shared.generated.resources.log_empty_title
 import tokenvault.shared.generated.resources.log_filter_summary
-import tokenvault.shared.generated.resources.log_filter_title
 import tokenvault.shared.generated.resources.log_level_debug
 import tokenvault.shared.generated.resources.log_level_error
 import tokenvault.shared.generated.resources.log_level_info
 import tokenvault.shared.generated.resources.log_level_warn
 import tokenvault.shared.generated.resources.log_retention
 import tokenvault.shared.generated.resources.log_retention_options
-import tokenvault.shared.generated.resources.log_retention_summary
+import tokenvault.shared.generated.resources.log_settings_cd
 import tokenvault.shared.generated.resources.log_title
 import com.lc33.tokenvault.domain.model.AuditEntry
 import com.lc33.tokenvault.domain.model.LogCategory
@@ -63,24 +61,33 @@ import com.lc33.tokenvault.ui.common.StatusDot
 import com.lc33.tokenvault.ui.common.relativeLabel
 import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppDialog
-import com.lc33.tokenvault.ui.miuix.AppDropdownRow
-import com.lc33.tokenvault.ui.miuix.AppFilterChip
 import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppIconButton
-import com.lc33.tokenvault.ui.miuix.AppPreferenceGroup
+import com.lc33.tokenvault.ui.miuix.AppIconMenu
+import com.lc33.tokenvault.ui.miuix.AppMenuGroup
+import com.lc33.tokenvault.ui.miuix.AppMenuItem
 import com.lc33.tokenvault.ui.miuix.AppScaffold
-import com.lc33.tokenvault.ui.miuix.AppSwitchRow
+import com.lc33.tokenvault.ui.miuix.AppTabRow
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.AppTopBar
-import com.lc33.tokenvault.ui.miuix.SectionTitle
 import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
+import com.lc33.tokenvault.ui.miuix.appTopBarScroll
 import com.lc33.tokenvault.ui.miuix.rememberAppTopBarScrollState
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
 import com.lc33.tokenvault.ui.theme.LocalStatusPalette
 import com.lc33.tokenvault.ui.theme.StatusPalette
 
-/** 日志页：等级筛选、自动滚动、保留期和清理。 */
+/**
+ * 日志页：等级筛选条 + 日志列表，保留期与自动滚动收在顶栏的设置菜单里。
+ *
+ * 等级是**筛选器**——它改的是"现在看到什么"，用户会反复来回切，所以留在页面主体、
+ * 固定不随列表滚走；保留期和自动滚动是**设置**——改一次管很久，放进顶栏菜单。
+ * 两者分开的判据是"要不要反复按"，不是"重不重要"。
+ *
+ * 等级用 [AppTabRow] 而不是一排 chip：四档是固定的、互斥的、数量不变的，属于分段选择；
+ * chip 那套是给数量会变的用户分组（管理页的分组筛选）用的。
+ */
 @Composable
 fun LogScreen(
     entries: List<AuditEntry>,
@@ -126,9 +133,37 @@ fun LogScreen(
                     )
                 },
                 actions = {
+                    // 下拉按 ordinal 取选项：`log_retention_options` 的顺序必须与
+                    // `LogRetention.entries` 一致（7/30/90/永久），否则选中的档位会串位。
+                    val retentionLabels =
+                        stringArrayResource(Res.array.log_retention_options).toList()
+                    AppIconMenu(
+                        icon = AppIcon.Tune,
+                        contentDescription = stringResource(Res.string.log_settings_cd),
+                        groups = listOf(
+                            AppMenuGroup(
+                                items = LogRetention.entries.mapIndexed { index, option ->
+                                    AppMenuItem(
+                                        text = retentionLabels.getOrElse(index) { "" },
+                                        selected = option == retention,
+                                        onClick = { onRetentionChange(option) },
+                                    )
+                                },
+                            ),
+                            AppMenuGroup(
+                                items = listOf(
+                                    AppMenuItem(
+                                        text = stringResource(Res.string.log_auto_scroll),
+                                        selected = autoScroll,
+                                        onClick = { autoScroll = !autoScroll },
+                                    ),
+                                ),
+                            ),
+                        ),
+                    )
                     AppIconButton(
                         icon = AppIcon.Delete,
-                        contentDescription = stringResource(Res.string.log_clear),
+                        contentDescription = stringResource(Res.string.log_clear_cd),
                         onClick = { confirmClear = true },
                     )
                 },
@@ -136,50 +171,29 @@ fun LogScreen(
         },
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            SectionTitle(
-                text = stringResource(Res.string.log_filter_title),
-                modifier = Modifier.padding(top = tokens.itemSpacing),
+            // 等级条固定在列表上方：列表滚走时筛选状态必须还看得见。
+            AppTabRow(
+                tabs = LogLevel.entries.map { level -> stringResource(levelLabelRes(level)) },
+                selectedIndex = levelFilter.ordinal,
+                onSelect = { index -> onLevelFilterChange(LogLevel.entries[index]) },
+                modifier = Modifier.padding(
+                    start = tokens.screenPadding,
+                    end = tokens.screenPadding,
+                    top = tokens.itemSpacing,
+                ),
             )
+            // “及以上”不是自明的：选中「警告」同时包含「错误」，一句话说清，
+            // 否则用户会以为筛选只挑出这一个等级。
             AppText(
                 text = stringResource(Res.string.log_filter_summary),
                 style = AppTextStyle.Footnote,
                 color = appSecondaryTextColor,
-                modifier = Modifier.padding(horizontal = tokens.screenPadding),
+                modifier = Modifier.padding(
+                    start = tokens.screenPadding,
+                    end = tokens.screenPadding,
+                    top = 6.dp,
+                ),
             )
-            LazyRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = tokens.itemSpacing),
-                contentPadding = PaddingValues(horizontal = tokens.screenPadding),
-                horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
-            ) {
-                items(LogLevel.entries.size) { index ->
-                    val level = LogLevel.entries[index]
-                    AppFilterChip(
-                        text = stringResource(levelLabelRes(level)),
-                        selected = level == levelFilter,
-                        onClick = { onLevelFilterChange(level) },
-                    )
-                }
-            }
-
-            AppPreferenceGroup(modifier = Modifier.padding(horizontal = tokens.screenPadding)) {
-                // 下拉按 ordinal 取选项：`log_retention_options` 的顺序必须与
-                // `LogRetention.entries` 一致（7/30/90/永久），否则选中的档位会串位。
-                AppDropdownRow(
-                    title = stringResource(Res.string.log_retention),
-                    summary = stringResource(Res.string.log_retention_summary),
-                    items = stringArrayResource(Res.array.log_retention_options).toList(),
-                    selectedIndex = retention.ordinal,
-                    onSelect = { onRetentionChange(LogRetention.entries[it]) },
-                )
-                AppSwitchRow(
-                    title = stringResource(Res.string.log_auto_scroll),
-                    summary = stringResource(Res.string.log_auto_scroll_summary),
-                    checked = autoScroll,
-                    onCheckedChange = { autoScroll = it },
-                )
-            }
 
             if (entries.isEmpty()) {
                 EmptyState(
@@ -190,7 +204,9 @@ fun LogScreen(
             } else {
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .appTopBarScroll(scrollState),
                     contentPadding = PaddingValues(
                         horizontal = tokens.screenPadding,
                         vertical = tokens.itemSpacing,

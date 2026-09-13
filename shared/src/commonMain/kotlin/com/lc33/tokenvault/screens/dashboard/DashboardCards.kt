@@ -264,6 +264,7 @@ internal fun AttentionCard(items: List<AttentionItem>, onOpenProvider: (Long) ->
                         AppActionRow(
                             text = stringResource(Res.string.dashboard_attention_fix_client),
                             onClick = { onOpenProvider(item.providerId) },
+                            inset = false,
                         )
                     }
                 }
@@ -322,6 +323,7 @@ internal fun ProbeCard(
             AppActionRow(
                 text = stringResource(Res.string.dashboard_probe_cancel),
                 onClick = onCancel,
+                inset = false,
                 modifier = Modifier.padding(top = tokens.itemSpacing),
             )
             return@AppCard
@@ -369,6 +371,7 @@ internal fun ProbeCard(
         AppActionRow(
             text = stringResource(Res.string.dashboard_probe_start),
             onClick = onStart,
+            inset = false,
             modifier = Modifier.padding(top = tokens.itemSpacing),
         )
     }
@@ -424,6 +427,10 @@ internal fun BackupCard(backup: BackupStatus, onOpenSync: () -> Unit) {
                 modifier = Modifier.padding(vertical = tokens.itemSpacing),
             )
         }
-        AppActionRow(text = stringResource(Res.string.dashboard_backup_now), onClick = onOpenSync)
+        AppActionRow(
+            text = stringResource(Res.string.dashboard_backup_now),
+            onClick = onOpenSync,
+            inset = false,
+        )
     }
 }

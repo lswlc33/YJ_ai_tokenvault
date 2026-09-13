@@ -34,8 +34,10 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.BasicComponentDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.FloatingActionButton
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
@@ -44,6 +46,7 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.PullToRefresh
 import top.yukonga.miuix.kmp.basic.SmallTitle
+import top.yukonga.miuix.kmp.basic.SmallTitleDefaults
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.TabRow
@@ -167,9 +170,93 @@ fun AppPreferenceGroup(
     )
 }
 
+/**
+ * 区块标题。
+ *
+ * MIUIX 的 `SmallTitle` 自带 28dp 的左内边距，而卡片是 16dp 外边距 + 16dp 内边距——
+ * 两者差 4dp，视觉上标题正落在卡片内容左缘，这是 HyperOS 的既定排版，直接用即可。
+ *
+ * 唯一要覆盖它的场合：标题与右侧按钮同处一行，而那一行自己又加了 16dp（为了按钮
+ * 与卡片右缘对齐）。此时标题的 28dp 会叠加成 44dp、比卡片内容深出去一截，
+ * 于是 [startInset] 用来把它压回 12dp，总数仍是 28dp。
+ */
 @Composable
-fun SectionTitle(text: String, modifier: Modifier = Modifier) {
-    SmallTitle(text = text, modifier = modifier)
+fun SectionTitle(
+    text: String,
+    modifier: Modifier = Modifier,
+    /** 覆盖 MIUIX 默认的 28dp 左内边距。null 表示用默认值。 */
+    startInset: Dp? = null,
+) {
+    SmallTitle(
+        text = text,
+        modifier = modifier,
+        insideMargin = if (startInset == null) {
+            SmallTitleDefaults.InsideMargin
+        } else {
+            PaddingValues(start = startInset, top = 8.dp, bottom = 8.dp)
+        },
+    )
+}
+
+/**
+ * 只读的「标题 — 值」行。连接信息（Base URL / 鉴权风格 / 客户端预设 / 超时…）用它。
+ *
+ * 为什么需要它：这些字段以前用「一列 label 加一列 value」直接铺在卡片里，六项叠起来
+ * 就是一堵文字墙——label 与 value 的行距和卡片内边距对不齐，读起来不知道哪一行属于
+ * 哪个标签。MIUIX 里"一行读一个字段"的正确形态是 [BasicComponent]，title 在左、值在右，
+ * 与 preference 行共用触控高度、内边距和对齐；它不带背景也不可点（[enabled] 默认 false
+ * 只用来关掉按压反馈）。
+ *
+ * 值要换行时（长 URL）用 [stacked]：值另起一行画在标题下方，而不是挤在右侧——
+ * 右侧那一格被组件限制在可用宽度的六成以内，长 URL 一定会被截断。
+ * 走 `bottomAction` 而不是 `summary`：后者是 MIUIX 固定的正文小字号，改不了等宽字体，
+ * 而 URL / 密钥遮蔽串必须用等宽，否则每个字符宽度不一致、对不齐。
+ *
+ * 不用 `enabled = false` 去掉按压反馈：那会同时把标题与值换成禁用色（一片灰）。
+ * 不给 `onClick` 就已经不可点、没有波纹，文字保持正常颜色。
+ */
+@Composable
+fun AppValueRow(
+    title: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    /** 值放标题下方而不是右侧：长 URL、模型 id 这类一行放不下的值用它。 */
+    stacked: Boolean = false,
+    /** 值用等宽字族。URL、密钥遮蔽串这类值用它。 */
+    mono: Boolean = false,
+) {
+    val tokens = LocalAppTokens.current
+    val valueFamily = if (mono) tokens.monoFontFamily else null
+    BasicComponent(
+        modifier = modifier,
+        title = title,
+        insideMargin = BasicComponentDefaults.InsideMargin,
+        bottomAction = if (stacked) {
+            {
+                Text(
+                    text = value,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    style = MiuixTheme.textStyles.body2,
+                    fontFamily = valueFamily,
+                )
+            }
+        } else {
+            null
+        },
+        endActions = if (stacked) {
+            null
+        } else {
+            {
+                Text(
+                    text = value,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    style = MiuixTheme.textStyles.body2,
+                    fontFamily = valueFamily,
+                    maxLines = 1,
+                )
+            }
+        },
+    )
 }
 
 /** 可点进二级页的一行，右侧带箭头。 */
@@ -179,6 +266,8 @@ fun AppArrowRow(
     modifier: Modifier = Modifier,
     summary: String? = null,
     enabled: Boolean = true,
+    /** false 时不要行自带的 16dp 内边距，用于嵌在已有内边距的 [AppCard] 里。 */
+    inset: Boolean = true,
     onClick: (() -> Unit)? = null,
 ) {
     ArrowPreference(
@@ -186,6 +275,7 @@ fun AppArrowRow(
         modifier = modifier,
         summary = summary,
         enabled = enabled,
+        insideMargin = if (inset) BasicComponentDefaults.InsideMargin else PaddingValues(0.dp),
         onClick = {
             Haptics.tap()
             onClick?.invoke()
@@ -293,9 +383,17 @@ fun AppActionRow(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     primary: Boolean = false,
+    /** false 时不要行自带的 16dp 内边距，用于嵌在已有内边距的 [AppCard] 里。 */
+    inset: Boolean = true,
 ) {
     // primary 只保留旧调用的语义占位；入口形态不随强调级别变成按钮。
-    AppArrowRow(title = text, modifier = modifier, enabled = enabled, onClick = onClick)
+    AppArrowRow(
+        title = text,
+        modifier = modifier,
+        enabled = enabled,
+        inset = inset,
+        onClick = onClick,
+    )
 }
 
 /**
@@ -428,6 +526,11 @@ fun AppDialog(
 /**
  * 底部弹层。和 [AppDialog] 一样只用 `Overlay*`——`Window*` 那一族是独立系统窗口、
  * 行为与页面脱钩。
+ *
+ * MIUIX 的 `OverlayBottomSheet` 自带 `insideMargin`（默认左右 24dp），所以这里**不再**
+ * 叠一层 `screenPadding`：叠了就是 40dp，弹层里的行比页面里的行明显内缩一截。
+ * 要用项目的 16dp 就改 MIUIX 那一个参数，别在内容里再补一次。
+ * 纵向另给 `itemSpacing`——MIUIX 那个 `insideMargin` 的纵向是 0。
  */
 @Composable
 fun AppBottomSheet(
@@ -443,14 +546,12 @@ fun AppBottomSheet(
         modifier = modifier,
         title = title,
         onDismissRequest = onDismissRequest,
+        insideMargin = DpSize(tokens.screenPadding, 0.dp),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(
-                    horizontal = tokens.screenPadding,
-                    vertical = tokens.itemSpacing,
-                ),
+                .padding(vertical = tokens.itemSpacing),
             verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
             content = content,
         )

@@ -17,7 +17,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.lc33.tokenvault.domain.Protocol
 import com.lc33.tokenvault.screens.model.KeyDetailUiState
 import com.lc33.tokenvault.screens.model.UiModelRow
@@ -30,13 +29,17 @@ import com.lc33.tokenvault.ui.miuix.AppBottomSheet
 import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppDialog
 import com.lc33.tokenvault.ui.miuix.AppDivider
-import com.lc33.tokenvault.ui.miuix.AppChip
 import com.lc33.tokenvault.ui.miuix.AppIconButton
 import com.lc33.tokenvault.ui.miuix.AppIcon
+import com.lc33.tokenvault.ui.miuix.AppIconMenu
+import com.lc33.tokenvault.ui.miuix.AppMenuGroup
+import com.lc33.tokenvault.ui.miuix.AppMenuItem
+import com.lc33.tokenvault.ui.miuix.AppPreferenceGroup
 import com.lc33.tokenvault.ui.miuix.AppScaffold
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.AppTopBar
+import com.lc33.tokenvault.ui.miuix.AppValueRow
 import com.lc33.tokenvault.ui.miuix.SectionTitle
 import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
 import com.lc33.tokenvault.ui.miuix.appTopBarScroll
@@ -69,7 +72,7 @@ import tokenvault.shared.generated.resources.detail_models_refresh
 import tokenvault.shared.generated.resources.detail_key_balance_value
 import tokenvault.shared.generated.resources.detail_models_section
 import tokenvault.shared.generated.resources.detail_models_source
-import tokenvault.shared.generated.resources.detail_key_actions
+import tokenvault.shared.generated.resources.detail_key_more_cd
 import tokenvault.shared.generated.resources.detail_key_connection
 import tokenvault.shared.generated.resources.detail_probe_key
 import tokenvault.shared.generated.resources.editor_note
@@ -130,6 +133,46 @@ fun KeyDetailScreen(
                         icon = AppIcon.Edit,
                         contentDescription = stringResource(Res.string.detail_edit_cd),
                         onClick = onEdit,
+                    )
+                    // 排序、探测、删除都收进「更多」：它们是低频动作，铺成卡片会把
+                    // 详情页正文（连接信息、模型）推到第二屏。菜单点完就收起
+                    // （collapseOnSelection 默认 true），一次只做一件事。
+                    AppIconMenu(
+                        icon = AppIcon.More,
+                        contentDescription = stringResource(Res.string.detail_key_more_cd),
+                        collapseOnSelection = true,
+                        groups = listOf(
+                            AppMenuGroup(
+                                items = listOf(
+                                    AppMenuItem(
+                                        text = stringResource(Res.string.detail_probe_key),
+                                        onClick = onProbe,
+                                    ),
+                                ),
+                            ),
+                            AppMenuGroup(
+                                items = listOf(
+                                    AppMenuItem(
+                                        text = stringResource(Res.string.key_sort_up),
+                                        enabled = state.canMoveUp,
+                                        onClick = onMoveUp,
+                                    ),
+                                    AppMenuItem(
+                                        text = stringResource(Res.string.key_sort_down),
+                                        enabled = state.canMoveDown,
+                                        onClick = onMoveDown,
+                                    ),
+                                ),
+                            ),
+                            AppMenuGroup(
+                                items = listOf(
+                                    AppMenuItem(
+                                        text = stringResource(Res.string.groups_delete),
+                                        onClick = { pendingDelete = true },
+                                    ),
+                                ),
+                            ),
+                        ),
                     )
                 },
             )
@@ -192,58 +235,48 @@ fun KeyDetailScreen(
                         text = stringResource(Res.string.detail_key_view),
                         onClick = onReveal,
                         modifier = Modifier.padding(top = tokens.itemSpacing),
+                        inset = false,
                     )
                 }
             }
 
             item { SectionTitle(text = stringResource(Res.string.detail_key_connection)) }
             item {
-                AppCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = tokens.screenPadding),
-                ) {
-                    ConnectionField(
-                        label = stringResource(Res.string.detail_key_connection_base_url),
+                AppPreferenceGroup {
+                    AppValueRow(
+                        title = stringResource(Res.string.detail_key_connection_base_url),
                         value = key.settings.apiBaseUrl,
+                        stacked = true,
                         mono = true,
                     )
-                    AppText(
-                        text = stringResource(Res.string.detail_key_connection_protocol),
-                        style = AppTextStyle.Footnote,
-                        color = appSecondaryTextColor,
-                        modifier = Modifier.padding(top = tokens.itemSpacing),
+                    AppValueRow(
+                        title = stringResource(Res.string.detail_key_connection_protocol),
+                        // protocolLabel 是 @Composable（要读资源），不能塞进 joinToString 的
+                        // lambda 里——那是非 Composable 上下文。先逐项取出来再拼。
+                        value = key.settings.protocols
+                            .map { protocolLabel(it) }
+                            .joinToString("  "),
                     )
-                    Row(
-                        modifier = Modifier.padding(top = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
-                    ) {
-                        key.settings.protocols.forEach { AppChip(text = protocolLabel(it)) }
-                    }
-                    ConnectionField(
-                        label = stringResource(Res.string.detail_key_connection_auth),
+                    AppValueRow(
+                        title = stringResource(Res.string.detail_key_connection_auth),
                         value = key.settings.authStyle,
-                        modifier = Modifier.padding(top = tokens.itemSpacing),
                     )
-                    ConnectionField(
-                        label = stringResource(Res.string.detail_key_connection_profile),
+                    AppValueRow(
+                        title = stringResource(Res.string.detail_key_connection_profile),
                         value = key.settings.clientProfileName
                             ?: stringResource(Res.string.editor_profile_default),
-                        modifier = Modifier.padding(top = tokens.itemSpacing),
                     )
-                    ConnectionField(
-                        label = stringResource(Res.string.detail_key_connection_timeout),
+                    AppValueRow(
+                        title = stringResource(Res.string.detail_key_connection_timeout),
                         value = key.settings.timeoutSeconds?.let {
                             stringResource(Res.string.detail_key_timeout_value, it)
                         } ?: stringResource(Res.string.detail_key_timeout_default),
-                        modifier = Modifier.padding(top = tokens.itemSpacing),
                     )
-                    ConnectionField(
-                        label = stringResource(Res.string.detail_key_connection_allow_http),
+                    AppValueRow(
+                        title = stringResource(Res.string.detail_key_connection_allow_http),
                         value = stringResource(
                             if (key.settings.allowInsecure) Res.string.common_on else Res.string.common_off,
                         ),
-                        modifier = Modifier.padding(top = tokens.itemSpacing),
                     )
                 }
             }
@@ -310,23 +343,6 @@ fun KeyDetailScreen(
                 }
             }
 
-            item {
-                SectionTitle(text = stringResource(Res.string.detail_key_actions))
-            }
-            item {
-                AppCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = tokens.screenPadding),
-                ) {
-                    AppActionRow(text = stringResource(Res.string.secret_copy_cd), onClick = onReveal)
-                    AppActionRow(text = stringResource(Res.string.detail_probe_key), onClick = onProbe)
-                    AppActionRow(text = stringResource(Res.string.key_sort_up), onClick = onMoveUp)
-                    AppActionRow(text = stringResource(Res.string.key_sort_down), onClick = onMoveDown)
-                    AppActionRow(text = stringResource(Res.string.groups_delete), onClick = { pendingDelete = true })
-                }
-            }
-
             item { Spacer(modifier = Modifier.height(tokens.sectionSpacing)) }
         }
     }
@@ -365,12 +381,12 @@ fun KeyDetailScreen(
         title = selectedModel?.modelId.orEmpty(),
     ) {
         val model = selectedModel ?: return@AppBottomSheet
-        ConnectionField(
-            label = stringResource(Res.string.detail_model_protocol),
+        AppValueRow(
+            title = stringResource(Res.string.detail_model_protocol),
             value = protocolLabel(model.protocol),
         )
-        ConnectionField(
-            label = stringResource(Res.string.detail_models_source),
+        AppValueRow(
+            title = stringResource(Res.string.detail_models_source),
             value = stringResource(
                 if (model.source == com.lc33.tokenvault.screens.model.UiModelSource.Manual) {
                     Res.string.manage_source_manual
@@ -378,7 +394,6 @@ fun KeyDetailScreen(
                     Res.string.manage_source_discovered
                 },
             ),
-            modifier = Modifier.padding(top = tokens.itemSpacing),
         )
         Row(
             modifier = Modifier.padding(top = tokens.itemSpacing),
@@ -387,25 +402,4 @@ fun KeyDetailScreen(
             StatusDot(color = colorOf(model.health), label = labelOf(model.health))
         }
     }
-}
-
-@Composable
-private fun ConnectionField(
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier,
-    mono: Boolean = false,
-) {
-    val tokens = LocalAppTokens.current
-    AppText(
-        text = label,
-        style = AppTextStyle.Footnote,
-        color = appSecondaryTextColor,
-        modifier = modifier,
-    )
-    AppText(
-        text = value,
-        style = AppTextStyle.Body,
-        fontFamily = if (mono) tokens.monoFontFamily else null,
-    )
 }

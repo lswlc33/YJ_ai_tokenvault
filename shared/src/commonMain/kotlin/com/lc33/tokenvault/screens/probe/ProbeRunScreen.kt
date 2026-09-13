@@ -175,6 +175,7 @@ private fun SummaryCard(
                 text = stringResource(Res.string.probe_run_retry),
                 onClick = onRetry,
                 modifier = Modifier.padding(top = tokens.itemSpacing),
+                inset = false,
             )
         }
     }

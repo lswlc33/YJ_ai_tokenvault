@@ -162,6 +162,10 @@ private fun StatusCard(backup: BackupStatus, onExport: () -> Unit) {
                 modifier = Modifier.padding(vertical = tokens.itemSpacing),
             )
         }
-        AppActionRow(text = stringResource(Res.string.dashboard_backup_now), onClick = onExport)
+        AppActionRow(
+            text = stringResource(Res.string.dashboard_backup_now),
+            onClick = onExport,
+            inset = false,
+        )
     }
 }

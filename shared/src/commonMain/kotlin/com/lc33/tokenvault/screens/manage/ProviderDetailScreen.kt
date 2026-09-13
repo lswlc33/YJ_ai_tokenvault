@@ -215,6 +215,10 @@ fun ProviderDetailScreen(
                     SectionTitle(
                         text = stringResource(Res.string.detail_section_keys),
                         modifier = Modifier.weight(1f),
+                        // 这一行自己带了 screenPadding(16dp)，再叠 SmallTitle 默认的 28dp
+                        // 就是 44dp、比卡片内容(32dp)深出去 12dp。压回 12dp 后与其它页的
+                        // 区块标题左缘一致（相对卡片内容左缘略偏左 4dp，是 HyperOS 既定排版）。
+                        startInset = 12.dp,
                     )
                     AppIconButton(
                         icon = AppIcon.Add,
@@ -259,6 +263,7 @@ fun ProviderDetailScreen(
                     SectionTitle(
                         text = stringResource(Res.string.detail_section_accounts),
                         modifier = Modifier.weight(1f),
+                        startInset = 12.dp,
                     )
                     AppIconButton(
                         icon = AppIcon.Add,
@@ -412,6 +417,7 @@ private fun HintCard(text: String, actionText: String, onAction: () -> Unit) {
             text = actionText,
             onClick = onAction,
             modifier = Modifier.padding(top = tokens.itemSpacing),
+            inset = false,
         )
     }
 }
@@ -879,6 +885,7 @@ private fun HeaderCard(
                 text = stringResource(Res.string.editor_website) + ": " + website,
                 onClick = { openExternalUrl(website) },
                 modifier = Modifier.padding(top = 4.dp),
+                inset = false,
             )
         }
         Row(

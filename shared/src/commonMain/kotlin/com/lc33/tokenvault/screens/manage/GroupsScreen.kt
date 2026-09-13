@@ -286,9 +286,9 @@ fun GroupsScreen(
                 }
             } else {
                 item {
-                    AppPreferenceGroup(
-                        modifier = Modifier.padding(horizontal = tokens.screenPadding),
-                    ) {
+                    // AppPreferenceGroup 自己已经加了一次 screenPadding，这里不能再传，
+                    // 否则左右各叠一次、比同页的 AppCard 宽出 32dp。
+                    AppPreferenceGroup {
                         providers.forEach { provider ->
                             val selected = groupChoices.indexOfFirst { it.id == provider.groupId }
                                 .coerceAtLeast(0)

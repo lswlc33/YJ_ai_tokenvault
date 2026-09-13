@@ -168,6 +168,7 @@ private fun DefaultsNoticeCard(onOpenManage: () -> Unit) {
             text = stringResource(Res.string.probe_defaults_goto_manage),
             onClick = onOpenManage,
             modifier = Modifier.padding(top = tokens.itemSpacing),
+            inset = false,
         )
     }
 }

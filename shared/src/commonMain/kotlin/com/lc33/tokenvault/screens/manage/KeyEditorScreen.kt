@@ -373,6 +373,7 @@ fun KeyEditorScreen(
                                 text = stringResource(Res.string.editor_models_sync_now),
                                 onClick = onRefreshModels,
                                 modifier = Modifier.padding(top = tokens.itemSpacing),
+                                inset = false,
                             )
                         } else {
                             AppText(
@@ -401,6 +402,7 @@ fun KeyEditorScreen(
                                 text = stringResource(Res.string.detail_add_model),
                                 onClick = { addModel = true },
                                 modifier = Modifier.padding(top = tokens.itemSpacing),
+                                inset = false,
                             )
                         }
                     }

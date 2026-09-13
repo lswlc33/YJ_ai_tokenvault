@@ -163,6 +163,7 @@ private fun VersionCard(
             text = stringResource(Res.string.update_check_now),
             onClick = onCheckNow,
             enabled = updateState.phase != UpdateViewModel.Phase.CHECKING,
+            inset = false,
         )
     }
 }
