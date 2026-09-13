@@ -31,6 +31,7 @@ import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.icon.extended.Show
 import top.yukonga.miuix.kmp.icon.extended.Sort
 import top.yukonga.miuix.kmp.icon.extended.Store
+import top.yukonga.miuix.kmp.icon.extended.TopDownloads
 import top.yukonga.miuix.kmp.icon.extended.Tune
 import top.yukonga.miuix.kmp.icon.extended.Update
 
@@ -88,6 +89,9 @@ enum class AppIcon {
     Info,
     Sync,
     Update,
+
+    /** 设置页顶部会员卡的装饰图标。命名按用途，换图形不用改页面。 */
+    Member,
 }
 
 internal fun AppIcon.imageVector(): ImageVector = when (this) {
@@ -129,4 +133,5 @@ internal fun AppIcon.imageVector(): ImageVector = when (this) {
     AppIcon.Info -> MiuixIcons.Info
     AppIcon.Sync -> MiuixIcons.Backup
     AppIcon.Update -> MiuixIcons.Update
+    AppIcon.Member -> MiuixIcons.TopDownloads
 }

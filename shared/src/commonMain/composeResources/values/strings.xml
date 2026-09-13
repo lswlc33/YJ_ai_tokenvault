@@ -96,6 +96,8 @@
 
     <!-- Settings hub -->
     <string name="settings_title">Settings</string>
+    <string name="settings_member_title">Lifetime Member</string>
+    <string name="settings_member_expiry">Expires 2099-99-99</string>
     <string name="settings_group_settings">General</string>
     <string name="settings_group_sync">Sync</string>
     <string name="settings_group_about">About</string>

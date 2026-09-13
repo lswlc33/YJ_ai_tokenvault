@@ -95,6 +95,8 @@
 
     <!-- Settings hub -->
     <string name="settings_title">设置</string>
+    <string name="settings_member_title">永久会员</string>
+    <string name="settings_member_expiry">过期时间 2099-99-99</string>
     <string name="settings_group_settings">通用</string>
     <string name="settings_group_sync">同步</string>
     <string name="settings_group_about">关于</string>
