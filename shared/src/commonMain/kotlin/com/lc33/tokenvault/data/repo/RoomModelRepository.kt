@@ -11,6 +11,7 @@ import com.lc33.tokenvault.domain.model.LogLevel
 import com.lc33.tokenvault.domain.repo.AuditLogRepository
 import com.lc33.tokenvault.domain.repo.ModelRepository
 import com.lc33.tokenvault.domain.repo.TransactionRunner
+import com.lc33.tokenvault.domain.repo.UndoableDeletion
 import com.lc33.tokenvault.probe.ModelMerger
 import com.lc33.tokenvault.probe.NewDiscoveredModel
 import kotlinx.coroutines.flow.Flow
@@ -28,6 +29,7 @@ class RoomModelRepository constructor(
     private val transactions: TransactionRunner,
     private val now: () -> Long,
     private val audit: AuditLogRepository? = null,
+    private val restorer: UndoRestorer? = null,
 ) : ModelRepository {
 
     override fun observeByProvider(providerId: Long): Flow<List<AiModel>> =
@@ -126,7 +128,11 @@ class RoomModelRepository constructor(
         dao.update(model.toEntity())
     }
 
-    override suspend fun delete(id: Long) = dao.delete(id)
+    override suspend fun delete(id: Long): UndoableDeletion? {
+        val undo = restorer?.deleteModel(id)
+        if (restorer == null) dao.delete(id)
+        return undo
+    }
 
     override suspend fun clearByProvider(providerId: Long) = dao.deleteByProvider(providerId)
 }

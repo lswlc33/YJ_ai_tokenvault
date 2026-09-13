@@ -8,20 +8,21 @@ import com.lc33.tokenvault.domain.SecretMask
 import com.lc33.tokenvault.domain.repo.ApiKeyRepository
 import com.lc33.tokenvault.domain.repo.ClientProfileRepository
 import com.lc33.tokenvault.domain.repo.ModelRepository
+import com.lc33.tokenvault.domain.repo.UndoableDeletion
 import com.lc33.tokenvault.engine.ProbeEngine
 import com.lc33.tokenvault.platform.SecureClipboard
 import com.lc33.tokenvault.platform.nowMillis
 import com.lc33.tokenvault.screens.model.KeyDetailUiState
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -42,11 +43,21 @@ class KeyDetailViewModel constructor(
 
     private val mask = MutableStateFlow(SecretMask.ELLIPSIS)
 
-    private val _deleted = MutableSharedFlow<Unit>(
-        extraBufferCapacity = 1,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST,
-    )
-    val deleted: SharedFlow<Unit> = _deleted
+    /**
+     * 一次性事件。**只带语义、不带文案**：文案解析要 `stringResource`，那是 composable
+     * 层的事（本层拿不到资源），所以这里发"发生了什么"，由 VaultNavHost 决定说什么。
+     */
+    sealed interface Event {
+        /** 描述删除结果的语义。有 [undo] 时提示要带"撤销"。 */
+        data class Deleted(val undo: UndoableDeletion?) : Event
+
+        /** 明文已复制到剪贴板。 */
+        data object Copied : Event
+    }
+
+    private val _events = Channel<Event>(Channel.BUFFERED)
+    val events: Flow<Event> = _events.receiveAsFlow()
+
     private val _revealed = MutableStateFlow<RevealState?>(null)
     val revealed: StateFlow<RevealState?> = _revealed.asStateFlow()
 
@@ -107,6 +118,8 @@ class KeyDetailViewModel constructor(
     fun copyRevealed(label: String) {
         val plain = revealedPlain ?: return
         clipboard.copy(label, plain, SecureClipboard.DEFAULT_AUTO_CLEAR_SECONDS)
+        // 复制是"看不见的动作"：不提示的话用户不知道到底复制成功没有。
+        _events.trySend(Event.Copied)
     }
 
     fun closeReveal() {
@@ -120,8 +133,9 @@ class KeyDetailViewModel constructor(
 
     fun delete() {
         viewModelScope.launch {
-            keys.delete(keyId)
-            _deleted.tryEmit(Unit)
+            // 拿住撤销句柄再发事件：删除已经落库，提示消失前用户可以按"撤销"把它写回来。
+            val undo = keys.delete(keyId)
+            _events.trySend(Event.Deleted(undo))
         }
     }
 

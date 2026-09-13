@@ -571,6 +571,38 @@
     <!-- ==================== M1 lock gate: onboarding, unlock ==================== -->
     <string name="dialog_cancel">Cancel</string>
 
+    <!-- Snackbar feedback. Every message shows a close button; only deletions add an undo action. -->
+    <string name="common_undo">Undo</string>
+    <string name="feedback_undone">Restored</string>
+    <string name="feedback_undo_failed">Could not restore — the item may have been recreated since</string>
+    <string name="feedback_copied">Copied</string>
+    <string name="feedback_providers_deleted">Deleted selected providers</string>
+    <string name="feedback_key_deleted">Key deleted</string>
+    <string name="feedback_model_deleted">Model deleted</string>
+    <string name="feedback_account_deleted">Account deleted</string>
+    <string name="feedback_account_saved">Account saved</string>
+    <string name="feedback_probe_key_sent">Probing this key…</string>
+    <string name="feedback_model_saved">Model saved</string>
+    <string name="feedback_group_added">Group added</string>
+    <string name="feedback_group_renamed">Group renamed</string>
+    <string name="feedback_group_deleted">Group deleted; its providers moved back to All</string>
+    <string name="feedback_provider_saved">Provider saved</string>
+    <string name="feedback_key_saved">Key saved</string>
+    <string name="feedback_profile_saved">Profile saved</string>
+    <string name="feedback_pin_changed">PIN changed</string>
+    <string name="feedback_imported">Key imported</string>
+    <string name="feedback_clipboard_filled">Pasted from clipboard</string>
+    <string name="feedback_clipboard_empty">Clipboard is empty</string>
+    <string name="feedback_probe_started">Probe started</string>
+    <string name="feedback_probe_cancelled">Probe cancelled</string>
+    <string name="feedback_balance_refreshed">Balances refreshed</string>
+    <string name="feedback_status_refreshed">Status refreshed</string>
+    <string name="feedback_models_refreshed">Model list refreshed</string>
+    <string name="feedback_model_probed">Model probed</string>
+    <string name="feedback_probe_retried">Retrying failed items</string>
+    <string name="feedback_logs_cleared">Log cleared</string>
+    <string name="feedback_probe_results_cleared">Probe results cleared</string>
+
     <!-- PIN entry -->
     <string name="pin_dots_cd">%1$d of %2$d digits entered</string>
     <string name="pin_backspace_cd">Backspace</string>

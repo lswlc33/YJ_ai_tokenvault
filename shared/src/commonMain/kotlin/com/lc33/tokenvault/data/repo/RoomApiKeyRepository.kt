@@ -17,6 +17,7 @@ import com.lc33.tokenvault.domain.model.KeySettings
 import com.lc33.tokenvault.domain.repo.ApiKeyRepository
 import com.lc33.tokenvault.domain.repo.AuditLogRepository
 import com.lc33.tokenvault.domain.repo.TransactionRunner
+import com.lc33.tokenvault.domain.repo.UndoableDeletion
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -27,6 +28,7 @@ class RoomApiKeyRepository constructor(
     private val transactions: TransactionRunner,
     private val now: () -> Long,
     private val audit: AuditLogRepository? = null,
+    private val restorer: UndoRestorer? = null,
 ) : ApiKeyRepository {
     override fun observeByProvider(providerId: Long): Flow<List<ApiKey>> =
         dao.observeByProvider(providerId).map { rows -> rows.map { it.toDomain() } }
@@ -150,9 +152,11 @@ class RoomApiKeyRepository constructor(
         audit.recordSafe(LogLevel.INFO, LogCategory.VAULT, "api key enabled changed", "id=$id enabled=$enabled", keyId = id)
     }
 
-    override suspend fun delete(id: Long) {
-        dao.delete(id)
+    override suspend fun delete(id: Long): UndoableDeletion? {
+        val undo = restorer?.deleteKey(id)
+        if (restorer == null) dao.delete(id)
         audit.recordSafe(LogLevel.WARN, LogCategory.VAULT, "api key deleted", "id=$id", keyId = id)
+        return undo
     }
 
     override suspend fun reorder(providerId: Long, idsInOrder: List<Long>) {

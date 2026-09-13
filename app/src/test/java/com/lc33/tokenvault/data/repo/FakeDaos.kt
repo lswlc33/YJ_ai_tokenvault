@@ -65,6 +65,8 @@ internal class FakeGroupDao : GroupDao {
     override suspend fun findById(id: Long): GroupEntity? = store.firstOrNull { it.id == id }
 
     override suspend fun insert(group: GroupEntity): Long {
+        // id != 0 = 写显式主键（对齐 Room 生成的 nullif(?,0)），撤销要靠它。
+        if (group.id != 0L) { store += group; revision.value++; return group.id }
         val id = nextId++
         store += group.copy(id = id)
         revision.value++
@@ -112,6 +114,8 @@ internal class FakeProviderDao : ProviderDao {
     override suspend fun findAll(): List<ProviderEntity> = store.toList()
 
     override suspend fun insert(provider: ProviderEntity): Long {
+        // id != 0 = 写显式主键（对齐 Room 生成的 nullif(?,0)），撤销要靠它。
+        if (provider.id != 0L) { store += provider; revision.value++; return provider.id }
         val id = nextId++
         store += provider.copy(id = id)
         revision.value++
@@ -251,6 +255,8 @@ internal class FakeApiKeyDao(
         store.count { it.providerId == providerId && it.fingerprint == fingerprint }
 
     override suspend fun insertRaw(key: ApiKeyEntity): Long {
+        // id != 0 = 写显式主键（对齐 Room 生成的 nullif(?,0)），撤销要靠它。
+        if (key.id != 0L) { store += key; revision.value++; return key.id }
         val id = nextId++
         store += key.copy(id = id)
         revision.value++
@@ -391,9 +397,19 @@ internal class FakeProviderAccountDao : ProviderAccountDao {
 
     override suspend fun findAll(): List<ProviderAccountEntity> = ordered()
 
+    override suspend fun findByProvider(providerId: Long): List<ProviderAccountEntity> =
+        ordered().filter { it.providerId == providerId }
+
     override suspend fun findById(id: Long): ProviderAccountEntity? = store.firstOrNull { it.id == id }
 
     override suspend fun insert(account: ProviderAccountEntity): Long {
+        // 与真 Room 生成的 SQL 一致：id != 0 即写显式主键（生成的是 `nullif(?, 0)`）。
+        // 撤销按原主键写回全靠这个行为，假 DAO 必须照做，否则测不出真实语义。
+        if (account.id != 0L) {
+            store += account
+            revision.value++
+            return account.id
+        }
         val id = nextId++
         store += account.copy(id = id)
         revision.value++
@@ -477,6 +493,21 @@ internal class FakeModelDao : ModelDao {
     override suspend fun findById(id: Long): ModelEntity? = store.firstOrNull { it.id == id }
 
     override suspend fun insertIgnoring(model: ModelEntity): Long {
+        // id != 0 = 写显式主键（对齐 Room 生成的 nullif(?,0)），撤销要靠它。
+        // 真实现是 INSERT OR IGNORE：唯一冲突时返回 -1，撤销据此判失败。
+        if (model.id != 0L) {
+            val clash = store.any {
+                it.id != model.id &&
+                    it.providerId == model.providerId &&
+                    it.keyId == model.keyId &&
+                    it.modelId == model.modelId &&
+                    it.protocol == model.protocol
+            }
+            if (clash) return -1L
+            store += model
+            revision.value++
+            return model.id
+        }
         val id = nextId++
         store += model.copy(id = id)
         revision.value++

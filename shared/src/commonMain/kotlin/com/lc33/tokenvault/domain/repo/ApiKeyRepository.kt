@@ -50,7 +50,9 @@ interface ApiKeyRepository {
     suspend fun revealBalanceToken(id: Long): CharArray?
 
     suspend fun setEnabled(id: Long, enabled: Boolean)
-    suspend fun delete(id: Long)
+
+    /** 删除这把 Key（连同它的 KeySettings 与模型）。返回可撤销句柄。 */
+    suspend fun delete(id: Long): UndoableDeletion?
 
     /** 同一供应商内重排 Key。排序本身就是优先级，v3 起没有默认 Key。 */
     suspend fun reorder(providerId: Long, idsInOrder: List<Long>)

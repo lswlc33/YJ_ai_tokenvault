@@ -29,9 +29,10 @@ import com.lc33.tokenvault.ui.miuix.AppNavBarItem
 import com.lc33.tokenvault.ui.miuix.AppScaffold
 import com.lc33.tokenvault.ui.miuix.AppSnackbarHost
 import com.lc33.tokenvault.ui.miuix.LocalAppBottomBarInset
-import com.lc33.tokenvault.ui.miuix.LocalAppSnackbar
+import com.lc33.tokenvault.ui.miuix.LocalAppFeedback
 import com.lc33.tokenvault.ui.miuix.navigation.rememberVaultBackStack
 import com.lc33.tokenvault.ui.miuix.appLayerBackdrop
+import com.lc33.tokenvault.ui.miuix.rememberAppFeedbackHost
 import com.lc33.tokenvault.ui.miuix.rememberAppLayerBackdrop
 import com.lc33.tokenvault.ui.miuix.rememberAppSnackbarState
 
@@ -48,6 +49,9 @@ fun VaultShell() {
     val backStack = rememberVaultBackStack()
     var backStackRevision by remember { mutableIntStateOf(0) }
     val snackbar = rememberAppSnackbarState()
+    // 提示队列挂在这里（Shell 级），不挂到各页面：删除后页面会退出组合，撤销回调
+    // 必须活得比页面久，否则用户点"撤销"时协程已被取消、按钮点了没反应。
+    val feedback = rememberAppFeedbackHost(snackbar)
 
     // 底栏模糊与返回动画都来自 app_settings：外观页改完，这里和导航层看到的是同一条流。
     val appearance: AppearanceViewModel = koinViewModel()
@@ -120,7 +124,7 @@ fun VaultShell() {
         snackbarHost = { AppSnackbarHost(snackbar) },
     ) { padding ->
         CompositionLocalProvider(
-            LocalAppSnackbar provides snackbar,
+            LocalAppFeedback provides feedback,
             LocalAppBottomBarInset provides padding.calculateBottomPadding(),
         ) {
             // 内容必须绘制到窗口底部，才能透过浮层玻璃被采样；底栏高度改为通过

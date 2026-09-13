@@ -53,8 +53,8 @@ interface ProviderAccountRepository {
         note: String?,
     )
 
-    /** 删除一条平台账号。 */
-    suspend fun delete(id: Long)
+    /** 删除一条平台账号。返回可撤销句柄。 */
+    suspend fun delete(id: Long): UndoableDeletion?
 
     /**
      * 解出这条账号的**用户名明文**（遮蔽串要现算，红线 21）。返回的 [CharArray] 归调用方擦。

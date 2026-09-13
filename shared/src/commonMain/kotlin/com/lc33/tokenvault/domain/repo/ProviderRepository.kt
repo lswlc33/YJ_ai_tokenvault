@@ -13,8 +13,13 @@ interface ProviderRepository {
     /** 新增或保存合集信息。 */
     suspend fun save(provider: Provider): Long
 
-    /** 删除供应商会级联删除其 Key、KeySettings、账号与模型。 */
-    suspend fun delete(id: Long)
+    /**
+     * 删除供应商会级联删除其 Key、KeySettings、账号与模型。
+     *
+     * 返回的句柄持有删除前的完整快照，可在提示消失前把这一供应商连同它下面的一切
+     * 按原主键写回（见 [UndoableDeletion]）。
+     */
+    suspend fun delete(id: Long): UndoableDeletion?
 
     suspend fun setGroup(ids: List<Long>, groupId: Long?)
 

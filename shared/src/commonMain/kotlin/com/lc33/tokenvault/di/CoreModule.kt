@@ -16,6 +16,7 @@ import com.lc33.tokenvault.data.repo.RoomModelRepository
 import com.lc33.tokenvault.data.repo.RoomProviderAccountRepository
 import com.lc33.tokenvault.data.repo.RoomProbeRunRepository
 import com.lc33.tokenvault.data.repo.RoomProviderRepository
+import com.lc33.tokenvault.data.repo.UndoRestorer
 import com.lc33.tokenvault.data.repo.RoomSettingsRepository
 import com.lc33.tokenvault.data.repo.RoomWebDavSettingsRepository
 import com.lc33.tokenvault.data.repo.RoomTransactionRunner
@@ -157,13 +158,28 @@ val coreModule = module {
     single { ImportWriter(get(), get(), get(), get(), get()) }
     single { ProfileSeeder(get()) }
 
+    // 「删除后可撤销」的共用写回器。它要按外键顺序、按原主键把快照写回，
+    // 所以需要这几张表的 DAO 与事务边界；四个可撤销仓库共用同一份实例。
+    single {
+        UndoRestorer(
+            providerDao = get(),
+            apiKeyDao = get(),
+            settingsDao = get(),
+            modelDao = get(),
+            accountDao = get(),
+            groupDao = get(),
+            profileDao = get(),
+            transactions = get(),
+        )
+    }
+
     single<GroupRepository> { RoomGroupRepository(get(), get()) }
-    single<ProviderRepository> { RoomProviderRepository(get(), get(named(Qualifiers.NOW)), get()) }
-    single<ApiKeyRepository> { RoomApiKeyRepository(get(), get(), get(), get(), get(named(Qualifiers.NOW)), get()) }
+    single<ProviderRepository> { RoomProviderRepository(get(), get(named(Qualifiers.NOW)), get(), get()) }
+    single<ApiKeyRepository> { RoomApiKeyRepository(get(), get(), get(), get(), get(named(Qualifiers.NOW)), get(), get()) }
     single<SettingsRepository> { RoomSettingsRepository(get(), get()) }
     single<WebDavSettingsRepository> { RoomWebDavSettingsRepository(get(), get(), get()) }
-    single<ProviderAccountRepository> { RoomProviderAccountRepository(get(), get(), get(), get(named(Qualifiers.NOW)), get()) }
-    single<ModelRepository> { RoomModelRepository(get(), get(), get(named(Qualifiers.NOW)), get()) }
+    single<ProviderAccountRepository> { RoomProviderAccountRepository(get(), get(), get(), get(named(Qualifiers.NOW)), get(), get()) }
+    single<ModelRepository> { RoomModelRepository(get(), get(), get(named(Qualifiers.NOW)), get(), get()) }
     single<ClientProfileRepository> { RoomClientProfileRepository(get(), get()) }
     single<AuditLogRepository> { RoomAuditLogRepository(get(), get(), get(named(Qualifiers.NOW))) }
     single { LogMaintenance(settings = get(), audit = get(), now = get(named(Qualifiers.NOW))) }

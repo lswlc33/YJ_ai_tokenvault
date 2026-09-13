@@ -19,6 +19,7 @@ import com.lc33.tokenvault.domain.repo.ApiKeyRepository
 import com.lc33.tokenvault.domain.repo.ModelRepository
 import com.lc33.tokenvault.domain.repo.ProviderAccountRepository
 import com.lc33.tokenvault.domain.repo.ProviderRepository
+import com.lc33.tokenvault.domain.repo.UndoableDeletion
 import com.lc33.tokenvault.engine.BalanceEngine
 import com.lc33.tokenvault.engine.ProbeEngine
 import com.lc33.tokenvault.screens.model.ProviderDetailUiState
@@ -27,12 +28,15 @@ import com.lc33.tokenvault.screens.model.UiKeyRow
 import com.lc33.tokenvault.screens.model.UiModelRow
 import com.lc33.tokenvault.screens.model.UiProviderRow
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -73,6 +77,33 @@ class ProviderDetailViewModel constructor(
     private data class Mask(val updatedAt: Long, val text: String)
 
     private val masks = MutableStateFlow<Map<Long, Mask>>(emptyMap())
+
+    /**
+     * 一次性事件。只带语义、不带文案——文案解析在 composable 层（本层拿不到资源）。
+     */
+    sealed interface Event {
+        /** 模型已删除；[undo] 非空时提示要带"撤销"。 */
+        data class ModelDeleted(val undo: UndoableDeletion?) : Event
+
+        /** 平台账号已删除；[undo] 非空时提示要带"撤销"。 */
+        data class AccountDeleted(val undo: UndoableDeletion?) : Event
+
+        /** 账号密码明文已复制。 */
+        data object Copied : Event
+
+        /** 模型/账号保存成功。 */
+        data object ModelSaved : Event
+        data object AccountSaved : Event
+
+        /** 一次性动作已发出（结果本身由状态流回填）。 */
+        data object BalanceRefreshed : Event
+        data object ModelsRefreshed : Event
+        data object KeyProbed : Event
+        data object ModelProbed : Event
+    }
+
+    private val _events = Channel<Event>(Channel.BUFFERED)
+    val events: Flow<Event> = _events.receiveAsFlow()
 
     /**
      * 账号用户名的遮蔽串缓存，按 `updatedAt` 记（和密钥 [masks] 同一套逻辑）。
@@ -254,6 +285,7 @@ class ProviderDetailViewModel constructor(
                     loginMethods = loginMethods,
                     note = note,
                 )
+                _events.trySend(Event.AccountSaved)
             } finally {
                 username?.zeroize()
                 password?.zeroize()
@@ -295,8 +327,9 @@ class ProviderDetailViewModel constructor(
 
     fun onDeleteAccount(id: Long) {
         viewModelScope.launch {
-            runCatching { accounts.delete(id) }
+            val undo = runCatching { accounts.delete(id) }.getOrNull()
             if (_revealedAccount.value?.accountId == id) onCloseAccountSheet()
+            _events.trySend(Event.AccountDeleted(undo))
         }
     }
 
@@ -311,6 +344,7 @@ class ProviderDetailViewModel constructor(
                     protocol = protocol,
                     needsReview = modelId.any { it.isWhitespace() || it.isUpperCase() },
                 )
+                _events.trySend(Event.ModelSaved)
             }
         }
     }
@@ -338,12 +372,16 @@ class ProviderDetailViewModel constructor(
     }
 
     fun onDeleteModel(id: Long) {
-        viewModelScope.launch { models.delete(id) }
+        viewModelScope.launch {
+            val undo = models.delete(id)
+            _events.trySend(Event.ModelDeleted(undo))
+        }
     }
 
     /** 模型可达性探测（快捷）：长按模型行手动触发。 */
     fun onProbeModel(keyId: Long, modelId: String, protocol: Protocol) {
         probeEngine.probeModel(providerId, keyId, modelId, protocol)
+        _events.trySend(Event.ModelProbed)
     }
 
     fun onRevealAccount(accountId: Long) {
@@ -373,6 +411,7 @@ class ProviderDetailViewModel constructor(
         val plain = revealedAccountPlain ?: return
         val secret = plain.password ?: plain.username ?: return
         clipboard.copy(label, secret, SecureClipboard.DEFAULT_AUTO_CLEAR_SECONDS)
+        _events.trySend(Event.Copied)
     }
 
     fun onCloseAccountSheet() {
@@ -397,6 +436,7 @@ class ProviderDetailViewModel constructor(
     fun refreshBalance() {
         viewModelScope.launch {
             runCatching { balanceEngine.refresh(providerId) }
+            _events.trySend(Event.BalanceRefreshed)
         }
     }
 
@@ -408,11 +448,13 @@ class ProviderDetailViewModel constructor(
     /** 详情页 Key 行「单 Key 探测」。只发一次 L2（零成本），验证这一张 Key 是否有效。 */
     fun probeKey(keyId: Long) {
         probeEngine.probeKey(keyId)
+        _events.trySend(Event.KeyProbed)
     }
 
     /** 手动拉模型列表。null = 这家全部启用 Key；指定 id = 只拉那一张 Key。 */
     fun refreshModels(keyId: Long? = null) {
         probeEngine.refreshModels(providerId, keyId)
+        _events.trySend(Event.ModelsRefreshed)
     }
 
     private fun Provider.toDetailRow(

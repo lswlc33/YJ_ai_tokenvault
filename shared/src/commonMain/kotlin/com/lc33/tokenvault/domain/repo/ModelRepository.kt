@@ -61,7 +61,8 @@ interface ModelRepository {
     /** 手动编辑模型。模型表没有密文，可以整行保存。 */
     suspend fun update(model: AiModel)
 
-    suspend fun delete(id: Long)
+    /** 删除一个模型。返回可撤销句柄。 */
+    suspend fun delete(id: Long): UndoableDeletion?
 
     /** 开启自动模型列表前清空这家已保存的模型列表。 */
     suspend fun clearByProvider(providerId: Long)

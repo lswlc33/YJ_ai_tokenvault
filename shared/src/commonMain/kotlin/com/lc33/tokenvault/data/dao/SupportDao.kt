@@ -25,6 +25,10 @@ interface ProviderAccountDao {
     @Query("SELECT * FROM provider_accounts ORDER BY providerId, sortOrder, id")
     suspend fun findAll(): List<ProviderAccountEntity>
 
+    /** 撤销用：按供应商读回全部账号整行（含密文；按原主键写回时不需要解密）。 */
+    @Query("SELECT * FROM provider_accounts WHERE providerId = :providerId ORDER BY sortOrder, id")
+    suspend fun findByProvider(providerId: Long): List<ProviderAccountEntity>
+
     @Query("SELECT * FROM provider_accounts WHERE id = :id")
     suspend fun findById(id: Long): ProviderAccountEntity?
 

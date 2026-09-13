@@ -16,6 +16,7 @@ import com.lc33.tokenvault.domain.model.LogLevel
 import com.lc33.tokenvault.domain.model.ProviderAccount
 import com.lc33.tokenvault.domain.repo.AuditLogRepository
 import com.lc33.tokenvault.domain.repo.ProviderAccountRepository
+import com.lc33.tokenvault.domain.repo.UndoableDeletion
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -34,6 +35,7 @@ class RoomProviderAccountRepository constructor(
     private val transactions: TransactionRunner,
     private val now: () -> Long,
     private val audit: AuditLogRepository? = null,
+    private val restorer: UndoRestorer? = null,
 ) : ProviderAccountRepository {
 
     override fun observeByProvider(providerId: Long): Flow<List<ProviderAccount>> =
@@ -138,10 +140,12 @@ class RoomProviderAccountRepository constructor(
         }
     }
 
-    override suspend fun delete(id: Long) {
+    override suspend fun delete(id: Long): UndoableDeletion? {
         val providerId = dao.findById(id)?.providerId
-        dao.delete(id)
+        val undo = restorer?.deleteAccount(id)
+        if (restorer == null) dao.delete(id)
         audit.recordSafe(LogLevel.WARN, LogCategory.ACCOUNT, "provider account deleted", "id=$id", providerId = providerId)
+        return undo
     }
 
     override suspend fun revealUsername(id: Long): CharArray? {

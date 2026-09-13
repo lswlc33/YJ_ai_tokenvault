@@ -6,11 +6,15 @@ import com.lc33.tokenvault.domain.SecretMask
 import com.lc33.tokenvault.domain.repo.ApiKeyRepository
 import com.lc33.tokenvault.domain.repo.GroupRepository
 import com.lc33.tokenvault.domain.repo.ProviderRepository
+import com.lc33.tokenvault.domain.repo.UndoableDeletion
+import com.lc33.tokenvault.domain.repo.combined
 import com.lc33.tokenvault.engine.BalanceEngine
 import com.lc33.tokenvault.engine.ProbeEngine
 import com.lc33.tokenvault.screens.model.ManageUiState
 import com.lc33.tokenvault.screens.model.ProviderSort
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -18,6 +22,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -59,6 +64,26 @@ class ManageViewModel constructor(
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
     )
     val groupError: SharedFlow<Unit> = _groupError.asSharedFlow()
+
+    /**
+     * 一次性事件。只带语义、不带文案（文案解析在 composable 层）。
+     */
+    sealed interface Event {
+        /** 批量删除的供应商，[undo] 非空时提示要带"撤销"。 */
+        data class ProvidersDeleted(val undo: UndoableDeletion?) : Event
+
+        /** 分组新增成功。 */
+        data object GroupAdded : Event
+
+        /** 分组重命名成功。 */
+        data object GroupRenamed : Event
+
+        /** 分组已删除（不撤销：只把供应商落回「全部」，可重新创建）。 */
+        data object GroupDeleted : Event
+    }
+
+    private val _events = Channel<Event>(Channel.BUFFERED)
+    val events: Flow<Event> = _events.receiveAsFlow()
 
     /**
      * 「全部」那一枚 chip 的名字。
@@ -189,8 +214,12 @@ class ManageViewModel constructor(
     /** 批量删除。连带删密钥 / 账号 / 模型（外键 CASCADE），调用方已做二次确认。 */
     fun batchDelete(ids: Set<Long>) {
         viewModelScope.launch {
-            ids.forEach { id -> runCatching { providers.delete(id) } }
+            // 逐个取撤销句柄再合成一条：提示里只有一个"撤销"，按下去要把这一批全恢复。
+            val undos = ids.mapNotNull { id -> runCatching { providers.delete(id) }.getOrNull() }
             selection.value = emptySet()
+            _events.trySend(
+                Event.ProvidersDeleted(undos.takeIf { it.isNotEmpty() }?.combined()),
+            )
         }
     }
 
@@ -206,13 +235,17 @@ class ManageViewModel constructor(
         // 同名会被唯一索引挡住。这里不预先查一遍再插：查与插之间有窗口，
         // 而唯一索引本来就是那条保证；失败通过 groupError 提示，不能静默吞掉。
         viewModelScope.launch {
-            runCatching { groups.add(name) }.onFailure { _groupError.tryEmit(Unit) }
+            runCatching { groups.add(name) }
+                .onSuccess { _events.trySend(Event.GroupAdded) }
+                .onFailure { _groupError.tryEmit(Unit) }
         }
     }
 
     fun onRenameGroup(id: Long, name: String) {
         viewModelScope.launch {
-            runCatching { groups.rename(id, name) }.onFailure { _groupError.tryEmit(Unit) }
+            runCatching { groups.rename(id, name) }
+                .onSuccess { _events.trySend(Event.GroupRenamed) }
+                .onFailure { _groupError.tryEmit(Unit) }
         }
     }
 
@@ -222,6 +255,7 @@ class ManageViewModel constructor(
             groups.delete(id)
             // 正筛着这个分组时把筛选退回「全部」，否则列表会停在一个不存在的分组上、显示空
             if (selectedGroupId.value == id) selectedGroupId.value = null
+            _events.trySend(Event.GroupDeleted)
         }
     }
 

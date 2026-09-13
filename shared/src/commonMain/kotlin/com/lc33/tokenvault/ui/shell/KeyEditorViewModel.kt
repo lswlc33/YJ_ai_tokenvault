@@ -8,6 +8,7 @@ import com.lc33.tokenvault.domain.model.ApiKey
 import com.lc33.tokenvault.domain.repo.ApiKeyRepository
 import com.lc33.tokenvault.domain.repo.ClientProfileRepository
 import com.lc33.tokenvault.domain.repo.ModelRepository
+import com.lc33.tokenvault.domain.repo.UndoableDeletion
 import com.lc33.tokenvault.endpoint.EndpointError
 import com.lc33.tokenvault.endpoint.NormalizeResult
 import com.lc33.tokenvault.endpoint.normalizeBaseUrl
@@ -15,6 +16,8 @@ import com.lc33.tokenvault.engine.ProbeEngine
 import com.lc33.tokenvault.screens.model.KeyDraft
 import com.lc33.tokenvault.screens.model.UiModelRow
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -23,6 +26,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -66,6 +70,20 @@ class KeyEditorViewModel constructor(
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
     )
     val saved: SharedFlow<Unit> = _saved.asSharedFlow()
+
+    /**
+     * 一次性事件。只带语义、不带文案（文案解析在 composable 层）。
+     */
+    sealed interface Event {
+        /** 模型已删除；[undo] 非空时提示要带"撤销"。 */
+        data class ModelDeleted(val undo: UndoableDeletion?) : Event
+
+        /** 模型已添加或编辑落库。 */
+        data object ModelSaved : Event
+    }
+
+    private val _events = Channel<Event>(Channel.BUFFERED)
+    val events: Flow<Event> = _events.receiveAsFlow()
 
     private val _urlError = MutableStateFlow<EndpointError?>(null)
     val urlError: StateFlow<EndpointError?> = _urlError.asStateFlow()
@@ -194,7 +212,7 @@ class KeyEditorViewModel constructor(
                     protocol = protocol,
                     needsReview = modelId.any { it.isWhitespace() || it.isUpperCase() },
                 )
-            }
+            }.onSuccess { _events.trySend(Event.ModelSaved) }
         }
     }
 
@@ -218,12 +236,15 @@ class KeyEditorViewModel constructor(
                         enabled = enabled,
                     ),
                 )
-            }
+            }.onSuccess { _events.trySend(Event.ModelSaved) }
         }
     }
 
     fun deleteModel(id: Long) {
-        viewModelScope.launch { runCatching { modelsRepository.delete(id) } }
+        viewModelScope.launch {
+            val undo = runCatching { modelsRepository.delete(id) }.getOrNull()
+            _events.trySend(Event.ModelDeleted(undo))
+        }
     }
 
     fun refreshModels() {

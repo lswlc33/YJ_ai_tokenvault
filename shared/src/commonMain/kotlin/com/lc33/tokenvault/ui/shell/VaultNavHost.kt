@@ -53,7 +53,9 @@ import com.lc33.tokenvault.ui.miuix.AppSecretTextField
 import com.lc33.tokenvault.ui.miuix.AppSwitchRow
 import com.lc33.tokenvault.ui.miuix.AppTextButton
 import com.lc33.tokenvault.ui.miuix.AppTextField
-import com.lc33.tokenvault.ui.miuix.LocalAppSnackbar
+import com.lc33.tokenvault.ui.miuix.AppFeedback
+import com.lc33.tokenvault.ui.miuix.AppUndoFeedback
+import com.lc33.tokenvault.ui.miuix.LocalAppFeedback
 import com.lc33.tokenvault.ui.miuix.navigation.VaultNavDisplay
 import com.lc33.tokenvault.ui.miuix.rememberAppTextFieldState
 import com.lc33.tokenvault.ui.miuix.rememberSecretTextFieldState
@@ -64,6 +66,36 @@ import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 import tokenvault.shared.generated.resources.clipboard_label_account
 import tokenvault.shared.generated.resources.clipboard_label_api_key
+import tokenvault.shared.generated.resources.common_undo
+import tokenvault.shared.generated.resources.feedback_account_deleted
+import tokenvault.shared.generated.resources.feedback_copied
+import tokenvault.shared.generated.resources.feedback_group_added
+import tokenvault.shared.generated.resources.feedback_group_deleted
+import tokenvault.shared.generated.resources.feedback_group_renamed
+import tokenvault.shared.generated.resources.feedback_key_deleted
+import tokenvault.shared.generated.resources.feedback_model_deleted
+import tokenvault.shared.generated.resources.feedback_model_saved
+import tokenvault.shared.generated.resources.feedback_providers_deleted
+import tokenvault.shared.generated.resources.feedback_account_saved
+import tokenvault.shared.generated.resources.feedback_balance_refreshed
+import tokenvault.shared.generated.resources.feedback_clipboard_empty
+import tokenvault.shared.generated.resources.feedback_clipboard_filled
+import tokenvault.shared.generated.resources.feedback_imported
+import tokenvault.shared.generated.resources.feedback_key_saved
+import tokenvault.shared.generated.resources.feedback_logs_cleared
+import tokenvault.shared.generated.resources.feedback_model_probed
+import tokenvault.shared.generated.resources.feedback_models_refreshed
+import tokenvault.shared.generated.resources.feedback_pin_changed
+import tokenvault.shared.generated.resources.feedback_probe_cancelled
+import tokenvault.shared.generated.resources.feedback_probe_key_sent
+import tokenvault.shared.generated.resources.feedback_probe_results_cleared
+import tokenvault.shared.generated.resources.feedback_probe_retried
+import tokenvault.shared.generated.resources.feedback_probe_started
+import tokenvault.shared.generated.resources.feedback_profile_saved
+import tokenvault.shared.generated.resources.feedback_provider_saved
+import tokenvault.shared.generated.resources.feedback_status_refreshed
+import tokenvault.shared.generated.resources.feedback_undone
+import tokenvault.shared.generated.resources.feedback_undo_failed
 import tokenvault.shared.generated.resources.editor_group_none
 import tokenvault.shared.generated.resources.editor_url_err_empty
 import tokenvault.shared.generated.resources.editor_url_err_host
@@ -137,15 +169,34 @@ fun VaultNavHost(
             is DashboardRoute -> {
             val vm: DashboardViewModel = koinViewModel()
             val dashboard by vm.state.collectAsStateWithLifecycle()
+            val feedback = LocalAppFeedback.current
+            val probeStarted = stringResource(Res.string.feedback_probe_started)
+            val probeCancelled = stringResource(Res.string.feedback_probe_cancelled)
+            val balanceRefreshed = stringResource(Res.string.feedback_balance_refreshed)
+            val statusRefreshed = stringResource(Res.string.feedback_status_refreshed)
             DashboardScreen(
                 state = dashboard,
                 // 总览与管理的入口是「切到管理的某一页」，不是往栈上压一条管理路由：
                 // 三个一级页平级，压在栈上会让返回语义变成"回到总览"。
                 onOpenManage = { pager.animateToPage(topLevelIndexOf(ManageRoute)) },
-                onStartProbe = vm::startProbe,
-                onCancelProbe = vm::cancelProbe,
-                onRefreshBalance = vm::refreshBalance,
-                onRefreshStatus = vm::refreshStatus,
+                // 探测是异步长动作，卡片本身有进度；这里只确认"动作确实发出去了"，
+                // 否则点了按钮到进度出现之间有一段没有任何反馈的空档。
+                onStartProbe = {
+                    vm.startProbe()
+                    feedback?.post(AppFeedback(probeStarted))
+                },
+                onCancelProbe = {
+                    vm.cancelProbe()
+                    feedback?.post(AppFeedback(probeCancelled))
+                },
+                onRefreshBalance = {
+                    vm.refreshBalance()
+                    feedback?.post(AppFeedback(balanceRefreshed))
+                },
+                onRefreshStatus = {
+                    vm.refreshStatus()
+                    feedback?.post(AppFeedback(statusRefreshed))
+                },
             )
         }
 
@@ -155,13 +206,48 @@ fun VaultNavHost(
             // 「全部」那一枚 chip 的文案在资源里，而 ViewModel 读不到资源（红线 19）
             val allLabel = stringResource(Res.string.group_all)
             LaunchedEffect(allLabel) { vm.setAllGroupLabel(allLabel) }
+            val feedback = LocalAppFeedback.current
+            val undoLabel = stringResource(Res.string.common_undo)
+            val undone = stringResource(Res.string.feedback_undone)
+            val undoFailed = stringResource(Res.string.feedback_undo_failed)
+            val providersDeleted = stringResource(Res.string.feedback_providers_deleted)
+            val groupAdded = stringResource(Res.string.feedback_group_added)
+            val groupRenamed = stringResource(Res.string.feedback_group_renamed)
+            val groupDeleted = stringResource(Res.string.feedback_group_deleted)
+            val statusRefreshed = stringResource(Res.string.feedback_status_refreshed)
+            LaunchedEffect(vm) {
+                vm.events.collect { event ->
+                    when (event) {
+                        is ManageViewModel.Event.ProvidersDeleted -> feedback?.post(
+                            AppFeedback(
+                                message = providersDeleted,
+                                undo = event.undo?.let { deletion ->
+                                    AppUndoFeedback(
+                                        actionLabel = undoLabel,
+                                        undoneMessage = undone,
+                                        failedMessage = undoFailed,
+                                        action = { deletion.undo() },
+                                    )
+                                },
+                            ),
+                        )
+                        ManageViewModel.Event.GroupAdded -> feedback?.post(AppFeedback(groupAdded))
+                        ManageViewModel.Event.GroupRenamed -> feedback?.post(AppFeedback(groupRenamed))
+                        // 删分组不提供撤销：它只把供应商落回「全部」，重新建一个即可。
+                        ManageViewModel.Event.GroupDeleted -> feedback?.post(AppFeedback(groupDeleted))
+                    }
+                }
+            }
             ManageScreen(
                 state = manage,
                 onSelectGroup = vm::onSelectGroup,
                 onOpenProvider = { id -> navigate(ProviderDetailRoute(id)) },
                 onOpenGroups = { navigate(GroupsRoute) },
                 onNewProvider = { navigate(ProviderEditorRoute()) },
-                onRefreshStatus = vm::refreshStatus,
+                onRefreshStatus = {
+                    vm.refreshStatus()
+                    feedback?.post(AppFeedback(statusRefreshed))
+                },
                 onQueryChange = vm::onQueryChange,
                 onEnterSelection = vm::enterSelection,
                 onToggleSelect = vm::toggleSelect,
@@ -201,6 +287,65 @@ fun VaultNavHost(
                 val detailState = detail
                 val revealedAccount by vm.revealedAccount.collectAsStateWithLifecycle()
                 val accountClipboardLabel = stringResource(Res.string.clipboard_label_account)
+                val feedback = LocalAppFeedback.current
+                val undoLabel = stringResource(Res.string.common_undo)
+                val undone = stringResource(Res.string.feedback_undone)
+                val undoFailed = stringResource(Res.string.feedback_undo_failed)
+                val modelDeleted = stringResource(Res.string.feedback_model_deleted)
+                val accountDeleted = stringResource(Res.string.feedback_account_deleted)
+                val copied = stringResource(Res.string.feedback_copied)
+                val modelSaved = stringResource(Res.string.feedback_model_saved)
+                val accountSaved = stringResource(Res.string.feedback_account_saved)
+                val balanceRefreshed = stringResource(Res.string.feedback_balance_refreshed)
+                val modelsRefreshed = stringResource(Res.string.feedback_models_refreshed)
+                val keyProbed = stringResource(Res.string.feedback_probe_key_sent)
+                val modelProbed = stringResource(Res.string.feedback_model_probed)
+                LaunchedEffect(vm) {
+                    vm.events.collect { event ->
+                        // 删除留当前页（不像删密钥要退出页面），所以只投提示；
+                        // 其余是"动作已发出"的确认，结果本身由状态流回填。
+                        val (message, undo) = when (event) {
+                            is ProviderDetailViewModel.Event.ModelDeleted ->
+                                modelDeleted to event.undo
+                            is ProviderDetailViewModel.Event.AccountDeleted ->
+                                accountDeleted to event.undo
+                            ProviderDetailViewModel.Event.Copied -> {
+                                feedback?.post(AppFeedback(copied)); return@collect
+                            }
+                            ProviderDetailViewModel.Event.ModelSaved -> {
+                                feedback?.post(AppFeedback(modelSaved)); return@collect
+                            }
+                            ProviderDetailViewModel.Event.AccountSaved -> {
+                                feedback?.post(AppFeedback(accountSaved)); return@collect
+                            }
+                            ProviderDetailViewModel.Event.BalanceRefreshed -> {
+                                feedback?.post(AppFeedback(balanceRefreshed)); return@collect
+                            }
+                            ProviderDetailViewModel.Event.ModelsRefreshed -> {
+                                feedback?.post(AppFeedback(modelsRefreshed)); return@collect
+                            }
+                            ProviderDetailViewModel.Event.KeyProbed -> {
+                                feedback?.post(AppFeedback(keyProbed)); return@collect
+                            }
+                            ProviderDetailViewModel.Event.ModelProbed -> {
+                                feedback?.post(AppFeedback(modelProbed)); return@collect
+                            }
+                        }
+                        feedback?.post(
+                            AppFeedback(
+                                message = message,
+                                undo = undo?.let { deletion ->
+                                    AppUndoFeedback(
+                                        actionLabel = undoLabel,
+                                        undoneMessage = undone,
+                                        failedMessage = undoFailed,
+                                        action = { deletion.undo() },
+                                    )
+                                },
+                            ),
+                        )
+                    }
+                }
                 if (detailState == null) {
                     LoadingState(Modifier.fillMaxSize())
                 } else {
@@ -239,8 +384,42 @@ fun VaultNavHost(
                 val state by vm.state.collectAsStateWithLifecycle()
                 val keyState = state
                 val revealed by vm.revealed.collectAsStateWithLifecycle()
-                LaunchedEffect(vm) { vm.deleted.collect { back() } }
+                val feedback = LocalAppFeedback.current
                 val keyClipboardLabel = stringResource(Res.string.clipboard_label_api_key)
+                val keyDeleted = stringResource(Res.string.feedback_key_deleted)
+                val keyUndone = stringResource(Res.string.feedback_undone)
+                val keyUndoFailed = stringResource(Res.string.feedback_undo_failed)
+                val undoLabel = stringResource(Res.string.common_undo)
+                val copied = stringResource(Res.string.feedback_copied)
+                val keyProbed = stringResource(Res.string.feedback_probe_key_sent)
+                val modelsRefreshed = stringResource(Res.string.feedback_models_refreshed)
+                val modelProbed = stringResource(Res.string.feedback_model_probed)
+                LaunchedEffect(vm) {
+                    vm.events.collect { event ->
+                        when (event) {
+                            is KeyDetailViewModel.Event.Deleted -> {
+                                // 先退回上一页再投递提示：提示挂在 Shell 上，不受导航影响，
+                                // 而且这样用户是在"已经看不到那把 Key 的页面"上看到撤销入口。
+                                back()
+                                feedback?.post(
+                                    AppFeedback(
+                                        message = keyDeleted,
+                                        undo = event.undo?.let { deletion ->
+                                            AppUndoFeedback(
+                                                actionLabel = undoLabel,
+                                                undoneMessage = keyUndone,
+                                                failedMessage = keyUndoFailed,
+                                                action = { deletion.undo() },
+                                            )
+                                        },
+                                    ),
+                                )
+                            }
+                            KeyDetailViewModel.Event.Copied ->
+                                feedback?.post(AppFeedback(copied))
+                        }
+                    }
+                }
                 if (keyState == null) {
                     LoadingState(Modifier.fillMaxSize())
                 } else {
@@ -253,9 +432,18 @@ fun VaultNavHost(
                             onReveal = vm::reveal,
                             onCopyRevealed = { vm.copyRevealed(keyClipboardLabel) },
                             onCloseReveal = vm::closeReveal,
-                            onProbe = vm::probeKey,
-                            onProbeModel = vm::probeModel,
-                            onRefreshModels = vm::refreshModels,
+                            onProbe = {
+                                vm.probeKey()
+                                feedback?.post(AppFeedback(keyProbed))
+                            },
+                            onProbeModel = { modelId, protocol ->
+                                vm.probeModel(modelId, protocol)
+                                feedback?.post(AppFeedback(modelProbed))
+                            },
+                            onRefreshModels = {
+                                vm.refreshModels()
+                                feedback?.post(AppFeedback(modelsRefreshed))
+                            },
                             onMoveUp = vm::moveUp,
                             onMoveDown = vm::moveDown,
                             onDelete = vm::delete,
@@ -273,7 +461,40 @@ fun VaultNavHost(
                 val saving by vm.saving.collectAsStateWithLifecycle()
                 val saveError by vm.saveError.collectAsStateWithLifecycle()
                 val urlError by vm.urlError.collectAsStateWithLifecycle()
-                LaunchedEffect(vm) { vm.saved.collect { back() } }
+                val feedback = LocalAppFeedback.current
+                val keySaved = stringResource(Res.string.feedback_key_saved)
+                LaunchedEffect(vm) {
+                    vm.saved.collect {
+                        feedback?.post(AppFeedback(keySaved))
+                        back()
+                    }
+                }
+                val undoLabel = stringResource(Res.string.common_undo)
+                val undone = stringResource(Res.string.feedback_undone)
+                val undoFailed = stringResource(Res.string.feedback_undo_failed)
+                val modelDeleted = stringResource(Res.string.feedback_model_deleted)
+                val modelSaved = stringResource(Res.string.feedback_model_saved)
+                LaunchedEffect(vm) {
+                    vm.events.collect { event ->
+                        when (event) {
+                            is KeyEditorViewModel.Event.ModelDeleted -> feedback?.post(
+                                AppFeedback(
+                                    message = modelDeleted,
+                                    undo = event.undo?.let { deletion ->
+                                        AppUndoFeedback(
+                                            actionLabel = undoLabel,
+                                            undoneMessage = undone,
+                                            failedMessage = undoFailed,
+                                            action = { deletion.undo() },
+                                        )
+                                    },
+                                ),
+                            )
+                            KeyEditorViewModel.Event.ModelSaved ->
+                                feedback?.post(AppFeedback(modelSaved))
+                        }
+                    }
+                }
                 val keyProfileDefaultLabel = stringResource(Res.string.profile_name_default)
                 val keyEditorProfileDefault = stringResource(Res.string.editor_profile_default)
                 val baseUrlError = when (urlError) {
@@ -349,7 +570,14 @@ fun VaultNavHost(
             val state by vm.changePin.collectAsStateWithLifecycle()
             // 改完就退出去。用一次性事件而不是状态里的标志：标志会在重组时重放，
             // 于是这一页会在下一次进来时立刻自己弹回去。
-            LaunchedEffect(vm) { vm.pinChanged.collect { back() } }
+            val feedback = LocalAppFeedback.current
+            val pinChanged = stringResource(Res.string.feedback_pin_changed)
+            LaunchedEffect(vm) {
+                vm.pinChanged.collect {
+                    feedback?.post(AppFeedback(pinChanged))
+                    back()
+                }
+            }
             ChangePinScreen(
                 state = state,
                 onDigit = vm::onPinDigit,
@@ -431,7 +659,15 @@ fun VaultNavHost(
             val vm: ProfileEditorViewModel = koinViewModel(parameters = { parametersOf(route.id) })
             val loaded by vm.loaded.collectAsStateWithLifecycle()
             val profile by vm.profile.collectAsStateWithLifecycle()
-            LaunchedEffect(vm) { vm.saved.collect { back() } }
+            val feedback = LocalAppFeedback.current
+            val profileSaved = stringResource(Res.string.feedback_profile_saved)
+            // 预设删除不提供撤销：自定义预设重新建一个即可，删除没有级联副作用。
+            LaunchedEffect(vm) {
+                vm.saved.collect {
+                    feedback?.post(AppFeedback(profileSaved))
+                    back()
+                }
+            }
             LaunchedEffect(vm) { vm.deleted.collect { back() } }
             if (loaded) {
                 ProfileEditorScreen(
@@ -444,12 +680,23 @@ fun VaultNavHost(
         }
             is DataRoute -> {
             val vm: DataViewModel = koinViewModel()
+            val feedback = LocalAppFeedback.current
+            // 清空类操作只提示完成、不提供撤销：日志与探测结果都是批量清除，
+            // 快照代价大，且确认框已经写明「不可撤销」。
+            val probeResultsCleared = stringResource(Res.string.feedback_probe_results_cleared)
+            val logsCleared = stringResource(Res.string.feedback_logs_cleared)
             DataScreen(
                 onBack = back,
                 onOpenGroups = { navigate(GroupsRoute) },
                 onOpenLog = { navigate(LogRoute) },
-                onClearProbeResults = vm::clearProbeResults,
-                onClearLog = vm::clearLog,
+                onClearProbeResults = {
+                    vm.clearProbeResults()
+                    feedback?.post(AppFeedback(probeResultsCleared))
+                },
+                onClearLog = {
+                    vm.clearLog()
+                    feedback?.post(AppFeedback(logsCleared))
+                },
             )
         }
             is LicensesRoute -> {
@@ -461,13 +708,18 @@ fun VaultNavHost(
             val entries by vm.entries.collectAsStateWithLifecycle()
             val levelFilter by vm.levelFilter.collectAsStateWithLifecycle()
             val retention by vm.retention.collectAsStateWithLifecycle()
+            val feedback = LocalAppFeedback.current
+            val logsCleared = stringResource(Res.string.feedback_logs_cleared)
             LogScreen(
                 entries = entries,
                 levelFilter = levelFilter,
                 retention = retention,
                 onLevelFilterChange = vm::setLevelFilter,
                 onRetentionChange = vm::setRetention,
-                onClear = vm::clear,
+                onClear = {
+                    vm.clear()
+                    feedback?.post(AppFeedback(logsCleared))
+                },
                 onBack = back,
             )
         }
@@ -500,7 +752,14 @@ fun VaultNavHost(
             val draft by vm.draft.collectAsStateWithLifecycle()
             val groups by vm.groups.collectAsStateWithLifecycle()
             val loaded by vm.loaded.collectAsStateWithLifecycle()
-            LaunchedEffect(vm) { vm.saved.collect { back() } }
+            val feedback = LocalAppFeedback.current
+            val providerSaved = stringResource(Res.string.feedback_provider_saved)
+            LaunchedEffect(vm) {
+                vm.saved.collect {
+                    feedback?.post(AppFeedback(providerSaved))
+                    back()
+                }
+            }
             val ungrouped = stringResource(Res.string.editor_group_none)
             if (loaded) {
                 ProviderEditorScreen(
@@ -521,6 +780,10 @@ fun VaultNavHost(
             val error by vm.error.collectAsStateWithLifecycle()
             val importing by vm.importing.collectAsStateWithLifecycle()
             val duplicatePrompt by vm.duplicatePrompt.collectAsStateWithLifecycle()
+            val feedback = LocalAppFeedback.current
+            val imported = stringResource(Res.string.feedback_imported)
+            val clipboardFilled = stringResource(Res.string.feedback_clipboard_filled)
+            val clipboardEmpty = stringResource(Res.string.feedback_clipboard_empty)
             ImportScreen(
                 preview = preview,
                 error = error,
@@ -528,19 +791,37 @@ fun VaultNavHost(
                 duplicatePrompt = duplicatePrompt,
                 onBack = back,
                 onParse = vm::parse,
-                onConfirm = { vm.confirm { back() } },
-                onConfirmDuplicate = { vm.confirmDuplicate { back() } },
+                // 导入成功后先提示再退回：提示挂在 Shell 上，不受这一页退出组合影响。
+                onConfirm = {
+                    vm.confirm {
+                        feedback?.post(AppFeedback(imported))
+                        back()
+                    }
+                },
+                onConfirmDuplicate = {
+                    vm.confirmDuplicate {
+                        feedback?.post(AppFeedback(imported))
+                        back()
+                    }
+                },
                 onDismissDuplicate = vm::dismissDuplicate,
-                readClipboard = vm::readClipboard,
+                readClipboard = {
+                    // 剪贴板为空时以前是静默无反应，用户会以为按钮坏了。
+                    val text = vm.readClipboard()
+                    feedback?.post(
+                        AppFeedback(if (text.isNullOrEmpty()) clipboardEmpty else clipboardFilled),
+                    )
+                    text
+                },
             )
         }
             is GroupsRoute -> {
             val vm: ManageViewModel = koinViewModel()
             val manage by vm.state.collectAsStateWithLifecycle()
-            val snackbar = LocalAppSnackbar.current
+            val feedback = LocalAppFeedback.current
             val groupAddFailed = stringResource(Res.string.groups_add_failed)
             LaunchedEffect(vm, groupAddFailed) {
-                vm.groupError.collect { snackbar?.show(groupAddFailed) }
+                vm.groupError.collect { feedback?.post(AppFeedback(groupAddFailed)) }
             }
             GroupsScreen(
                 groups = manage.groups,
@@ -558,6 +839,8 @@ fun VaultNavHost(
             is ProbeRunRoute -> {
             val vm: ProbeRunViewModel = koinViewModel()
             val run by vm.state.collectAsStateWithLifecycle()
+            val feedback = LocalAppFeedback.current
+            val probeRetried = stringResource(Res.string.feedback_probe_retried)
             ProbeRunScreen(
                 lastRun = run.lastRun,
                 nowMs = run.nowMs,
@@ -565,7 +848,10 @@ fun VaultNavHost(
                 skipped = run.skipped,
                 succeeded = run.succeeded,
                 onBack = back,
-                onRetryFailed = vm::retryFailed,
+                onRetryFailed = {
+                    vm.retryFailed()
+                    feedback?.post(AppFeedback(probeRetried))
+                },
                 onOpenProvider = { id -> navigate(ProviderDetailRoute(id)) },
             )
         }
@@ -626,7 +912,7 @@ private fun SyncRouteContent(
     onBack: () -> Unit,
     vm: SyncViewModel,
 ) {
-    val snackbar = LocalAppSnackbar.current
+    val feedback = LocalAppFeedback.current
     val backup by vm.backup.collectAsStateWithLifecycle()
     val webDavConfig by vm.webDavConfig.collectAsStateWithLifecycle()
     val webDavBusy by vm.webDavBusy.collectAsStateWithLifecycle()
@@ -660,27 +946,33 @@ private fun SyncRouteContent(
     LaunchedEffect(vm) {
         vm.events.collect { event ->
             when (event) {
-                is SyncEvent.ExportSucceeded -> snackbar?.show(exported)
+                is SyncEvent.ExportSucceeded -> feedback?.post(AppFeedback(exported))
                 is SyncEvent.ExportFailed ->
-                    snackbar?.show(getString(Res.string.sync_result_failed, event.message ?: "?"))
+                    feedback?.post(AppFeedback(getString(Res.string.sync_result_failed, event.message ?: "?")))
                 is SyncEvent.RestoreSucceeded ->
-                    snackbar?.show(getString(Res.string.sync_result_restored, event.importedProviders))
+                    feedback?.post(AppFeedback(getString(Res.string.sync_result_restored, event.importedProviders)))
                 is SyncEvent.RestoreFailed ->
-                    snackbar?.show(getString(Res.string.sync_result_failed, event.message ?: "?"))
+                    feedback?.post(AppFeedback(getString(Res.string.sync_result_failed, event.message ?: "?")))
                 SyncEvent.WebDavConfigSaved -> {
                     remoteBackups = null
-                    snackbar?.show(getString(Res.string.sync_result_webdav_configured))
+                    feedback?.post(AppFeedback(getString(Res.string.sync_result_webdav_configured)))
                 }
                 is SyncEvent.WebDavListSucceeded -> {
                     remoteBackups = event.names
-                    snackbar?.show(getString(Res.string.sync_remote_count, event.names.size))
+                    feedback?.post(AppFeedback(getString(Res.string.sync_remote_count, event.names.size)))
                 }
                 is SyncEvent.WebDavUploadSucceeded ->
-                    snackbar?.show(
-                        getString(Res.string.sync_result_webdav_uploaded, event.fileName, event.prunedCount),
+                    feedback?.post(
+                        AppFeedback(
+                            getString(
+                                Res.string.sync_result_webdav_uploaded,
+                                event.fileName,
+                                event.prunedCount,
+                            ),
+                        ),
                     )
                 is SyncEvent.WebDavFailed ->
-                    snackbar?.show(getString(Res.string.sync_result_failed, event.message ?: "?"))
+                    feedback?.post(AppFeedback(getString(Res.string.sync_result_failed, event.message ?: "?")))
             }
         }
     }

@@ -6,20 +6,27 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
+import top.yukonga.miuix.kmp.basic.SnackbarDuration
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
+import top.yukonga.miuix.kmp.basic.SnackbarResult
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.basic.rememberTopAppBarState
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
@@ -181,13 +188,44 @@ private fun RowScope.NavBarItem(
     )
 }
 
+/** 提示停留时长。页面不直接用 MIUIX 的 `SnackbarDuration`。 */
+enum class AppSnackbarDuration {
+    /** 4 秒。只报结果的提示用它。 */
+    Short,
+
+    /** 10 秒。**带撤销的提示必须用它**：撤销窗口就是这段时间，太短等于没给机会点。 */
+    Long,
+}
+
 /**
- * Snackbar 状态。MIUIX 0.9.3 自带 Snackbar，所以不需要为了它引入 material3。
+ * Snackbar 状态。MIUIX 自带 Snackbar，所以不需要为了它引入 material3。
+ *
+ * **关闭按钮固定打开**（[SnackbarHostState.showSnackbar] 的 `withDismissAction = true`）：
+ * 提示只要出现就一定能被主动关掉，不必等它自己走完，也不会只剩"点空白处"一条退路。
  */
 @Stable
 class AppSnackbarState internal constructor(internal val hostState: SnackbarHostState) {
-    suspend fun show(message: String) {
-        hostState.showSnackbar(message)
+    /**
+     * 显示一条提示。
+     *
+     * @param actionText 非空时在右侧显示 action 按钮（撤销这类动作）。
+     * @return true 表示用户点了 action，而不是让提示自己消失或被关闭按钮关掉。
+     */
+    suspend fun show(
+        message: String,
+        duration: AppSnackbarDuration = AppSnackbarDuration.Short,
+        actionText: String? = null,
+    ): Boolean {
+        val result = hostState.showSnackbar(
+            message = message,
+            actionLabel = actionText,
+            withDismissAction = true,
+            duration = when (duration) {
+                AppSnackbarDuration.Short -> SnackbarDuration.Short
+                AppSnackbarDuration.Long -> SnackbarDuration.Long
+            },
+        )
+        return result == SnackbarResult.ActionPerformed
     }
 }
 
@@ -202,5 +240,84 @@ fun AppSnackbarHost(state: AppSnackbarState, modifier: Modifier = Modifier) {
     SnackbarHost(state = state.hostState, modifier = modifier)
 }
 
+/**
+ * 可撤销提示的三个文案。由调用方（composable 层）从资源解析，本层不碰资源。
+ */
+@Immutable
+data class AppUndoFeedback(
+    /** action 按钮文案，例如"撤销"。 */
+    val actionLabel: String,
+    /** 撤销成功后的提示。 */
+    val undoneMessage: String,
+    /** 撤销失败后的提示（如唯一约束冲突、行已被重建）。 */
+    val failedMessage: String,
+    /** 真正执行撤销；返回 false 表示这次撤销没成功。 */
+    val action: suspend () -> Boolean,
+)
+
+/**
+ * 一条待展示的提示。
+ */
+@Immutable
+data class AppFeedback(
+    val message: String,
+    /** 非空时提示带上"撤销"action，且停留 [AppSnackbarDuration.Long]。 */
+    val undo: AppUndoFeedback? = null,
+)
+
+/**
+ * 提示队列。Shell 持有唯一一份，页面通过 [LocalAppFeedback] 投递。
+ *
+ * 两个不显然但必要的地方：
+ *
+ * 1. **它必须挂在 Shell 上，而不是某个页面的组合里。** 删除之后页面会退出组合，
+ *    如果在一个随页面销毁的作用域里 `await` snackbar 的结果，协程会被取消，
+ *    用户点"撤销"时回调早已不存在——撤销按钮会点了没反应。
+ * 2. **一条一条串行展示（Channel + 单消费者）。** MIUIX 的 host 支持同时堆叠多条
+ *    snackbar，但那样连续删除时屏幕上会同时出现好几个"撤销"，用户不知道该撤哪一个，
+ *    点错就是恢复到错误的状态。
+ */
+@Stable
+class AppFeedbackHost internal constructor(
+    private val scope: CoroutineScope,
+    private val snackbar: AppSnackbarState,
+) {
+    private val queue = Channel<AppFeedback>(Channel.UNLIMITED)
+
+    init {
+        scope.launch {
+            for (feedback in queue) present(feedback)
+        }
+    }
+
+    /** 投递提示。非阻塞：调用方（含即将被销毁的页面）不因等待提示而挂住。 */
+    fun post(feedback: AppFeedback) {
+        queue.trySend(feedback)
+    }
+
+    private suspend fun present(feedback: AppFeedback) {
+        val undo = feedback.undo
+        val acted = snackbar.show(
+            message = feedback.message,
+            // 有撤销就必须给足时间，否则用户还没看清提示它已经消失了。
+            duration = if (undo == null) {
+                AppSnackbarDuration.Short
+            } else {
+                AppSnackbarDuration.Long
+            },
+            actionText = undo?.actionLabel,
+        )
+        if (!acted || undo == null) return
+        val ok = runCatching { undo.action() }.getOrDefault(false)
+        snackbar.show(if (ok) undo.undoneMessage else undo.failedMessage)
+    }
+}
+
+@Composable
+fun rememberAppFeedbackHost(snackbar: AppSnackbarState): AppFeedbackHost {
+    val scope = rememberCoroutineScope()
+    return remember(snackbar, scope) { AppFeedbackHost(scope, snackbar) }
+}
+
 /** 由 Shell 提供，页面通过它发提示，不各自持有一个 host。 */
-val LocalAppSnackbar = staticCompositionLocalOf<AppSnackbarState?> { null }
+val LocalAppFeedback = staticCompositionLocalOf<AppFeedbackHost?> { null }

@@ -567,6 +567,38 @@
     <!-- ==================== M1 锁闸：引导、解锁 ==================== -->
     <string name="dialog_cancel">取消</string>
 
+    <!-- Snackbar 提示。每条都带关闭按钮；只有删除才多一个「撤销」action。 -->
+    <string name="common_undo">撤销</string>
+    <string name="feedback_undone">已恢复</string>
+    <string name="feedback_undo_failed">恢复失败，该项可能已被重建</string>
+    <string name="feedback_copied">已复制</string>
+    <string name="feedback_providers_deleted">已删除所选供应商</string>
+    <string name="feedback_key_deleted">密钥已删除</string>
+    <string name="feedback_model_deleted">模型已删除</string>
+    <string name="feedback_account_deleted">账号已删除</string>
+    <string name="feedback_account_saved">账号已保存</string>
+    <string name="feedback_probe_key_sent">正在探测该密钥…</string>
+    <string name="feedback_model_saved">模型已保存</string>
+    <string name="feedback_group_added">分组已添加</string>
+    <string name="feedback_group_renamed">分组已重命名</string>
+    <string name="feedback_group_deleted">分组已删除，其中的供应商回到「全部」</string>
+    <string name="feedback_provider_saved">供应商已保存</string>
+    <string name="feedback_key_saved">密钥已保存</string>
+    <string name="feedback_profile_saved">预设已保存</string>
+    <string name="feedback_pin_changed">PIN 已修改</string>
+    <string name="feedback_imported">密钥已导入</string>
+    <string name="feedback_clipboard_filled">已从剪贴板填充</string>
+    <string name="feedback_clipboard_empty">剪贴板为空</string>
+    <string name="feedback_probe_started">已开始探测</string>
+    <string name="feedback_probe_cancelled">已取消探测</string>
+    <string name="feedback_balance_refreshed">余额已刷新</string>
+    <string name="feedback_status_refreshed">状态已刷新</string>
+    <string name="feedback_models_refreshed">模型列表已刷新</string>
+    <string name="feedback_model_probed">已探测该模型</string>
+    <string name="feedback_probe_retried">正在重试失败项</string>
+    <string name="feedback_logs_cleared">日志已清空</string>
+    <string name="feedback_probe_results_cleared">探测结果已清空</string>
+
     <!-- PIN 输入 -->
     <string name="pin_dots_cd">已输入 %1$d 位，共 %2$d 位</string>
     <string name="pin_backspace_cd">退格</string>
