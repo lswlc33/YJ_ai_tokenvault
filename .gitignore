@@ -17,6 +17,10 @@ local.properties
 captures/
 .cxx/
 
+# `gradle updateDaemonJvm` 生成的本机文件：里面把 daemon JVM 钉成 JDK 21，
+# 与本项目声明的 JDK 17 不一致，且各平台的下载地址是逐机生成的，不入库。
+gradle/gradle-daemon-jvm.properties
+
 # IDE
 .idea/
 *.iml
