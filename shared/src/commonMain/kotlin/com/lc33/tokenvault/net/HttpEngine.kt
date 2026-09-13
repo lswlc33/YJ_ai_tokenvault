@@ -1,5 +1,8 @@
 package com.lc33.tokenvault.net
 
+import com.lc33.tokenvault.domain.model.LogCategory
+import com.lc33.tokenvault.domain.model.LogLevel
+import com.lc33.tokenvault.domain.repo.AuditLogRepository
 import com.lc33.tokenvault.endpoint.ProbeRequest
 import com.lc33.tokenvault.endpoint.ProbeResponse
 import io.ktor.client.HttpClient
@@ -38,6 +41,7 @@ import kotlinx.coroutines.delay
 class HttpEngine(
     private val client: HttpClient,
     private val hostGate: HostGate,
+    private val audit: AuditLogRepository? = null,
 ) {
 
     /** 某 host 当前的串行最小间隔。编排器（ProbeEngine）据此决定要不要先睡。 */
@@ -53,6 +57,12 @@ class HttpEngine(
     suspend fun execute(request: ProbeRequest, allowInsecure: Boolean = false): ProbeResponse {
         // §7.5：http:// 必须显式 allowInsecure 才放行。
         if (request.url.startsWith("http://") && !allowInsecure) {
+            record(
+                level = LogLevel.WARN,
+                category = LogCategory.HTTP,
+                message = "http request blocked",
+                detail = "${request.method} ${safeTarget(request.url)}",
+            )
             return ProbeResponse(
                 status = 0,
                 error = InsecureEndpointException("insecure endpoint not allowed"),
@@ -76,6 +86,12 @@ class HttpEngine(
                 }
             }
             val latencyMs = clockMillis() - started
+            record(
+                level = if (response.status.value in 200..299) LogLevel.INFO else LogLevel.WARN,
+                category = LogCategory.HTTP,
+                message = "http ${request.method} ${safeTarget(request.url)} -> ${response.status.value}",
+                detail = "latency=${latencyMs}ms",
+            )
             ProbeResponse(
                 status = response.status.value,
                 headers = response.headers.entries().associate { it.key to it.value.joinToString(", ") },
@@ -86,8 +102,31 @@ class HttpEngine(
             // 取消不是一次失败响应：必须原样上抛，否则调用方的 Job.cancel 会一直等网络超时。
             throw cancelled
         } catch (t: Throwable) {
+            record(
+                level = LogLevel.ERROR,
+                category = LogCategory.HTTP,
+                message = "http ${request.method} ${safeTarget(request.url)} failed",
+                detail = t::class.simpleName,
+            )
             ProbeResponse(status = 0, error = t)
         }
+    }
+
+    private suspend fun record(
+        level: LogLevel,
+        category: LogCategory,
+        message: String,
+        detail: String? = null,
+    ) {
+        runCatching { audit?.record(level = level, category = category, message = message, detail = detail) }
+    }
+
+    /** 日志里只放脱敏目标；query/fragment/header/body 永不进入日志。 */
+    private fun safeTarget(url: String): String {
+        val base = url.substringBefore('?').substringBefore('#')
+        val schemeEnd = base.indexOf("://").let { if (it < 0) 0 else it + 3 }
+        val pathStart = base.indexOf('/', startIndex = schemeEnd).let { if (it < 0) base.length else it }
+        return base.substring(schemeEnd, pathStart) + base.substring(pathStart)
     }
 
     /** 公共头 + 预设头（User-Agent 兜底）。 */

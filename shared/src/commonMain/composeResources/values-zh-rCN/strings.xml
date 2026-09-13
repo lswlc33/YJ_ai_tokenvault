@@ -107,6 +107,8 @@
     <string name="settings_probe_summary">级别、时机、限流、余额阈值</string>
     <string name="settings_profiles">客户端预设</string>
     <string name="settings_profiles_summary">让请求看起来像真实 AI 客户端的那套请求头</string>
+    <string name="settings_log">日志</string>
+    <string name="settings_log_summary">查看网络请求、增删排序和数据变更记录</string>
     <string name="settings_data">数据</string>
     <string name="settings_data_summary">模型元数据、分组、日志</string>
     <string name="settings_sync_row">备份与 WebDAV</string>
@@ -261,8 +263,24 @@
     <string name="data_clear_probe_confirm_body">所有密钥回到「未探测」。密钥、模型与账号本身都会保留。</string>
     <string name="data_clear_log_confirm_title">清空整份日志？</string>
     <string name="data_clear_log_confirm_body">所有日志条目都会被删除，不可撤销。</string>
+    <string name="log_filter_title">最低等级</string>
+    <string name="log_filter_summary">显示所选等级及以上的日志。</string>
+    <string name="log_retention">保留时间</string>
+    <string name="log_retention_summary">超过保留时间的日志会自动清理。</string>
+    <string-array name="log_retention_options">
+        <item>7 天</item>
+        <item>30 天</item>
+        <item>90 天</item>
+        <item>永久保留</item>
+    </string-array>
+    <string name="log_auto_scroll">自动滚动</string>
+    <string name="log_auto_scroll_summary">新日志到达时自动回到最新一条。</string>
+    <string name="log_clear">清空日志</string>
+    <string name="log_clear_confirm_title">清空全部日志？</string>
+    <string name="log_clear_confirm_body">日志记录将无法恢复，数据和设置不受影响。</string>
     <string name="log_title">日志</string>
-    <string name="log_empty">还没有日志。探测、余额与备份事件会出现在这里，写入前已脱敏。</string>
+    <string name="log_empty_title">还没有记录</string>
+    <string name="log_empty">探测、余额、备份、网络请求与数据变更都会记在这里，写入前已脱敏。</string>
 
     <!-- 日志级别与分类的显示文案。日志页按级别着色（红线 17：颜色 + 文字），分类做筛选。 -->
     <string name="log_level_debug">调试</string>

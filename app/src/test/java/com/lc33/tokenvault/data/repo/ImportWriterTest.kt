@@ -60,8 +60,8 @@ class ImportWriterTest {
                 transactions = ImmediateTransactions(),
                 now = { now },
             ),
-            accounts = RoomProviderAccountRepository(accountDao, cipher, ImmediateTransactions()) { now },
-            models = RoomModelRepository(modelDao, ImmediateTransactions()) { now },
+            accounts = RoomProviderAccountRepository(accountDao, cipher, ImmediateTransactions(), now = { now }),
+            models = RoomModelRepository(modelDao, ImmediateTransactions(), now = { now }),
             transactions = ImmediateTransactions(),
         )
     }

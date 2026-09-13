@@ -659,9 +659,20 @@ internal class FakeAuditLogDao : AuditLogDao {
 
     val rows: List<AuditLogEntity> get() = store.toList()
 
-    private fun ordered(limit: Int) = store.sortedByDescending { it.at }.take(limit)
+    /**
+     * 倒序取最近若干条。
+     *
+     * 同一毫秒写的多条（一次操作连带写好几条日志）在真实 SQLite 里顺序不确定，
+     * 这里用 id 兜底成"后写的在前"——测试要的是稳定，而不是复刻 SQLite 的实现细节。
+     */
+    private fun ordered(limit: Int) = store
+        .sortedWith(compareByDescending<AuditLogEntity> { it.at }.thenByDescending { it.id })
+        .take(limit)
 
     override fun observeRecent(limit: Int): Flow<List<AuditLogEntity>> = revision.map { ordered(limit) }
+
+    override fun observeRecentByLevels(levels: List<String>, limit: Int): Flow<List<AuditLogEntity>> =
+        revision.map { ordered(limit).filter { it.level in levels } }
 
     override fun observeByProvider(providerId: Long, limit: Int): Flow<List<AuditLogEntity>> =
         revision.map { ordered(limit).filter { it.providerId == providerId } }

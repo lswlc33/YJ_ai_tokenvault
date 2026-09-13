@@ -7,8 +7,12 @@ import com.lc33.tokenvault.domain.AutoLockTimeout
 import com.lc33.tokenvault.domain.ClipboardClearPolicy
 import com.lc33.tokenvault.domain.DefaultProbeSettings
 import com.lc33.tokenvault.domain.model.BalanceSnapshot
+import com.lc33.tokenvault.domain.model.LogCategory
+import com.lc33.tokenvault.domain.model.LogLevel
+import com.lc33.tokenvault.domain.model.LogRetention
 import com.lc33.tokenvault.domain.model.PredictiveBackExitDirection
 import com.lc33.tokenvault.domain.model.PredictiveBackStyle
+import com.lc33.tokenvault.domain.repo.AuditLogRepository
 import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.probe.ProbeClassifier
 import kotlinx.coroutines.flow.Flow
@@ -40,6 +44,7 @@ import kotlinx.serialization.json.jsonPrimitive
  */
 class RoomSettingsRepository constructor(
     private val dao: AppSettingDao,
+    private val audit: AuditLogRepository? = null,
 ) : SettingsRepository {
 
     override fun observeAutoLockTimeout(): Flow<AutoLockTimeout> = dao.observeAll()
@@ -48,6 +53,7 @@ class RoomSettingsRepository constructor(
 
     override suspend fun setAutoLockTimeout(timeout: AutoLockTimeout) {
         dao.put(AppSettingEntity(key = KEY_AUTO_LOCK, value = AutoLockPolicy.encode(timeout)))
+        auditChange(KEY_AUTO_LOCK)
     }
 
     override fun observeIdleLock(): Flow<Boolean> = dao.observeAll()
@@ -56,6 +62,7 @@ class RoomSettingsRepository constructor(
 
     override suspend fun setIdleLock(enabled: Boolean) {
         dao.put(AppSettingEntity(key = KEY_IDLE_LOCK, value = enabled.toString()))
+        auditChange(KEY_IDLE_LOCK)
     }
 
     override fun observeLockOnScreenOff(): Flow<Boolean> = dao.observeAll()
@@ -64,6 +71,7 @@ class RoomSettingsRepository constructor(
 
     override suspend fun setLockOnScreenOff(enabled: Boolean) {
         dao.put(AppSettingEntity(key = KEY_LOCK_ON_SCREEN_OFF, value = enabled.toString()))
+        auditChange(KEY_LOCK_ON_SCREEN_OFF)
     }
 
     override fun observeBalanceThresholds(): Flow<Map<String, Double>> = dao.observeAll()
@@ -72,6 +80,7 @@ class RoomSettingsRepository constructor(
 
     override suspend fun setBalanceThresholds(thresholds: Map<String, Double>) {
         dao.put(AppSettingEntity(key = KEY_BALANCE_THRESHOLDS, value = encodeThresholds(thresholds)))
+        auditChange(KEY_BALANCE_THRESHOLDS)
     }
 
     override fun observeClientKeywords(): Flow<List<String>> = dao.observeAll()
@@ -80,6 +89,7 @@ class RoomSettingsRepository constructor(
 
     override suspend fun setClientKeywords(keywords: List<String>) {
         dao.put(AppSettingEntity(key = KEY_CLIENT_KEYWORDS, value = encodeKeywords(keywords)))
+        auditChange(KEY_CLIENT_KEYWORDS)
     }
 
     override fun observeProxy(): Flow<String> = dao.observeAll()
@@ -88,6 +98,7 @@ class RoomSettingsRepository constructor(
 
     override suspend fun setProxy(hostPort: String) {
         dao.put(AppSettingEntity(key = KEY_PROXY, value = hostPort.trim()))
+        auditChange(KEY_PROXY)
     }
 
     override fun observeSniffClientProfile(): Flow<Boolean> = dao.observeAll()
@@ -96,6 +107,7 @@ class RoomSettingsRepository constructor(
 
     override suspend fun setSniffClientProfile(enabled: Boolean) {
         dao.put(AppSettingEntity(key = KEY_SNIFF_CLIENT_PROFILE, value = enabled.toString()))
+        auditChange(KEY_SNIFF_CLIENT_PROFILE)
     }
 
     override fun observeClipboardClearSeconds(): Flow<Int> = dao.observeAll()
@@ -104,6 +116,7 @@ class RoomSettingsRepository constructor(
 
     override suspend fun setClipboardClearSeconds(seconds: Int) {
         dao.put(AppSettingEntity(key = KEY_CLIPBOARD_CLEAR, value = ClipboardClearPolicy.encode(seconds)))
+        auditChange(KEY_CLIPBOARD_CLEAR)
     }
 
     override fun observeUpdateChannel(): Flow<Int> = dao.observeAll()
@@ -112,6 +125,7 @@ class RoomSettingsRepository constructor(
 
     override suspend fun setUpdateChannel(channel: Int) {
         dao.put(AppSettingEntity(key = KEY_UPDATE_CHANNEL, value = channel.toString()))
+        auditChange(KEY_UPDATE_CHANNEL)
     }
 
     override fun observeDefaultProbeSettings(): Flow<DefaultProbeSettings> = dao.observeAll()
@@ -120,6 +134,40 @@ class RoomSettingsRepository constructor(
 
     override suspend fun setDefaultProbeSettings(settings: DefaultProbeSettings) {
         dao.put(AppSettingEntity(key = KEY_DEFAULT_PROBE, value = encodeDefaultProbe(settings)))
+        auditChange(KEY_DEFAULT_PROBE)
+    }
+
+    override fun observeLogLevelFilter(): Flow<LogLevel> = dao.observeAll()
+        .map { rows ->
+            LogLevel.fromWireName(
+                rows.firstOrNull { it.key == KEY_LOG_LEVEL_FILTER }?.value ?: LogLevel.INFO.wireName,
+            )
+        }
+        .distinctUntilChanged()
+
+    override suspend fun setLogLevelFilter(level: LogLevel) {
+        dao.put(AppSettingEntity(key = KEY_LOG_LEVEL_FILTER, value = level.wireName))
+        auditChange(KEY_LOG_LEVEL_FILTER)
+    }
+
+    override fun observeLogRetention(): Flow<LogRetention> = dao.observeAll()
+        .map { rows ->
+            when (val raw = rows.firstOrNull { it.key == KEY_LOG_RETENTION_DAYS }?.value?.trim()) {
+                RETENTION_FOREVER -> LogRetention.FOREVER
+                null, "" -> LogRetention.SEVEN_DAYS
+                else -> LogRetention.fromDays(raw.toIntOrNull())
+            }
+        }
+        .distinctUntilChanged()
+
+    override suspend fun setLogRetention(retention: LogRetention) {
+        dao.put(
+            AppSettingEntity(
+                key = KEY_LOG_RETENTION_DAYS,
+                value = retention.days?.toString() ?: RETENTION_FOREVER,
+            ),
+        )
+        auditChange(KEY_LOG_RETENTION_DAYS)
     }
 
     override fun observeBlurNavBar(): Flow<Boolean> = dao.observeAll()
@@ -128,6 +176,7 @@ class RoomSettingsRepository constructor(
 
     override suspend fun setBlurNavBar(enabled: Boolean) {
         dao.put(AppSettingEntity(key = KEY_BLUR_NAV_BAR, value = enabled.toString()))
+        auditChange(KEY_BLUR_NAV_BAR)
     }
 
     override fun observePredictiveBackStyle(): Flow<PredictiveBackStyle> = dao.observeAll()
@@ -136,6 +185,7 @@ class RoomSettingsRepository constructor(
 
     override suspend fun setPredictiveBackStyle(style: PredictiveBackStyle) {
         dao.put(AppSettingEntity(key = KEY_PREDICTIVE_BACK_STYLE, value = style.storageValue))
+        auditChange(KEY_PREDICTIVE_BACK_STYLE)
     }
 
     override fun observePredictiveBackExitDirection(): Flow<PredictiveBackExitDirection> = dao.observeAll()
@@ -153,6 +203,11 @@ class RoomSettingsRepository constructor(
                 value = direction.storageValue,
             ),
         )
+        auditChange(KEY_PREDICTIVE_BACK_EXIT_DIRECTION)
+    }
+
+    private suspend fun auditChange(key: String) {
+        audit.recordSafe(LogLevel.INFO, LogCategory.VAULT, "setting changed", "key=$key")
     }
 
     private companion object {
@@ -181,6 +236,13 @@ class RoomSettingsRepository constructor(
         const val KEY_UPDATE_CHANNEL = "updateChannel"
 
         const val KEY_DEFAULT_PROBE = "defaultProbe"
+
+        const val KEY_LOG_LEVEL_FILTER = "logLevelFilter"
+
+        const val KEY_LOG_RETENTION_DAYS = "logRetentionDays"
+
+        /** 永久保留的存储值；与 null 区分于“坏数据落回默认 7 天”。 */
+        const val RETENTION_FOREVER = "forever"
 
         const val KEY_BLUR_NAV_BAR = "blurNavBar"
 

@@ -36,6 +36,7 @@ import com.lc33.tokenvault.domain.repo.TransactionRunner
 import com.lc33.tokenvault.engine.BackupEngine
 import com.lc33.tokenvault.engine.BalanceEngine
 import com.lc33.tokenvault.engine.IdleLockSuspender
+import com.lc33.tokenvault.engine.LogMaintenance
 import com.lc33.tokenvault.engine.ProbeEngine
 import com.lc33.tokenvault.engine.ProbeSession
 import com.lc33.tokenvault.engine.UpdateEngine
@@ -156,22 +157,23 @@ val coreModule = module {
     single { ImportWriter(get(), get(), get(), get(), get()) }
     single { ProfileSeeder(get()) }
 
-    single<GroupRepository> { RoomGroupRepository(get()) }
-    single<ProviderRepository> { RoomProviderRepository(get(), get(named(Qualifiers.NOW))) }
-    single<ApiKeyRepository> { RoomApiKeyRepository(get(), get(), get(), get(), get(named(Qualifiers.NOW))) }
-    single<SettingsRepository> { RoomSettingsRepository(get()) }
-    single<WebDavSettingsRepository> { RoomWebDavSettingsRepository(get(), get()) }
-    single<ProviderAccountRepository> { RoomProviderAccountRepository(get(), get(), get(), get(named(Qualifiers.NOW))) }
-    single<ModelRepository> { RoomModelRepository(get(), get(), get(named(Qualifiers.NOW))) }
-    single<ClientProfileRepository> { RoomClientProfileRepository(get()) }
+    single<GroupRepository> { RoomGroupRepository(get(), get()) }
+    single<ProviderRepository> { RoomProviderRepository(get(), get(named(Qualifiers.NOW)), get()) }
+    single<ApiKeyRepository> { RoomApiKeyRepository(get(), get(), get(), get(), get(named(Qualifiers.NOW)), get()) }
+    single<SettingsRepository> { RoomSettingsRepository(get(), get()) }
+    single<WebDavSettingsRepository> { RoomWebDavSettingsRepository(get(), get(), get()) }
+    single<ProviderAccountRepository> { RoomProviderAccountRepository(get(), get(), get(), get(named(Qualifiers.NOW)), get()) }
+    single<ModelRepository> { RoomModelRepository(get(), get(), get(named(Qualifiers.NOW)), get()) }
+    single<ClientProfileRepository> { RoomClientProfileRepository(get(), get()) }
     single<AuditLogRepository> { RoomAuditLogRepository(get(), get(), get(named(Qualifiers.NOW))) }
+    single { LogMaintenance(settings = get(), audit = get(), now = get(named(Qualifiers.NOW))) }
     single<ProbeRunRepository> { RoomProbeRunRepository(get()) }
 
     // ------------------------------------------------------------------ 网络与引擎
 
     single { HostGate(nowMillis = ::nowMillis) }
     single { ProxyProvider(get()) }
-    single { HttpEngine(client = get<ProxyProvider>().client, hostGate = get()) }
+    single { HttpEngine(client = get<ProxyProvider>().client, hostGate = get(), audit = get()) }
     single { com.lc33.tokenvault.backup.BackupCodec(get()) }
     single<BackupStore> {
         RoomBackupStore(
@@ -195,7 +197,7 @@ val coreModule = module {
             placeholders = get(named(Qualifiers.PLACEHOLDERS)),
         )
     }
-    single { WebDavClient(get<ProxyProvider>().client) }
+    single { WebDavClient(get<ProxyProvider>().client, audit = get()) }
     single {
         WebDavEngine(
             settings = get(), backup = get(), client = get(), audit = get(),

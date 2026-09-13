@@ -266,6 +266,9 @@ interface AuditLogDao {
     @Query("SELECT * FROM audit_log ORDER BY at DESC LIMIT :limit")
     fun observeRecent(limit: Int): Flow<List<AuditLogEntity>>
 
+    @Query("SELECT * FROM audit_log WHERE level IN (:levels) ORDER BY at DESC LIMIT :limit")
+    fun observeRecentByLevels(levels: List<String>, limit: Int): Flow<List<AuditLogEntity>>
+
     @Query("SELECT * FROM audit_log WHERE providerId = :providerId ORDER BY at DESC LIMIT :limit")
     fun observeByProvider(providerId: Long, limit: Int): Flow<List<AuditLogEntity>>
 

@@ -2,6 +2,8 @@ package com.lc33.tokenvault.domain.repo
 
 import com.lc33.tokenvault.domain.AutoLockTimeout
 import com.lc33.tokenvault.domain.DefaultProbeSettings
+import com.lc33.tokenvault.domain.model.LogLevel
+import com.lc33.tokenvault.domain.model.LogRetention
 import com.lc33.tokenvault.domain.model.PredictiveBackExitDirection
 import com.lc33.tokenvault.domain.model.PredictiveBackStyle
 import kotlinx.coroutines.flow.Flow
@@ -148,6 +150,16 @@ interface SettingsRepository {
     fun observePredictiveBackStyle(): Flow<PredictiveBackStyle>
 
     suspend fun setPredictiveBackStyle(style: PredictiveBackStyle)
+
+    /** 日志页默认展示等级。默认 INFO；DEBUG 只有在用户显式选择后才会显示出来。 */
+    fun observeLogLevelFilter(): Flow<LogLevel>
+
+    suspend fun setLogLevelFilter(level: LogLevel)
+
+    /** 日志保留期。默认 7 天；永久保留是显式选项。 */
+    fun observeLogRetention(): Flow<LogRetention>
+
+    suspend fun setLogRetention(retention: LogRetention)
 
     /** Scale 样式的退出方向。没写过的键回退 [PredictiveBackExitDirection.AlwaysRight]。 */
     fun observePredictiveBackExitDirection(): Flow<PredictiveBackExitDirection>

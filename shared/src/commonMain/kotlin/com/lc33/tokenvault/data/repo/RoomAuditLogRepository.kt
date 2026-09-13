@@ -48,8 +48,14 @@ class RoomAuditLogRepository constructor(
         )
     }
 
-    override fun observeRecent(limit: Int): Flow<List<AuditEntry>> =
-        dao.observeRecent(limit).map { rows -> rows.map { it.toDomain() } }
+    override fun observeRecent(limit: Int, minLevel: LogLevel): Flow<List<AuditEntry>> {
+        val levels = LogLevel.entries
+            .filter { it.ordinal >= minLevel.ordinal }
+            .map { it.wireName }
+        return dao.observeRecentByLevels(levels, limit).map { rows -> rows.map { it.toDomain() } }
+    }
+
+    override suspend fun trimOlderThan(before: Long) = dao.trimOlderThan(before)
 
     override suspend fun clear() = dao.clear()
 }

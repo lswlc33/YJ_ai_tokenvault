@@ -1,9 +1,11 @@
 package com.lc33.tokenvault.ui.shell
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import com.lc33.tokenvault.screens.lock.LockCallbacks
 import com.lc33.tokenvault.ui.miuix.AppTheme
@@ -26,6 +28,11 @@ fun AppRoot() {
     val uiState by vm.uiState.collectAsStateWithLifecycle()
 
     val appearance: AppearanceViewModel = koinViewModel()
+    val logMaintenance: com.lc33.tokenvault.engine.LogMaintenance = koinInject()
+
+    LaunchedEffect(logMaintenance) {
+        runCatching { logMaintenance.run() }
+    }
     val colorScheme by appearance.colorScheme.collectAsStateWithLifecycle()
 
     // LockCallbacks 必须 remember 一次：它是 @Immutable，但 Compose 比的是实例相等，

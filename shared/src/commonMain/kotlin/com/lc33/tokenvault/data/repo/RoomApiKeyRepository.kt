@@ -11,8 +11,11 @@ import com.lc33.tokenvault.data.mapper.toDomain
 import com.lc33.tokenvault.data.mapper.toEntity
 import com.lc33.tokenvault.domain.model.ApiKey
 import com.lc33.tokenvault.domain.model.BalanceSnapshot
+import com.lc33.tokenvault.domain.model.LogCategory
+import com.lc33.tokenvault.domain.model.LogLevel
 import com.lc33.tokenvault.domain.model.KeySettings
 import com.lc33.tokenvault.domain.repo.ApiKeyRepository
+import com.lc33.tokenvault.domain.repo.AuditLogRepository
 import com.lc33.tokenvault.domain.repo.TransactionRunner
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -23,6 +26,7 @@ class RoomApiKeyRepository constructor(
     private val cipher: FieldCipher,
     private val transactions: TransactionRunner,
     private val now: () -> Long,
+    private val audit: AuditLogRepository? = null,
 ) : ApiKeyRepository {
     override fun observeByProvider(providerId: Long): Flow<List<ApiKey>> =
         dao.observeByProvider(providerId).map { rows -> rows.map { it.toDomain() } }
@@ -76,6 +80,15 @@ class RoomApiKeyRepository constructor(
                     ),
                 )
                 keyId
+            }.also { keyId ->
+                audit.recordSafe(
+                    LogLevel.INFO,
+                    LogCategory.VAULT,
+                    "api key added",
+                    "label=${label.trim()}",
+                    providerId = providerId,
+                    keyId = keyId,
+                )
             }
         } finally {
             bytes.zeroize()
@@ -86,13 +99,16 @@ class RoomApiKeyRepository constructor(
         val bytes = secret.toUtf8()
         try {
             dao.setSecret(id, cipher.seal(bytes, aadForSecret(id)), cipher.fingerprint(bytes), now())
+            audit.recordSafe(LogLevel.INFO, LogCategory.VAULT, "api key secret replaced", "id=$id", keyId = id)
         } finally {
             bytes.zeroize()
         }
     }
 
-    override suspend fun updateMeta(key: ApiKey) =
+    override suspend fun updateMeta(key: ApiKey) {
         dao.updateMeta(key.id, key.label.trim(), key.note.trim(), key.sortOrder, now())
+        audit.recordSafe(LogLevel.INFO, LogCategory.VAULT, "api key metadata updated", "id=${key.id} label=${key.label.trim()}", providerId = key.providerId, keyId = key.id)
+    }
 
     override suspend fun updateSettings(
         id: Long,
@@ -106,6 +122,7 @@ class RoomApiKeyRepository constructor(
             else -> sealBalanceToken(id, balanceToken)
         }
         settingsDao.insert(settings.toEntity(id, stamp).copy(balanceTokenEnc = token))
+        audit.recordSafe(LogLevel.INFO, LogCategory.VAULT, "api key settings updated", "id=$id", keyId = id)
     }
 
     override suspend fun reveal(id: Long): CharArray {
@@ -128,12 +145,20 @@ class RoomApiKeyRepository constructor(
         }
     }
 
-    override suspend fun setEnabled(id: Long, enabled: Boolean) = dao.setEnabled(id, enabled, now())
+    override suspend fun setEnabled(id: Long, enabled: Boolean) {
+        dao.setEnabled(id, enabled, now())
+        audit.recordSafe(LogLevel.INFO, LogCategory.VAULT, "api key enabled changed", "id=$id enabled=$enabled", keyId = id)
+    }
 
-    override suspend fun delete(id: Long) = dao.delete(id)
+    override suspend fun delete(id: Long) {
+        dao.delete(id)
+        audit.recordSafe(LogLevel.WARN, LogCategory.VAULT, "api key deleted", "id=$id", keyId = id)
+    }
 
-    override suspend fun reorder(providerId: Long, idsInOrder: List<Long>) =
+    override suspend fun reorder(providerId: Long, idsInOrder: List<Long>) {
         dao.reorder(providerId, idsInOrder, now())
+        audit.recordSafe(LogLevel.INFO, LogCategory.VAULT, "api keys reordered", "providerId=$providerId count=${idsInOrder.size}", providerId = providerId)
+    }
 
     override suspend fun applyProbeResult(
         id: Long,

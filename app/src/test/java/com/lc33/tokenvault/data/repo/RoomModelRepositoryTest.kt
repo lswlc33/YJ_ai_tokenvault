@@ -12,7 +12,7 @@ class RoomModelRepositoryTest {
     private var now = 1_700_000_000_000L
 
     private fun repo(dao: FakeModelDao = FakeModelDao()) =
-        RoomModelRepository(dao, ImmediateTransactions()) { now }
+        RoomModelRepository(dao, ImmediateTransactions(), now = { now })
 
     @Test
     fun `首次发现写入 discovered 并记录协议`() = runTest {

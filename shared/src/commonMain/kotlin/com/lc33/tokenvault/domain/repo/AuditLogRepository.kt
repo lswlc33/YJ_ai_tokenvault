@@ -31,8 +31,11 @@ interface AuditLogRepository {
         keyId: Long? = null,
     )
 
-    /** 最近 N 条，倒序。日志页读它。 */
-    fun observeRecent(limit: Int): Flow<List<AuditEntry>>
+    /** 最近 N 条，倒序；只返回日志等级不低于 [minLevel] 的记录。 */
+    fun observeRecent(limit: Int, minLevel: LogLevel = LogLevel.DEBUG): Flow<List<AuditEntry>>
+
+    /** 删除早于 [before] 的日志。 */
+    suspend fun trimOlderThan(before: Long)
 
     /** 清空（数据页的「清空日志」）。 */
     suspend fun clear()

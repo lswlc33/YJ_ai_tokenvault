@@ -1,6 +1,9 @@
 package com.lc33.tokenvault.net
 
 import com.lc33.tokenvault.crypto.toUtf8
+import com.lc33.tokenvault.domain.model.LogCategory
+import com.lc33.tokenvault.domain.model.LogLevel
+import com.lc33.tokenvault.domain.repo.AuditLogRepository
 import com.lc33.tokenvault.domain.model.WebDavConfig
 import com.lc33.tokenvault.domain.model.WebDavCredentials
 import io.ktor.client.HttpClient
@@ -15,6 +18,7 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.contentType
 import io.ktor.http.decodeURLPart
+import kotlinx.coroutines.CancellationException
 import com.lc33.tokenvault.crypto.zeroize
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -27,45 +31,85 @@ import kotlin.io.encoding.ExperimentalEncodingApi
  */
 class WebDavClient constructor(
     private val client: HttpClient,
+    private val audit: AuditLogRepository? = null,
 ) {
 
-    suspend fun listBackups(config: WebDavConfig, credentials: WebDavCredentials): List<String> {
-        val response = client.request(remoteDirectoryUrl(config)) {
-            method = HttpMethod("PROPFIND")
-            applyAuth(credentials)
-            header(HttpHeaders.Depth, "1")
-            contentType(ContentType.Application.Xml)
-            setBody(PROP_REQUEST_BODY)
+    suspend fun listBackups(config: WebDavConfig, credentials: WebDavCredentials): List<String> =
+        logged("PROPFIND", remoteDirectoryUrl(config)) {
+            val response = client.request(remoteDirectoryUrl(config)) {
+                method = HttpMethod("PROPFIND")
+                applyAuth(credentials)
+                header(HttpHeaders.Depth, "1")
+                contentType(ContentType.Application.Xml)
+                setBody(PROP_REQUEST_BODY)
+            }
+            ensureSuccess(response.status.value, "PROPFIND")
+            response.status.value to parseBackupNames(response.bodyAsText())
         }
-        ensureSuccess(response.status.value, "PROPFIND")
-        return parseBackupNames(response.bodyAsText())
-    }
 
     suspend fun put(config: WebDavConfig, credentials: WebDavCredentials, fileName: String, bytes: ByteArray) {
-        val response = client.request(remoteFileUrl(config, fileName)) {
-            method = HttpMethod.Put
-            applyAuth(credentials)
-            setBody(bytes)
+        logged("PUT", remoteFileUrl(config, fileName)) {
+            val response = client.request(remoteFileUrl(config, fileName)) {
+                method = HttpMethod.Put
+                applyAuth(credentials)
+                setBody(bytes)
+            }
+            ensureSuccess(response.status.value, "PUT")
+            response.status.value to Unit
         }
-        ensureSuccess(response.status.value, "PUT")
     }
 
-    suspend fun get(config: WebDavConfig, credentials: WebDavCredentials, fileName: String): ByteArray {
-        val response = client.request(remoteFileUrl(config, fileName)) {
-            method = HttpMethod.Get
-            applyAuth(credentials)
+    suspend fun get(config: WebDavConfig, credentials: WebDavCredentials, fileName: String): ByteArray =
+        logged("GET", remoteFileUrl(config, fileName)) {
+            val response = client.request(remoteFileUrl(config, fileName)) {
+                method = HttpMethod.Get
+                applyAuth(credentials)
+            }
+            ensureSuccess(response.status.value, "GET")
+            response.status.value to response.bodyAsBytes()
         }
-        ensureSuccess(response.status.value, "GET")
-        return response.bodyAsBytes()
-    }
 
     suspend fun delete(config: WebDavConfig, credentials: WebDavCredentials, fileName: String) {
-        val response = client.request(remoteFileUrl(config, fileName)) {
-            method = HttpMethod.Delete
-            applyAuth(credentials)
+        logged("DELETE", remoteFileUrl(config, fileName)) {
+            val response = client.request(remoteFileUrl(config, fileName)) {
+                method = HttpMethod.Delete
+                applyAuth(credentials)
+            }
+            ensureSuccess(response.status.value, "DELETE")
+            response.status.value to Unit
         }
-        ensureSuccess(response.status.value, "DELETE")
     }
+
+    private suspend fun recordHttp(
+        level: LogLevel,
+        message: String,
+        detail: String? = null,
+    ) {
+        runCatching { audit?.record(level = level, category = LogCategory.HTTP, message = message, detail = detail) }
+    }
+
+    private suspend fun <T> logged(verb: String, url: String, block: suspend () -> Pair<Int, T>): T =
+        try {
+            val (status, result) = block()
+            recordHttp(
+                level = LogLevel.INFO,
+                message = "webdav $verb ${safeTarget(url)} -> $status",
+            )
+            result
+        } catch (cancelled: CancellationException) {
+            // 取消不是失败：用户自己中断的传输不该在日志里留下一条 ERROR，
+            // 与 HttpEngine 的处理保持一致。
+            throw cancelled
+        } catch (t: Throwable) {
+            recordHttp(
+                level = LogLevel.ERROR,
+                message = "webdav $verb ${safeTarget(url)} failed",
+                detail = t::class.simpleName,
+            )
+            throw t
+        }
+
+    private fun safeTarget(url: String): String = url.substringBefore('?').substringBefore('#')
 
     private fun HttpRequestBuilder.applyAuth(credentials: WebDavCredentials) {
         header(HttpHeaders.Authorization, basic(credentials.username, credentials.password))

@@ -5,7 +5,10 @@ import com.lc33.tokenvault.domain.AutoLockPolicy
 import com.lc33.tokenvault.domain.AutoLockTimeout
 import com.lc33.tokenvault.domain.DefaultProbeSettings
 import com.lc33.tokenvault.domain.model.BalanceSnapshot
+import com.lc33.tokenvault.domain.model.LogLevel
+import com.lc33.tokenvault.domain.model.LogRetention
 import com.lc33.tokenvault.probe.ProbeClassifier
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -397,5 +400,74 @@ class SettingsRepositoryTest {
             assertEquals(true, awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
+    }
+    // ---------------------------------------------------------------- 日志等级与保留期
+
+    @Test
+    fun `日志等级没写过时默认 INFO`() = runTest {
+        // 默认给 DEBUG 的后果是日志页一打开就是满屏调试噪声；默认给 WARN 又会把
+        // 用户刚做完的那次操作藏起来。INFO 是"看得见自己做了什么"的那一档。
+        repo.observeLogLevelFilter().test {
+            assertEquals(LogLevel.INFO, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `日志等级写了能读回来，落库的是线上名`() = runTest {
+        repo.setLogLevelFilter(LogLevel.DEBUG)
+
+        assertEquals(LogLevel.DEBUG, repo.observeLogLevelFilter().first())
+        // 存 ordinal 的代价是以后插一档等级就会让所有已存的设置悄悄改变含义。
+        assertEquals("debug", dao.rows.single { it.key == "logLevelFilter" }.value)
+    }
+
+    @Test
+    fun `日志等级坏值落回 INFO，不落回 DEBUG`() = runTest {
+        // 读方向单向容错：坏数据不该让日志突然变成全量调试输出。
+        dao.put(com.lc33.tokenvault.data.entity.AppSettingEntity(key = "logLevelFilter", value = "verbose"))
+        repo.observeLogLevelFilter().test {
+            assertEquals(LogLevel.INFO, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `日志保留期没写过时默认七天`() = runTest {
+        repo.observeLogRetention().test {
+            assertEquals(LogRetention.SEVEN_DAYS, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `日志保留期写了能读回来，永久落库为 forever`() = runTest {
+        repo.setLogRetention(LogRetention.NINETY_DAYS)
+        assertEquals("90", dao.rows.single { it.key == "logRetentionDays" }.value)
+        assertEquals(LogRetention.NINETY_DAYS, repo.observeLogRetention().first())
+
+        repo.setLogRetention(LogRetention.FOREVER)
+        // 永久必须是显式字样：写 null 会与"这个键还没写过"撞在一起，读回来就成 7 天。
+        assertEquals("forever", dao.rows.single { it.key == "logRetentionDays" }.value)
+        assertEquals(LogRetention.FOREVER, repo.observeLogRetention().first())
+    }
+
+    @Test
+    fun `日志保留期坏值落回七天，不落回永久`() = runTest {
+        // 这条是回归钉子：`toIntOrNull()` 给 null，而 FOREVER 的 days 也是 null，
+        // 早先的实现因此把一段读不懂的值读成了"永久保留"——正好是清理的反面。
+        dao.put(com.lc33.tokenvault.data.entity.AppSettingEntity(key = "logRetentionDays", value = "3650"))
+        repo.observeLogRetention().test {
+            assertEquals(LogRetention.SEVEN_DAYS, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `保留期四个选项与天数一一对应`() {
+        // 下拉按 ordinal 取选项，所以这份清单同时钉住"有几档、分别是什么"。
+        assertEquals(listOf(7, 30, 90, null), LogRetention.entries.map { it.days })
+        assertEquals(LogRetention.THIRTY_DAYS, LogRetention.fromDays(30))
+        assertEquals(LogRetention.SEVEN_DAYS, LogRetention.fromDays(null))
     }
 }

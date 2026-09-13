@@ -108,6 +108,8 @@
     <string name="settings_probe_summary">Levels, timing, rate limits, balance thresholds</string>
     <string name="settings_profiles">Client profiles</string>
     <string name="settings_profiles_summary">Headers used to look like a real AI client</string>
+    <string name="settings_log">Logs</string>
+    <string name="settings_log_summary">Review network requests, data changes, and reordering</string>
     <string name="settings_data">Data</string>
     <string name="settings_data_summary">Model metadata, groups, logs</string>
     <string name="settings_sync_row">Backup and WebDAV</string>
@@ -262,8 +264,24 @@
     <string name="data_clear_probe_confirm_body">Every key goes back to "not probed". Keys, models and accounts themselves are kept.</string>
     <string name="data_clear_log_confirm_title">Clear the entire log?</string>
     <string name="data_clear_log_confirm_body">All log entries are deleted. This cannot be undone.</string>
+    <string name="log_filter_title">Minimum level</string>
+    <string name="log_filter_summary">Show entries at this level and above.</string>
+    <string name="log_retention">Retention</string>
+    <string name="log_retention_summary">Entries older than this are cleaned up automatically.</string>
+    <string-array name="log_retention_options">
+        <item>7 days</item>
+        <item>30 days</item>
+        <item>90 days</item>
+        <item>Forever</item>
+    </string-array>
+    <string name="log_auto_scroll">Auto-scroll</string>
+    <string name="log_auto_scroll_summary">Jump back to the newest entry when new logs arrive.</string>
+    <string name="log_clear">Clear logs</string>
+    <string name="log_clear_confirm_title">Clear all logs?</string>
+    <string name="log_clear_confirm_body">Log entries cannot be recovered. Your data and settings are not affected.</string>
     <string name="log_title">Log</string>
-    <string name="log_empty">Nothing logged yet. Probe, balance and backup events show up here, redacted before they are written.</string>
+    <string name="log_empty_title">No entries</string>
+    <string name="log_empty">Probes, balances, backups, network requests and data changes show up here, redacted before they are written.</string>
 
     <!-- 日志级别与分类的显示文案。日志页按级别着色（红线 17：颜色 + 文字），分类做筛选。 -->
     <string name="log_level_debug">Debug</string>

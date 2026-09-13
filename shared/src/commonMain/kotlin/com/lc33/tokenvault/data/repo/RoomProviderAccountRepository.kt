@@ -11,7 +11,10 @@ import com.lc33.tokenvault.data.entity.ProviderAccountEntity
 import com.lc33.tokenvault.data.mapper.toLoginMethodsCsv
 import com.lc33.tokenvault.data.mapper.toDomain
 import com.lc33.tokenvault.domain.LoginMethod
+import com.lc33.tokenvault.domain.model.LogCategory
+import com.lc33.tokenvault.domain.model.LogLevel
 import com.lc33.tokenvault.domain.model.ProviderAccount
+import com.lc33.tokenvault.domain.repo.AuditLogRepository
 import com.lc33.tokenvault.domain.repo.ProviderAccountRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -30,6 +33,7 @@ class RoomProviderAccountRepository constructor(
     private val cipher: FieldCipher,
     private val transactions: TransactionRunner,
     private val now: () -> Long,
+    private val audit: AuditLogRepository? = null,
 ) : ProviderAccountRepository {
 
     override fun observeByProvider(providerId: Long): Flow<List<ProviderAccount>> =
@@ -74,6 +78,8 @@ class RoomProviderAccountRepository constructor(
                     dao.setPassword(id, cipher.seal(bytes, aadPassword(id)), stamp)
                 }
                 id
+            }.also { id ->
+                audit.recordSafe(LogLevel.INFO, LogCategory.ACCOUNT, "provider account added", "id=$id", providerId = providerId)
             }
         } finally {
             usernameBytes?.zeroize()
@@ -125,13 +131,18 @@ class RoomProviderAccountRepository constructor(
                     )
                 }
             }
+            audit.recordSafe(LogLevel.INFO, LogCategory.ACCOUNT, "provider account updated", "id=$id label=${label.trim()}", providerId = dao.findById(id)?.providerId)
         } finally {
             usernameBytes?.zeroize()
             passwordBytes?.zeroize()
         }
     }
 
-    override suspend fun delete(id: Long) = dao.delete(id)
+    override suspend fun delete(id: Long) {
+        val providerId = dao.findById(id)?.providerId
+        dao.delete(id)
+        audit.recordSafe(LogLevel.WARN, LogCategory.ACCOUNT, "provider account deleted", "id=$id", providerId = providerId)
+    }
 
     override suspend fun revealUsername(id: Long): CharArray? {
         val row = requireNotNull(dao.findById(id)) { "provider account $id not found" }
@@ -156,7 +167,9 @@ class RoomProviderAccountRepository constructor(
     }
 
     override suspend fun setLoginMethods(id: Long, methods: Set<LoginMethod>) {
+        val providerId = dao.findById(id)?.providerId
         dao.setLoginMethods(id, methods.toLoginMethodsCsv(), now())
+        audit.recordSafe(LogLevel.INFO, LogCategory.ACCOUNT, "account login methods updated", "id=$id methods=${methods.joinToString { it.wireName }}", providerId = providerId)
     }
 
     private fun aadUsername(id: Long) = FieldAad.of(TABLE, id, COLUMN_USERNAME)

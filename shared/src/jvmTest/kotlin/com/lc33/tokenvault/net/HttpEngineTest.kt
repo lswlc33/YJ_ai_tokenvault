@@ -1,5 +1,7 @@
 package com.lc33.tokenvault.net
 
+import com.lc33.tokenvault.domain.model.LogCategory
+import com.lc33.tokenvault.domain.model.LogLevel
 import com.lc33.tokenvault.endpoint.ProbeRequest
 import com.lc33.tokenvault.endpoint.ProbeResponse
 import io.ktor.client.HttpClient
@@ -139,6 +141,33 @@ class HttpEngineTest {
         yield()
         job.cancelAndJoin()
         assertNull(withTimeout(1_000) { completed.await() })
+    }
+
+    @Test
+    fun `成功的请求留一条 INFO，日志里没有 query 也没有请求头`() = runBlocking {
+        val gate = HostGate(defaultMinIntervalMs = 0, nowMillis = { 0L })
+        val audit = RecordingAuditLog()
+        val mock = MockEngine { _ -> respond("{}", HttpStatusCode.OK) }
+        val engine = HttpEngine(HttpClient(mock), gate, audit)
+
+        engine.execute(
+            ProbeRequest(
+                method = "POST",
+                url = "https://example.com/v1/chat?api_key=QUERY-SECRET#frag",
+                headers = listOf("Authorization" to "Bearer HEADER-SECRET"),
+            ),
+            allowInsecure = true,
+        )
+
+        val record = audit.records.single()
+        assertEquals(LogLevel.INFO, record.level)
+        assertEquals(LogCategory.HTTP, record.category)
+        assertEquals("http POST example.com/v1/chat -> 200", record.message)
+        assertTrue(record.detail!!.startsWith("latency="))
+        // 脱敏：query 与请求头都不进日志，只有 host + path。
+        val text = record.message + record.detail
+        assertTrue(!text.contains("QUERY-SECRET"))
+        assertTrue(!text.contains("HEADER-SECRET"))
     }
 
     @Test

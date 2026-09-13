@@ -2,13 +2,16 @@ package com.lc33.tokenvault.data.repo
 
 import com.lc33.tokenvault.crypto.DecryptionFailedException
 import com.lc33.tokenvault.crypto.FieldAad
+import com.lc33.tokenvault.crypto.Redactor
 import com.lc33.tokenvault.crypto.SecretBox
 import com.lc33.tokenvault.crypto.VaultLockedException
 import com.lc33.tokenvault.crypto.zeroize
 import com.lc33.tokenvault.domain.model.KeySettings
+import com.lc33.tokenvault.domain.model.LogCategory
 import com.lc33.tokenvault.platform.FileBootStore
 import com.lc33.tokenvault.platform.VaultSession
 import java.io.File
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -30,6 +33,7 @@ class ApiKeyRepositoryTest {
     private lateinit var keyDao: FakeApiKeyDao
     private lateinit var settingsDao: FakeKeySettingsDao
     private lateinit var repo: RoomApiKeyRepository
+    private lateinit var auditRepo: RoomAuditLogRepository
 
     private var now = 1_700_000_000_000L
 
@@ -47,12 +51,14 @@ class ApiKeyRepositoryTest {
         assertTrue(session.isUnlocked)
         settingsDao = FakeKeySettingsDao()
         keyDao = FakeApiKeyDao(settingsDao)
+        auditRepo = RoomAuditLogRepository(FakeAuditLogDao(), Redactor(), { now })
         repo = RoomApiKeyRepository(
             dao = keyDao,
             settingsDao = settingsDao,
             cipher = FieldCipher(session, SecretBox()),
             transactions = ImmediateTransactions(),
             now = { now },
+            audit = auditRepo,
         )
     }
 
@@ -183,6 +189,27 @@ class ApiKeyRepositoryTest {
             SecretBox().open(envelope, key, FieldAad.of("api_keys", id, "secretEnc"), "test")
         }
         assertEquals(SECRET, String(plain, Charsets.UTF_8))
+    }
+
+    @Test
+    fun `密钥的新增排序与删除都会留痕，且不留明文`() = runTest {
+        val first = add(label = "a")
+        now += 1000
+        val second = add(label = "b", secret = OTHER_SECRET)
+        now += 1000
+        repo.reorder(1, listOf(second, first))
+        now += 1000
+        repo.delete(second)
+
+        val entries = auditRepo.observeRecent(20).first()
+        assertEquals(
+            listOf("api key deleted", "api keys reordered", "api key added", "api key added"),
+            entries.map { it.message },
+        )
+        assertEquals(LogCategory.VAULT, entries.first().category)
+        // 红线 32：日志里不能出现密钥明文——写路径只记 id 与标签。
+        assertTrue(entries.none { it.message.contains(SECRET) || it.message.contains(OTHER_SECRET) })
+        assertTrue(entries.none { it.detail?.contains(SECRET) == true || it.detail?.contains(OTHER_SECRET) == true })
     }
 }
 

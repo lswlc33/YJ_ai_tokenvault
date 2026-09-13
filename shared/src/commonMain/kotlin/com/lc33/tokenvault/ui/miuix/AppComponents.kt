@@ -377,6 +377,12 @@ fun AppDialog(
     summary: String? = null,
     confirmText: String? = null,
     onConfirm: (() -> Unit)? = null,
+    /**
+     * 取消文案。**破坏性动作必须给**：只有"确定"的弹层里，用户唯一的退路是点弹层外
+     * 空白或按返回键，而"清空日志""删除分组"这一类动作不该靠猜怎么退出。
+     */
+    dismissText: String? = null,
+    onDismiss: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit = {},
 ) {
     OverlayDialog(
@@ -392,14 +398,28 @@ fun AppDialog(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             content()
-            if (confirmText != null) {
-                AppTextButton(
-                    text = confirmText,
-                    onClick = { (onConfirm ?: onDismissRequest)() },
+            if (confirmText != null || dismissText != null) {
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 4.dp),
-                )
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    if (dismissText != null) {
+                        AppTextButton(
+                            text = dismissText,
+                            onClick = { (onDismiss ?: onDismissRequest)() },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    if (confirmText != null) {
+                        AppTextButton(
+                            text = confirmText,
+                            onClick = { (onConfirm ?: onDismissRequest)() },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
             }
         }
     }

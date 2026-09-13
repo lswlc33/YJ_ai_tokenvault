@@ -121,8 +121,12 @@ class BackupEngineTest {
                 keyId: Long?,
             ) = Unit
 
-            override fun observeRecent(limit: Int) =
-                kotlinx.coroutines.flow.flowOf(emptyList<com.lc33.tokenvault.domain.model.AuditEntry>())
+            override fun observeRecent(
+                limit: Int,
+                minLevel: com.lc33.tokenvault.domain.model.LogLevel,
+            ) = kotlinx.coroutines.flow.flowOf(emptyList<com.lc33.tokenvault.domain.model.AuditEntry>())
+
+            override suspend fun trimOlderThan(before: Long) = Unit
 
             override suspend fun clear() = Unit
         }

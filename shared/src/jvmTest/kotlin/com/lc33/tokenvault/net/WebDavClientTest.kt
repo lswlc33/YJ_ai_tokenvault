@@ -1,5 +1,7 @@
 package com.lc33.tokenvault.net
 
+import com.lc33.tokenvault.domain.model.LogCategory
+import com.lc33.tokenvault.domain.model.LogLevel
 import com.lc33.tokenvault.domain.model.WebDavConfig
 import com.lc33.tokenvault.domain.model.WebDavCredentials
 import io.ktor.client.HttpClient
@@ -87,5 +89,50 @@ class WebDavClientTest {
         assertEquals(listOf("PROPFIND", "PUT", "GET", "DELETE"), methods)
         credentials.zeroize()
         assertTrue(credentials.username.all { it == Char(0) })
+    }
+    @Test
+    fun `四个动词各留一条 HTTP 日志，且不含凭据`() {
+        val config = WebDavConfig(url = "https://dav.example.com/dav", remoteDirectory = "/YuanJi")
+        val credentials = WebDavCredentials("user".toCharArray(), "pass".toCharArray())
+        val engine = MockEngine { request ->
+            when (request.method.value) {
+                "PROPFIND" -> respond(
+                    content = """<D:multistatus><D:response><D:href>/dav/YuanJi/a.yjv</D:href></D:response></D:multistatus>""",
+                    status = HttpStatusCode(207, "Multi-Status"),
+                )
+                "PUT" -> respond(ByteArray(0), HttpStatusCode.Created)
+                "GET" -> respond(byteArrayOf(1, 2, 3), HttpStatusCode.OK)
+                "DELETE" -> respond(ByteArray(0), HttpStatusCode.NoContent)
+                else -> error("unexpected method ${request.method.value}")
+            }
+        }
+        val audit = RecordingAuditLog()
+        val client = WebDavClient(HttpClient(engine), audit)
+
+        runBlocking {
+            client.listBackups(config, credentials)
+            client.put(config, credentials, "a.yjv", byteArrayOf(4))
+            client.get(config, credentials, "a.yjv")
+            client.delete(config, credentials, "a.yjv")
+        }
+
+        assertEquals(
+            listOf(
+                "webdav PROPFIND https://dav.example.com/dav/YuanJi -> 207",
+                "webdav PUT https://dav.example.com/dav/YuanJi/a.yjv -> 201",
+                "webdav GET https://dav.example.com/dav/YuanJi/a.yjv -> 200",
+                "webdav DELETE https://dav.example.com/dav/YuanJi/a.yjv -> 204",
+            ),
+            audit.records.map { it.message },
+        )
+        assertTrue(audit.records.all { it.level == LogLevel.INFO && it.category == LogCategory.HTTP })
+        // Basic 凭据只进请求头：日志里不能出现用户名或口令。
+        assertTrue(
+            audit.records.none { record ->
+                val text = record.message + record.detail.orEmpty()
+                text.contains("user") || text.contains("pass")
+            },
+        )
+        credentials.zeroize()
     }
 }

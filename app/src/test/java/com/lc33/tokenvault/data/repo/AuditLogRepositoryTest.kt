@@ -76,6 +76,29 @@ class AuditLogRepositoryTest {
     }
 
     @Test
+    fun `按最低等级筛选`() = runTest {
+        repo.record(LogLevel.DEBUG, LogCategory.VAULT, message = "debug")
+        repo.record(LogLevel.INFO, LogCategory.VAULT, message = "info")
+        repo.record(LogLevel.ERROR, LogCategory.VAULT, message = "error")
+
+        val visible = repo.observeRecent(10, LogLevel.INFO).first()
+
+        assertEquals(listOf("error", "info"), visible.map { it.message })
+    }
+
+    @Test
+    fun `按保留时间删除旧日志`() = runTest {
+        repo.record(LogLevel.INFO, LogCategory.VAULT, message = "old")
+        val oldAt = now
+        now += 8L * 24 * 60 * 60 * 1000
+        repo.record(LogLevel.INFO, LogCategory.VAULT, message = "new")
+
+        repo.trimOlderThan(oldAt + 1)
+
+        assertEquals(listOf("new"), repo.observeRecent(10).first().map { it.message })
+    }
+
+    @Test
     fun `日志倒序且带分类`() = runTest {
         repo.record(LogLevel.INFO, LogCategory.LOCK, message = "first")
         now += 1000

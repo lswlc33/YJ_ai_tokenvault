@@ -6,6 +6,9 @@ import com.lc33.tokenvault.data.mapper.toDomain
 import com.lc33.tokenvault.data.mapper.toEntity
 import com.lc33.tokenvault.domain.Protocol
 import com.lc33.tokenvault.domain.model.AiModel
+import com.lc33.tokenvault.domain.model.LogCategory
+import com.lc33.tokenvault.domain.model.LogLevel
+import com.lc33.tokenvault.domain.repo.AuditLogRepository
 import com.lc33.tokenvault.domain.repo.ModelRepository
 import com.lc33.tokenvault.domain.repo.TransactionRunner
 import com.lc33.tokenvault.probe.ModelMerger
@@ -24,6 +27,7 @@ class RoomModelRepository constructor(
     private val dao: ModelDao,
     private val transactions: TransactionRunner,
     private val now: () -> Long,
+    private val audit: AuditLogRepository? = null,
 ) : ModelRepository {
 
     override fun observeByProvider(providerId: Long): Flow<List<AiModel>> =
@@ -50,7 +54,9 @@ class RoomModelRepository constructor(
                 firstSeenAt = stamp,
                 sortOrder = dao.findByProviderAndKey(providerId, keyId).size,
             ),
-        )
+        ).also { id ->
+            audit.recordSafe(LogLevel.INFO, LogCategory.VAULT, "model added", "id=$id modelId=${modelId.trim()}", providerId = providerId, keyId = keyId)
+        }
     }
 
     override suspend fun applyDiscovered(
@@ -85,6 +91,7 @@ class RoomModelRepository constructor(
             plan.toTouch.forEach { dao.touchLastSeen(it, stamp) }
             plan.toDisable.forEach { dao.setEnabled(it, false) }
         }
+        audit.recordSafe(LogLevel.INFO, LogCategory.VAULT, "models discovered", "protocol=${protocol.wireName} count=${modelIds.size}", providerId = providerId, keyId = keyId)
     }
 
     override suspend fun applyProbeResult(

@@ -13,6 +13,8 @@ import tokenvault.shared.generated.resources.settings_appearance
 import tokenvault.shared.generated.resources.settings_appearance_summary
 import tokenvault.shared.generated.resources.settings_data
 import tokenvault.shared.generated.resources.settings_data_summary
+import tokenvault.shared.generated.resources.settings_log
+import tokenvault.shared.generated.resources.settings_log_summary
 import tokenvault.shared.generated.resources.settings_group_about
 import tokenvault.shared.generated.resources.settings_group_settings
 import tokenvault.shared.generated.resources.settings_group_sync
@@ -49,6 +51,7 @@ fun SettingsScreen(
     onOpenProbeSettings: () -> Unit,
     onOpenProfiles: () -> Unit,
     onOpenData: () -> Unit,
+    onOpenLog: () -> Unit,
     onOpenSync: () -> Unit,
     onOpenAbout: () -> Unit,
     onOpenUpdate: () -> Unit,
@@ -95,6 +98,11 @@ fun SettingsScreen(
                         title = stringResource(Res.string.settings_data),
                         summary = stringResource(Res.string.settings_data_summary),
                         onClick = onOpenData,
+                    )
+                    AppArrowRow(
+                        title = stringResource(Res.string.settings_log),
+                        summary = stringResource(Res.string.settings_log_summary),
+                        onClick = onOpenLog,
                     )
                 }
             }

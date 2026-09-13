@@ -175,6 +175,7 @@ fun VaultNavHost(
                 onOpenProbeSettings = { navigate(ProbeSettingsRoute) },
                 onOpenProfiles = { navigate(ProfileListRoute) },
                 onOpenData = { navigate(DataRoute) },
+                onOpenLog = { navigate(LogRoute) },
                 onOpenSync = { navigate(SyncRoute) },
                 onOpenAbout = { navigate(AboutRoute) },
                 onOpenUpdate = { navigate(UpdateRoute) },
@@ -449,8 +450,15 @@ fun VaultNavHost(
             is LogRoute -> {
             val vm: LogViewModel = koinViewModel()
             val entries by vm.entries.collectAsStateWithLifecycle()
+            val levelFilter by vm.levelFilter.collectAsStateWithLifecycle()
+            val retention by vm.retention.collectAsStateWithLifecycle()
             LogScreen(
                 entries = entries,
+                levelFilter = levelFilter,
+                retention = retention,
+                onLevelFilterChange = vm::setLevelFilter,
+                onRetentionChange = vm::setRetention,
+                onClear = vm::clear,
                 onBack = back,
             )
         }

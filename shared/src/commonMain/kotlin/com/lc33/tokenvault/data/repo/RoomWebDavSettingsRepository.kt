@@ -6,8 +6,11 @@ import com.lc33.tokenvault.crypto.utf8Chars
 import com.lc33.tokenvault.crypto.zeroize
 import com.lc33.tokenvault.data.dao.AppSettingDao
 import com.lc33.tokenvault.data.entity.AppSettingEntity
+import com.lc33.tokenvault.domain.model.LogCategory
+import com.lc33.tokenvault.domain.model.LogLevel
 import com.lc33.tokenvault.domain.model.WebDavConfig
 import com.lc33.tokenvault.domain.model.WebDavCredentials
+import com.lc33.tokenvault.domain.repo.AuditLogRepository
 import com.lc33.tokenvault.domain.repo.WebDavSettingsRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -22,6 +25,7 @@ import kotlinx.coroutines.flow.map
 class RoomWebDavSettingsRepository constructor(
     private val dao: AppSettingDao,
     private val cipher: FieldCipher,
+    private val audit: AuditLogRepository? = null,
 ) : WebDavSettingsRepository {
 
     override fun observeConfig(): Flow<WebDavConfig> = dao.observeAll()
@@ -48,6 +52,12 @@ class RoomWebDavSettingsRepository constructor(
 
         username?.let { saveCredential(KEY_USERNAME, it) }
         password?.let { saveCredential(KEY_PASSWORD, it) }
+        audit.recordSafe(
+            LogLevel.INFO,
+            LogCategory.BACKUP,
+            "webdav settings saved",
+            "directory=${normalizeDirectory(config.remoteDirectory)} allowInsecure=${config.allowInsecure}",
+        )
     }
 
     override suspend fun credentials(): WebDavCredentials {

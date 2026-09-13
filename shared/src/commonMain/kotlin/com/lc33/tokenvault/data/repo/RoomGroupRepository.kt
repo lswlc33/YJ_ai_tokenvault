@@ -4,6 +4,9 @@ import com.lc33.tokenvault.data.dao.GroupDao
 import com.lc33.tokenvault.data.mapper.toDomain
 import com.lc33.tokenvault.data.mapper.toEntity
 import com.lc33.tokenvault.domain.model.Group
+import com.lc33.tokenvault.domain.model.LogCategory
+import com.lc33.tokenvault.domain.model.LogLevel
+import com.lc33.tokenvault.domain.repo.AuditLogRepository
 import com.lc33.tokenvault.domain.repo.GroupRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -13,6 +16,7 @@ import kotlinx.coroutines.flow.map
  */
 class RoomGroupRepository constructor(
     private val dao: GroupDao,
+    private val audit: AuditLogRepository? = null,
 ) : GroupRepository {
 
     override fun observeGroups(): Flow<List<Group>> =
@@ -24,15 +28,24 @@ class RoomGroupRepository constructor(
      */
     override suspend fun add(name: String): Long {
         val next = dao.findAll().size
-        return dao.insert(Group(name = name.trim(), sortOrder = next).toEntity())
+        return dao.insert(Group(name = name.trim(), sortOrder = next).toEntity()).also { id ->
+            audit.recordSafe(LogLevel.INFO, LogCategory.VAULT, "group added", "id=$id")
+        }
     }
 
     override suspend fun rename(id: Long, name: String) {
         val existing = dao.findById(id) ?: return
         dao.update(existing.copy(name = name.trim()))
+        audit.recordSafe(LogLevel.INFO, LogCategory.VAULT, "group renamed", "id=$id")
     }
 
-    override suspend fun delete(id: Long) = dao.delete(id)
+    override suspend fun delete(id: Long) {
+        dao.delete(id)
+        audit.recordSafe(LogLevel.INFO, LogCategory.VAULT, "group deleted", "id=$id")
+    }
 
-    override suspend fun reorder(idsInOrder: List<Long>) = dao.reorder(idsInOrder)
+    override suspend fun reorder(idsInOrder: List<Long>) {
+        dao.reorder(idsInOrder)
+        audit.recordSafe(LogLevel.INFO, LogCategory.VAULT, "groups reordered", "count=${idsInOrder.size}")
+    }
 }
