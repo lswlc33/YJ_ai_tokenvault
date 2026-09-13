@@ -160,11 +160,18 @@ fun AppCard(
 @Composable
 fun AppPreferenceGroup(
     modifier: Modifier = Modifier,
+    /**
+     * false 时不加左右 `screenPadding`。
+     *
+     * 用在弹层里：`OverlayBottomSheet` 已经通过它的 `insideMargin` 给了左右边距，
+     * 组再加一次就会比同一个弹层里的输入框明显内缩。
+     */
+    inset: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val tokens = LocalAppTokens.current
     AppCard(
-        modifier = modifier.padding(horizontal = tokens.screenPadding),
+        modifier = if (inset) modifier.padding(horizontal = tokens.screenPadding) else modifier,
         insideMargin = PaddingValues(0.dp),
         content = content,
     )

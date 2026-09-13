@@ -96,6 +96,7 @@ import com.lc33.tokenvault.ui.miuix.AppDropdownRow
 import com.lc33.tokenvault.ui.miuix.AppFilterChip
 import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppIconButton
+import com.lc33.tokenvault.ui.miuix.AppPreferenceGroup
 import com.lc33.tokenvault.ui.miuix.AppScaffold
 import com.lc33.tokenvault.ui.miuix.AppSecretTextField
 import com.lc33.tokenvault.ui.miuix.AppSwitchRow
@@ -507,30 +508,36 @@ private fun AccountEditorSheet(
             label = stringResource(Res.string.editor_note),
             modifier = Modifier.padding(top = tokens.itemSpacing),
         )
+        // 三种登录方式都是「开 / 关」，用开关而不是 chip：chip 让"选中"看起来像筛选，
+        // 而这里每一项都是一个独立的是非题；开关也自带 ON/OFF 文字，比只有颜色的
+        // 选中态更好读（红线 17：状态不能只靠颜色）。
         AppText(
             text = stringResource(Res.string.detail_account_login_methods),
             style = AppTextStyle.Footnote,
             color = appSecondaryTextColor,
             modifier = Modifier.padding(top = tokens.itemSpacing),
         )
-        Row(
-            modifier = Modifier.padding(top = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
+        AppPreferenceGroup(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp),
+            inset = false,
         ) {
             LoginMethod.entries.forEach { method ->
-                val selected = method in methods
-                AppFilterChip(
-                    text = loginMethodLabel(method),
-                    selected = selected,
-                    onClick = {
-                        methods = if (selected) methods - method else methods + method
+                AppSwitchRow(
+                    title = loginMethodLabel(method),
+                    checked = method in methods,
+                    onCheckedChange = { enabled ->
+                        methods = if (enabled) methods + method else methods - method
                     },
                 )
             }
-            AppFilterChip(
-                text = stringResource(Res.string.login_method_password),
-                selected = usesPassword,
-                onClick = { usesPassword = !usesPassword },
+            // 密码登录不是 LoginMethod 枚举的一员（枚举只有 GitHub / LINUX DO），
+            // 它由 usesPassword 单独承载，所以第三行手动补上。
+            AppSwitchRow(
+                title = stringResource(Res.string.login_method_password),
+                checked = usesPassword,
+                onCheckedChange = { usesPassword = it },
             )
         }
         if (usesPassword) {
@@ -547,7 +554,9 @@ private fun AccountEditorSheet(
                 modifier = Modifier.padding(top = tokens.itemSpacing),
             )
         }
-        AppActionRow(
+        // 保存用按钮而不是行入口：它是这个表单的收尾动作，必须一眼看出"填完了按这里"，
+        // 行入口（带箭头那一类）读起来像"还能进下一页"。
+        AppDialogTextButton(
             text = stringResource(Res.string.editor_save),
             onClick = {
                 val usernameChars = username.chars.takeIf { it.isNotEmpty() }
@@ -559,6 +568,7 @@ private fun AccountEditorSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = tokens.itemSpacing),
+            primary = true,
         )
         account?.let { row ->
             AppActionRow(
