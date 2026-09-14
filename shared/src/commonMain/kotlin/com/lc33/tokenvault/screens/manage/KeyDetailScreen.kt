@@ -242,7 +242,6 @@ fun KeyDetailScreen(
                         text = stringResource(Res.string.detail_key_view),
                         onClick = onReveal,
                         modifier = Modifier.fillMaxWidth(),
-                        inset = false,
                     )
                 }
             }
@@ -381,7 +380,6 @@ fun KeyDetailScreen(
                 text = stringResource(Res.string.secret_copy_cd),
                 onClick = onCopyRevealed,
                 modifier = Modifier.fillMaxWidth(),
-                inset = false,
             )
         }
     }

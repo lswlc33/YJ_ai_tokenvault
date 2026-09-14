@@ -39,10 +39,10 @@ import tokenvault.shared.generated.resources.dashboard_probe_last_updated
 import tokenvault.shared.generated.resources.dashboard_probe_provider_label
 import tokenvault.shared.generated.resources.dashboard_probe_detail
 import tokenvault.shared.generated.resources.dashboard_probe_finished
+import tokenvault.shared.generated.resources.dashboard_probe_start
 import tokenvault.shared.generated.resources.dashboard_probe_never
 import tokenvault.shared.generated.resources.dashboard_probe_no_autolock
 import tokenvault.shared.generated.resources.dashboard_probe_running
-import tokenvault.shared.generated.resources.dashboard_probe_start
 import tokenvault.shared.generated.resources.dashboard_probe_title
 import tokenvault.shared.generated.resources.refresh_cd
 import tokenvault.shared.generated.resources.time_duration_seconds
@@ -402,6 +402,18 @@ internal fun ProbeCard(
                 title = stringResource(Res.string.dashboard_probe_key_label),
                 metric = it,
             )
+        }
+        // 「查看明细」放探测区最下面：它是回看上一轮结果，摆在进度卡之前会把
+        // "看进度"和"看结果"两件事的先后顺序颠倒。从未探测过时没有明细分页可看。
+        if (lastRun != null && progress == null) {
+            AppCard(modifier = cardModifier()) {
+                AppActionRow(
+                    text = stringResource(Res.string.dashboard_probe_detail),
+                    onClick = onOpenDetail,
+                    modifier = Modifier.fillMaxWidth(),
+                    inset = false,
+                )
+            }
         }
     }
 }

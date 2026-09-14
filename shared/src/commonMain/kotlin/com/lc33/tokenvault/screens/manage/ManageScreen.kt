@@ -281,14 +281,12 @@ private fun GroupPickerSheet(
             text = stringResource(Res.string.manage_batch_ungrouped),
             onClick = { onPick(null) },
             modifier = Modifier.fillMaxWidth(),
-            inset = false,
         )
         groups.filter { it.id != null }.forEach { group ->
             AppActionRow(
                 text = group.name,
                 onClick = { onPick(group.id) },
                 modifier = Modifier.fillMaxWidth(),
-                inset = false,
             )
         }
     }

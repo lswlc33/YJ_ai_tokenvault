@@ -9,12 +9,14 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.KeyboardActionHandler
+import androidx.compose.foundation.text.input.OutputTransformation
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.clearText
@@ -400,6 +402,39 @@ fun AppActionRow(
         enabled = enabled,
         inset = inset,
         onClick = onClick,
+    )
+}
+
+/**
+ * 页面主体里的**按钮**。只给"同一行里两个等重动作"这一种场合用——行入口
+ * （[AppActionRow]，带箭头的 preference 行）表达的是"进下一页 / 触发一个设置项"，
+ * 并排两个行入口既画不出主次，也放不进同一行（第二个会被挤到屏幕外）。
+ *
+ * 单独开这个出口而不是让页面直接用 `TextButton`：那条"页面主体不出现 AppTextButton"
+ * 的架构规则（[com.lc33.tokenvault.screens] 层）要防的是页面里长出按钮堆；这里是唯一的
+ * 例外，命名与调用点都显式，review 时一眼能看见。**单个动作仍然走 [AppActionRow]**。
+ */
+@Composable
+fun AppActionButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    primary: Boolean = false,
+) {
+    TextButton(
+        text = text,
+        onClick = {
+            Haptics.tap()
+            onClick()
+        },
+        modifier = modifier.defaultMinSize(minHeight = LocalAppTokens.current.minTouchTarget),
+        enabled = enabled,
+        colors = if (primary) {
+            ButtonDefaults.textButtonColorsPrimary()
+        } else {
+            ButtonDefaults.textButtonColors()
+        },
     )
 }
 
@@ -945,6 +980,10 @@ fun AppTextField(
  *
  * [onDone] 非空时回车键变成「完成」并直接提交：这一格常常是一屏里唯一的输入，
  * 让用户先收起键盘再去找按钮，等于让他盲着点。
+ *
+ * [concealed] 与 [onToggleConceal] 给"要回显已有明文、但默认不露"的场合（平台账号编辑）：
+ * 前者只改**显示**（走 `outputTransformation` 换成圆点，明文仍在 `state` 里），
+ * 后者非空时右侧出现眼睛按钮。默认 `false` / `null`，与以前完全一致。
  */
 @Composable
 fun AppSecretTextField(
@@ -955,6 +994,9 @@ fun AppSecretTextField(
     errorText: String? = null,
     supportingText: String? = null,
     onDone: (() -> Unit)? = null,
+    concealed: Boolean = false,
+    toggleConcealDescription: String? = null,
+    onToggleConceal: (() -> Unit)? = null,
 ) {
     FieldWithNote(modifier = modifier, errorText = errorText, supportingText = supportingText) {
         TextField(
@@ -970,8 +1012,28 @@ fun AppSecretTextField(
                 if (onDone == null) performDefault() else onDone()
             },
             lineLimits = if (singleLine) TextFieldLineLimits.SingleLine else TextFieldLineLimits.Default,
+            // 圆点的个数与字符数一致（等长替换），光标才能落在正确的位置上。
+            outputTransformation = if (concealed) ConcealOutputTransformation else null,
+            trailingIcon = onToggleConceal?.let { toggle ->
+                {
+                    IconButton(onClick = toggle) {
+                        Icon(
+                            imageVector = (if (concealed) AppIcon.Reveal else AppIcon.Conceal).imageVector(),
+                            contentDescription = toggleConcealDescription,
+                        )
+                    }
+                }
+            },
         )
     }
+}
+
+/**
+ * 把整段正文换成等长圆点。**只影响显示与读屏语义**，`TextFieldState` 里仍是明文——
+ * 所以持久化、保存走的是真值，而屏幕上与无障碍节点里看到的是圆点。
+ */
+private val ConcealOutputTransformation = OutputTransformation {
+    replace(0, length, "•".repeat(length))
 }
 
 /** 输入框 + 下面那行说明。校验结果必须能被看到，不能只靠边框变色。 */

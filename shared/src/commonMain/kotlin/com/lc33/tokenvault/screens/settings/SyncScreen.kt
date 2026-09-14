@@ -61,6 +61,7 @@ fun SyncScreen(
     onRestoreWebDav: () -> Unit,
     onRefreshWebDav: () -> Unit,
 ) {
+    val tokens = LocalAppTokens.current
     SettingsSubPage(titleRes = Res.string.sync_title, onBack = onBack) {
         item { StatusCard(backup, onExport) }
 
@@ -112,22 +113,27 @@ fun SyncScreen(
             }
         }
         item {
-            AppText(
-                text = stringResource(Res.string.sync_remote_count, remoteBackups?.size ?: 0),
-                style = AppTextStyle.Footnote,
-                color = appSecondaryTextColor,
-                modifier = Modifier.padding(horizontal = LocalAppTokens.current.screenPadding),
-            )
-        }
-        item {
-            // 备份口令默认沿用 PIN；WebDAV 上传前同样要输入。这里常驻提示，
-            // 不折叠成“高级设置”。
-            AppText(
-                text = stringResource(Res.string.sync_passphrase_summary),
-                style = AppTextStyle.Footnote,
-                color = appSecondaryTextColor,
-                modifier = Modifier.padding(horizontal = LocalAppTokens.current.screenPadding),
-            )
+            // 两条说明同装一张卡：以前是两张"裸文本"，左缘比卡片内容浅 16dp，
+            // 而且紧挨着排（行距为 0），看起来像漏排版的两行。
+            AppCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = tokens.screenPadding, vertical = tokens.itemSpacing),
+            ) {
+                AppText(
+                    text = stringResource(Res.string.sync_remote_count, remoteBackups?.size ?: 0),
+                    style = AppTextStyle.Footnote,
+                    color = appSecondaryTextColor,
+                )
+                // 备份口令默认沿用 PIN；WebDAV 上传前同样要输入。这里常驻提示，
+                // 不折叠成“高级设置”。
+                AppText(
+                    text = stringResource(Res.string.sync_passphrase_summary),
+                    style = AppTextStyle.Footnote,
+                    color = appSecondaryTextColor,
+                    modifier = Modifier.padding(top = tokens.itemSpacing),
+                )
+            }
         }
     }
 }
@@ -173,7 +179,6 @@ private fun StatusCard(backup: BackupStatus, onExport: () -> Unit) {
             text = stringResource(Res.string.dashboard_backup_now),
             onClick = onExport,
             modifier = Modifier.fillMaxWidth(),
-            inset = false,
         )
     }
 }

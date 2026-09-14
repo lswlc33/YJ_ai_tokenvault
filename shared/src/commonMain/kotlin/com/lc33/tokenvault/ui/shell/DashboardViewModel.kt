@@ -80,10 +80,10 @@ class DashboardViewModel constructor(
         .map { snap -> snap.rows() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
-    /** 仪表盘"开始探测"。引擎已接入（M5）。 */
-    fun startProbe() = probeEngine.start()
+    /** 仪表盘“开始探测”。结果与进度由 ProbeEngine 的状态流回 UI。 */
+    fun startProbe(): Boolean = probeEngine.start()
 
-    /** 仪表盘"取消探测"。 */
+    /** 仪表盘“取消探测”。 */
     fun cancelProbe() = probeEngine.cancel()
 
     /**

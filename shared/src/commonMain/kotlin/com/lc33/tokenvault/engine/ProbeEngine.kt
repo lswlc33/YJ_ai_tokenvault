@@ -539,8 +539,9 @@ class ProbeEngine constructor(
     }
 
     private suspend fun runRoundInner(scope: String, filter: (PlannedTask) -> Boolean) {
+        val startedAt = now()
         val runId = runRepository.insert(
-            ProbeRun(scope = scope, startedAt = now()),
+            ProbeRun(scope = scope, startedAt = startedAt),
         )
 
         // 新一轮：清空上一轮的累计快照，明细页随之刷新成"这一轮刚开始"。
@@ -587,6 +588,8 @@ class ProbeEngine constructor(
         if (tasks.isEmpty()) {
             finishRun(
                 runId = runId,
+                scope = scope,
+                startedAt = startedAt,
                 total = 0,
                 done = 0,
                 ok = 0,
@@ -727,6 +730,8 @@ class ProbeEngine constructor(
             // 取消：已落库的结果保留，probe_runs 标 cancelled。
             finishRun(
                 runId = runId,
+                scope = scope,
+                startedAt = startedAt,
                 total = tasks.size,
                 done = done,
                 ok = ok,
@@ -762,6 +767,8 @@ class ProbeEngine constructor(
 
         finishRun(
             runId = runId,
+            scope = scope,
+            startedAt = startedAt,
             total = tasks.size,
             done = done,
             ok = ok,
@@ -780,6 +787,8 @@ class ProbeEngine constructor(
 
     private suspend fun finishRun(
         runId: Long,
+        scope: String,
+        startedAt: Long,
         total: Int,
         done: Int,
         ok: Int,
@@ -797,8 +806,8 @@ class ProbeEngine constructor(
         runRepository.update(
             ProbeRun(
                 id = runId,
-                scope = "all",
-                startedAt = now(),
+                scope = scope,
+                startedAt = startedAt,
                 finishedAt = now(),
                 total = total,
                 done = done,

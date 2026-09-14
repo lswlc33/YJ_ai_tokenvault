@@ -398,7 +398,6 @@ fun KeyEditorScreen(
                                 text = stringResource(Res.string.editor_models_sync_now),
                                 onClick = onRefreshModels,
                                 modifier = Modifier.fillMaxWidth(),
-                                inset = false,
                             )
                         } else {
                             if (models.isNotEmpty()) {
@@ -414,7 +413,6 @@ fun KeyEditorScreen(
                                 text = stringResource(Res.string.detail_add_model),
                                 onClick = { addModel = true },
                                 modifier = Modifier.fillMaxWidth(),
-                                inset = false,
                             )
                         }
                     }

@@ -183,7 +183,6 @@ private fun RetryGroup(onRetry: () -> Unit) {
             text = stringResource(Res.string.probe_run_retry),
             onClick = onRetry,
             modifier = Modifier.fillMaxWidth(),
-            inset = false,
         )
     }
 }

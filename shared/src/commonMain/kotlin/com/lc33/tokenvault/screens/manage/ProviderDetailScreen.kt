@@ -23,14 +23,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.back_cd
 import tokenvault.shared.generated.resources.dashboard_balance_none
 import tokenvault.shared.generated.resources.balance_failed_section
-import tokenvault.shared.generated.resources.detail_account_none
 import tokenvault.shared.generated.resources.detail_account_password
-import tokenvault.shared.generated.resources.detail_account_reveal_hint
-import tokenvault.shared.generated.resources.detail_account_sheet_title
 import tokenvault.shared.generated.resources.detail_account_username
 import tokenvault.shared.generated.resources.detail_account_login_methods
 import tokenvault.shared.generated.resources.detail_add_model
@@ -52,7 +50,6 @@ import tokenvault.shared.generated.resources.login_method_linuxdo
 import tokenvault.shared.generated.resources.detail_accounts_empty
 import tokenvault.shared.generated.resources.detail_add_account
 import tokenvault.shared.generated.resources.detail_account_keep_secret
-import tokenvault.shared.generated.resources.detail_account_view
 import tokenvault.shared.generated.resources.detail_account_delete
 import tokenvault.shared.generated.resources.detail_account_delete_title
 import tokenvault.shared.generated.resources.detail_account_delete_body
@@ -78,7 +75,9 @@ import tokenvault.shared.generated.resources.editor_save
 import tokenvault.shared.generated.resources.groups_delete
 import tokenvault.shared.generated.resources.import_manual
 import tokenvault.shared.generated.resources.import_title
+import tokenvault.shared.generated.resources.secret_conceal_cd
 import tokenvault.shared.generated.resources.secret_copy_cd
+import tokenvault.shared.generated.resources.secret_reveal_cd
 import com.lc33.tokenvault.domain.LoginMethod
 import com.lc33.tokenvault.platform.openExternalUrl
 import com.lc33.tokenvault.domain.Protocol
@@ -104,7 +103,6 @@ import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppDialogTextButton
 import com.lc33.tokenvault.ui.miuix.AppTextField
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
-import com.lc33.tokenvault.ui.miuix.AppValueRow
 import com.lc33.tokenvault.ui.miuix.AppTopBar
 import com.lc33.tokenvault.ui.miuix.SectionTitle
 import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
@@ -115,7 +113,6 @@ import com.lc33.tokenvault.ui.miuix.rememberSecretTextFieldState
 import com.lc33.tokenvault.ui.shell.ProviderDetailViewModel
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
 import com.lc33.tokenvault.ui.theme.LocalStatusPalette
-import kotlinx.coroutines.delay
 
 /**
  * 供应商详情 —— 这一家的密钥 / 模型 / 平台账号都在这里看、也在这里改
@@ -145,9 +142,8 @@ fun ProviderDetailScreen(
     onUpdateModel: (Long, String, Protocol, String?, Boolean) -> Unit,
     onDeleteModel: (Long) -> Unit,
     onRevealAccount: (Long) -> Unit,
-    onCopyRevealedAccount: (String) -> Unit,
+    onCopyRevealedAccount: (Long) -> Unit,
     onCloseAccountReveal: () -> Unit,
-    onSetAccountLoginMethods: (Long, Set<LoginMethod>) -> Unit,
     onAddAccount: (String, String, CharArray?, CharArray?, Set<LoginMethod>) -> Unit,
     onUpdateAccount: (Long, String, String, CharArray?, CharArray?, Set<LoginMethod>, Boolean) -> Unit,
     onDeleteAccount: (Long) -> Unit,
@@ -162,11 +158,12 @@ fun ProviderDetailScreen(
     var accountEditor by remember { mutableStateOf<AccountEditorTarget?>(null) }
     var pendingDeleteAccountId by remember { mutableStateOf<Long?>(null) }
 
-    LaunchedEffect(revealedAccount?.accountId) {
-        if (revealedAccount != null) {
-            delay(30_000)
-            onCloseAccountReveal()
-        }
+    // 账号编辑层要用到展开的明文（用户名 / 密码预填进输入框，密码默认遮蔽）。
+    // 目标变化时先清空旧输入，异步解密完成后再填入当前账号；展开显示只持续一段时间，
+    // 自动回遮但不清除输入值，避免在编辑过程中暴露明文过久或打断用户输入。
+    LaunchedEffect(accountEditor) {
+        val editing = accountEditor as? AccountEditorTarget.Edit ?: return@LaunchedEffect
+        onRevealAccount(editing.account.id)
     }
 
     AppScaffold(
@@ -343,7 +340,13 @@ fun ProviderDetailScreen(
 
     AccountEditorSheet(
         target = accountEditor,
-        onDismiss = { accountEditor = null },
+        revealed = revealedAccount,
+        onDismiss = {
+            accountEditor = null
+            // 明文只在编辑层存活期间存在；关掉就擦（红线 1）。
+            onCloseAccountReveal()
+        },
+        onCopy = { accountId -> onCopyRevealedAccount(accountId) },
         onSave = { label, note, username, password, methods, usesPassword ->
             when (val current = accountEditor) {
                 is AccountEditorTarget.New -> onAddAccount(label, note, username, password, methods)
@@ -359,22 +362,13 @@ fun ProviderDetailScreen(
                 null -> Unit
             }
             accountEditor = null
+            onCloseAccountReveal()
         },
         onDelete = { id ->
             accountEditor = null
+            onCloseAccountReveal()
             pendingDeleteAccountId = id
         },
-        onReveal = { id ->
-            accountEditor = null
-            onRevealAccount(id)
-        },
-    )
-
-    RevealAccountSheet(
-        account = revealedAccount,
-        onCopy = { label -> onCopyRevealedAccount(label) },
-        onSetLoginMethods = onSetAccountLoginMethods,
-        onDismiss = onCloseAccountReveal,
     )
 
     AppDialog(
@@ -415,7 +409,6 @@ private fun HintCard(text: String, actionText: String, onAction: () -> Unit) {
             text = actionText,
             onClick = onAction,
             modifier = Modifier.padding(top = tokens.itemSpacing),
-            inset = false,
         )
     }
 }
@@ -459,10 +452,11 @@ private sealed interface AccountEditorTarget {
 @Composable
 private fun AccountEditorSheet(
     target: AccountEditorTarget?,
+    revealed: ProviderDetailViewModel.AccountRevealState?,
     onDismiss: () -> Unit,
+    onCopy: (Long) -> Unit,
     onSave: (String, String, CharArray?, CharArray?, Set<LoginMethod>, Boolean) -> Unit,
     onDelete: (Long) -> Unit,
-    onReveal: (Long) -> Unit,
 ) {
     val tokens = LocalAppTokens.current
     val account = (target as? AccountEditorTarget.Edit)?.account
@@ -479,6 +473,39 @@ private fun AccountEditorSheet(
         )
     }
     var usesPassword by remember(target) { mutableStateOf(account?.hasPassword == true) }
+    var usernameConcealed by remember(target) { mutableStateOf(true) }
+    var passwordConcealed by remember(target) { mutableStateOf(true) }
+
+    LaunchedEffect(target) {
+        label.setText(account?.label.orEmpty())
+        note.setText(account?.note.orEmpty())
+        username.clear()
+        password.clear()
+        usernameConcealed = true
+        passwordConcealed = true
+    }
+
+    LaunchedEffect(usernameConcealed) {
+        if (!usernameConcealed) {
+            delay(30_000)
+            usernameConcealed = true
+        }
+    }
+
+    LaunchedEffect(passwordConcealed) {
+        if (!passwordConcealed) {
+            delay(30_000)
+            passwordConcealed = true
+        }
+    }
+
+    // 明文在选中的账号弹出后才解密完成，到达时再填进输入框（不是构造时给初值）。
+    LaunchedEffect(target, revealed) {
+        val editing = (target as? AccountEditorTarget.Edit)?.account ?: return@LaunchedEffect
+        if (revealed?.accountId != editing.id) return@LaunchedEffect
+        username.setText(revealed.username.orEmpty())
+        password.setText(revealed.password.orEmpty())
+    }
 
     AppBottomSheet(
         show = target != null,
@@ -538,17 +565,27 @@ private fun AccountEditorSheet(
             )
         }
         if (usesPassword) {
+            // 用户名与密码直接预填进输入框（查看与编辑合一），密码默认遮蔽，
+            // 右侧眼睛展开。明文只在弹层存活期间留在输入框里，关掉即擦。
+            val revealCd = stringResource(Res.string.secret_reveal_cd)
+            val concealCd = stringResource(Res.string.secret_conceal_cd)
             AppSecretTextField(
                 state = username,
                 label = stringResource(Res.string.detail_account_username),
                 supportingText = account?.let { stringResource(Res.string.detail_account_keep_secret) },
                 modifier = Modifier.padding(top = tokens.itemSpacing),
+                concealed = usernameConcealed,
+                toggleConcealDescription = if (usernameConcealed) revealCd else concealCd,
+                onToggleConceal = { usernameConcealed = !usernameConcealed },
             )
             AppSecretTextField(
                 state = password,
                 label = stringResource(Res.string.detail_account_password),
                 supportingText = account?.let { stringResource(Res.string.detail_account_keep_secret) },
                 modifier = Modifier.padding(top = tokens.itemSpacing),
+                concealed = passwordConcealed,
+                toggleConcealDescription = if (passwordConcealed) revealCd else concealCd,
+                onToggleConceal = { passwordConcealed = !passwordConcealed },
             )
         }
         // 保存用按钮而不是行入口：它是这个表单的收尾动作，必须一眼看出"填完了按这里"，
@@ -568,24 +605,31 @@ private fun AccountEditorSheet(
             primary = true,
         )
         account?.let { row ->
-            // 查看与删除是 action 行，包成一组：裸铺在弹层里既没有容器背景，
-            // 也和页面里同一类行的形态对不上。
+            // 复制与删除都是对这条账号的动作，包成一组摆在表单最后。
+            // 只有确实解出了凭据才给「复制」：这条账号可能只记了登录方式（没有用户名密码），
+            // 那种情况下复制是无内容的死按钮。
+            val canCopy = revealed?.accountId == row.id &&
+                (revealed.username != null || revealed.password != null)
             AppPreferenceGroup(
                 modifier = Modifier.padding(top = tokens.itemSpacing),
                 inset = false,
             ) {
-                AppActionRow(
-                    text = stringResource(Res.string.detail_account_view),
-                    onClick = { onReveal(row.id) },
-                    modifier = Modifier.fillMaxWidth(),
-                    inset = false,
-                )
-                AppActionRow(
-                    text = stringResource(Res.string.detail_account_delete),
-                    onClick = { onDelete(row.id) },
-                    modifier = Modifier.fillMaxWidth(),
-                    inset = false,
-                )
+                if (canCopy) {
+                    AppActionRow(
+                        text = stringResource(Res.string.secret_copy_cd),
+                        onClick = { onCopy(row.id) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                    AppActionRow(
+                        text = stringResource(Res.string.detail_account_delete),
+                        onClick = {
+                            username.clear()
+                            password.clear()
+                            onDelete(row.id)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
             }
         }
         }
@@ -768,88 +812,7 @@ private fun KeyCard(
         }
     }
 }
-/**
- * 展开一把密钥。
- *
- * [text] 非空就显示这一层。它是**擦不掉的 `String`**（红线 1），
- * 关掉这一层时 ViewModel 会擦掉它背后那份 `CharArray`。
- */
-@Composable
-private fun RevealAccountSheet(
-    account: ProviderDetailViewModel.AccountRevealState?,
-    onCopy: (String) -> Unit,
-    onSetLoginMethods: (Long, Set<LoginMethod>) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val tokens = LocalAppTokens.current
-    AppBottomSheet(
-        show = account != null,
-        onDismissRequest = onDismiss,
-        title = account?.label?.takeIf { it.isNotBlank() }
-            ?: stringResource(Res.string.detail_account_sheet_title),
-    ) {
-        if (account == null) return@AppBottomSheet
 
-        // 用户名
-        AppText(
-            text = stringResource(Res.string.detail_account_username),
-            style = AppTextStyle.Footnote,
-            color = appSecondaryTextColor,
-        )
-        // 用户名与密码是一组只读字段，包进 group；裸铺就是两段悬空文本。
-        AppPreferenceGroup(inset = false) {
-            AppValueRow(
-                title = stringResource(Res.string.detail_account_username),
-                value = account.username ?: stringResource(Res.string.detail_account_none),
-                stacked = true,
-                mono = true,
-            )
-            AppValueRow(
-                title = stringResource(Res.string.detail_account_password),
-                value = account.password ?: stringResource(Res.string.detail_account_none),
-                stacked = true,
-                mono = true,
-            )
-        }
-
-        // 登录方式与添加账号那一层保持一致：都是独立的是非题，用开关而不是 chip。
-        AppPreferenceGroup(
-            modifier = Modifier.padding(top = tokens.itemSpacing),
-            inset = false,
-        ) {
-            LoginMethod.entries.forEach { method ->
-                val selected = method in account.loginMethods
-                AppSwitchRow(
-                    title = loginMethodLabel(method),
-                    checked = selected,
-                    onCheckedChange = { enabled ->
-                        val next = if (enabled) account.loginMethods + method
-                        else account.loginMethods - method
-                        onSetLoginMethods(account.accountId, next)
-                    },
-                )
-            }
-        }
-
-        AppText(
-            text = stringResource(Res.string.detail_account_reveal_hint),
-            style = AppTextStyle.Footnote,
-            color = appSecondaryTextColor,
-            modifier = Modifier.padding(top = tokens.itemSpacing),
-        )
-        AppPreferenceGroup(
-            modifier = Modifier.padding(top = tokens.itemSpacing),
-            inset = false,
-        ) {
-            AppActionRow(
-                text = stringResource(Res.string.secret_copy_cd),
-                onClick = { onCopy(account.label) },
-                modifier = Modifier.fillMaxWidth(),
-                inset = false,
-            )
-        }
-    }
-}
 
 
 @Composable

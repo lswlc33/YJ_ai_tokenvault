@@ -2,6 +2,7 @@ package com.lc33.tokenvault.screens.manage
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -36,6 +37,7 @@ import tokenvault.shared.generated.resources.import_result_protocol
 import tokenvault.shared.generated.resources.import_section_paste
 import tokenvault.shared.generated.resources.import_section_preview
 import tokenvault.shared.generated.resources.import_title
+import com.lc33.tokenvault.ui.miuix.AppActionButton
 import com.lc33.tokenvault.ui.miuix.AppActionRow
 import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppChip
@@ -133,16 +135,19 @@ fun ImportScreen(
                         supportingText = stringResource(Res.string.import_paste_hint),
                         errorText = errorText,
                     )
+                    // 两个动作并排、没有主次之外的层级差别，用按钮而不是行入口：
+                    // 行入口并排会有一个被挤出屏幕外（第二个行的右内边距直接越界）。
                     Row(horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing)) {
-                        AppActionRow(
+                        AppActionButton(
                             text = stringResource(Res.string.import_from_clipboard),
                             onClick = { readClipboard()?.let { textFieldState.setText(it) } },
                             modifier = Modifier.weight(1f),
                         )
-                        AppActionRow(
+                        AppActionButton(
                             text = stringResource(Res.string.import_parse),
                             onClick = { onParse(textFieldState.text) },
                             modifier = Modifier.weight(1f),
+                            primary = true,
                         )
                     }
                 }
@@ -184,9 +189,12 @@ fun ImportScreen(
                                 color = appSecondaryTextColor,
                             )
                         } else {
-                            Row(
-                                modifier = Modifier.padding(top = 4.dp),
+                            FlowRow(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp),
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
                             ) {
                                 result.models.take(4).forEach { AppChip(text = it) }
                             }

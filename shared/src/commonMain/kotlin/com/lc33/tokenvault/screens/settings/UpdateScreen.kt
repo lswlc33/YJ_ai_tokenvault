@@ -80,7 +80,6 @@ fun UpdateScreen(
                     // 检查中禁用，防连点；其余时候都能再点一次。
                     enabled = updateState.phase != UpdateViewModel.Phase.CHECKING,
                     modifier = Modifier.fillMaxWidth(),
-                    inset = false,
                 )
             }
         }
@@ -95,7 +94,6 @@ fun UpdateScreen(
                         text = stringResource(Res.string.update_open_download),
                         onClick = { onOpenDownload(downloadUrl) },
                         modifier = Modifier.fillMaxWidth(),
-                        inset = false,
                     )
                 }
             }

@@ -582,6 +582,7 @@
     <string name="feedback_account_deleted">Account deleted</string>
     <string name="feedback_account_saved">Account saved</string>
     <string name="feedback_probe_key_sent">Probing this key…</string>
+    <string name="feedback_probe_started">Probe started</string>
     <string name="feedback_model_saved">Model saved</string>
     <string name="feedback_group_added">Group added</string>
     <string name="feedback_group_renamed">Group renamed</string>
@@ -593,7 +594,6 @@
     <string name="feedback_imported">Key imported</string>
     <string name="feedback_clipboard_filled">Pasted from clipboard</string>
     <string name="feedback_clipboard_empty">Clipboard is empty</string>
-    <string name="feedback_probe_started">Probe started</string>
     <string name="feedback_probe_cancelled">Probe cancelled</string>
     <string name="feedback_balance_refreshed">Balances refreshed</string>
     <string name="feedback_status_refreshed">Status refreshed</string>
@@ -673,11 +673,8 @@
     <string name="detail_key_delete_title">Delete this key?</string>
     <string name="detail_key_delete_body">Deletion cannot be undone. If it is the default key, the first enabled key in order takes over automatically.</string>
     <string name="detail_key_reveal_hint">Copying places it on the clipboard and clears it after a while. Leaving this sheet clears the plain text.</string>
-    <string name="detail_account_sheet_title">This account</string>
     <string name="detail_account_username">Username</string>
     <string name="detail_account_password">Password</string>
-    <string name="detail_account_none">(not stored)</string>
-    <string name="detail_account_reveal_hint">Copying places the password on the clipboard and clears it after a while. Leaving this sheet clears the plain text.</string>
     <string name="detail_balance_refresh">Check balance</string>
     <string name="detail_probe_provider">Probe this provider</string>
     <string name="detail_key_view">View</string>
@@ -728,7 +725,6 @@
     <string name="detail_add_account">Add account</string>
     <string name="login_method_password">Password login</string>
     <string name="detail_account_keep_secret">Leave blank to keep the current value.</string>
-    <string name="detail_account_view">View and copy secrets</string>
     <string name="detail_account_delete">Delete account</string>
     <string name="detail_account_delete_title">Delete this account?</string>
     <string name="detail_account_delete_body">The encrypted username and password are deleted with it.</string>

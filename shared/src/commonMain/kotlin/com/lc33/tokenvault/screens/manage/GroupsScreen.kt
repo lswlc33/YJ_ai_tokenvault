@@ -235,7 +235,6 @@ fun GroupsScreen(
                         text = stringResource(Res.string.groups_add),
                         onClick = { editing = newGroup },
                         modifier = Modifier.fillMaxWidth(),
-                        inset = false,
                     )
                 }
             }

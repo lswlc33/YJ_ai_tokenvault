@@ -87,10 +87,10 @@ import tokenvault.shared.generated.resources.feedback_model_probed
 import tokenvault.shared.generated.resources.feedback_models_refreshed
 import tokenvault.shared.generated.resources.feedback_pin_changed
 import tokenvault.shared.generated.resources.feedback_probe_cancelled
+import tokenvault.shared.generated.resources.feedback_probe_started
 import tokenvault.shared.generated.resources.feedback_probe_key_sent
 import tokenvault.shared.generated.resources.feedback_probe_results_cleared
 import tokenvault.shared.generated.resources.feedback_probe_retried
-import tokenvault.shared.generated.resources.feedback_probe_started
 import tokenvault.shared.generated.resources.feedback_profile_saved
 import tokenvault.shared.generated.resources.feedback_provider_saved
 import tokenvault.shared.generated.resources.feedback_status_refreshed
@@ -180,11 +180,8 @@ fun VaultNavHost(
                 // 三个一级页平级，压在栈上会让返回语义变成"回到总览"。
                 onOpenManage = { pager.animateToPage(topLevelIndexOf(ManageRoute)) },
                 onOpenProbeDetail = { navigate(ProbeRunRoute) },
-                // 探测是异步长动作，卡片本身有进度；这里只确认"动作确实发出去了"，
-                // 否则点了按钮到进度出现之间有一段没有任何反馈的空档。
                 onStartProbe = {
-                    vm.startProbe()
-                    feedback?.post(AppFeedback(probeStarted))
+                    if (vm.startProbe()) feedback?.post(AppFeedback(probeStarted))
                 },
                 onCancelProbe = {
                     vm.cancelProbe()
@@ -357,9 +354,10 @@ fun VaultNavHost(
                             onUpdateModel = vm::onUpdateModel,
                             onDeleteModel = vm::onDeleteModel,
                             onRevealAccount = vm::onRevealAccount,
-                            onCopyRevealedAccount = { vm.onCopyRevealedAccount(accountClipboardLabel) },
+                            onCopyRevealedAccount = { accountId ->
+                                vm.onCopyRevealedAccount(accountId, accountClipboardLabel)
+                            },
                             onCloseAccountReveal = vm::onCloseAccountSheet,
-                            onSetAccountLoginMethods = vm::onSetAccountLoginMethods,
                             onAddAccount = vm::onAddAccount,
                             onUpdateAccount = vm::onUpdateAccount,
                             onDeleteAccount = vm::onDeleteAccount,

@@ -28,6 +28,7 @@ import com.lc33.tokenvault.screens.model.UiKeyRow
 import com.lc33.tokenvault.screens.model.UiModelRow
 import com.lc33.tokenvault.screens.model.UiProviderRow
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -107,13 +108,15 @@ class ProviderDetailViewModel constructor(
      * 账号用户名的遮蔽串缓存，按 `updatedAt` 记（和密钥 [masks] 同一套逻辑）。
      * 用户名也加密（红线 21），遮蔽串要解密现算；密码连遮蔽串都不给，只在展开时现算。
      */
-    private val accountMasks = MutableStateFlow<Map<Long, String>>(emptyMap())
+    private val accountMasks = MutableStateFlow<Map<Long, Mask>>(emptyMap())
 
     /**
      * 当前展开的那条账号的明文（用户名 + 密码各一份 [CharArray]，红线 1）。与密钥的
      * [revealedPlain] 分开存：账号展开的是两段明文，关掉都要擦。
      */
     private var revealedAccountPlain: AccountPlain? = null
+    private var revealJob: Job? = null
+    private var revealGeneration = 0L
 
     private val _revealedAccount = MutableStateFlow<AccountRevealState?>(null)
     val revealedAccount: StateFlow<AccountRevealState?> = _revealedAccount.asStateFlow()
@@ -169,7 +172,7 @@ class ProviderDetailViewModel constructor(
             }
             val modelRows = data.models.map { it.toRow() }
             val accountRows = data.accounts.map { account ->
-                account.toRow(accountMaskMap[account.id] ?: SecretMask.ELLIPSIS)
+                account.toRow(accountMaskMap[account.id]?.text ?: SecretMask.ELLIPSIS)
             }
             ProviderDetailUiState(
                 provider = provider.toDetailRow(
@@ -230,13 +233,17 @@ class ProviderDetailViewModel constructor(
 
     /** 账号用户名遮蔽串的重算，逻辑同 [recomputeMasks]。没记用户名的给空串（不是省略号）。 */
     private suspend fun recomputeAccountMasks(list: List<ProviderAccount>) {
+        val current = accountMasks.value
+        val stale = list.filter { current[it.id]?.updatedAt != it.updatedAt }
         val liveIds = list.map { it.id }.toSet()
-        if (accountMasks.value.keys == liveIds) return
+        if (stale.isEmpty() && current.keys == liveIds) return
 
         val computed = withContext(Dispatchers.Default) {
-            list.associate { account -> account.id to maskOfUsername(account.id) }
+            stale.associate { account ->
+                account.id to Mask(account.updatedAt, maskOfUsername(account.id))
+            }
         }
-        accountMasks.value = computed
+        accountMasks.value = current.filterKeys { it in liveIds } + computed
     }
 
     private suspend fun maskOfUsername(accountId: Long): String {
@@ -377,29 +384,40 @@ class ProviderDetailViewModel constructor(
     }
 
     fun onRevealAccount(accountId: Long) {
-        viewModelScope.launch {
+        val generation = ++revealGeneration
+        revealJob?.cancel()
+        clearRevealedAccount()
+        revealJob = viewModelScope.launch {
             val plain = withContext(Dispatchers.Default) {
                 val username = runCatching { accounts.revealUsername(accountId) }.getOrNull()
                 val password = runCatching { accounts.revealPassword(accountId) }.getOrNull()
                 if (username == null && password == null) null else AccountPlain(username, password)
             } ?: return@launch
-            revealedAccountPlain?.zeroize()
+            if (generation != revealGeneration) {
+                plain.zeroize()
+                return@launch
+            }
+            val account = state.value?.accounts?.firstOrNull { it.id == accountId }
+            if (account == null) {
+                plain.zeroize()
+                return@launch
+            }
             revealedAccountPlain = plain
             plain.username?.let(knownSecrets::add)
             plain.password?.let(knownSecrets::add)
-            val account = state.value?.accounts?.firstOrNull { it.id == accountId }
             _revealedAccount.value = AccountRevealState(
                 accountId = accountId,
-                loginMethods = account?.loginMethods?.mapNotNull { LoginMethod.fromWireName(it) }?.toSet().orEmpty(),
-                label = account?.label.orEmpty(),
+                loginMethods = account.loginMethods.mapNotNull { LoginMethod.fromWireName(it) }.toSet(),
+                label = account.label,
                 username = plain.username?.let { it.concatToString() },
                 password = plain.password?.let { it.concatToString() },
             )
         }
     }
 
-    /** 复制账号密码明文（复制的是密码那一份；没记密码就复制用户名）。 */
-    fun onCopyRevealedAccount(label: String) {
+    /** 复制指定账号的凭据，避免异步切换时复制到另一账号。 */
+    fun onCopyRevealedAccount(accountId: Long, label: String) {
+        if (_revealedAccount.value?.accountId != accountId) return
         val plain = revealedAccountPlain ?: return
         val secret = plain.password ?: plain.username ?: return
         clipboard.copy(label, secret, SecureClipboard.DEFAULT_AUTO_CLEAR_SECONDS)
@@ -407,21 +425,16 @@ class ProviderDetailViewModel constructor(
     }
 
     fun onCloseAccountSheet() {
+        ++revealGeneration
+        revealJob?.cancel()
+        revealJob = null
+        clearRevealedAccount()
+    }
+
+    private fun clearRevealedAccount() {
         revealedAccountPlain?.zeroize()
         revealedAccountPlain = null
         _revealedAccount.value = null
-    }
-    /** 登录方式是明文元数据，可以在展开账号时直接修改。 */
-    fun onSetAccountLoginMethods(accountId: Long, methods: Set<LoginMethod>) {
-        viewModelScope.launch {
-            // 先落库再更新展开层，失败时不让 chip 假装已经生效。
-            runCatching { accounts.setLoginMethods(accountId, methods) }
-                .onSuccess {
-                    _revealedAccount.value = _revealedAccount.value
-                        ?.takeIf { it.accountId == accountId }
-                        ?.copy(loginMethods = methods)
-                }
-        }
     }
 
     /** 详情页「查余额」。结果经 observeProvider 那条订阅流回，不用手动刷新（红线 10）。 */
