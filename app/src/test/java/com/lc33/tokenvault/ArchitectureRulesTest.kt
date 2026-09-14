@@ -8,6 +8,7 @@ import com.lc33.tokenvault.domain.model.PredictiveBackStyle
 import com.lc33.tokenvault.ui.shell.KEY_AUTH_STYLES
 import com.lc33.tokenvault.ui.shell.KEY_BALANCE_KINDS
 import com.lc33.tokenvault.ui.theme.AppColorSchemeMode
+import com.lc33.tokenvault.ui.theme.PROVIDER_COLOR_COUNT
 import java.io.File
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -264,6 +265,16 @@ class ArchitectureRulesTest {
         fail(
             "日志保留期下拉按下标取值，两边数量必须一致：",
             arrayItemCountMismatches("log_retention_options", LogRetention.entries.size, "LogRetention"),
+        )
+    }
+
+    @Test
+    fun `供应商颜色下拉的选项数与调色板一致`() {
+        // `providers.color` 存的是调色板下标，颜色名按同一下标取：少一个名字就是
+        // 「选第 8 个颜色得到第 1 个」，而用户只会觉得"这个软件记错了我的选择"。
+        fail(
+            "供应商颜色下拉按下标取值，颜色名数量必须与调色板一致：",
+            arrayItemCountMismatches("provider_colors", PROVIDER_COLOR_COUNT, "PROVIDER_COLOR_COUNT"),
         )
     }
 

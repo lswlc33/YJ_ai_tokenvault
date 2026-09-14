@@ -482,6 +482,21 @@
         <item>Auto</item>
         <item>Authorization: Bearer</item>
         <item>x-api-key</item>
+    </string-array>
+    <!--
+      Names for the provider swatches, one per swatch in ProviderPalette, in order.
+      Colour is picked by index, so neither the order nor the count may change;
+      the architecture test compares this against PROVIDER_COLOR_COUNT.
+    -->
+    <string-array name="provider_colors">
+        <item>Blue</item>
+        <item>Teal</item>
+        <item>Purple</item>
+        <item>Orange</item>
+        <item>Rose</item>
+        <item>Green</item>
+        <item>Slate</item>
+        <item>Ochre</item>
     </string-array>    <!-- Groups -->
     <string name="groups_add">New group</string>
     <string name="groups_rename">Rename</string>

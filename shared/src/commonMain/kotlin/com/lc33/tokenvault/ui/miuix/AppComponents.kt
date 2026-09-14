@@ -57,8 +57,10 @@ import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
+import top.yukonga.miuix.kmp.basic.DropdownItem
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
+import top.yukonga.miuix.kmp.preference.OverlaySpinnerPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import com.lc33.tokenvault.platform.Haptics
 import com.lc33.tokenvault.ui.theme.AppTokens
@@ -781,6 +783,42 @@ fun AppDropdownRow(
 ) {
     OverlayDropdownPreference(
         items = items,
+        selectedIndex = selectedIndex,
+        title = title,
+        modifier = modifier,
+        summary = summary,
+        enabled = enabled,
+        onSelectedIndexChange = onSelect,
+    )
+}
+
+/**
+ * 带图标的下拉行（SpinnerPreference）。
+ *
+ * 与 [AppDropdownRow] 的区别只在**每一项前面能不能画东西**：颜色、图标这类选项光有名字
+ * 不够，得把那个颜色本身摆出来。所以这不是另一套控件，是同一个下拉的带图标版本。
+ *
+ * @param itemLeading 每一项左侧的内容，收到的是 MIUIX 给的图标格 Modifier
+ *   （带最小尺寸与右侧间距），**必须把它 then 到自己的根上**，否则会和文字贴在一起。
+ */
+@Composable
+fun AppIconDropdownRow(
+    title: String,
+    items: List<String>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    itemLeading: @Composable (Int, Modifier) -> Unit,
+    modifier: Modifier = Modifier,
+    summary: String? = null,
+    enabled: Boolean = true,
+) {
+    OverlaySpinnerPreference(
+        items = items.mapIndexed { index, text ->
+            DropdownItem(
+                text = text,
+                icon = { cellModifier -> itemLeading(index, cellModifier) },
+            )
+        },
         selectedIndex = selectedIndex,
         title = title,
         modifier = modifier,

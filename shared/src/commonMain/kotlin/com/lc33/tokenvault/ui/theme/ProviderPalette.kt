@@ -8,12 +8,18 @@ import androidx.compose.ui.graphics.Color
  *
  * 与 [StatusPalette] 分开：状态色表达"好不好"，这一组只是让用户在长列表里认出某一行，
  * 不承担任何语义。`providers.color` 存的是这个列表的下标（红线 16 的唯一入口是编辑页的
- * 色块选择器）。取模访问，所以下标越界不会崩。
+ * 颜色选择行）。取模访问，所以下标越界不会崩。
+ *
+ * **色块数量必须与 `provider_colors` 那个 string-array 的条目数一致**：编辑页是按
+ * 下标选色的，少一项就是"选第 8 个颜色得到第 1 个"。`ArchitectureRulesTest` 守着这条。
  */
 @Immutable
 data class ProviderPalette(val swatches: List<Color>) {
     fun swatchFor(index: Int): Color = swatches[((index % swatches.size) + swatches.size) % swatches.size]
 }
+
+/** 备选色的数量。颜色名走 `provider_colors` 资源，两边必须一致（架构测试盯着）。 */
+const val PROVIDER_COLOR_COUNT = 8
 
 private val LightSwatches = listOf(
     Color(0xFF3B76F0),
@@ -39,7 +45,6 @@ private val DarkSwatches = listOf(
 
 fun providerPaletteFor(dark: Boolean): ProviderPalette =
     ProviderPalette(if (dark) DarkSwatches else LightSwatches)
-
 val LocalProviderPalette = androidx.compose.runtime.staticCompositionLocalOf {
     ProviderPalette(LightSwatches)
 }

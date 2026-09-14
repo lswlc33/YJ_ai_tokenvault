@@ -14,26 +14,26 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.lc33.tokenvault.platform.PlatformBackHandler
 import com.lc33.tokenvault.screens.model.ProviderDraft
-import com.lc33.tokenvault.ui.common.ColorSwatchRow
+import com.lc33.tokenvault.ui.common.ProviderColorSwatch
 import com.lc33.tokenvault.ui.miuix.AppDialog
 import com.lc33.tokenvault.ui.miuix.AppDropdownRow
 import com.lc33.tokenvault.ui.miuix.AppIconButton
+import com.lc33.tokenvault.ui.miuix.AppIconDropdownRow
 import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppPreferenceGroup
 import com.lc33.tokenvault.ui.miuix.AppScaffold
 import com.lc33.tokenvault.ui.miuix.AppSwitchRow
-import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppTextField
-import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.AppTopBar
 import com.lc33.tokenvault.ui.miuix.SectionTitle
-import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
 import com.lc33.tokenvault.ui.miuix.appTopBarScroll
 import com.lc33.tokenvault.ui.miuix.rememberAppTextFieldState
 import com.lc33.tokenvault.ui.miuix.rememberAppTopBarScrollState
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
+import org.jetbrains.compose.resources.stringArrayResource
 import org.jetbrains.compose.resources.stringResource
 import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.back_cd
@@ -42,6 +42,7 @@ import tokenvault.shared.generated.resources.editor_group
 import tokenvault.shared.generated.resources.editor_name
 import tokenvault.shared.generated.resources.editor_note
 import tokenvault.shared.generated.resources.editor_pinned
+import tokenvault.shared.generated.resources.provider_colors
 import tokenvault.shared.generated.resources.editor_section_basic
 import tokenvault.shared.generated.resources.editor_section_look
 import tokenvault.shared.generated.resources.editor_discard_confirm
@@ -63,6 +64,9 @@ fun ProviderEditorScreen(
     val scrollState = rememberAppTopBarScrollState()
     val tokens = LocalAppTokens.current
     var showDiscard by remember { mutableStateOf(false) }
+    // 颜色名与调色板按**下标**对齐，两边数量由架构测试比对（provider_colors ↔
+    // PROVIDER_COLOR_COUNT）：少一项的表现是"选第 8 个颜色得到第 1 个"。
+    val colorNames = stringArrayResource(Res.array.provider_colors).toList()
 
     val name = rememberAppTextFieldState(draft.name)
     val note = rememberAppTextFieldState(draft.note)
@@ -127,6 +131,8 @@ fun ProviderEditorScreen(
 
             item { SectionTitle(text = stringResource(Res.string.editor_section_look)) }
             item {
+                // 分组 / 颜色 / 置顶同一组：三件事都是"这一家在列表里长什么样"，
+                // 拆成三块会让外观这一节比基础信息还长。
                 AppPreferenceGroup {
                     AppDropdownRow(
                         title = stringResource(Res.string.editor_group),
@@ -134,28 +140,19 @@ fun ProviderEditorScreen(
                         selectedIndex = draft.groupIndex,
                         onSelect = { onChange(draft.copy(groupIndex = it)) },
                     )
-                }
-            }
-            item {
-                Column(
-                    modifier = Modifier.padding(
-                        horizontal = tokens.screenPadding,
-                        vertical = tokens.itemSpacing,
-                    ),
-                ) {
-                    AppText(
-                        text = stringResource(Res.string.editor_color),
-                        style = AppTextStyle.Secondary,
-                        modifier = Modifier.padding(bottom = tokens.itemSpacing),
-                    )
-                    ColorSwatchRow(
+                    AppIconDropdownRow(
+                        title = stringResource(Res.string.editor_color),
+                        items = colorNames,
                         selectedIndex = draft.colorIndex,
                         onSelect = { onChange(draft.copy(colorIndex = it)) },
+                        itemLeading = { index, cellModifier ->
+                            ProviderColorSwatch(
+                                index = index,
+                                modifier = cellModifier,
+                                size = 22.dp,
+                            )
+                        },
                     )
-                }
-            }
-            item {
-                AppPreferenceGroup {
                     AppSwitchRow(
                         title = stringResource(Res.string.editor_pinned),
                         checked = draft.pinned,

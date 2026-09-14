@@ -481,6 +481,22 @@
         <item>自动</item>
         <item>Authorization: Bearer</item>
         <item>x-api-key</item>
+    </string-array>
+    <!--
+      供应商色块的名称，与 ProviderPalette 的 8 个色块一一对应（按 **下标** 取色，
+      所以顺序与数量都不能变；架构测试比对着 PROVIDER_COLOR_COUNT）。
+      名字是给"选色"这个动作一个可读的标签——色块本身在小下拉里只有 20dp，
+      光看颜色很难说清哪个是哪个。
+    -->
+    <string-array name="provider_colors">
+        <item>蓝色</item>
+        <item>青色</item>
+        <item>紫色</item>
+        <item>橙色</item>
+        <item>玫红</item>
+        <item>绿色</item>
+        <item>石板灰</item>
+        <item>土黄</item>
     </string-array>    <!-- Groups -->
     <string name="groups_add">新建分组</string>
     <string name="groups_rename">重命名</string>
