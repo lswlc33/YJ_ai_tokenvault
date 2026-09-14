@@ -50,6 +50,7 @@ import com.lc33.tokenvault.ui.miuix.rememberSecretTextFieldState
 import com.lc33.tokenvault.ui.shell.KeyEditorViewModel
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
 import com.lc33.tokenvault.ui.theme.LocalStatusPalette
+import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringArrayResource
 import org.jetbrains.compose.resources.stringResource
 import tokenvault.shared.generated.resources.Res
@@ -72,6 +73,7 @@ import tokenvault.shared.generated.resources.editor_balance_custom_method
 import tokenvault.shared.generated.resources.editor_balance_custom_path
 import tokenvault.shared.generated.resources.editor_balance_custom_used_path
 import tokenvault.shared.generated.resources.editor_balance_custom_value_path
+import tokenvault.shared.generated.resources.editor_key_keep_secret
 import tokenvault.shared.generated.resources.editor_balance_kind
 import tokenvault.shared.generated.resources.editor_balance_kind_summary
 import tokenvault.shared.generated.resources.editor_balance_token
@@ -108,6 +110,8 @@ import tokenvault.shared.generated.resources.editor_probe_quick_model_summary
 import tokenvault.shared.generated.resources.editor_probe_reachability
 import tokenvault.shared.generated.resources.editor_probe_reachability_summary
 import tokenvault.shared.generated.resources.editor_save
+import tokenvault.shared.generated.resources.secret_conceal_cd
+import tokenvault.shared.generated.resources.secret_reveal_cd
 import tokenvault.shared.generated.resources.editor_section_advanced
 import tokenvault.shared.generated.resources.editor_section_balance
 import tokenvault.shared.generated.resources.editor_section_basic
@@ -128,6 +132,7 @@ fun KeyEditorScreen(
     baseUrlError: String?,
     saveError: KeyEditorViewModel.SaveError?,
     saving: Boolean,
+    revealed: KeyEditorViewModel.RevealedSecrets,
     onChange: (KeyDraft) -> Unit,
     onBaseUrlChange: () -> Unit,
     onAddModel: (String, Protocol) -> Unit,
@@ -140,6 +145,9 @@ fun KeyEditorScreen(
     val scrollState = rememberAppTopBarScrollState()
     val tokens = LocalAppTokens.current
     val palette = LocalStatusPalette.current
+    // 眼睛图标的无障碍文案：密钥框与余额令牌框共用同一对。
+    val revealCd = stringResource(Res.string.secret_reveal_cd)
+    val concealCd = stringResource(Res.string.secret_conceal_cd)
 
     val label = rememberAppTextFieldState(draft.label)
     val note = rememberAppTextFieldState(draft.note)
@@ -162,12 +170,44 @@ fun KeyEditorScreen(
     var addModel by remember { mutableStateOf(false) }
     var editingModel by remember { mutableStateOf<UiModelRow?>(null) }
     var pendingDeleteModelId by remember { mutableStateOf<Long?>(null) }
+    // 编辑已有 Key 时两段明文直接摆在输入框里、**默认可见**：这一页要回答的问题就是
+    // "里面存的是什么"，藏起来等于让用户闭着眼睛改配置。眼睛图标可以随时遮回去，
+    // 一直摆着不看 30 秒也会自动遮（与密钥详情页的「查看」同一条规则）。
+    var secretConcealed by remember { mutableStateOf(false) }
+    var tokenConcealed by remember { mutableStateOf(false) }
+
+    // 明文是异步解出来的，到达时再填进输入框（不是构造时给初值）。
+    // 只在输入框还空着时填：用户在等待期间已经动过手的话，不能把他的输入冲掉。
+    LaunchedEffect(revealed) {
+        if (secret.text.isEmpty()) secret.setText(revealed.secret.orEmpty())
+        if (balanceToken.text.isEmpty()) balanceToken.setText(revealed.balanceToken.orEmpty())
+    }
+
+    LaunchedEffect(secretConcealed) {
+        if (!secretConcealed) {
+            delay(30_000)
+            secretConcealed = true
+        }
+    }
+
+    LaunchedEffect(tokenConcealed) {
+        if (!tokenConcealed) {
+            delay(30_000)
+            tokenConcealed = true
+        }
+    }
+
+    // 这两格也要算进"改过没有"：它们不在 draft 里（明文不走草稿），漏掉的表现是
+    // "只改了密钥、按返回 → 不弹放弃确认、改动静默消失"。
+    val secretChanged = secret.text != revealed.secret.orEmpty()
+    val tokenChanged = balanceToken.text != revealed.balanceToken.orEmpty()
 
     val dirty = label.text != draft.label || note.text != draft.note || baseUrl.text != draft.baseUrl ||
         override.text != draft.pathOverrideAnthropic || timeout.text != draft.timeoutSeconds ||
         balanceUserId.text != draft.balanceUserId || balanceMethod.text != draft.balanceMethod ||
         balancePath.text != draft.balancePath || balanceValuePath.text != draft.balanceValuePath ||
         balanceUsedPath.text != draft.balanceUsedPath || balanceCurrency.text != draft.balanceCurrency ||
+        secretChanged || tokenChanged ||
         draft != initialDraft
 
     LaunchedEffect(baseUrl.state) {
@@ -196,10 +236,12 @@ fun KeyEditorScreen(
             balanceUsedPath = balanceUsedPath.text.trim(),
             balanceCurrency = balanceCurrency.text.trim(),
         )
+        // 只交**改过**的那两段：原值已经在输入框里了，原样交回去会让每一次保存
+        // 都重新加密一遍同一个明文（还多一条审计日志）。null = 没动，保留原值。
         onSave(
             next,
-            secret.chars.takeIf { it.isNotEmpty() },
-            balanceToken.chars.takeIf { it.isNotEmpty() },
+            secret.chars.takeIf { secretChanged },
+            balanceToken.chars.takeIf { tokenChanged },
         )
     }
 
@@ -245,7 +287,17 @@ fun KeyEditorScreen(
                     AppSecretTextField(
                         state = secret,
                         label = stringResource(Res.string.detail_key_secret),
+                        // 编辑时字段里就是原值：说清楚"清空 = 保留"，
+                        // 免得用户删掉它、再看到旧密钥还在而以为没保存成功。
+                        supportingText = if (draft.id != 0L) {
+                            stringResource(Res.string.editor_key_keep_secret)
+                        } else {
+                            null
+                        },
                         errorText = if (secretError) stringResource(Res.string.editor_error_missing_secret) else null,
+                        concealed = secretConcealed,
+                        toggleConcealDescription = if (secretConcealed) revealCd else concealCd,
+                        onToggleConceal = { secretConcealed = !secretConcealed },
                     )
                 }
             }
@@ -431,10 +483,15 @@ fun KeyEditorScreen(
                 ) {
                     when (draft.balanceKindIndex) {
                         1 -> {
+                            // 编辑时这个框里就是**存着的那串令牌**（new-api 的个人访问令牌），
+                            // 默认可见、眼睛可遮——理由同上面的密钥：看不见就没法核对。
                             AppSecretTextField(
                                 state = balanceToken,
                                 label = stringResource(Res.string.editor_balance_token),
                                 supportingText = stringResource(Res.string.editor_balance_token_hint),
+                                concealed = tokenConcealed,
+                                toggleConcealDescription = if (tokenConcealed) revealCd else concealCd,
+                                onToggleConceal = { tokenConcealed = !tokenConcealed },
                             )
                             AppTextField(
                                 state = balanceUserId,

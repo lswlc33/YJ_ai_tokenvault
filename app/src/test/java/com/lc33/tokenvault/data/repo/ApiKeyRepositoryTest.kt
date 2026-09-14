@@ -181,6 +181,49 @@ class ApiKeyRepositoryTest {
         revealed.zeroize()
     }
 
+    /**
+     * 编辑页**回显明文再保存**这条路径不能把凭据弄丢。
+     *
+     * 编辑页现在会把原密钥与令牌填进输入框；用户原样保存时传回来的是同一个值，
+     * 仓库这边必须：
+     * - 传 null（"没动这一格"）→ 保留原值；
+     * - 传同一个明文 → 换一组密文（AAD 含行号，密文每次不同），但解出来还是它；
+     * - 传空数组 → 清空令牌（用户的显式动作）。
+     *
+     * 这三条任何一条错了，表现都是"改完别的设置回来，密钥没了"。
+     */
+    @Test
+    fun `改设置时回显的明文原样保存不丢凭据`() = runTest {
+        val id = repo.add(
+            providerId = 1,
+            label = "k",
+            note = "",
+            secret = SECRET.toCharArray(),
+            settings = settings(),
+            balanceToken = "balance-token".toCharArray(),
+        )
+
+        // 1) 没动两格：都传 null，凭据保持。
+        repo.updateSettings(id, settings().copy(apiVersion = "v2"), balanceToken = null)
+        assertEquals(SECRET, repo.reveal(id).concatToString())
+        assertEquals("balance-token", repo.revealBalanceToken(id)!!.concatToString())
+
+        // 2) 原样交回同一个明文（回显后直接保存）：仍然解得出原值。
+        repo.updateSettings(
+            id,
+            settings().copy(apiVersion = "v3"),
+            balanceToken = "balance-token".toCharArray(),
+        )
+        assertEquals(SECRET, repo.reveal(id).concatToString())
+        assertEquals("balance-token", repo.revealBalanceToken(id)!!.concatToString())
+
+        // 3) 显式清空令牌：这才真的清掉。
+        repo.updateSettings(id, settings(), balanceToken = CharArray(0))
+        assertEquals(null, repo.revealBalanceToken(id))
+        // 清令牌不该顺手把密钥也弄没。
+        assertEquals(SECRET, repo.reveal(id).concatToString())
+    }
+
     @Test
     fun `解密用的 AAD 就是表名行号列名那一串`() = runTest {
         val id = add(label = "a")

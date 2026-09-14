@@ -453,6 +453,7 @@
     <string name="editor_balance_kind_summary">Pick “None” to turn balance queries off</string>
     <string name="editor_balance_token">Access token</string>
     <string name="editor_balance_token_hint">A separate token from the provider's account settings, not your API key</string>
+    <string name="editor_key_keep_secret">Clearing this field keeps the current key; it is not deleted.</string>
     <string name="editor_balance_user_id">User ID</string>
     <string name="editor_balance_none_hint">No balance query for this provider.</string>
     <string name="editor_balance_default_key_hint">Uses this provider's default key; no extra fields required.</string>

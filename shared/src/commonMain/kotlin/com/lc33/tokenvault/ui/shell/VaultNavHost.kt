@@ -448,6 +448,7 @@ fun VaultNavHost(
                 val saving by vm.saving.collectAsStateWithLifecycle()
                 val saveError by vm.saveError.collectAsStateWithLifecycle()
                 val urlError by vm.urlError.collectAsStateWithLifecycle()
+                val revealedSecrets by vm.revealed.collectAsStateWithLifecycle()
                 val feedback = LocalAppFeedback.current
                 val keySaved = stringResource(Res.string.feedback_key_saved)
                 LaunchedEffect(vm) {
@@ -504,6 +505,7 @@ fun VaultNavHost(
                         baseUrlError = baseUrlError,
                         saveError = saveError,
                         saving = saving,
+                        revealed = revealedSecrets,
                         onChange = vm::onChange,
                         onBaseUrlChange = vm::clearUrlError,
                         onAddModel = vm::addModel,

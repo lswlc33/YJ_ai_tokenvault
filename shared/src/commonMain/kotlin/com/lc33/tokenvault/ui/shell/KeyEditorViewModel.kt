@@ -2,6 +2,7 @@ package com.lc33.tokenvault.ui.shell
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lc33.tokenvault.crypto.KnownSecrets
 import com.lc33.tokenvault.crypto.zeroize
 import com.lc33.tokenvault.domain.Protocol
 import com.lc33.tokenvault.domain.model.ApiKey
@@ -38,9 +39,27 @@ class KeyEditorViewModel constructor(
     private val profilesRepository: ClientProfileRepository,
     private val settings: SettingsRepository,
     private val probeEngine: ProbeEngine,
+    private val knownSecrets: KnownSecrets,
     private val providerId: Long,
     private val keyId: Long,
 ) : ViewModel() {
+
+    /**
+     * 编辑已有 Key 时**回显在输入框里的明文**（密钥与余额令牌）。
+     *
+     * 为的是"打开编辑页却看不见里面存了什么"——字段空的，用户没法核对，也自然怀疑
+     * "再存一次是不是就把它覆盖成空的了"。空值本来就走"保留原值"，但**看得见**才谈得上
+     * 确认；这与账号编辑页回显用户名/密码是同一条规则。
+     *
+     * 两段明文只在编辑页存活期间存在：`onCleared` 里擦，锁定时随 `KnownSecrets.clear()`
+     * 一起从脱敏清单里消失（红线 1、6）。[secret]/[balanceToken] 是给输入框用的
+     * 展示串（`String` 擦不掉，这是 Compose 文本框的固有代价），权威副本仍是 ViewModel
+     * 里那两份可擦的 [CharArray]。
+     */
+    data class RevealedSecrets(
+        val secret: String? = null,
+        val balanceToken: String? = null,
+    )
 
     enum class SaveError {
         MissingSecret,
@@ -90,6 +109,13 @@ class KeyEditorViewModel constructor(
     private val _urlError = MutableStateFlow<EndpointError?>(null)
     val urlError: StateFlow<EndpointError?> = _urlError.asStateFlow()
 
+    private val _revealed = MutableStateFlow(RevealedSecrets())
+    val revealed: StateFlow<RevealedSecrets> = _revealed.asStateFlow()
+
+    /** 明文的可擦副本。输入框里那份 `String` 擦不掉，这份是权威。 */
+    private var revealedSecretPlain: CharArray? = null
+    private var revealedTokenPlain: CharArray? = null
+
     private var currentKey: ApiKey? = null
 
     init {
@@ -100,6 +126,7 @@ class KeyEditorViewModel constructor(
             // 新建时用「探测」设置页里的那五个默认值当草稿初值。之前这里是写死的
             // `KeyDraft()`，于是那一页的开关改了什么都不影响——界面在，功能不存在。
             _draft.value = key?.toDraft(profileList) ?: defaultDraft()
+            key?.let { revealSecrets(it.id) }
             _loaded.value = true
 
             val observedProviderId = key?.providerId ?: providerId
@@ -111,6 +138,32 @@ class KeyEditorViewModel constructor(
                 }
             }
         }
+    }
+
+    /**
+     * 解出这一把 Key 的密钥与余额令牌，供编辑页回显。
+     *
+     * 解不开（密文坏了 / 锁定）就给空：那一项在页面上是空的，用户自己填新的即可——
+     * 抛出去会让整个编辑页打不开，比少回显一个字段糟得多。
+     */
+    private suspend fun revealSecrets(id: Long) {
+        val secret = runCatching { keys.reveal(id) }.getOrNull()?.also { knownSecrets.add(it) }
+        val token = runCatching { keys.revealBalanceToken(id) }.getOrNull()?.also { knownSecrets.add(it) }
+        clearRevealed()
+        revealedSecretPlain = secret
+        revealedTokenPlain = token
+        _revealed.value = RevealedSecrets(
+            secret = secret?.concatToString(),
+            balanceToken = token?.concatToString(),
+        )
+    }
+
+    private fun clearRevealed() {
+        revealedSecretPlain?.zeroize()
+        revealedTokenPlain?.zeroize()
+        revealedSecretPlain = null
+        revealedTokenPlain = null
+        _revealed.value = RevealedSecrets()
     }
 
     private suspend fun defaultDraft(): KeyDraft =
@@ -254,5 +307,10 @@ class KeyEditorViewModel constructor(
     fun refreshModels() {
         val key = currentKey ?: return
         probeEngine.refreshModels(key.providerId, key.id)
+    }
+
+    override fun onCleared() {
+        // 编辑页退出即擦回显的明文（红线 1 的可擦副本）。
+        clearRevealed()
     }
 }

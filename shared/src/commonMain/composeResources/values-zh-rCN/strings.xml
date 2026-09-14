@@ -452,6 +452,7 @@
     <string name="editor_balance_kind_summary">选「不查」即关闭余额查询</string>
     <string name="editor_balance_token">访问令牌</string>
     <string name="editor_balance_token_hint">在中转站个人安全设置中获取的独立令牌，不是 API 密钥</string>
+    <string name="editor_key_keep_secret">清空则保留原密钥，不会把它删掉。</string>
     <string name="editor_balance_user_id">用户 ID</string>
     <string name="editor_balance_none_hint">该供应商不查询余额。</string>
     <string name="editor_balance_default_key_hint">使用该供应商的默认密钥查询，无需填写额外字段。</string>
