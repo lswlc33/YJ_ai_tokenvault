@@ -557,7 +557,7 @@
     <string name="editor_probe_reachability">可达性检测</string>
     <string name="editor_probe_reachability_summary">获取一次模型列表，不产生费用。</string>
     <string name="editor_probe_keys">密钥有效性</string>
-    <string name="editor_probe_keys_summary">模型列表接口需要鉴权时不产生费用；不需要鉴权时需通过真实调用判断，仅支持手动执行。</string>
+    <string name="editor_probe_keys_summary">用这把密钥取一次模型列表：拿到就是可用，取不到就是不可用。关闭后不再判断，这把密钥始终按可用显示。</string>
     <string name="editor_probe_balance">探测时查询余额</string>
     <string name="editor_probe_balance_summary">需要在上面「余额」里先选好查询类型；未选时此项不可用。</string>
     <!-- 全局「探测」设置页那一份：那里是新建密钥的默认值，没有可选的余额类型在近旁。 -->
@@ -745,7 +745,7 @@
 
     <!-- 探测默认值。 -->
     <string name="editor_probe_model_reachability">模型可达性探测（快捷）</string>
-    <string name="editor_probe_model_reachability_summary">默认关闭。开启后可长按模型发送一次简短的付费请求。</string>
+    <string name="editor_probe_model_reachability_summary">默认关闭。只能手动长按模型触发一次简短的付费请求：先试 Chat 协议，失败自动回落 Anthropic，两个都失败才算不可达。</string>
     <string name="editor_probe_models_confirm_title">清除已保存的模型？</string>
     <string name="editor_probe_models_confirm_action">开启</string>
     <string name="editor_probe_models_confirm_body">开启模型列表检测会清除该供应商已保存的模型列表，之后每轮探测会按密钥重新获取。</string>

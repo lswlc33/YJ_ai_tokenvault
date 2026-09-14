@@ -561,7 +561,7 @@
     <string name="editor_probe_reachability">Reachability check</string>
     <string name="editor_probe_reachability_summary">Fetches the model list once. Costs nothing.</string>
     <string name="editor_probe_keys">Key validity</string>
-    <string name="editor_probe_keys_summary">Costs nothing when the model list endpoint requires authentication. Otherwise a verdict needs a real call, which is manual only.</string>
+    <string name="editor_probe_keys_summary">Fetches the model list with this key: success means usable, failure means unusable. When off, nothing is judged and the key always shows as usable.</string>
     <string name="editor_probe_balance">Query balance during probes</string>
     <string name="editor_probe_balance_summary">Requires a query type set under Balance above; unavailable until then.</string>
     <string name="editor_probe_balance_default_summary">Whether a new key queries balance during probes by default.</string>
@@ -749,7 +749,7 @@
 
     <!-- Probe defaults. -->
     <string name="editor_probe_model_reachability">Model reachability probe (quick)</string>
-    <string name="editor_probe_model_reachability_summary">Off by default. When enabled, long-pressing a model sends one short paid request.</string>
+    <string name="editor_probe_model_reachability_summary">Off by default, manual only (long-press a model). Sends one short paid request: tries Chat first, falls back to Anthropic; only when both fail is the model unreachable.</string>
     <string name="editor_probe_models_confirm_title">Clear saved models?</string>
     <string name="editor_probe_models_confirm_action">Turn on</string>
     <string name="editor_probe_models_confirm_body">Enabling model list detection clears this provider's saved model lists. Lists are then fetched per key during each probe.</string>

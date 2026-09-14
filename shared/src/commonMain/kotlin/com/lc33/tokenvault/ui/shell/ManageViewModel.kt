@@ -137,7 +137,7 @@ class ManageViewModel constructor(
     ) { snap, ctrl ->
         // 每家的聚合状态要它自己那几把密钥的 health。全部密钥一次订阅、在这里按 providerId
         // 分组，所以这一段不发额外的 SQL
-        val healths = snap.keys.groupBy({ it.providerId }, { it.health })
+        val healths = snap.keys.groupBy({ it.providerId }, { it.effectiveHealth() })
         // 每家「最近探测」= 它那几把密钥 checkedAt 的最大值（§13.4「最近探测」排序档）。
         val lastProbeByProvider = snap.keys.groupBy({ it.providerId }, { it.checkedAt })
             .mapValues { (_, stamps) -> stamps.mapNotNull { it }.maxOrNull() }

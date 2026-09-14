@@ -12,6 +12,7 @@ import com.lc33.tokenvault.domain.ProbeOutcome
 import com.lc33.tokenvault.domain.Protocol
 import com.lc33.tokenvault.domain.model.ApiKey
 import com.lc33.tokenvault.domain.model.ClientProfile
+import com.lc33.tokenvault.domain.model.KeySettings
 import com.lc33.tokenvault.domain.model.LogCategory
 import com.lc33.tokenvault.domain.model.LogLevel
 import com.lc33.tokenvault.domain.model.Provider
@@ -24,6 +25,7 @@ import com.lc33.tokenvault.domain.repo.ProbeRunRepository
 import com.lc33.tokenvault.domain.repo.ProviderRepository
 import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.endpoint.HeaderAssembler
+import com.lc33.tokenvault.endpoint.ApiEndpointSet
 import com.lc33.tokenvault.endpoint.mergeBodyPatch
 import com.lc33.tokenvault.endpoint.NormalizeResult
 import com.lc33.tokenvault.endpoint.normalizeBaseUrl
@@ -32,7 +34,9 @@ import com.lc33.tokenvault.endpoint.ProbeRequestBuilder
 import com.lc33.tokenvault.endpoint.ProbeResponse
 import com.lc33.tokenvault.net.HttpEngine
 import com.lc33.tokenvault.probe.PlannedTask
+import com.lc33.tokenvault.probe.MODEL_PROBE_PROTOCOL_ORDER
 import com.lc33.tokenvault.probe.ModelListParser
+import com.lc33.tokenvault.probe.modelProbeStateOf
 import com.lc33.tokenvault.probe.ProbeBudget
 import com.lc33.tokenvault.probe.Classification
 import com.lc33.tokenvault.probe.ProbeClassifier
@@ -392,16 +396,20 @@ class ProbeEngine constructor(
         )
     }
     /**
-     * 模型可达性探测（快捷）。长按模型手动触发，只发一次极短推理请求；
-     * 默认关闭，且必须同时打开全局默认值与该供应商自己的开关。
+     * 模型可达性探测（快捷）。**只能手动触发**：长按模型发一次极短推理请求，
+     * 自动路径（[start] / [probeProvider] / [probeKey]）永远不生成 L3 任务——
+     * 它必然花钱，红线 36。
+     *
+     * 协议按 [MODEL_PROBE_PROTOCOL_ORDER]（Chat → Anthropic）试探，先成功者为准；
+     * 所以这里不接"模型行上记的协议"这个参数——那个值只在展示层用。
      */
-    fun probeModel(providerId: Long, keyId: Long, modelId: String, protocol: Protocol): Boolean {
+    fun probeModel(providerId: Long, keyId: Long, modelId: String): Boolean {
         if (quickModelJob?.isActive == true) return false
         if (!session.isUnlocked) return false
         quickModelJob = scope.launch {
             autoLocker.pauseIdleLock()
             try {
-                probeModelInner(providerId, keyId, modelId, protocol)
+                probeModelInner(providerId, keyId, modelId)
             } finally {
                 autoLocker.resumeIdleLock()
             }
@@ -413,7 +421,6 @@ class ProbeEngine constructor(
         providerId: Long,
         keyId: Long,
         modelId: String,
-        protocol: Protocol,
     ) {
         val key = keys.find(keyId) ?: return
         if (!key.settings.probe.enabled || !key.settings.probe.modelReachability || !key.settings.probe.quickModelProbe) return
@@ -422,7 +429,6 @@ class ProbeEngine constructor(
             is NormalizeResult.Ok -> result.endpoints
             is NormalizeResult.Err -> return
         }
-        val url = endpoints.byProtocol[protocol] ?: return
 
         val secret = try {
             keys.reveal(keyId)
@@ -435,42 +441,35 @@ class ProbeEngine constructor(
             val profileList = clientProfiles.observeAll().first()
             val defaultProfile = profileList.firstOrNull { it.builtinKey == "default" }
             val profile = profileList.firstOrNull { it.id == keySettings.clientProfileId } ?: defaultProfile
-            val baseRequest = ProbeRequestBuilder.inference(
-                url = url,
-                protocol = protocol,
-                apiKey = secret,
-                modelId = modelId,
-                authStyle = keySettings.authStyle,
-                prompt = ProbeRequestBuilder.QUICK_REACHABILITY_PROMPT,
-            )
-            val patchedBody = mergeBodyPatch(
-                baseRequest.body ?: "",
-                profile?.bodyPatch ?: "{}",
-            )
-            val request = baseRequest.copy(
-                headers = HeaderAssembler.assemble(
-                    baseHeaders = BASE_HEADERS,
-                    profile = profile,
-                    authHeaders = baseRequest.headers,
-                    placeholders = placeholders,
-                ).headers,
-                body = HeaderAssembler.expandPlaceholders(patchedBody, placeholders),
-            )
-            val response = engine.execute(request, allowInsecure = keySettings.allowInsecure)
-            if (response.status == 429) engine.onRateLimited(keySettings.apiRoot.substringAfter("://").substringBefore('/').substringBefore(':'))
+            val clientKeywords = settings.observeClientKeywords().first()
 
-            val classification = ProbeClassifier.classify(
-                status = response.status.takeIf { response.error == null },
-                body = response.body,
-                error = response.error,
-                level = ProbeLevel.L3_MODEL,
-                clientKeywords = this.settings.observeClientKeywords().first(),
-            )
+            // Chat 优先、失败回落 Anthropic；两个都不行才算不可达。
+            var lastAttempt: ModelProbeAttempt? = null
+            for (candidate in MODEL_PROBE_PROTOCOL_ORDER) {
+                val url = endpoints.byProtocol[candidate] ?: continue
+                val attempt = probeModelOnce(
+                    keySettings = keySettings,
+                    endpoints = endpoints,
+                    profile = profile,
+                    secret = secret,
+                    modelId = modelId,
+                    protocol = candidate,
+                    clientKeywords = clientKeywords,
+                    prompt = ProbeRequestBuilder.QUICK_REACHABILITY_PROMPT,
+                )
+                lastAttempt = attempt
+                if (attempt.classification.outcome == ProbeOutcome.SUCCESS) break
+            }
+            val attempt = lastAttempt ?: return
+
+            val classification = attempt.classification
             val detail = classification.detail?.let { redactor.scrub(it) }
-            val state = modelStateOf(classification)
-            val modelRowId = modelIdToRow(providerId, keyId, modelId, protocol)
+            // 模型行按 keyId + modelId 定位：这一轮试的可能不是那一行记的协议，
+            // 拿协议一起查会查不到、于是白探一遍（不写回任何东西）。
+            val modelRowId = modelIdToRow(providerId, keyId, modelId)
             if (modelRowId == 0L) return
 
+            val state = modelProbeStateOf(classification)
             if (state == ModelProbeState.UNKNOWN) {
                 models.applyTransientOutcome(
                     id = modelRowId,
@@ -484,7 +483,7 @@ class ProbeEngine constructor(
                     state = state.wireName,
                     lastOutcome = classification.outcome.wireName,
                     detail = detail,
-                    latencyMs = response.latencyMs,
+                    latencyMs = attempt.latencyMs,
                     probedAt = now(),
                 )
             }
@@ -492,7 +491,8 @@ class ProbeEngine constructor(
                 level = if (classification.outcome == ProbeOutcome.SUCCESS) LogLevel.INFO else LogLevel.WARN,
                 category = LogCategory.PROBE,
                 message = "model quick probe finished",
-                detail = "provider=$providerId key=$keyId outcome=${classification.outcome.wireName}",
+                detail = "provider=$providerId key=$keyId protocol=${attempt.protocol.wireName} " +
+                    "outcome=${classification.outcome.wireName}",
                 providerId = providerId,
                 keyId = keyId,
             )
@@ -501,25 +501,82 @@ class ProbeEngine constructor(
         }
     }
 
+    /** 一次模型探测尝试的结果。带上协议，因为回落时"哪条路由成的"是要报给用户的。 */
+    private data class ModelProbeAttempt(
+        val protocol: Protocol,
+        val classification: Classification,
+        val latencyMs: Long?,
+    )
+
+    /**
+     * 单次模型探测：按 [protocol] 造推理请求、发出去、分类。
+     *
+     * 抽出来是为了让"chat 失败回落 Anthropic"是两次**同样的**请求，只有协议不同——
+     * 内联两遍迟早出现两边头不一样、body 不一样这种只有某些站点才暴露的差异。
+     */
+    private suspend fun probeModelOnce(
+        keySettings: KeySettings,
+        endpoints: ApiEndpointSet,
+        profile: ClientProfile?,
+        secret: CharArray,
+        modelId: String,
+        protocol: Protocol,
+        clientKeywords: List<String>,
+        prompt: String,
+    ): ModelProbeAttempt {
+        val baseRequest = ProbeRequestBuilder.inference(
+            url = endpoints.byProtocol[protocol] ?: "",
+            protocol = protocol,
+            apiKey = secret,
+            modelId = modelId,
+            authStyle = keySettings.authStyle,
+            prompt = prompt,
+        )
+        val patchedBody = mergeBodyPatch(
+            baseRequest.body ?: "",
+            profile?.bodyPatch ?: "{}",
+        )
+        val request = baseRequest.copy(
+            headers = HeaderAssembler.assemble(
+                baseHeaders = BASE_HEADERS,
+                profile = profile,
+                authHeaders = baseRequest.headers,
+                placeholders = placeholders,
+            ).headers,
+            body = HeaderAssembler.expandPlaceholders(patchedBody, placeholders),
+        )
+        val response = engine.execute(request, allowInsecure = keySettings.allowInsecure)
+        if (response.status == 429) {
+            engine.onRateLimited(
+                keySettings.apiRoot.substringAfter("://").substringBefore('/').substringBefore(':'),
+            )
+        }
+        val classification = ProbeClassifier.classify(
+            status = response.status.takeIf { response.error == null },
+            body = response.body,
+            error = response.error,
+            level = ProbeLevel.L3_MODEL,
+            clientKeywords = clientKeywords,
+        )
+        return ModelProbeAttempt(
+            protocol = protocol,
+            classification = classification,
+            latencyMs = response.latencyMs,
+        )
+    }
+
+    /**
+     * 模型行定位：**按 keyId + modelId，不带协议**。
+     *
+     * 回落探测时用的协议可能与该行记的协议不同，带上协议就查不到那一行了。
+     */
     private suspend fun modelIdToRow(
         providerId: Long,
         keyId: Long,
         modelId: String,
-        protocol: Protocol,
     ): Long = models.observeByProvider(providerId).first()
-        .firstOrNull { it.keyId == keyId && it.modelId == modelId && it.protocol == protocol }
+        .firstOrNull { it.keyId == keyId && it.modelId == modelId }
         ?.id ?: 0L
-
-    private fun modelStateOf(classification: Classification): ModelProbeState = when {
-        classification.outcome == ProbeOutcome.SUCCESS -> ModelProbeState.OK
-        classification.modelState != null -> classification.modelState
-        classification.outcome == ProbeOutcome.CONCLUSIVE_FAIL -> when (classification.health) {
-            KeyHealth.FORBIDDEN -> ModelProbeState.NO_ACCESS
-            else -> ModelProbeState.ERROR
-        }
-        else -> ModelProbeState.UNKNOWN
-    }
-
 
     private fun startScoped(runScope: String, filter: (PlannedTask) -> Boolean): Boolean {
         if (running) return false

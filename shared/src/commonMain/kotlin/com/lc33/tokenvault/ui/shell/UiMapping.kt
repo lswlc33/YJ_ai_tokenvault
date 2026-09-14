@@ -83,11 +83,31 @@ fun ProbeItemResult.toUiHealth(): UiHealth = health?.toUi() ?: when (outcome) {
  * 规则：**有一把可用就算可用**（多把密钥的意义正在于此），一把都没有时看最坏的那一档，
  * 一把密钥都没录就是未探测。
  */
-fun aggregateHealth(keyHealths: List<KeyHealth>): UiHealth = when {
-    keyHealths.isEmpty() -> UiHealth.Unknown
-    keyHealths.any { it.usable } -> UiHealth.Ok
-    keyHealths.map { it.toUi() }.any { it == UiHealth.Error } -> UiHealth.Error
-    keyHealths.map { it.toUi() }.any { it == UiHealth.Warn } -> UiHealth.Warn
+/**
+ * 这一把 Key 的**展示健康**。
+ *
+ * 规则（用户定的语义）：**关掉「密钥有效性」检测的 Key 一律显示为可用**。
+ * 不检测就不该给它挂一个"未探测/错误"的结论——那个灰点是在报告一个用户明确说过
+ * 不要的判断，还会把"这家几张可用"的数一起带歪。
+ *
+ * 全应用只走这一个函数：密钥行、健康分布、供应商聚合、卡片上的"N / M 张可用"
+ * （最后那处在 SQL 里，见 `ProviderDao.observeSummaries`）。同一件事两处各算一遍，
+ * 迟早出现列表说可用、仪表盘说错误。
+ */
+fun ApiKey.effectiveHealth(): UiHealth =
+    if (settings.probe.keyValidity) health.toUi() else UiHealth.Ok
+
+/**
+ * 供应商聚合状态：有一把算可用就算可用（§5.3 末尾）。
+ *
+ * 入参是**已经过 [effectiveHealth] 的**展示档，所以调用方要交 `keys.map { it.effectiveHealth() }`
+ * 而不是原始的 `it.health`——否则关掉有效性检测的 Key 会在这里被算成未知。
+ */
+fun aggregateHealth(healths: List<UiHealth>): UiHealth = when {
+    healths.isEmpty() -> UiHealth.Unknown
+    healths.any { it == UiHealth.Ok } -> UiHealth.Ok
+    healths.any { it == UiHealth.Error } -> UiHealth.Error
+    healths.any { it == UiHealth.Warn } -> UiHealth.Warn
     else -> UiHealth.Unknown
 }
 
@@ -226,7 +246,7 @@ fun ApiKey.toRow(masked: String, clientProfileName: String? = null): UiKeyRow = 
     note = note,
     providerId = providerId,
     masked = masked,
-    health = health.toUi(),
+    health = effectiveHealth(),
     latencyMs = latencyMs,
     checkedAt = checkedAt,
     sortOrder = sortOrder,
@@ -355,7 +375,7 @@ fun contentCountsOf(summaries: List<ProviderSummary>): ContentCounts = ContentCo
  * 只读 `health`（持久结论），不看 `lastOutcome`：一次限流不该把分布图染成红的（红线 11）。
  */
 fun healthBreakdownOf(keys: List<ApiKey>): HealthBreakdown {
-    val buckets = keys.groupingBy { it.health.toUi() }.eachCount()
+    val buckets = keys.groupingBy { it.effectiveHealth() }.eachCount()
     return HealthBreakdown(
         ok = buckets[UiHealth.Ok] ?: 0,
         warn = buckets[UiHealth.Warn] ?: 0,

@@ -18,7 +18,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.lc33.tokenvault.domain.Protocol
 import com.lc33.tokenvault.screens.model.KeyDetailUiState
 import com.lc33.tokenvault.screens.model.UiModelRow
 import com.lc33.tokenvault.ui.common.StatusDot
@@ -99,7 +98,7 @@ fun KeyDetailScreen(
     onCopyRevealed: () -> Unit,
     onCloseReveal: () -> Unit,
     onProbe: () -> Unit,
-    onProbeModel: (String, Protocol) -> Unit,
+    onProbeModel: (String) -> Unit,
     onRefreshModels: () -> Unit,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
@@ -396,11 +395,9 @@ fun KeyDetailScreen(
                                 showProbe = key.settings.probeModelReachability,
                                 onClick = if (editable) ({ selectedModel = model }) else null,
                                 onLongPress = if (key.settings.probeQuickModel) {
-                                    {
-                                        Protocol.fromWireName(model.protocol)?.let { protocol ->
-                                            onProbeModel(model.modelId, protocol)
-                                        }
-                                    }
+                                    // 只传模型 id：协议由引擎按 Chat → Anthropic 试探，
+                                    // 这一行记的协议不参与（它只是用户当初填的值）。
+                                    { onProbeModel(model.modelId) }
                                 } else {
                                     null
                                 },

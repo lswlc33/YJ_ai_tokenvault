@@ -87,6 +87,20 @@ class ProbePlanBuilderTest {
     }
 
     @Test
+    fun `自动计划里永远不产出 L3 模型探测`() {
+        // 模型可达性探测必然花钱，**只能手动长按触发**（红线 36）。
+        // 这条把它锁死在"自动路径根本没有这个任务"上：以后谁想把 L3 塞进计划，
+        // 会先在这里红。
+        val p = provider(1)
+        val keys = listOf(
+            key(10, 1, probe = KeyProbeSettings(modelReachability = true, quickModelProbe = true)),
+        )
+        val plan = ProbePlanBuilder.build(listOf(p)) { pid -> keys.filter { it.providerId == pid } }
+
+        assertTrue(plan.tasks.none { it.level == ProbeLevel.L3_MODEL })
+    }
+
+    @Test
     fun `端点规范化失败的 Key 跳过`() {
         val p = provider(1)
         val keys = listOf(key(10, 1, baseUrl = ""))

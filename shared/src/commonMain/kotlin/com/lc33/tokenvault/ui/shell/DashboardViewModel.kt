@@ -117,7 +117,7 @@ class DashboardViewModel constructor(
         }
 
     private fun Snapshot.rows(): List<UiProviderRow> {
-        val healths = keys.groupBy({ it.providerId }, { it.health })
+        val healths = keys.groupBy({ it.providerId }, { it.effectiveHealth() })
         val balances = balanceByProvider()
         return summaries.map { summary ->
             val providerKeys = keys.filter { it.providerId == summary.provider.id }
@@ -142,7 +142,10 @@ class DashboardViewModel constructor(
         attention = attentionItemsOf(
             summaries = summaries,
             balanceByProvider = balanceByProvider(),
-            healthByProvider = keys.groupBy({ it.providerId }, { it.health }),
+            // 关掉「密钥有效性」的 Key 不进告警：用户明确说过别判断它，
+            // 就不该在「需要处理」里报它的故障（与展示层的 effectiveHealth 同一条规则）。
+            healthByProvider = keys.filter { it.settings.probe.keyValidity }
+                .groupBy({ it.providerId }, { it.health }),
             // 阈值来自设置（§13.4 探测设置页），默认 §9.3 的初值。
             // 不写死数字在这里（红线 15）：初值是有名字、有出处的领域常量。
             thresholds = thresholds,

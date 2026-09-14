@@ -56,11 +56,21 @@ data class ProviderSummaryRow(
 
 @Dao
 interface ProviderDao {
+    /**
+     * 列表页每行的聚合列。
+     *
+     * `okKeyCount` 要把**关掉密钥有效性检测**的 Key 也算成可用：那是用户说了"别判断它"，
+     * 展示层一律按可用显示（`ApiKey.effectiveHealth`），这个计数必须跟着一起算，
+     * 否则会出现列表写"0 / 1 张可用"、而那一行的状态点是绿的。
+     */
     @Query(
         """
         SELECT p.*,
                (SELECT COUNT(*) FROM api_keys k WHERE k.providerId = p.id) AS keyCount,
-               (SELECT COUNT(*) FROM api_keys k WHERE k.providerId = p.id AND k.health = 'ok') AS okKeyCount,
+               (SELECT COUNT(*) FROM api_keys k
+                  LEFT JOIN key_settings s ON s.keyId = k.id
+                 WHERE k.providerId = p.id
+                   AND (k.health = 'ok' OR s.probeKeyValidity = 0)) AS okKeyCount,
                (SELECT COUNT(DISTINCT m.modelId) FROM models m WHERE m.providerId = p.id) AS modelCount,
                (SELECT COUNT(*) FROM provider_accounts a WHERE a.providerId = p.id) AS accountCount
         FROM providers p

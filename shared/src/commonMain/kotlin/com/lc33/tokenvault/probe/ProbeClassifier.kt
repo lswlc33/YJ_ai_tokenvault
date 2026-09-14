@@ -309,3 +309,24 @@ object ProbeClassifier {
 
     private const val MAX_BODY_SCAN = 2048
 }
+
+/**
+ * 模型探测结论 → 模型行状态（§8.6 的手动快捷探测）。
+ *
+ * 三条分界都是产品语义，所以放在这里、可被单测直接断言：
+ *
+ * - **成功就是可用**，不看用的哪条协议（Chat 成的和 Anthropic 成的没有区别）。
+ * - **判定性失败就是"到不了"**：两个协议都试过、都被明确拒绝时落 [ModelProbeState.ERROR]，
+ *   不能停在"未探测"——那会让人以为还没测过，而实际是试遍了都不行。
+ * - **瞬时失败不落结论**（超时 / 429 / 5xx）：一次抖动不该把上一轮的好结论抹掉（红线 11），
+ *   返回 [ModelProbeState.UNKNOWN]，调用方只记"这一轮发生了什么"。
+ */
+fun modelProbeStateOf(classification: Classification): ModelProbeState = when {
+    classification.outcome == ProbeOutcome.SUCCESS -> ModelProbeState.OK
+    classification.modelState != null -> classification.modelState
+    classification.outcome == ProbeOutcome.CONCLUSIVE_FAIL -> when (classification.health) {
+        KeyHealth.FORBIDDEN -> ModelProbeState.NO_ACCESS
+        else -> ModelProbeState.ERROR
+    }
+    else -> ModelProbeState.UNKNOWN
+}

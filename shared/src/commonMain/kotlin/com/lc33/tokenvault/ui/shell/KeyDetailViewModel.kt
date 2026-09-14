@@ -114,8 +114,9 @@ class KeyDetailViewModel constructor(
         probeEngine.refreshModels(providerId, keyId)
     }
 
-    fun probeModel(modelId: String, protocol: com.lc33.tokenvault.domain.Protocol) {
-        probeEngine.probeModel(providerId, keyId, modelId, protocol)
+    /** 手动触发模型可达性探测。协议由引擎按 Chat → Anthropic 自己试，这里不需要知道。 */
+    fun probeModel(modelId: String) {
+        probeEngine.probeModel(providerId, keyId, modelId)
     }
 
     fun reveal() {

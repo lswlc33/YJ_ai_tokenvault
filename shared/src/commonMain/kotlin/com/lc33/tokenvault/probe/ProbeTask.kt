@@ -105,3 +105,18 @@ data class ProbeRunOutcome(
     val results: List<ProbeItemResult>,
     val skipped: Map<String, SkipReason>,
 )
+
+/**
+ * 模型可达性探测按什么顺序试协议（§8.6 的手动快捷探测）。
+ *
+ * 规则：**Chat 优先，失败回落 Anthropic**；两个都不行才算不可达。
+ *
+ * 为什么不能只信模型行上记的协议：那一栏是用户照着文档填的猜测，而这一轮探测要回答的
+ * 恰恰是"哪条路由真的能到"。只发一条的话，填错的模型永远显示不可达，用户除了改配置
+ * 没有别的办法；回落一次就能自己纠正过来。
+ *
+ * 为什么只有两条：Chat 与 Anthropic 覆盖了绝大多数中转站；Responses 是 Chat 的同门
+ * 变体（能走 Responses 的站点基本也能走 Chat），排进去只会让每次失败探测多花一次
+ * 付费请求。
+ */
+val MODEL_PROBE_PROTOCOL_ORDER: List<Protocol> = listOf(Protocol.CHAT, Protocol.ANTHROPIC)

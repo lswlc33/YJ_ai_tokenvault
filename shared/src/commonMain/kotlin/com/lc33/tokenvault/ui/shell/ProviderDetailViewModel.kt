@@ -503,14 +503,14 @@ class ProviderDetailViewModel constructor(
         )
     }
 
-    /** 有一把可用就算可用（§5.3 末尾）；一把都没录是未探测，不是出错。 */
-    private fun aggregateOf(rows: List<UiKeyRow>): UiHealth = when {
-        rows.isEmpty() -> UiHealth.Unknown
-        rows.any { it.health == UiHealth.Ok } -> UiHealth.Ok
-        rows.any { it.health == UiHealth.Error } -> UiHealth.Error
-        rows.any { it.health == UiHealth.Warn } -> UiHealth.Warn
-        else -> UiHealth.Unknown
-    }
+    /**
+     * 有一把可用就算可用（§5.3 末尾）；一把都没录是未探测，不是出错。
+     *
+     * 走 [aggregateHealth] 而不是在这里重写一遍分支：这段逻辑三处都要用（管理页、
+     * 仪表盘、这里），各写一遍的下场是"某天给某一档改了颜色，另外两处还是旧行为"。
+     */
+    private fun aggregateOf(rows: List<UiKeyRow>): UiHealth =
+        aggregateHealth(rows.map { it.health })
 
     override fun onCleared() {
         revealedAccountPlain?.zeroize()

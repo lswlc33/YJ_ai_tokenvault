@@ -423,8 +423,8 @@ fun VaultNavHost(
                             onCopyRevealed = { vm.copyRevealed(keyClipboardLabel) },
                             onCloseReveal = vm::closeReveal,
                             onProbe = vm::probeKey,
-                            onProbeModel = { modelId, protocol ->
-                                vm.probeModel(modelId, protocol)
+                            onProbeModel = { modelId ->
+                                vm.probeModel(modelId)
                                 feedback?.post(AppFeedback(modelProbed))
                             },
                             onRefreshModels = {
