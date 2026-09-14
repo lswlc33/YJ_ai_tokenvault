@@ -177,7 +177,6 @@ class KeyEditorViewModel constructor(
                         existing.copy(
                             label = draft.label.trim(),
                             note = draft.note.trim(),
-                            enabled = draft.enabled,
                             sortOrder = draft.sortOrder,
                         ),
                     )
@@ -221,7 +220,6 @@ class KeyEditorViewModel constructor(
         modelId: String,
         protocol: Protocol,
         displayName: String?,
-        enabled: Boolean,
     ) {
         val key = currentKey ?: return
         viewModelScope.launch {
@@ -233,7 +231,6 @@ class KeyEditorViewModel constructor(
                         modelId = modelId.trim(),
                         protocol = protocol,
                         displayName = displayName?.trim()?.ifEmpty { null },
-                        enabled = enabled,
                     ),
                 )
             }.onSuccess { _events.trySend(Event.ModelSaved) }

@@ -162,24 +162,25 @@ interface ModelDao {
     @Query("DELETE FROM models WHERE id = :id")
     suspend fun delete(id: Long)
 
-    @Query("UPDATE models SET enabled = :enabled WHERE id = :id")
-    suspend fun setEnabled(id: Long, enabled: Boolean)
+    /** 上游列表里没有了的发现项，按 id 批量删。 */
+    @Query("DELETE FROM models WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<Long>)
 
     @Query("UPDATE models SET lastSeenAt = :now WHERE id = :id")
     suspend fun touchLastSeen(id: Long, now: Long)
 
     /**
-     * "上游消失即停用"。
+     * "上游消失即删除"。
      *
      * **两个限定都不能少**（红线 30）：只动 `source = 'discovered'` 的行（手动录入的永不被
      * 自动同步改动，红线 13），且只动 `discoveredVia = 本轮查询的那个协议` 的行。
-     * 少了后者，只拉了 CHAT 列表就会把所有 ANTHROPIC 发现项一起停用。
+     * 少了后者，只拉了 CHAT 列表就会把所有 ANTHROPIC 发现项一起删掉。
      *
-     * 停用而不是删除：用户可能还想看到"这个模型上游下架了"，删了就没有这条信息（红线 13）。
+     * 删除而不是停用：没有启用状态，留着一条谁都不用的行只会让列表和计数说谎。
      */
     @Query(
         """
-        UPDATE models SET enabled = 0
+        DELETE FROM models
         WHERE providerId = :providerId
           AND source = 'discovered'
           AND discoveredVia = :protocol
@@ -187,7 +188,7 @@ interface ModelDao {
           AND modelId NOT IN (:seenModelIds)
         """,
     )
-    suspend fun disableVanished(providerId: Long, keyId: Long, protocol: String, seenModelIds: List<String>)
+    suspend fun deleteVanished(providerId: Long, keyId: Long, protocol: String, seenModelIds: List<String>)
 
     @Query(
         """
@@ -278,6 +279,10 @@ interface AuditLogDao {
 
     @Query("SELECT * FROM audit_log WHERE keyId = :keyId ORDER BY at DESC LIMIT :limit")
     fun observeByKey(keyId: Long, limit: Int): Flow<List<AuditLogEntity>>
+
+    /** 单条。日志详情页（网络报文明细）按 id 取，避免把整段报文塞进列表。 */
+    @Query("SELECT * FROM audit_log WHERE id = :id")
+    suspend fun findById(id: Long): AuditLogEntity?
 
     @Insert
     suspend fun insert(entry: AuditLogEntity): Long

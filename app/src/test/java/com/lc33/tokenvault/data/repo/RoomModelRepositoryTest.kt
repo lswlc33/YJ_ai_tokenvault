@@ -34,13 +34,12 @@ class RoomModelRepositoryTest {
         dao.rows.forEach { row ->
             assertEquals("discovered", row.source)
             assertEquals(row.protocol, row.discoveredVia)
-            assertTrue(row.enabled)
             assertEquals(now, row.lastSeenAt)
         }
     }
 
     @Test
-    fun `再次发现 touch 存在项并停用消失项`() = runTest {
+    fun `再次发现 touch 存在项并删掉消失项`() = runTest {
         val dao = FakeModelDao()
         val repository = repo(dao)
         repository.applyDiscovered(
@@ -58,13 +57,13 @@ class RoomModelRepositoryTest {
         )
 
         val rows = dao.rows.associateBy { it.modelId }
-        assertTrue(rows.getValue("gpt-5.6-sol").enabled)
+        assertEquals(1, dao.rows.size)
         assertEquals(now, rows.getValue("gpt-5.6-sol").lastSeenAt)
-        assertFalse(rows.getValue("gpt-4o").enabled)
+        assertFalse(rows.containsKey("gpt-4o"))
     }
 
     @Test
-    fun `手动模型与其它协议发现项不被停用`() = runTest {
+    fun `手动模型与其它协议发现项不被删除`() = runTest {
         val dao = FakeModelDao()
         val repository = repo(dao)
         repository.add(1, 10, "my-custom-model", Protocol.CHAT)
@@ -73,8 +72,7 @@ class RoomModelRepositoryTest {
         repository.applyDiscovered(1, 10, Protocol.CHAT, emptyList())
 
         val rows = dao.rows.associateBy { it.modelId }
-        assertTrue(rows.getValue("my-custom-model").enabled)
         assertEquals("manual", rows.getValue("my-custom-model").source)
-        assertTrue(rows.getValue("claude-opus-5").enabled)
+        assertTrue(rows.containsKey("claude-opus-5"))
     }
 }

@@ -51,7 +51,7 @@ object ProbePlanBuilder {
 
         for (provider in providers) {
             val keys = keysByProvider(provider.id)
-                .filter { it.enabled && it.settings.probe.enabled }
+                .filter { it.settings.probe.enabled }
             if (keys.isEmpty()) {
                 skippedProviders += provider
                 continue

@@ -96,12 +96,19 @@ class DashboardViewModel constructor(
         }
     }
 
-    /** 顶栏刷新：只查余额与供应商可达性延迟，不触发密钥检测或模型请求。 */
+    /**
+     * 顶栏刷新：一次把该发的都发出去——全量探测（密钥 L1/L2 + 开了自动获取的模型列表）、
+     * 官网连通性、余额。
+     *
+     * 三件事各跑各的 Job、互不阻塞；"跑完了没有"由 [ProbeEngine.roundResults] 统一告诉界面，
+     * 所以这里不返回、也不发提示（提示在 Shell 层收口，见 `VaultShell`）。
+     */
     fun refreshStatus() {
         viewModelScope.launch {
             probeEngine.refreshReachability()
             runCatching { balanceEngine.refreshAll() }
         }
+        probeEngine.start()
     }
 
     private fun Snapshot.balanceByProvider(): Map<Long, com.lc33.tokenvault.domain.model.BalanceSnapshot?> =
@@ -118,7 +125,7 @@ class DashboardViewModel constructor(
                 health = aggregateHealth(healths[summary.provider.id].orEmpty()),
                 balance = balances[summary.provider.id],
                 host = providerHostOf(providerKeys),
-                protocols = providerProtocolsOf(providerKeys),
+                balanceConfigured = balanceConfiguredOf(providerKeys),
             )
         }
     }

@@ -194,10 +194,14 @@ fun ManageScreen(
                     .padding(horizontal = tokens.screenPadding, vertical = tokens.itemSpacing),
                 onValueChange = onQueryChange,
             )
-            GroupFilterRow(
-                state = state,
-                onSelectGroup = onSelectGroup,
-            )
+            // 一个分组都没有时这一排只有「全部」一枚——筛不筛都一样，白白占一行。
+            // 用户建了第一个分组它才出现。
+            if (state.groups.size > 1) {
+                GroupFilterRow(
+                    state = state,
+                    onSelectGroup = onSelectGroup,
+                )
+            }
             ProviderList(
                 state = state,
                 scrollState = scrollState,

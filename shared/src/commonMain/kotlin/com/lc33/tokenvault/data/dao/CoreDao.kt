@@ -59,9 +59,9 @@ interface ProviderDao {
     @Query(
         """
         SELECT p.*,
-               (SELECT COUNT(*) FROM api_keys k WHERE k.providerId = p.id AND k.enabled = 1) AS keyCount,
-               (SELECT COUNT(*) FROM api_keys k WHERE k.providerId = p.id AND k.enabled = 1 AND k.health = 'ok') AS okKeyCount,
-               (SELECT COUNT(DISTINCT m.modelId) FROM models m WHERE m.providerId = p.id AND m.enabled = 1) AS modelCount,
+               (SELECT COUNT(*) FROM api_keys k WHERE k.providerId = p.id) AS keyCount,
+               (SELECT COUNT(*) FROM api_keys k WHERE k.providerId = p.id AND k.health = 'ok') AS okKeyCount,
+               (SELECT COUNT(DISTINCT m.modelId) FROM models m WHERE m.providerId = p.id) AS modelCount,
                (SELECT COUNT(*) FROM provider_accounts a WHERE a.providerId = p.id) AS accountCount
         FROM providers p
         ORDER BY p.pinned DESC, p.sortOrder, p.id
@@ -164,9 +164,6 @@ interface ApiKeyDao {
 
     @Query("UPDATE api_keys SET label = :label, note = :note, sortOrder = :sortOrder, updatedAt = :now WHERE id = :id")
     suspend fun updateMeta(id: Long, label: String, note: String, sortOrder: Int, now: Long)
-
-    @Query("UPDATE api_keys SET enabled = :enabled, updatedAt = :now WHERE id = :id")
-    suspend fun setEnabled(id: Long, enabled: Boolean, now: Long)
 
     @Query("DELETE FROM api_keys WHERE id = :id")
     suspend fun delete(id: Long)

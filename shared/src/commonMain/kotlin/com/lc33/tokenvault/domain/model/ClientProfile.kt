@@ -100,9 +100,11 @@ enum class LogCategory(val wireName: String) {
 /**
  * 一条日志。
  *
- * [message] 与 [detail] **入库前必须过 `Redactor.scrub`**（红线 32）。这一层不做脱敏——
- * 脱敏需要"当前会话已知的秘密"，而那是 `VaultSession` 的知识；放在这里会变成
- * "有时候脱敏了有时候没脱"。
+ * [message] / [detail] / 三个报文列**入库前都必须过 `Redactor.scrub`**（红线 32）。
+ * 这一层不做脱敏——脱敏需要"当前会话已知的秘密"，而那是 `VaultSession` 的知识；
+ * 放在这里会变成"有时候脱敏了有时候没脱"。
+ *
+ * 三个报文列只有 HTTP 类日志才有；有 [requestUrl] 的条目在日志页可以点开看完整报文。
  */
 data class AuditEntry(
     val id: Long = 0,
@@ -116,4 +118,12 @@ data class AuditEntry(
     val runId: Long? = null,
     val message: String,
     val detail: String? = null,
-)
+
+    /** 请求地址（已去掉 query 与 fragment）。null = 这条日志不是一次网络请求。 */
+    val requestUrl: String? = null,
+    val requestBody: String? = null,
+    val responseBody: String? = null,
+) {
+    /** 能不能点开看报文详情。 */
+    val hasRequestDetail: Boolean get() = requestUrl != null
+}

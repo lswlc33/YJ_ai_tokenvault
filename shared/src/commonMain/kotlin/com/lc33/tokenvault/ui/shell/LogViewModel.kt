@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -62,4 +63,20 @@ class LogViewModel constructor(
         const val RECENT_LIMIT = 500
         const val DAY_MILLIS = 24L * 60L * 60L * 1000L
     }
+}
+
+/**
+ * 一条日志的详情（网络报文明细）。
+ *
+ * 单独一个 ViewModel 而不是把报文塞进列表：一段 8KB 的响应体跟着列表流每帧比较，
+ * 100 条日志就是每帧比 800KB 文本。这里按 id 取一次，读完就完。
+ */
+class LogEntryViewModel constructor(
+    private val audit: AuditLogRepository,
+    private val entryId: Long,
+) : ViewModel() {
+
+    val entry: StateFlow<AuditEntry?> = flow {
+        emit(audit.findById(entryId))
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 }

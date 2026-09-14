@@ -39,6 +39,7 @@ import com.lc33.tokenvault.screens.settings.BalanceThresholdsScreen
 import com.lc33.tokenvault.screens.settings.ClientKeywordsScreen
 import com.lc33.tokenvault.screens.settings.DataScreen
 import com.lc33.tokenvault.screens.settings.LicensesScreen
+import com.lc33.tokenvault.screens.settings.LogDetailScreen
 import com.lc33.tokenvault.screens.settings.LogScreen
 import com.lc33.tokenvault.screens.settings.ProbeSettingsScreen
 import com.lc33.tokenvault.screens.settings.ProfileEditorScreen
@@ -84,7 +85,7 @@ import tokenvault.shared.generated.resources.feedback_imported
 import tokenvault.shared.generated.resources.feedback_key_saved
 import tokenvault.shared.generated.resources.feedback_logs_cleared
 import tokenvault.shared.generated.resources.feedback_model_probed
-import tokenvault.shared.generated.resources.feedback_models_refreshed
+import tokenvault.shared.generated.resources.feedback_models_refreshing
 import tokenvault.shared.generated.resources.feedback_pin_changed
 import tokenvault.shared.generated.resources.feedback_probe_cancelled
 import tokenvault.shared.generated.resources.feedback_probe_started
@@ -93,7 +94,6 @@ import tokenvault.shared.generated.resources.feedback_probe_results_cleared
 import tokenvault.shared.generated.resources.feedback_probe_retried
 import tokenvault.shared.generated.resources.feedback_profile_saved
 import tokenvault.shared.generated.resources.feedback_provider_saved
-import tokenvault.shared.generated.resources.feedback_status_refreshed
 import tokenvault.shared.generated.resources.feedback_undone
 import tokenvault.shared.generated.resources.feedback_undo_failed
 import tokenvault.shared.generated.resources.editor_group_none
@@ -173,7 +173,6 @@ fun VaultNavHost(
             val probeStarted = stringResource(Res.string.feedback_probe_started)
             val probeCancelled = stringResource(Res.string.feedback_probe_cancelled)
             val balanceRefreshed = stringResource(Res.string.feedback_balance_refreshed)
-            val statusRefreshed = stringResource(Res.string.feedback_status_refreshed)
             DashboardScreen(
                 state = dashboard,
                 // 总览与管理的入口是「切到管理的某一页」，不是往栈上压一条管理路由：
@@ -193,7 +192,7 @@ fun VaultNavHost(
                 },
                 onRefreshStatus = {
                     vm.refreshStatus()
-                    feedback?.post(AppFeedback(statusRefreshed))
+                    feedback?.post(AppFeedback(probeStarted))
                 },
             )
         }
@@ -212,7 +211,7 @@ fun VaultNavHost(
             val groupAdded = stringResource(Res.string.feedback_group_added)
             val groupRenamed = stringResource(Res.string.feedback_group_renamed)
             val groupDeleted = stringResource(Res.string.feedback_group_deleted)
-            val statusRefreshed = stringResource(Res.string.feedback_status_refreshed)
+            val probeStarted = stringResource(Res.string.feedback_probe_started)
             LaunchedEffect(vm) {
                 vm.events.collect { event ->
                     when (event) {
@@ -244,7 +243,7 @@ fun VaultNavHost(
                 onNewProvider = { navigate(ProviderEditorRoute()) },
                 onRefreshStatus = {
                     vm.refreshStatus()
-                    feedback?.post(AppFeedback(statusRefreshed))
+                    feedback?.post(AppFeedback(probeStarted))
                 },
                 onQueryChange = vm::onQueryChange,
                 onEnterSelection = vm::enterSelection,
@@ -294,8 +293,8 @@ fun VaultNavHost(
                 val copied = stringResource(Res.string.feedback_copied)
                 val modelSaved = stringResource(Res.string.feedback_model_saved)
                 val accountSaved = stringResource(Res.string.feedback_account_saved)
-                val balanceRefreshed = stringResource(Res.string.feedback_balance_refreshed)
-                val modelsRefreshed = stringResource(Res.string.feedback_models_refreshed)
+                val probeStarted = stringResource(Res.string.feedback_probe_started)
+                val modelsRefreshing = stringResource(Res.string.feedback_models_refreshing)
                 LaunchedEffect(vm) {
                     vm.events.collect { event ->
                         // 删除留当前页（不像删密钥要退出页面），所以只投提示；
@@ -314,11 +313,8 @@ fun VaultNavHost(
                             ProviderDetailViewModel.Event.AccountSaved -> {
                                 feedback?.post(AppFeedback(accountSaved)); return@collect
                             }
-                            ProviderDetailViewModel.Event.BalanceRefreshed -> {
-                                feedback?.post(AppFeedback(balanceRefreshed)); return@collect
-                            }
-                            ProviderDetailViewModel.Event.ModelsRefreshed -> {
-                                feedback?.post(AppFeedback(modelsRefreshed)); return@collect
+                            ProviderDetailViewModel.Event.Probed -> {
+                                feedback?.post(AppFeedback(probeStarted)); return@collect
                             }
                         }
                         feedback?.post(
@@ -348,8 +344,11 @@ fun VaultNavHost(
                             onCurlImport = { navigate(ImportRoute(route.id)) },
                             onManualAddKey = { navigate(KeyEditorRoute(route.id, 0L)) },
                             onOpenKey = { keyId -> navigate(KeyDetailRoute(route.id, keyId)) },
-                            onRefreshBalance = vm::refreshBalance,
-                            onRefreshKeyModels = { keyId -> vm.refreshModels(keyId) },
+                            onProbeAll = vm::probeAll,
+                            onRefreshKeyModels = { keyId ->
+                                vm.refreshModels(keyId)
+                                feedback?.post(AppFeedback(modelsRefreshing))
+                            },
                             onAddModel = vm::onAddModel,
                             onUpdateModel = vm::onUpdateModel,
                             onDeleteModel = vm::onDeleteModel,
@@ -381,7 +380,7 @@ fun VaultNavHost(
                 val undoLabel = stringResource(Res.string.common_undo)
                 val copied = stringResource(Res.string.feedback_copied)
                 val keyProbed = stringResource(Res.string.feedback_probe_key_sent)
-                val modelsRefreshed = stringResource(Res.string.feedback_models_refreshed)
+                val modelsRefreshing = stringResource(Res.string.feedback_models_refreshing)
                 val modelProbed = stringResource(Res.string.feedback_model_probed)
                 LaunchedEffect(vm) {
                     vm.events.collect { event ->
@@ -406,6 +405,8 @@ fun VaultNavHost(
                             }
                             KeyDetailViewModel.Event.Copied ->
                                 feedback?.post(AppFeedback(copied))
+                            KeyDetailViewModel.Event.Probed ->
+                                feedback?.post(AppFeedback(keyProbed))
                         }
                     }
                 }
@@ -421,17 +422,14 @@ fun VaultNavHost(
                             onReveal = vm::reveal,
                             onCopyRevealed = { vm.copyRevealed(keyClipboardLabel) },
                             onCloseReveal = vm::closeReveal,
-                            onProbe = {
-                                vm.probeKey()
-                                feedback?.post(AppFeedback(keyProbed))
-                            },
+                            onProbe = vm::probeKey,
                             onProbeModel = { modelId, protocol ->
                                 vm.probeModel(modelId, protocol)
                                 feedback?.post(AppFeedback(modelProbed))
                             },
                             onRefreshModels = {
                                 vm.refreshModels()
-                                feedback?.post(AppFeedback(modelsRefreshed))
+                                feedback?.post(AppFeedback(modelsRefreshing))
                             },
                             onMoveUp = vm::moveUp,
                             onMoveDown = vm::moveDown,
@@ -658,7 +656,10 @@ fun VaultNavHost(
                 }
             }
             LaunchedEffect(vm) { vm.deleted.collect { back() } }
-            if (loaded) {
+            // 同 ProviderEditorRoute：载入前给占位，否则推入动画期间这一页是空的。
+            if (!loaded) {
+                LoadingState(Modifier.fillMaxSize())
+            } else {
                 ProfileEditorScreen(
                     initial = profile,
                     onBack = back,
@@ -705,6 +706,7 @@ fun VaultNavHost(
                 retention = retention,
                 onLevelFilterChange = vm::setLevelFilter,
                 onRetentionChange = vm::setRetention,
+                onOpenEntry = { id -> navigate(LogEntryRoute(id)) },
                 onClear = {
                     vm.clear()
                     feedback?.post(AppFeedback(logsCleared))
@@ -712,6 +714,11 @@ fun VaultNavHost(
                 onBack = back,
             )
         }
+            is LogEntryRoute -> {
+                val vm: LogEntryViewModel = koinViewModel(parameters = { parametersOf(route.id) })
+                val entry by vm.entry.collectAsStateWithLifecycle()
+                LogDetailScreen(entry = entry, onBack = back)
+            }
             is SyncRoute -> {
             val vm: SyncViewModel = koinViewModel()
             SyncRouteContent(
@@ -750,7 +757,11 @@ fun VaultNavHost(
                 }
             }
             val ungrouped = stringResource(Res.string.editor_group_none)
-            if (loaded) {
+            // 载入前必须占位，不能什么都不画：推入动画期间这一页是**空的**，
+            // 于是动画看起来"丢了"——上一页滑走、下一页内容直接跳出来。
+            if (!loaded) {
+                LoadingState(Modifier.fillMaxSize())
+            } else {
                 ProviderEditorScreen(
                     draft = draft,
                     groupNames = listOf(ungrouped) + groups.map { it.name },

@@ -119,7 +119,6 @@ import tokenvault.shared.generated.resources.editor_section_client
 import tokenvault.shared.generated.resources.editor_section_endpoint
 import tokenvault.shared.generated.resources.editor_timeout
 import tokenvault.shared.generated.resources.editor_timeout_hint
-import tokenvault.shared.generated.resources.key_enabled
 import tokenvault.shared.generated.resources.key_settings_title
 import tokenvault.shared.generated.resources.settings_profiles
 
@@ -136,7 +135,7 @@ fun KeyEditorScreen(
     onChange: (KeyDraft) -> Unit,
     onBaseUrlChange: () -> Unit,
     onAddModel: (String, Protocol) -> Unit,
-    onUpdateModel: (Long, String, Protocol, String?, Boolean) -> Unit,
+    onUpdateModel: (Long, String, Protocol, String?) -> Unit,
     onDeleteModel: (Long) -> Unit,
     onRefreshModels: () -> Unit,
     onBack: () -> Unit,
@@ -254,16 +253,6 @@ fun KeyEditorScreen(
                     )
                 }
             }
-            item {
-                AppPreferenceGroup {
-                    AppSwitchRow(
-                        title = stringResource(Res.string.key_enabled),
-                        checked = draft.enabled,
-                        onCheckedChange = { onChange(draft.copy(enabled = it)) },
-                    )
-                }
-            }
-
             item { SectionTitle(text = stringResource(Res.string.editor_section_endpoint)) }
             item {
                 Column(
@@ -404,6 +393,7 @@ fun KeyEditorScreen(
                                 models.forEachIndexed { index, model ->
                                     ModelRow(
                                         row = model,
+                                        showProbe = draft.probeModelReachability,
                                         onClick = { editingModel = model },
                                     )
                                     if (index != models.lastIndex) AppDivider()
@@ -562,12 +552,12 @@ fun KeyEditorScreen(
             addModel = false
             editingModel = null
         },
-        onConfirm = { keyId, modelId, protocol, displayName, enabled ->
+        onConfirm = { keyId, modelId, protocol, displayName ->
             val editing = editingModel
             if (editing == null) {
                 onAddModel(modelId, protocol)
             } else {
-                onUpdateModel(editing.id, modelId, protocol, displayName, enabled)
+                onUpdateModel(editing.id, modelId, protocol, displayName)
             }
             addModel = false
             editingModel = null

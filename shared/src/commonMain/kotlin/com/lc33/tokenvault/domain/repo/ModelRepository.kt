@@ -16,6 +16,12 @@ interface ModelRepository {
     fun observeByProvider(providerId: Long): Flow<List<AiModel>>
 
     /**
+     * 全部模型。列表页与仪表盘的协议 chip 要用它算「这家实际在跑哪些协议」——
+     * 按家各查一次是 N+1，而这批数据本来就不大。
+     */
+    fun observeAll(): Flow<List<AiModel>>
+
+    /**
      * 新增一条手动录入的模型（`source = MANUAL`，`discoveredVia = null`）。
      *
      * @param needsReview 疑似显示名而非真实 id（`DeepSeek V4 Pro` 这种，§11.2）。
@@ -31,7 +37,7 @@ interface ModelRepository {
 
     /**
      * 应用一次成功的模型列表拉取。`modelIds` 为空表示这把 Key 在当前协议下没有模型，
-     * 因此同 Key、同协议的 discovered 行会被停用；解析失败时调用方不应调用本方法。
+     * 因此同 Key、同协议的 discovered 行会被删除；解析失败时调用方不应调用本方法。
      */
     suspend fun applyDiscovered(
         providerId: Long,

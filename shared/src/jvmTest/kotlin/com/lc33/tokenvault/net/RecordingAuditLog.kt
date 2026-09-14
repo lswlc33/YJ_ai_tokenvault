@@ -20,6 +20,9 @@ class RecordingAuditLog : AuditLogRepository {
         val category: LogCategory,
         val message: String,
         val detail: String?,
+        val requestUrl: String? = null,
+        val requestBody: String? = null,
+        val responseBody: String? = null,
     )
 
     val records = mutableListOf<Recorded>()
@@ -31,9 +34,14 @@ class RecordingAuditLog : AuditLogRepository {
         detail: String?,
         providerId: Long?,
         keyId: Long?,
+        requestUrl: String?,
+        requestBody: String?,
+        responseBody: String?,
     ) {
-        records += Recorded(level, category, message, detail)
+        records += Recorded(level, category, message, detail, requestUrl, requestBody, responseBody)
     }
+
+    override suspend fun findById(id: Long): AuditEntry? = null
 
     override fun observeRecent(limit: Int, minLevel: LogLevel): Flow<List<AuditEntry>> =
         flowOf(emptyList())

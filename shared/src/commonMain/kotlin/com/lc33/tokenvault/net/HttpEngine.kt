@@ -86,16 +86,20 @@ class HttpEngine(
                 }
             }
             val latencyMs = clockMillis() - started
+            val responseBody = response.bodyAsText()
             record(
                 level = if (response.status.value in 200..299) LogLevel.INFO else LogLevel.WARN,
                 category = LogCategory.HTTP,
                 message = "http ${request.method} ${safeTarget(request.url)} -> ${response.status.value}",
                 detail = "latency=${latencyMs}ms",
+                requestUrl = safeTarget(request.url),
+                requestBody = request.body,
+                responseBody = responseBody,
             )
             ProbeResponse(
                 status = response.status.value,
                 headers = response.headers.entries().associate { it.key to it.value.joinToString(", ") },
-                body = response.bodyAsText(),
+                body = responseBody,
                 latencyMs = latencyMs,
             )
         } catch (cancelled: CancellationException) {
@@ -107,6 +111,9 @@ class HttpEngine(
                 category = LogCategory.HTTP,
                 message = "http ${request.method} ${safeTarget(request.url)} failed",
                 detail = t::class.simpleName,
+                requestUrl = safeTarget(request.url),
+                requestBody = request.body,
+                responseBody = t.message,
             )
             ProbeResponse(status = 0, error = t)
         }
@@ -117,11 +124,34 @@ class HttpEngine(
         category: LogCategory,
         message: String,
         detail: String? = null,
+        requestUrl: String? = null,
+        requestBody: String? = null,
+        responseBody: String? = null,
     ) {
-        runCatching { audit?.record(level = level, category = category, message = message, detail = detail) }
+        runCatching {
+            audit?.record(
+                level = level,
+                category = category,
+                message = message,
+                detail = detail,
+                // 报文入库前在仓库层统一过脱敏（红线 32）；这里只做长度截断——
+                // 模型列表这类响应几十 KB，整段进库会把日志表撑爆。
+                requestUrl = requestUrl,
+                requestBody = requestBody?.truncateBody(),
+                responseBody = responseBody?.truncateBody(),
+            )
+        }
     }
 
-    /** 日志里只放脱敏目标；query/fragment/header/body 永不进入日志。 */
+    /** 超长报文截断：留个头尾，够定位问题；**中间省略**而不是直接砍掉尾巴。 */
+    private fun String.truncateBody(): String =
+        if (length <= MAX_BODY_CHARS) {
+            this
+        } else {
+            take(MAX_BODY_CHARS / 2) + TRUNCATED_MARK + takeLast(MAX_BODY_CHARS / 2)
+        }
+
+    /** 日志里的目标地址：**去掉 query 与 fragment**，只留 scheme + host + path。 */
     private fun safeTarget(url: String): String {
         val base = url.substringBefore('?').substringBefore('#')
         val schemeEnd = base.indexOf("://").let { if (it < 0) 0 else it + 3 }
@@ -146,6 +176,14 @@ class HttpEngine(
     companion object {
         /** M5 阶段的默认 UA；M6 起由客户端预设（HeaderAssembler）提供。 */
         const val DEFAULT_USER_AGENT = "YuanJi/0.1.0 (Android)"
+
+        /**
+         * 单段报文的落库上限。模型列表能到几十 KB，整段进库会把日志表撑爆。
+         * 截断标记用英文：日志正文（`message` / `detail`）本来就是 `http GET …` 这类
+         * 技术英文，界面文案才走资源。
+         */
+        const val MAX_BODY_CHARS = 8_000
+        private const val TRUNCATED_MARK = "\n… [truncated] …\n"
     }
 }
 

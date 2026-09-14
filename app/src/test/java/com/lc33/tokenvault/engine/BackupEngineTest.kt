@@ -119,7 +119,14 @@ class BackupEngineTest {
                 detail: String?,
                 providerId: Long?,
                 keyId: Long?,
+                requestUrl: String?,
+                requestBody: String?,
+                responseBody: String?,
             ) = Unit
+
+            override suspend fun findById(
+                id: Long,
+            ): com.lc33.tokenvault.domain.model.AuditEntry? = null
 
             override fun observeRecent(
                 limit: Int,

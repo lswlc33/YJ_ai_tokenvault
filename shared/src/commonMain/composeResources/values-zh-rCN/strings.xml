@@ -77,7 +77,6 @@
     <string name="manage_default_key">默认</string>
     <string name="manage_source_manual">手动</string>
     <string name="manage_source_discovered">发现</string>
-    <string name="manage_disabled">已停用</string>
     <string name="manage_local_only">仅本地记录</string>
     <string name="manage_keys_ratio">%1$d / %2$d 张可用</string>
     <string name="manage_models_count">%1$d 个模型</string>
@@ -280,6 +279,11 @@
     <string name="log_clear_confirm_title">清空全部日志？</string>
     <string name="log_clear_confirm_body">日志记录将无法恢复，数据和设置不受影响。</string>
     <string name="log_title">日志</string>
+    <string name="log_detail_title">请求预览</string>
+    <string name="log_detail_request_url">请求地址</string>
+    <string name="log_detail_response_body">返回体</string>
+    <string name="log_detail_request_body">请求体</string>
+    <string name="log_detail_body_empty">（没有内容）</string>
     <string name="log_empty_title">还没有记录</string>
     <string name="log_empty">探测、余额、备份、网络请求与数据变更记录都会显示在这里，写入前已脱敏。</string>
 
@@ -566,6 +570,7 @@
 
     <!-- ==================== M1 锁闸：引导、解锁 ==================== -->
     <string name="dialog_cancel">取消</string>
+    <string name="common_close">关闭</string>
 
     <!-- Snackbar 提示。每条都带关闭按钮；只有删除才多一个「撤销」action。 -->
     <string name="common_undo">撤销</string>
@@ -579,6 +584,11 @@
     <string name="feedback_account_saved">账号已保存</string>
     <string name="feedback_probe_key_sent">正在探测该密钥…</string>
     <string name="feedback_probe_started">已开始探测</string>
+    <string name="feedback_probe_all_ok">探测完成，全部成功</string>
+    <string name="feedback_probe_has_failure">探测完成，有失败项，详见日志</string>
+    <string name="feedback_probe_nothing">没有可探测的项目</string>
+    <string name="feedback_models_refresh_failed">模型列表刷新失败</string>
+    <string name="feedback_models_refreshing">正在刷新模型列表…</string>
     <string name="feedback_model_saved">模型已保存</string>
     <string name="feedback_group_added">分组已添加</string>
     <string name="feedback_group_renamed">分组已重命名</string>
@@ -592,7 +602,6 @@
     <string name="feedback_clipboard_empty">剪贴板为空</string>
     <string name="feedback_probe_cancelled">已取消探测</string>
     <string name="feedback_balance_refreshed">余额已刷新</string>
-    <string name="feedback_status_refreshed">状态已刷新</string>
     <string name="feedback_models_refreshed">模型列表已刷新</string>
     <string name="feedback_model_probed">已探测该模型</string>
     <string name="feedback_probe_retried">正在重试失败项</string>
@@ -672,7 +681,7 @@
     <string name="detail_account_password">密码</string>
     <string name="detail_balance_refresh">查余额</string>
     <string name="detail_probe_provider">探测这一家</string>
-    <string name="detail_key_view">查看</string>
+    <string name="detail_key_view">查看密钥</string>
     <string name="detail_key_connection_base_url">Base URL</string>
     <string name="detail_key_connection_protocol">协议</string>
     <string name="detail_key_connection_auth">鉴权风格</string>
@@ -687,7 +696,7 @@
     <string name="detail_key_more_cd">更多操作</string>
     <string name="detail_probe_key">探测这把密钥</string>
     <string name="detail_probe_model_cd">探测这个模型</string>
-    <string name="detail_provider_balance_total">供应商余额合计</string>
+    <string name="detail_provider_balance_total">余额合计</string>
     <string name="detail_key_balance_value">本 Key：%1$s %2$s</string>
     <string name="protocol_chat">Chat</string>
     <string name="protocol_responses">Responses</string>
@@ -711,11 +720,16 @@
     <string name="detail_model_id">模型 ID</string>
     <string name="detail_model_display_name">显示名称</string>
     <string name="detail_model_protocol">协议</string>
-    <string name="detail_model_enabled">启用</string>
     <string name="detail_model_delete">删掉这个模型？</string>
     <string name="detail_model_delete_action">删除模型</string>
     <string name="detail_models_quick_hint">长按模型可发送一次简短请求。</string>
-    <string name="detail_reachability_latency">供应商延迟：%1$d ms</string>
+    <string name="detail_models_count_auto">共 %1$d 个（自动获取）</string>
+    <string name="detail_models_count_manual">共 %1$d 个</string>
+    <string name="detail_reachability_latency">%1$d 毫秒</string>
+    <string name="detail_key_full_content">密钥完整内容</string>
+    <string name="detail_models_count_short">%1$d 个</string>
+    <string name="detail_models_expand_cd">展开模型</string>
+    <string name="detail_models_collapse_cd">收起模型</string>
     <string name="detail_account_login_methods">登录方式</string>
     <string name="detail_add_account">添加账号</string>
     <string name="login_method_password">密码登录</string>
@@ -726,6 +740,8 @@
     <string name="login_method_github">GitHub</string>
     <string name="login_method_linuxdo">LINUX DO</string>
     <string name="refresh_status_cd">刷新余额和供应商延迟</string>
+    <string name="probe_provider_cd">一键探测这家</string>
+    <string name="detail_balance_not_checked">还没有查询过</string>
 
     <!-- 探测默认值。 -->
     <string name="editor_probe_model_reachability">模型可达性探测（快捷）</string>
@@ -741,7 +757,6 @@
     <string name="about_open_source_summary">查看本应用包含的开源组件及其许可证。</string>
     <string name="key_sort_up">上移</string>
     <string name="key_sort_down">下移</string>
-    <string name="key_enabled">启用</string>
     <string name="key_settings_title">密钥设置</string>    <string name="licenses_title">开放源代码许可</string>
     <string name="licenses_intro">本应用包含的开源组件及其许可证。</string>
     <string name="licenses_copyright_label">版权</string>

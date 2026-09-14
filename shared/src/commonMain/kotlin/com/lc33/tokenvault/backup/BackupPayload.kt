@@ -120,7 +120,6 @@ data class BackupApiKey(
     val note: String = "",
     val secret: String,
     val isDefault: Boolean = false,
-    val enabled: Boolean = true,
     val sortOrder: Int = 0,
     val settings: BackupKeySettings? = null,
 )
@@ -152,7 +151,6 @@ data class BackupModel(
     val displayName: String? = null,
     val source: String = "manual",
     val discoveredVia: String? = null,
-    val enabled: Boolean = true,
     val favorite: Boolean = false,
     val needsReview: Boolean = false,
     val catalogKey: String? = null,

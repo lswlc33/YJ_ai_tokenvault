@@ -63,7 +63,7 @@ abstract class VaultDatabase : RoomDatabase() {
     abstract fun appSettingDao(): AppSettingDao
 
     companion object {
-        const val VERSION = 4
+        const val VERSION = 6
         const val FILE_NAME = "vault.db"
 
         val MIGRATION_1_2: Migration = object : Migration(1, 2) {
@@ -332,6 +332,150 @@ abstract class VaultDatabase : RoomDatabase() {
                     "ALTER TABLE key_settings ADD COLUMN probeQuickModel INTEGER NOT NULL DEFAULT 0",
                 )
                 connection.execSQL("UPDATE key_settings SET probeQuickModel = probeModelReachability")
+            }
+        }
+
+        /**
+         * v5：去掉 Key 与模型的启用状态。
+         *
+         * 「不想用了」和「删掉」是同一件事：留着一个谁都不用的开关，只会让列表、计数与
+         * 探测计划在同一个问题上各说各话。所以两张表都去掉 `enabled` 列。
+         *
+         * 旧数据里 `enabled = 0` 的行**不删**，只是不再有这层含义——它们会重新参与探测与展示。
+         * 迁移里删用户数据是不可接受的：真不要了，用户自己在列表里删。
+         *
+         * minSdk 33 的 SQLite 没有 `ALTER TABLE ... DROP COLUMN`（3.35 才有），
+         * 所以照 v3 的做法重建两张表。
+         */
+        val MIGRATION_4_5: Migration = object : Migration(4, 5) {
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL("PRAGMA foreign_keys = OFF")
+
+                // 1) api_keys：去掉 enabled。
+                connection.execSQL(
+                    """
+                    CREATE TABLE api_keys_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        providerId INTEGER NOT NULL,
+                        label TEXT NOT NULL,
+                        note TEXT NOT NULL,
+                        secretEnc BLOB NOT NULL,
+                        fingerprint TEXT NOT NULL,
+                        health TEXT NOT NULL,
+                        lastOutcome TEXT NOT NULL,
+                        healthDetail TEXT,
+                        httpStatus INTEGER,
+                        latencyMs INTEGER,
+                        checkedAt INTEGER,
+                        okAt INTEGER,
+                        balanceAmount REAL,
+                        balanceUsed REAL,
+                        balanceCurrency TEXT,
+                        balanceRaw TEXT,
+                        balanceCheckedAt INTEGER,
+                        balanceError TEXT,
+                        sortOrder INTEGER NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        FOREIGN KEY(providerId) REFERENCES providers(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                connection.execSQL(
+                    """
+                    INSERT INTO api_keys_new (
+                        id, providerId, label, note, secretEnc, fingerprint, health,
+                        lastOutcome, healthDetail, httpStatus, latencyMs, checkedAt, okAt,
+                        balanceAmount, balanceUsed, balanceCurrency, balanceRaw,
+                        balanceCheckedAt, balanceError, sortOrder, createdAt, updatedAt
+                    )
+                    SELECT
+                        id, providerId, label, note, secretEnc, fingerprint, health,
+                        lastOutcome, healthDetail, httpStatus, latencyMs, checkedAt, okAt,
+                        balanceAmount, balanceUsed, balanceCurrency, balanceRaw,
+                        balanceCheckedAt, balanceError, sortOrder, createdAt, updatedAt
+                    FROM api_keys
+                    """.trimIndent(),
+                )
+                connection.execSQL("DROP TABLE api_keys")
+                connection.execSQL("ALTER TABLE api_keys_new RENAME TO api_keys")
+                connection.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_api_keys_providerId_sortOrder_id " +
+                        "ON api_keys(providerId, sortOrder, id)",
+                )
+                connection.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_api_keys_providerId_fingerprint " +
+                        "ON api_keys(providerId, fingerprint)",
+                )
+
+                // 2) models：去掉 enabled。
+                connection.execSQL(
+                    """
+                    CREATE TABLE models_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        providerId INTEGER NOT NULL,
+                        keyId INTEGER,
+                        modelId TEXT NOT NULL,
+                        protocol TEXT NOT NULL,
+                        displayName TEXT,
+                        source TEXT NOT NULL,
+                        discoveredVia TEXT,
+                        favorite INTEGER NOT NULL,
+                        needsReview INTEGER NOT NULL,
+                        catalogKey TEXT,
+                        probeState TEXT NOT NULL,
+                        lastOutcome TEXT NOT NULL,
+                        probeDetail TEXT,
+                        latencyMs INTEGER,
+                        probedAt INTEGER,
+                        firstSeenAt INTEGER NOT NULL,
+                        lastSeenAt INTEGER,
+                        sortOrder INTEGER NOT NULL,
+                        FOREIGN KEY(providerId) REFERENCES providers(id) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(keyId) REFERENCES api_keys(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                connection.execSQL(
+                    """
+                    INSERT INTO models_new (
+                        id, providerId, keyId, modelId, protocol, displayName, source,
+                        discoveredVia, favorite, needsReview, catalogKey, probeState,
+                        lastOutcome, probeDetail, latencyMs, probedAt, firstSeenAt,
+                        lastSeenAt, sortOrder
+                    )
+                    SELECT
+                        id, providerId, keyId, modelId, protocol, displayName, source,
+                        discoveredVia, favorite, needsReview, catalogKey, probeState,
+                        lastOutcome, probeDetail, latencyMs, probedAt, firstSeenAt,
+                        lastSeenAt, sortOrder
+                    FROM models
+                    """.trimIndent(),
+                )
+                connection.execSQL("DROP TABLE models")
+                connection.execSQL("ALTER TABLE models_new RENAME TO models")
+                connection.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_models_providerId_keyId_modelId_protocol " +
+                        "ON models(providerId, keyId, modelId, protocol)",
+                )
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_models_keyId ON models(keyId)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_models_catalogKey ON models(catalogKey)")
+
+                connection.execSQL("PRAGMA foreign_keys = ON")
+            }
+        }
+
+        /**
+         * v6：日志带上网络报文明细。
+         *
+         * 三列都是可空的、只给 HTTP 类日志填，所以是三条 `ADD COLUMN`——不必重建表
+         * （重建会连索引一起重来，而这次没有任何列要删或要改类型）。
+         */
+        val MIGRATION_5_6: Migration = object : Migration(5, 6) {
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL("ALTER TABLE audit_log ADD COLUMN requestUrl TEXT")
+                connection.execSQL("ALTER TABLE audit_log ADD COLUMN requestBody TEXT")
+                connection.execSQL("ALTER TABLE audit_log ADD COLUMN responseBody TEXT")
             }
         }
     }

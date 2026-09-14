@@ -12,15 +12,24 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lc33.tokenvault.domain.model.PredictiveBackExitDirection
 import com.lc33.tokenvault.domain.model.PredictiveBackStyle
+import com.lc33.tokenvault.engine.ProbeEngine
+import com.lc33.tokenvault.ui.miuix.AppFeedback
 import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.platform.Haptics
 import com.lc33.tokenvault.platform.PlatformBackHandler
 import tokenvault.shared.generated.resources.Res
+import tokenvault.shared.generated.resources.feedback_models_refresh_failed
+import tokenvault.shared.generated.resources.feedback_models_refreshed
+import tokenvault.shared.generated.resources.feedback_probe_all_ok
+import tokenvault.shared.generated.resources.feedback_probe_has_failure
+import tokenvault.shared.generated.resources.feedback_probe_nothing
 import tokenvault.shared.generated.resources.nav_dashboard
 import tokenvault.shared.generated.resources.nav_manage
 import tokenvault.shared.generated.resources.nav_settings
@@ -62,6 +71,36 @@ fun VaultShell() {
     // 底栏模糊：backdrop 捕获内容区，NavigationBar 挂 textureBlur。开关关掉时
     // textureBlur(enabled=false) 直接跳过模糊、内容照常画，所以 backdrop 始终创建无妨。
     val backdrop = rememberAppLayerBackdrop()
+
+    // 探测与刷新都是"发起即返回"的异步动作：点下去先给一条"已开始"，跑完再由引擎回一条
+    // 结果。**两处都在 Shell 级说**，页面只负责发"开始"那一条——否则每个页面各写一套，
+    // 迟早有页面只发开始不发结果，用户看到的就是"点了没反应"。
+    val probeEngine: ProbeEngine = koinInject()
+    val probeAllOk = stringResource(Res.string.feedback_probe_all_ok)
+    val probeHasFailure = stringResource(Res.string.feedback_probe_has_failure)
+    val probeNothing = stringResource(Res.string.feedback_probe_nothing)
+    val modelsRefreshed = stringResource(Res.string.feedback_models_refreshed)
+    val modelsRefreshFailed = stringResource(Res.string.feedback_models_refresh_failed)
+    LaunchedEffect(probeEngine) {
+        launch {
+            probeEngine.roundResults.collect { result ->
+                val message = when {
+                    result.cancelled -> null
+                    result.total == 0 -> probeNothing
+                    result.fail == 0 -> probeAllOk
+                    else -> probeHasFailure
+                }
+                message?.let { feedback?.post(AppFeedback(it)) }
+            }
+        }
+        launch {
+            probeEngine.modelResults.collect { result ->
+                feedback?.post(
+                    AppFeedback(if (result.failed) modelsRefreshFailed else modelsRefreshed),
+                )
+            }
+        }
+    }
 
     val items = listOf(
         AppNavBarItem(label = stringResource(Res.string.nav_dashboard), icon = AppIcon.Dashboard),

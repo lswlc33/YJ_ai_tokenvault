@@ -150,9 +150,9 @@ class ManageViewModel constructor(
                 health = aggregateHealth(healths[summary.provider.id].orEmpty()),
                 balance = balances[summary.provider.id],
                 host = providerHostOf(providerKeys),
-                protocols = providerProtocolsOf(providerKeys),
                 keys = providerKeys.map { it.toRow(SecretMask.ELLIPSIS) },
                 lastProbeAt = lastProbeByProvider[summary.provider.id],
+                balanceConfigured = balanceConfiguredOf(providerKeys),
             )
         }
         // 搜索 → 排序，都发生在内存里（红线 10：数据从 Flow 来，不回数据层重查）。
@@ -168,12 +168,16 @@ class ManageViewModel constructor(
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), ManageUiState(loading = true))
 
-    /** 顶栏刷新：只更新余额与供应商可达性延迟，不碰密钥与模型探测。 */
+    /**
+     * 顶栏刷新：发起一次全量探测（密钥 L1/L2 + 开了自动获取的模型列表）+ 官网连通性 + 余额。
+     * "跑完了没有"由 [ProbeEngine.roundResults] 统一告诉界面，提示在 Shell 层收口。
+     */
     fun refreshStatus() {
         viewModelScope.launch {
             probeEngine.refreshReachability()
             runCatching { balanceEngine.refreshAll() }
         }
+        probeEngine.start()
     }
 
     fun onSelectGroup(id: Long?) {

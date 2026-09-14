@@ -271,9 +271,6 @@ internal class FakeApiKeyDao(
     override suspend fun updateMeta(id: Long, label: String, note: String, sortOrder: Int, now: Long) =
         replace(id) { it.copy(label = label, note = note, sortOrder = sortOrder, updatedAt = now) }
 
-    override suspend fun setEnabled(id: Long, enabled: Boolean, now: Long) =
-        replace(id) { it.copy(enabled = enabled, updatedAt = now) }
-
     override suspend fun delete(id: Long) {
         store.removeAll { it.id == id }
         settingsDao.delete(id)
@@ -521,25 +518,24 @@ internal class FakeModelDao : ModelDao {
         revision.value++
     }
 
-    override suspend fun setEnabled(id: Long, enabled: Boolean) =
-        replace(id) { it.copy(enabled = enabled) }
+    override suspend fun deleteByIds(ids: List<Long>) {
+        store.removeAll { it.id in ids }
+        revision.value++
+    }
 
     override suspend fun touchLastSeen(id: Long, now: Long) =
         replace(id) { it.copy(lastSeenAt = now) }
 
-    override suspend fun disableVanished(
+    override suspend fun deleteVanished(
         providerId: Long,
         keyId: Long,
         protocol: String,
         seenModelIds: List<String>,
     ) {
-        store.indices
-            .filter {
-                val m = store[it]
-                m.providerId == providerId && m.keyId == keyId && m.source == "discovered" &&
-                    m.discoveredVia == protocol && m.modelId !in seenModelIds
-            }
-            .forEach { store[it] = store[it].copy(enabled = false) }
+        store.removeAll { m ->
+            m.providerId == providerId && m.keyId == keyId && m.source == "discovered" &&
+                m.discoveredVia == protocol && m.modelId !in seenModelIds
+        }
         revision.value++
     }
 
@@ -710,6 +706,8 @@ internal class FakeAuditLogDao : AuditLogDao {
 
     override fun observeByKey(keyId: Long, limit: Int): Flow<List<AuditLogEntity>> =
         revision.map { ordered(limit).filter { it.keyId == keyId } }
+
+    override suspend fun findById(id: Long): AuditLogEntity? = store.firstOrNull { it.id == id }
 
     override suspend fun insert(entry: AuditLogEntity): Long {
         val id = nextId++

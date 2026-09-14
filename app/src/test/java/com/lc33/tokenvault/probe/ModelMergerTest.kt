@@ -13,7 +13,7 @@ import org.junit.Test
  * 五个断言点：
  * - 新增：列表里有、库里没有 → 插入（discovered + 本协议）。
  * - 保留：两边都有 → touch lastSeenAt。
- * - 消失置停用：discovered + 本协议，但列表里没有 → 停用。
+ * - 消失即删除：discovered + 本协议，但列表里没有 → 删除。
  * - manual 行不动。
  * - **只查一个协议时不动其它协议的发现项**（红线 30）。
  */
@@ -46,7 +46,7 @@ class ModelMergerTest {
         )
         assertEquals(setOf("gpt-5.6-sol", "gpt-4o"), plan.toInsert.map { it.modelId }.toSet())
         assertTrue(plan.toTouch.isEmpty())
-        assertTrue(plan.toDisable.isEmpty())
+        assertTrue(plan.toDelete.isEmpty())
     }
 
     @Test
@@ -59,11 +59,11 @@ class ModelMergerTest {
         )
         assertEquals(listOf(1L), plan.toTouch)
         assertTrue(plan.toInsert.isEmpty())
-        assertTrue(plan.toDisable.isEmpty())
+        assertTrue(plan.toDelete.isEmpty())
     }
 
     @Test
-    fun `消失的 discovered 且本协议则停用`() {
+    fun `消失的 discovered 且本协议则删除`() {
         val a = model(1, "gpt-5.6-sol", source = ModelSource.DISCOVERED, discoveredVia = Protocol.CHAT)
         val b = model(2, "gpt-4o", source = ModelSource.DISCOVERED, discoveredVia = Protocol.CHAT)
         val plan = ModelMerger.merge(
@@ -71,18 +71,18 @@ class ModelMergerTest {
             fetched = listOf(fetched("gpt-5.6-sol")),
             thisProtocol = Protocol.CHAT,
         )
-        assertEquals(listOf(2L), plan.toDisable)
+        assertEquals(listOf(2L), plan.toDelete)
     }
 
     @Test
-    fun `manual 行永不被自动同步停用`() {
+    fun `manual 行永不被自动同步删除`() {
         val manual = model(1, "my-custom-model", source = ModelSource.MANUAL)
         val plan = ModelMerger.merge(
             existing = listOf(manual),
             fetched = emptyList(),
             thisProtocol = Protocol.CHAT,
         )
-        assertTrue(plan.toDisable.isEmpty())
+        assertTrue(plan.toDelete.isEmpty())
         assertTrue(plan.toInsert.isEmpty())
     }
 
@@ -95,8 +95,8 @@ class ModelMergerTest {
             fetched = emptyList(), // 本轮 CHAT 列表是空的（比如拉失败）
             thisProtocol = Protocol.CHAT,
         )
-        // 只停用 CHAT 的发现项，ANTHROPIC 的不动
-        assertEquals(listOf(1L), plan.toDisable)
+        // 只删 CHAT 的发现项，ANTHROPIC 的不动
+        assertEquals(listOf(1L), plan.toDelete)
     }
 
     @Test

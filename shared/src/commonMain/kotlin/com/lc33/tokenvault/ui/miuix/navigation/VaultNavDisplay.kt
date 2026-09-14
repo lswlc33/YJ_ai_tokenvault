@@ -44,6 +44,7 @@ import com.lc33.tokenvault.ui.shell.ImportRoute
 import com.lc33.tokenvault.ui.shell.KeyDetailRoute
 import com.lc33.tokenvault.ui.shell.KeyEditorRoute
 import com.lc33.tokenvault.ui.shell.LicensesRoute
+import com.lc33.tokenvault.ui.shell.LogEntryRoute
 import com.lc33.tokenvault.ui.shell.LogRoute
 import com.lc33.tokenvault.ui.shell.ManageRoute
 import com.lc33.tokenvault.ui.shell.ProfileEditorRoute
@@ -92,6 +93,7 @@ fun rememberVaultBackStack(): MutableList<VaultRoute> {
                     subclass(DataRoute::class)
                     subclass(LicensesRoute::class)
                     subclass(LogRoute::class)
+                    subclass(LogEntryRoute::class)
                     subclass(SyncRoute::class)
                     subclass(UpdateRoute::class)
                     subclass(AboutRoute::class)

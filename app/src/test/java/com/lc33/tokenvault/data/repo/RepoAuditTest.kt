@@ -102,9 +102,14 @@ class RepoAuditTest {
                 detail: String?,
                 providerId: Long?,
                 keyId: Long?,
+                requestUrl: String?,
+                requestBody: String?,
+                responseBody: String?,
             ) {
                 throw IllegalStateException("disk full")
             }
+
+            override suspend fun findById(id: Long): AuditEntry? = null
 
             override fun observeRecent(limit: Int, minLevel: LogLevel) = flowOf(emptyList<AuditEntry>())
 

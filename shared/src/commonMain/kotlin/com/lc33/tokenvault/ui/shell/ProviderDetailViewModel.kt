@@ -96,9 +96,8 @@ class ProviderDetailViewModel constructor(
         data object ModelSaved : Event
         data object AccountSaved : Event
 
-        /** 一次性动作已发出（结果本身由状态流回填）。 */
-        data object BalanceRefreshed : Event
-        data object ModelsRefreshed : Event
+        /** 一键探测已发出（官网 / 密钥 / 模型列表 / 余额）。结果本身由状态流回填。 */
+        data object Probed : Event
     }
 
     private val _events = Channel<Event>(Channel.BUFFERED)
@@ -176,9 +175,9 @@ class ProviderDetailViewModel constructor(
             }
             ProviderDetailUiState(
                 provider = provider.toDetailRow(
-                    keyRows,
-                    data.keys,
-                    modelCount = modelRows.filter { it.enabled }.distinctBy { it.modelId }.size,
+                    rows = keyRows,
+                    keyList = data.keys,
+                    models = data.models,
                     accountCount = accountRows.size,
                 ),
                 keys = keyRows,
@@ -360,7 +359,6 @@ class ProviderDetailViewModel constructor(
         modelId: String,
         protocol: Protocol,
         displayName: String?,
-        enabled: Boolean,
     ) {
         viewModelScope.launch {
             val existing = models.observeByProvider(providerId).first()
@@ -370,7 +368,6 @@ class ProviderDetailViewModel constructor(
                     modelId = modelId.trim(),
                     protocol = protocol,
                     displayName = displayName?.trim()?.ifEmpty { null },
-                    enabled = enabled,
                 ),
             )
         }
@@ -437,29 +434,42 @@ class ProviderDetailViewModel constructor(
         _revealedAccount.value = null
     }
 
-    /** 详情页「查余额」。结果经 observeProvider 那条订阅流回，不用手动刷新（红线 10）。 */
-    fun refreshBalance() {
-        viewModelScope.launch {
-            runCatching { balanceEngine.refresh(providerId) }
-            _events.trySend(Event.BalanceRefreshed)
-        }
+    /**
+     * 详情页顶栏的「一键探测」。
+     *
+     * 一次把这家的**四类**探测都发出去，各自看自己的开关：
+     * 官网连通性（[ProbeEngine.refreshReachability]）、密钥可达性与有效性
+     * （[ProbeEngine.probeProvider]，L1+L2，零成本）、模型列表（**跟着这一轮走**，见下）、
+     * 余额（[BalanceEngine.refresh]，尊重每把 Key 的余额类型与余额探测开关）。
+     *
+     * **不单独调 [ProbeEngine.refreshModels]**：这一轮本身就会顺手拉模型列表
+     * （L2 的响应被复用，keyValidity 关掉的 Key 由收尾那一趟补上），再调一次等于同一份
+     * 列表发两遍请求、还多弹一条提示。
+     *
+     * **只发零成本的那几类**：模型可达性（L3）要真发一次推理请求、会花钱，仍然只走
+     * Key 页长按手动触发（红线 36）。
+     */
+    fun probeAll() {
+        probeEngine.refreshReachability(providerId)
+        viewModelScope.launch { runCatching { balanceEngine.refresh(providerId) } }
+        // 提示在动作发出的这一刻给（"已开始探测"）；这一轮的结果由 Shell 层统一播报。
+        if (probeEngine.probeProvider(providerId)) _events.trySend(Event.Probed)
     }
 
-    /** 详情页「探测这一家」。只发 L1+L2（零成本，红线 36），结果流回 `probe_runs` 与明细页。 */
-    fun probeProvider() {
-        probeEngine.probeProvider(providerId)
-    }
-
-    /** 手动拉模型列表。null = 这家全部启用 Key；指定 id = 只拉那一张 Key。 */
+    /**
+     * 只拉模型列表（密钥卡上那个刷新按钮）。
+     *
+     * 不在这里发"已刷新"：刷新是异步的，写在这是说了句还没发生的事。什么时候刷完由
+     * [ProbeEngine.modelResults] 告诉 Shell。
+     */
     fun refreshModels(keyId: Long? = null) {
         probeEngine.refreshModels(providerId, keyId)
-        _events.trySend(Event.ModelsRefreshed)
     }
 
     private fun Provider.toDetailRow(
         rows: List<UiKeyRow>,
         keyList: List<ApiKey>,
-        modelCount: Int,
+        models: List<AiModel>,
         accountCount: Int,
     ): UiProviderRow {
         val aggregateBalance = aggregateBalanceOf(keyList)
@@ -470,18 +480,24 @@ class ProviderDetailViewModel constructor(
             note = note,
             websiteUrl = websiteUrl,
             host = firstSettings?.apiRoot?.let { hostOf(it) }.orEmpty(),
-            protocols = firstSettings?.supportedProtocols?.map { it.wireName } ?: emptyList(),
+            // 协议 = 这家所有模型的协议并集，和管理页 / 仪表盘同一个定义
+            protocols = providerProtocolsOf(models),
             colorIndex = color ?: 0,
             pinned = pinned,
             groupId = groupId,
             keyCount = rows.size,
             okKeyCount = rows.count { it.health == UiHealth.Ok },
-            modelCount = modelCount,
+            modelCount = models.distinctBy { it.modelId }.size,
             accountCount = accountCount,
             balance = aggregateBalance.toUiMoney(),
             balanceFailed = aggregateBalance?.failed == true,
+            balanceConfigured = balanceConfiguredOf(keyList),
+            balanceCheckedAt = aggregateBalance?.checkedAt,
             health = aggregateOf(rows),
             staleThisRound = false,
+            // 官网延迟只在**连通**时给：失败那次拿到的耗时说明不了任何事，
+            // 显示出来会被读成"通了但很慢"。
+            reachabilityLatencyMs = website.latencyMs.takeIf { website.ok },
             keys = rows,
         )
     }

@@ -9,6 +9,7 @@ import com.lc33.tokenvault.domain.repo.ApiKeyRepository
 import com.lc33.tokenvault.domain.repo.ClientProfileRepository
 import com.lc33.tokenvault.domain.repo.ModelRepository
 import com.lc33.tokenvault.domain.repo.UndoableDeletion
+import com.lc33.tokenvault.engine.BalanceEngine
 import com.lc33.tokenvault.engine.ProbeEngine
 import com.lc33.tokenvault.platform.SecureClipboard
 import com.lc33.tokenvault.platform.nowMillis
@@ -33,6 +34,7 @@ class KeyDetailViewModel constructor(
     private val clientProfiles: ClientProfileRepository,
     private val models: ModelRepository,
     private val probeEngine: ProbeEngine,
+    private val balanceEngine: BalanceEngine,
     private val clipboard: SecureClipboard,
     private val knownSecrets: KnownSecrets,
     private val providerId: Long,
@@ -53,6 +55,9 @@ class KeyDetailViewModel constructor(
 
         /** 明文已复制到剪贴板。 */
         data object Copied : Event
+
+        /** 顶栏「探测这把 Key」已发出（有效性 / 模型列表 / 余额，各自看开关）。 */
+        data object Probed : Event
     }
 
     private val _events = Channel<Event>(Channel.BUFFERED)
@@ -90,12 +95,22 @@ class KeyDetailViewModel constructor(
         viewModelScope.launch { recomputeMask() }
     }
 
+    /**
+     * 顶栏刷新：探测这把 Key 的信息——密钥有效性（含可达性 L1+L2）、模型列表、余额。
+     * 三件事各看自己的开关（`probe.keyValidity` / `probe.models` / `probe.balance`），
+     * 关着的就不发。**不含模型可达性**：那一次会真花钱（红线 36），只走长按模型手动触发。
+     *
+     * 模型列表跟着这一轮走（L2 的响应会被复用，keyValidity 关掉时由收尾那一趟补上），
+     * 不另外再调一次 [ProbeEngine.refreshModels]——那是同一份列表发两遍请求。
+     */
     fun probeKey() {
-        probeEngine.probeKey(keyId)
+        viewModelScope.launch { runCatching { balanceEngine.refresh(providerId, keyId) } }
+        // 提示在动作发出的这一刻给（"正在探测该密钥…"）；这一轮的结果由 Shell 层统一播报。
+        if (probeEngine.probeKey(keyId)) _events.trySend(Event.Probed)
     }
 
+    /** 只拉模型列表（模型区那个刷新按钮）。结果由 Shell 层统一播报。 */
     fun refreshModels() {
-        val providerId = state.value?.key?.providerId ?: return
         probeEngine.refreshModels(providerId, keyId)
     }
 

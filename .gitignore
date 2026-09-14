@@ -6,6 +6,13 @@
 # 脱敏之后才复制成 app/src/test/resources/fixtures/ 下的 fixture。
 .local/
 
+# 本机验收产物：模拟器截图、临时比对图。**必须忽略**——密钥详情页的设计就是要显示
+# 明文（「查看密钥」那一层），随手截一张图就带着真凭据。
+artifacts/
+
+# ZCode 会话工作区（计划文件等）。
+.zcode/
+
 # Gradle / Android
 .gradle/
 build/

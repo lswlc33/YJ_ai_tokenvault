@@ -86,8 +86,6 @@ data class ApiKeyEntity(
     /** `HMAC-SHA256(HKDF(DEK,"fp"), 明文)` 前 32 hex。**设备本地**，不能跨设备比较。 */
     val fingerprint: String,
 
-    val enabled: Boolean = true,
-
     /** `KeyHealth.wireName`，持久结论。 */
     val health: String = "unknown",
 

@@ -105,6 +105,10 @@ data object DataRoute : VaultRoute
 @Serializable
 data object LogRoute : VaultRoute
 
+/** 一条网络请求的完整报文（日志里点开）。 */
+@Serializable
+data class LogEntryRoute(val id: Long) : VaultRoute
+
 @Serializable
 data object SyncRoute : VaultRoute
 

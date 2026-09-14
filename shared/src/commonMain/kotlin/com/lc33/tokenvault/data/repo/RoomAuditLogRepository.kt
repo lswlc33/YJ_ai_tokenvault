@@ -34,6 +34,9 @@ class RoomAuditLogRepository constructor(
         detail: String?,
         providerId: Long?,
         keyId: Long?,
+        requestUrl: String?,
+        requestBody: String?,
+        responseBody: String?,
     ) {
         dao.insert(
             AuditLogEntity(
@@ -44,9 +47,16 @@ class RoomAuditLogRepository constructor(
                 keyId = keyId,
                 message = redactor.scrub(message),
                 detail = detail?.let { redactor.scrub(it) },
+                // 报文同样要过一道脱敏：上游经常把密钥原样回显在响应里
+                // （new-api 的 /api/user/self 就是），不擦等于把凭据写进日志。
+                requestUrl = requestUrl?.let { redactor.scrub(it) },
+                requestBody = requestBody?.let { redactor.scrub(it) },
+                responseBody = responseBody?.let { redactor.scrub(it) },
             ),
         )
     }
+
+    override suspend fun findById(id: Long): AuditEntry? = dao.findById(id)?.toDomain()
 
     override fun observeRecent(limit: Int, minLevel: LogLevel): Flow<List<AuditEntry>> {
         val levels = LogLevel.entries

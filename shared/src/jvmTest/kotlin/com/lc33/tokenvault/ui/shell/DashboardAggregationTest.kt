@@ -31,7 +31,6 @@ class DashboardAggregationTest {
         id: Long,
         providerId: Long,
         health: KeyHealth = KeyHealth.UNKNOWN,
-        enabled: Boolean = true,
         balance: BalanceSnapshot? = null,
     ) = ApiKey(
         id = id,
@@ -40,7 +39,6 @@ class DashboardAggregationTest {
         note = "",
         secretEnc = ByteArray(0),
         fingerprint = "fp$id",
-        enabled = enabled,
         settings = KeySettings(apiBaseUrl = "https://api$providerId.example.test/v1", apiRoot = "https://api$providerId.example.test"),
         health = health,
         balance = balance,
@@ -87,14 +85,14 @@ class DashboardAggregationTest {
     }
 
     @Test
-    fun `停用的密钥不进健康分布`() {
+    fun `所有密钥都进健康分布`() {
         val breakdown = healthBreakdownOf(
             listOf(
                 key(1, 1, KeyHealth.OK),
-                key(2, 1, KeyHealth.OK, enabled = false),
+                key(2, 1, KeyHealth.OK),
             ),
         )
-        assertEquals(1, breakdown.total)
+        assertEquals(2, breakdown.total)
         assertTrue(breakdown.allOk)
     }
 

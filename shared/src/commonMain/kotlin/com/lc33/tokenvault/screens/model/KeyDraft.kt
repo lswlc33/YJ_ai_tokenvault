@@ -8,7 +8,6 @@ data class KeyDraft(
     val providerId: Long = 0,
     val label: String = "",
     val note: String = "",
-    val enabled: Boolean = true,
     val sortOrder: Int = 0,
     val baseUrl: String = "",
     val protocols: Set<Protocol> = setOf(Protocol.CHAT),

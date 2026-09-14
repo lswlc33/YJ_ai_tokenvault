@@ -63,6 +63,7 @@ import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppDialog
 import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppIconButton
+import com.lc33.tokenvault.ui.miuix.AppIconTint
 import com.lc33.tokenvault.ui.miuix.AppIconMenu
 import com.lc33.tokenvault.ui.miuix.AppMenuGroup
 import com.lc33.tokenvault.ui.miuix.AppMenuItem
@@ -95,6 +96,7 @@ fun LogScreen(
     retention: LogRetention,
     onLevelFilterChange: (LogLevel) -> Unit,
     onRetentionChange: (LogRetention) -> Unit,
+    onOpenEntry: (Long) -> Unit,
     onClear: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -217,7 +219,16 @@ fun LogScreen(
                         count = entries.size,
                         key = { entries[it].id },
                     ) { index ->
-                        LogRow(entry = entries[index], nowMs = nowMs)
+                        val entry = entries[index]
+                        LogRow(
+                            entry = entry,
+                            nowMs = nowMs,
+                            onClick = if (entry.hasRequestDetail) {
+                                { onOpenEntry(entry.id) }
+                            } else {
+                                null
+                            },
+                        )
                     }
                 }
             }
@@ -239,10 +250,19 @@ fun LogScreen(
     )
 }
 
+/**
+ * 一条日志。
+ *
+ * 只有**网络请求**那类（[AuditEntry.hasRequestDetail]）可以点开：它背后还有一段完整的
+ * 报文可看。其余日志点开没有下一页，画个箭头等于骗一次点击。
+ */
 @Composable
-private fun LogRow(entry: AuditEntry, nowMs: Long) {
+private fun LogRow(entry: AuditEntry, nowMs: Long, onClick: (() -> Unit)?) {
     val palette = LocalStatusPalette.current
-    AppCard(modifier = Modifier.fillMaxWidth()) {
+    AppCard(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick,
+    ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -262,6 +282,9 @@ private fun LogRow(entry: AuditEntry, nowMs: Long) {
                 style = AppTextStyle.Footnote,
                 color = appSecondaryTextColor,
             )
+            if (onClick != null) {
+                AppIconTint(icon = AppIcon.Forward, size = 18.dp, tint = appSecondaryTextColor)
+            }
         }
         AppText(
             text = entry.message,
@@ -281,21 +304,21 @@ private fun LogRow(entry: AuditEntry, nowMs: Long) {
 
 private const val CLOCK_TICK_MILLIS = 30_000L
 
-private fun levelColor(level: LogLevel, palette: StatusPalette): Color = when (level) {
+internal fun levelColor(level: LogLevel, palette: StatusPalette): Color = when (level) {
     LogLevel.DEBUG -> palette.neutral
     LogLevel.INFO -> palette.neutral
     LogLevel.WARN -> palette.warn
     LogLevel.ERROR -> palette.error
 }
 
-private fun levelLabelRes(level: LogLevel): StringResource = when (level) {
+internal fun levelLabelRes(level: LogLevel): StringResource = when (level) {
     LogLevel.DEBUG -> Res.string.log_level_debug
     LogLevel.INFO -> Res.string.log_level_info
     LogLevel.WARN -> Res.string.log_level_warn
     LogLevel.ERROR -> Res.string.log_level_error
 }
 
-private fun categoryLabelRes(category: LogCategory): StringResource = when (category) {
+internal fun categoryLabelRes(category: LogCategory): StringResource = when (category) {
     LogCategory.LOCK -> Res.string.log_category_lock
     LogCategory.VAULT -> Res.string.log_category_vault
     LogCategory.PROBE -> Res.string.log_category_probe

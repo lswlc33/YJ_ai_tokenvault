@@ -11,6 +11,8 @@ import top.yukonga.miuix.kmp.icon.extended.Contacts
 import top.yukonga.miuix.kmp.icon.extended.Copy
 import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.icon.extended.Edit
+import top.yukonga.miuix.kmp.icon.extended.ExpandLess
+import top.yukonga.miuix.kmp.icon.extended.ExpandMore
 import top.yukonga.miuix.kmp.icon.extended.Filter
 import top.yukonga.miuix.kmp.icon.extended.GridView
 import top.yukonga.miuix.kmp.icon.extended.Hide
@@ -75,6 +77,10 @@ enum class AppIcon {
     OpenLink,
     Tune,
 
+    /** 展开 / 收起一段可折叠内容（如密钥卡里的模型列表）。 */
+    Expand,
+    Collapse,
+
     /** 数字键盘的退格键。用"清除"的图形，MIUIX 没有退格图形。 */
     Backspace,
 
@@ -114,6 +120,8 @@ internal fun AppIcon.imageVector(): ImageVector = when (this) {
     AppIcon.Copy -> MiuixIcons.Copy
     AppIcon.Paste -> MiuixIcons.Paste
     AppIcon.More -> MiuixIcons.More
+    AppIcon.Expand -> MiuixIcons.ExpandMore
+    AppIcon.Collapse -> MiuixIcons.ExpandLess
     AppIcon.Refresh -> MiuixIcons.Refresh
     AppIcon.Search -> MiuixIcons.Search
     AppIcon.Filter -> MiuixIcons.Filter

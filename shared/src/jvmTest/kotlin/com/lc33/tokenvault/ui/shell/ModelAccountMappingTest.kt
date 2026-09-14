@@ -21,7 +21,6 @@ class ModelAccountMappingTest {
     private fun model(
         source: ModelSource = ModelSource.MANUAL,
         probeState: ModelProbeState = ModelProbeState.UNKNOWN,
-        enabled: Boolean = true,
         displayName: String? = null,
     ) = AiModel(
         providerId = 1,
@@ -29,7 +28,6 @@ class ModelAccountMappingTest {
         protocol = Protocol.CHAT,
         source = source,
         probeState = probeState,
-        enabled = enabled,
         displayName = displayName,
     )
 
@@ -55,13 +53,9 @@ class ModelAccountMappingTest {
     }
 
     @Test
-    fun `启用状态与显示名透传`() {
-        val enabled = model(enabled = true, displayName = "GPT-4o").toRow()
-        assertEquals(true, enabled.enabled)
-        assertEquals("GPT-4o", enabled.contextLabel)
-
-        val disabled = model(enabled = false).toRow()
-        assertEquals(false, disabled.enabled)
+    fun `显示名透传到模型行`() {
+        val row = model(displayName = "GPT-4o").toRow()
+        assertEquals("GPT-4o", row.contextLabel)
     }
 
     // ---------------------------------------------------------------- ProviderAccount.toRow

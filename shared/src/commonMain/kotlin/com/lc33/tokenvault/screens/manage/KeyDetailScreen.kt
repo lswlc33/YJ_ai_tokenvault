@@ -17,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.lc33.tokenvault.domain.Protocol
 import com.lc33.tokenvault.screens.model.KeyDetailUiState
 import com.lc33.tokenvault.screens.model.UiModelRow
@@ -28,6 +29,7 @@ import com.lc33.tokenvault.ui.miuix.AppActionRow
 import com.lc33.tokenvault.ui.miuix.AppBottomSheet
 import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppDialog
+import com.lc33.tokenvault.ui.miuix.AppDialogTextButton
 import com.lc33.tokenvault.ui.miuix.AppDivider
 import com.lc33.tokenvault.ui.miuix.AppIconButton
 import com.lc33.tokenvault.ui.miuix.AppIcon
@@ -49,8 +51,10 @@ import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
 import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.back_cd
+import tokenvault.shared.generated.resources.common_close
 import tokenvault.shared.generated.resources.common_off
 import tokenvault.shared.generated.resources.common_on
+import tokenvault.shared.generated.resources.dashboard_balance_title
 import tokenvault.shared.generated.resources.detail_key_connection_allow_http
 import tokenvault.shared.generated.resources.detail_key_connection_auth
 import tokenvault.shared.generated.resources.detail_key_connection_base_url
@@ -64,19 +68,21 @@ import tokenvault.shared.generated.resources.detail_model_protocol
 import tokenvault.shared.generated.resources.detail_models_empty_auto
 import tokenvault.shared.generated.resources.detail_models_empty_manual
 import tokenvault.shared.generated.resources.editor_profile_default
+import tokenvault.shared.generated.resources.manage_latency
+import tokenvault.shared.generated.resources.manage_latency_time
 import tokenvault.shared.generated.resources.manage_source_discovered
 import tokenvault.shared.generated.resources.manage_source_manual
 import tokenvault.shared.generated.resources.detail_edit_cd
-import tokenvault.shared.generated.resources.detail_key_reveal_hint
-import tokenvault.shared.generated.resources.detail_key_secret
+import tokenvault.shared.generated.resources.detail_key_full_content
 import tokenvault.shared.generated.resources.detail_models_refresh
+import tokenvault.shared.generated.resources.detail_models_count_auto
+import tokenvault.shared.generated.resources.detail_models_count_manual
 import tokenvault.shared.generated.resources.detail_key_balance_value
 import tokenvault.shared.generated.resources.detail_models_section
 import tokenvault.shared.generated.resources.detail_models_source
 import tokenvault.shared.generated.resources.detail_key_more_cd
 import tokenvault.shared.generated.resources.detail_key_connection
 import tokenvault.shared.generated.resources.detail_probe_key
-import tokenvault.shared.generated.resources.editor_note
 import tokenvault.shared.generated.resources.groups_delete
 import tokenvault.shared.generated.resources.key_sort_down
 import tokenvault.shared.generated.resources.key_sort_up
@@ -125,10 +131,12 @@ fun KeyDetailScreen(
                     )
                 },
                 actions = {
+                    // 顶栏刷新 = 探测这把 Key 的全部信息：有效性（含可达性）、模型列表、余额，
+                    // 各自看自己那一档开关。**不含模型可达性**——那一次会真花钱，只在长按模型时发。
                     AppIconButton(
                         icon = AppIcon.Refresh,
-                        contentDescription = stringResource(Res.string.detail_models_refresh),
-                        onClick = onRefreshModels,
+                        contentDescription = stringResource(Res.string.detail_probe_key),
+                        onClick = onProbe,
                     )
                     AppIconButton(
                         icon = AppIcon.Edit,
@@ -192,50 +200,89 @@ fun KeyDetailScreen(
                         .fillMaxWidth()
                         .padding(horizontal = tokens.screenPadding),
                 ) {
-                    AppText(text = key.masked, style = AppTextStyle.Body)
-                    if (key.note.isNotBlank()) {
-                        AppText(
-                            text = stringResource(Res.string.editor_note) + ": " + key.note,
-                            style = AppTextStyle.Footnote,
-                            color = appSecondaryTextColor,
-                        )
-                    }
+                    // 与供应商预览里的密钥行同一套顺序：可达性 + 备注 / 遮蔽串 / 延迟 + 时间。
+                    // 余额不在这里——它是独立一张卡，混进来会让"这一行说的是什么"说不清。
                     Row(
-                        modifier = Modifier.padding(top = tokens.itemSpacing),
-                        horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
                         verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         StatusDot(color = colorOf(key.health), label = labelOf(key.health))
-                        key.latencyMs?.let {
+                        if (key.note.isNotBlank()) {
                             AppText(
-                                text = "$it ms",
+                                text = key.note,
                                 style = AppTextStyle.Footnote,
                                 color = appSecondaryTextColor,
-                            )
-                        }
-                        key.checkedAt?.let {
-                            AppText(
-                                text = relativeLabel(state.nowMs, it),
-                                style = AppTextStyle.Footnote,
-                                color = appSecondaryTextColor,
+                                maxLines = 1,
                             )
                         }
                     }
-                    key.balance?.let {
+                    AppText(
+                        text = key.masked,
+                        style = AppTextStyle.Body,
+                        fontFamily = tokens.monoFontFamily,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                    val timingText = when {
+                        key.latencyMs != null && key.checkedAt != null -> stringResource(
+                            Res.string.manage_latency_time,
+                            stringResource(Res.string.manage_latency, key.latencyMs),
+                            relativeLabel(state.nowMs, key.checkedAt),
+                        )
+                        key.latencyMs != null ->
+                            stringResource(Res.string.manage_latency, key.latencyMs)
+                        key.checkedAt != null -> relativeLabel(state.nowMs, key.checkedAt)
+                        else -> null
+                    }
+                    if (timingText != null) {
                         AppText(
-                            text = stringResource(
-                                Res.string.detail_key_balance_value,
-                                it.currency,
-                                it.amount,
-                            ),
-                            style = AppTextStyle.Title,
-                            modifier = Modifier.padding(top = tokens.itemSpacing),
+                            text = timingText,
+                            style = AppTextStyle.Footnote,
+                            color = appSecondaryTextColor,
+                            modifier = Modifier.padding(top = 4.dp),
                         )
                     }
                 }
             }
-            // 「查看」是一条动作入口，单独成组：混在描述卡里，
-            // 整张卡（含遮蔽串、状态、余额）看起来都能点。
+            // 余额单独一块：这一页只有这一把 Key，数字属于它自己，不跟状态挤一行。
+            key.balance?.let { balance ->
+                item {
+                    AppCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = tokens.screenPadding),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            AppText(
+                                text = stringResource(Res.string.dashboard_balance_title),
+                                style = AppTextStyle.Footnote,
+                                color = appSecondaryTextColor,
+                                modifier = Modifier.weight(1f),
+                            )
+                            key.balanceCheckedAt?.let { checkedAt ->
+                                AppText(
+                                    text = relativeLabel(state.nowMs, checkedAt),
+                                    style = AppTextStyle.Footnote,
+                                    color = appSecondaryTextColor,
+                                )
+                            }
+                        }
+                        AppText(
+                            text = stringResource(
+                                Res.string.detail_key_balance_value,
+                                balance.currency,
+                                balance.amount,
+                            ),
+                            style = AppTextStyle.Title,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                }
+            }
+            // 「查看密钥」是一条动作入口，单独成组：混在描述卡里，
+            // 整张卡（含遮蔽串、状态）看起来都能点。
             item {
                 AppPreferenceGroup {
                     AppActionRow(
@@ -257,11 +304,16 @@ fun KeyDetailScreen(
                     )
                     AppValueRow(
                         title = stringResource(Res.string.detail_key_connection_protocol),
+                        // 三项协议并排就超过了右侧那点宽度，默认的左右排版会把最后一项
+                        // 直接截掉（"Chat Responses" 之后看不到 Anthropic）。协议是这条
+                        // Key 的关键信息，宁可多占一行也不能缺。
+                        //
                         // protocolLabel 是 @Composable（要读资源），不能塞进 joinToString 的
                         // lambda 里——那是非 Composable 上下文。先逐项取出来再拼。
                         value = key.settings.protocols
                             .map { protocolLabel(it) }
                             .joinToString("  "),
+                        stacked = true,
                     )
                     AppValueRow(
                         title = stringResource(Res.string.detail_key_connection_auth),
@@ -301,9 +353,18 @@ fun KeyDetailScreen(
                         horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        // 「共 N 个」把数量和来源一起说清楚：只给一个数字，用户看不出
+                        // 这份列表是上游同步来的还是自己一条条加的，而这两者的可编辑性不同。
                         AppText(
-                            text = state.models.size.toString(),
-                            style = AppTextStyle.Title,
+                            text = stringResource(
+                                if (key.settings.probeModels) {
+                                    Res.string.detail_models_count_auto
+                                } else {
+                                    Res.string.detail_models_count_manual
+                                },
+                                state.models.size,
+                            ),
+                            style = AppTextStyle.Subtitle,
                             modifier = Modifier.weight(1f),
                         )
                         AppIconButton(
@@ -327,9 +388,13 @@ fun KeyDetailScreen(
                         )
                     } else {
                         state.models.forEachIndexed { index, model ->
+                            // 自动获取的列表不给编辑入口（同供应商详情页）：点开一个
+                            // 下次同步就会被覆盖的字段没有意义。
+                            val editable = !key.settings.probeModels
                             ModelRow(
                                 row = model,
-                                onClick = { selectedModel = model },
+                                showProbe = key.settings.probeModelReachability,
+                                onClick = if (editable) ({ selectedModel = model }) else null,
                                 onLongPress = if (key.settings.probeQuickModel) {
                                     {
                                         Protocol.fromWireName(model.protocol)?.let { protocol ->
@@ -355,31 +420,34 @@ fun KeyDetailScreen(
     AppBottomSheet(
         show = revealedText != null,
         onDismissRequest = onCloseReveal,
-        title = key.label.ifBlank { key.masked },
+        title = stringResource(Res.string.detail_key_view),
     ) {
-        // 明文是这一层的正文；复制是动作行，包进 group，与页面里的行入口同形。
+        // 面板里只有两件事：看清这串明文、把它复制走。所以是一段内容 + 两个按钮，
+        // 不夹说明文字，也不再多一个行入口。
         AppPreferenceGroup(inset = false) {
             AppValueRow(
-                title = stringResource(Res.string.detail_key_secret),
+                title = stringResource(Res.string.detail_key_full_content),
                 value = revealedText.orEmpty(),
                 stacked = true,
                 mono = true,
             )
         }
-        AppText(
-            text = stringResource(Res.string.detail_key_reveal_hint),
-            style = AppTextStyle.Footnote,
-            color = appSecondaryTextColor,
-            modifier = Modifier.padding(top = tokens.itemSpacing),
-        )
-        AppPreferenceGroup(
-            modifier = Modifier.padding(top = tokens.itemSpacing),
-            inset = false,
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = tokens.itemSpacing),
+            horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
         ) {
-            AppActionRow(
+            AppDialogTextButton(
+                text = stringResource(Res.string.common_close),
+                onClick = onCloseReveal,
+                modifier = Modifier.weight(1f),
+            )
+            AppDialogTextButton(
                 text = stringResource(Res.string.secret_copy_cd),
                 onClick = onCopyRevealed,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.weight(1f),
+                primary = true,
             )
         }
     }

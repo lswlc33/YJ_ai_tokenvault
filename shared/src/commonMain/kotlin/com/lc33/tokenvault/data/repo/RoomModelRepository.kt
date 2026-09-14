@@ -35,6 +35,9 @@ class RoomModelRepository constructor(
     override fun observeByProvider(providerId: Long): Flow<List<AiModel>> =
         dao.observeByProvider(providerId).map { rows -> rows.map { it.toDomain() } }
 
+    override fun observeAll(): Flow<List<AiModel>> =
+        dao.observeAll().map { rows -> rows.map { it.toDomain() } }
+
     override suspend fun add(
         providerId: Long,
         keyId: Long,
@@ -51,7 +54,6 @@ class RoomModelRepository constructor(
                 protocol = protocol.wireName,
                 source = "manual",
                 discoveredVia = null,
-                enabled = true,
                 needsReview = needsReview,
                 firstSeenAt = stamp,
                 sortOrder = dao.findByProviderAndKey(providerId, keyId).size,
@@ -83,7 +85,6 @@ class RoomModelRepository constructor(
                         protocol = protocol.wireName,
                         source = "discovered",
                         discoveredVia = protocol.wireName,
-                        enabled = true,
                         firstSeenAt = stamp,
                         lastSeenAt = stamp,
                         sortOrder = baseOrder + index,
@@ -91,7 +92,7 @@ class RoomModelRepository constructor(
                 )
             }
             plan.toTouch.forEach { dao.touchLastSeen(it, stamp) }
-            plan.toDisable.forEach { dao.setEnabled(it, false) }
+            plan.toDelete.forEach { dao.delete(it) }
         }
         audit.recordSafe(LogLevel.INFO, LogCategory.VAULT, "models discovered", "protocol=${protocol.wireName} count=${modelIds.size}", providerId = providerId, keyId = keyId)
     }

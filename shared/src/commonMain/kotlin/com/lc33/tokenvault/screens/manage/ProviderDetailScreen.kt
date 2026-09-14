@@ -1,5 +1,6 @@
 package com.lc33.tokenvault.screens.manage
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -26,7 +27,6 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.back_cd
-import tokenvault.shared.generated.resources.dashboard_balance_none
 import tokenvault.shared.generated.resources.balance_failed_section
 import tokenvault.shared.generated.resources.detail_account_password
 import tokenvault.shared.generated.resources.detail_account_username
@@ -36,11 +36,13 @@ import tokenvault.shared.generated.resources.detail_model_delete
 import tokenvault.shared.generated.resources.detail_model_delete_action
 import tokenvault.shared.generated.resources.detail_model_display_name
 import tokenvault.shared.generated.resources.detail_model_edit
-import tokenvault.shared.generated.resources.detail_model_enabled
 import tokenvault.shared.generated.resources.detail_model_id
 import tokenvault.shared.generated.resources.detail_model_protocol
 import tokenvault.shared.generated.resources.detail_models_empty_auto
 import tokenvault.shared.generated.resources.detail_models_empty_manual
+import tokenvault.shared.generated.resources.detail_models_expand_cd
+import tokenvault.shared.generated.resources.detail_models_collapse_cd
+import tokenvault.shared.generated.resources.detail_models_count_short
 import tokenvault.shared.generated.resources.detail_models_section
 import tokenvault.shared.generated.resources.detail_provider_balance_total
 import tokenvault.shared.generated.resources.detail_reachability_latency
@@ -55,22 +57,15 @@ import tokenvault.shared.generated.resources.detail_account_delete_title
 import tokenvault.shared.generated.resources.detail_account_delete_body
 import tokenvault.shared.generated.resources.login_method_password
 import tokenvault.shared.generated.resources.detail_add_key
-import tokenvault.shared.generated.resources.detail_balance_refresh
+import tokenvault.shared.generated.resources.detail_balance_not_checked
 import tokenvault.shared.generated.resources.detail_edit_cd
-import tokenvault.shared.generated.resources.detail_key_delete_body
-import tokenvault.shared.generated.resources.detail_key_delete_title
-import tokenvault.shared.generated.resources.detail_key_reveal_hint
-import tokenvault.shared.generated.resources.detail_key_secret
-import tokenvault.shared.generated.resources.detail_key_set_default
-import tokenvault.shared.generated.resources.detail_key_sheet_title
 import tokenvault.shared.generated.resources.detail_keys_empty
 import tokenvault.shared.generated.resources.detail_models_refresh
-import tokenvault.shared.generated.resources.refresh_cd
+import tokenvault.shared.generated.resources.probe_provider_cd
 import tokenvault.shared.generated.resources.detail_section_accounts
 import tokenvault.shared.generated.resources.detail_section_keys
 import tokenvault.shared.generated.resources.editor_name
 import tokenvault.shared.generated.resources.editor_note
-import tokenvault.shared.generated.resources.editor_website
 import tokenvault.shared.generated.resources.editor_save
 import tokenvault.shared.generated.resources.groups_delete
 import tokenvault.shared.generated.resources.import_manual
@@ -92,7 +87,6 @@ import com.lc33.tokenvault.ui.miuix.AppChip
 import com.lc33.tokenvault.ui.miuix.AppDialog
 import com.lc33.tokenvault.ui.miuix.AppDivider
 import com.lc33.tokenvault.ui.miuix.AppDropdownRow
-import com.lc33.tokenvault.ui.miuix.AppFilterChip
 import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppIconButton
 import com.lc33.tokenvault.ui.miuix.AppPreferenceGroup
@@ -136,10 +130,10 @@ fun ProviderDetailScreen(
     onCurlImport: () -> Unit,
     onManualAddKey: () -> Unit,
     onOpenKey: (Long) -> Unit,
-    onRefreshBalance: () -> Unit,
+    onProbeAll: () -> Unit,
     onRefreshKeyModels: (Long) -> Unit,
     onAddModel: (Long, String, Protocol) -> Unit,
-    onUpdateModel: (Long, String, Protocol, String?, Boolean) -> Unit,
+    onUpdateModel: (Long, String, Protocol, String?) -> Unit,
     onDeleteModel: (Long) -> Unit,
     onRevealAccount: (Long) -> Unit,
     onCopyRevealedAccount: (Long) -> Unit,
@@ -179,10 +173,12 @@ fun ProviderDetailScreen(
                     )
                 },
                 actions = {
+                    // 一键探测：官网连通性 + 密钥探测 + 模型列表 + 余额，一次点全发。
+                    // 分成几个图标（这里曾经还有一个余额刷新）只会让用户猜哪个按了什么。
                     AppIconButton(
                         icon = AppIcon.Refresh,
-                        contentDescription = stringResource(Res.string.refresh_cd),
-                        onClick = onRefreshBalance,
+                        contentDescription = stringResource(Res.string.probe_provider_cd),
+                        onClick = onProbeAll,
                     )
                     AppIconButton(
                         icon = AppIcon.Edit,
@@ -200,7 +196,14 @@ fun ProviderDetailScreen(
             contentPadding = padding,
             verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
         ) {
-            item { HeaderCard(state, onRefreshBalance) }
+            item { InfoCard(state) }
+
+            // 余额独立成卡，且只在真的配了查询时才出现：`余额合计 / 金额 / 更新时间`
+            // 是一组信息，塞进信息卡会和备注、官网挤成一片；而没配查询时它永远是
+            // 一句"还没有配置"，摆在那里只是占屏。
+            if (provider.balanceConfigured) {
+                item { BalanceCard(state) }
+            }
 
             item {
                 Row(
@@ -316,18 +319,25 @@ fun ProviderDetailScreen(
     ModelDialog(
         keyId = addModelKeyId,
         editing = editingModel,
-        protocols = provider.protocols.mapNotNull { Protocol.fromWireName(it) }
-            .ifEmpty { listOf(Protocol.CHAT) },
+        // 可选协议取**这张 Key 配的协议**，不是页头那排 chip：chip 是"这家实际在跑什么"，
+        // 而这一个还没建出来。拿 chip 当选项会让只有 Anthropic 的一家在加第一个模型时
+        // 只剩 Chat 可选（v3 起协议归属于 Key）。
+        protocols = state.keys
+            .firstOrNull { it.id == (addModelKeyId ?: editingModel?.keyId) }
+            ?.settings?.protocols
+            ?.mapNotNull { Protocol.fromWireName(it) }
+            ?.ifEmpty { listOf(Protocol.CHAT) }
+            ?: listOf(Protocol.CHAT),
         onDismiss = {
             addModelKeyId = null
             editingModel = null
         },
-        onConfirm = { keyId, modelId, protocol, displayName, enabled ->
+        onConfirm = { keyId, modelId, protocol, displayName ->
             val editing = editingModel
             if (editing == null) {
                 onAddModel(keyId, modelId, protocol)
             } else {
-                onUpdateModel(editing.id, modelId, protocol, displayName, enabled)
+                onUpdateModel(editing.id, modelId, protocol, displayName)
             }
             addModelKeyId = null
             editingModel = null
@@ -643,14 +653,13 @@ internal fun ModelDialog(
     editing: UiModelRow?,
     protocols: List<Protocol>,
     onDismiss: () -> Unit,
-    onConfirm: (Long, String, Protocol, String?, Boolean) -> Unit,
+    onConfirm: (Long, String, Protocol, String?) -> Unit,
     onRequestDelete: (UiModelRow) -> Unit,
 ) {
     val tokens = LocalAppTokens.current
     val modelId = rememberAppTextFieldState()
     val displayName = rememberAppTextFieldState()
     var protocol by remember { mutableStateOf(Protocol.CHAT) }
-    var enabled by remember { mutableStateOf(true) }
     val targetId = editing?.id
 
     LaunchedEffect(keyId, targetId) {
@@ -659,7 +668,6 @@ internal fun ModelDialog(
         modelId.setText(source?.modelId.orEmpty())
         displayName.setText(source?.displayName.orEmpty())
         protocol = source?.protocol?.let { Protocol.fromWireName(it) } ?: protocols.first()
-        enabled = source?.enabled ?: true
     }
 
     AppDialog(
@@ -685,11 +693,6 @@ internal fun ModelDialog(
             onSelect = { index -> protocol = protocols.getOrElse(index) { protocols.first() } },
             modifier = Modifier.padding(top = tokens.itemSpacing),
         )
-        AppSwitchRow(
-            title = stringResource(Res.string.detail_model_enabled),
-            checked = enabled,
-            onCheckedChange = { enabled = it },
-        )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -711,7 +714,6 @@ internal fun ModelDialog(
                         id,
                         protocol,
                         displayName.text,
-                        enabled,
                     )
                 },
                 modifier = Modifier.weight(1f),
@@ -731,6 +733,9 @@ internal fun ModelDialog(
 /**
  * 一张 Key 卡：Key 本身与绑定到它的模型共用一个容器。
  * 模型列表不另起卡片，避免在详情页里出现"卡片套卡片"的层级噪音。
+ *
+ * 模型区的两个按钮是**互斥**的，跟 Key 设置页同一套规则：自动获取开着时只给「刷新」
+ * （列表由上游同步维护，手动加一条下次同步也编辑不了），关掉自动获取才给「添加」。
  */
 @Composable
 private fun KeyCard(
@@ -743,6 +748,11 @@ private fun KeyCard(
     onEditModel: (UiModelRow) -> Unit,
 ) {
     val tokens = LocalAppTokens.current
+    // 自动获取：列表由探测/同步维护，不给编辑入口；手动列表才可点进编辑。
+    val autoModels = row.settings.probeModels
+    // 模型列表默认收起。这家有几把 Key 就是几份列表，全展开会把页面拉到好几屏，
+    // 而"有哪些模型"在多数时候不是打开这一页要办的事。收起态给出数量，知道里面有多少。
+    var modelsExpanded by remember(row.id) { mutableStateOf(false) }
     AppCard(
         modifier = Modifier
             .fillMaxWidth()
@@ -767,26 +777,42 @@ private fun KeyCard(
             AppText(
                 text = stringResource(Res.string.detail_models_section),
                 style = AppTextStyle.Subtitle,
-                modifier = Modifier.weight(1f),
             )
-            if (row.settings.probeModels) {
-                AppIconButton(
-                    icon = AppIcon.Refresh,
-                    contentDescription = stringResource(Res.string.detail_models_refresh),
-                    onClick = onRefreshModels,
+            if (models.isNotEmpty() && !modelsExpanded) {
+                AppText(
+                    text = stringResource(Res.string.detail_models_count_short, models.size),
+                    style = AppTextStyle.Footnote,
+                    color = appSecondaryTextColor,
+                    modifier = Modifier.padding(start = 6.dp),
                 )
             }
+            Spacer(modifier = Modifier.weight(1f))
             AppIconButton(
-                icon = AppIcon.Add,
-                contentDescription = stringResource(Res.string.detail_add_model),
-                onClick = onAddModel,
+                icon = if (autoModels) AppIcon.Refresh else AppIcon.Add,
+                contentDescription = stringResource(
+                    if (autoModels) Res.string.detail_models_refresh else Res.string.detail_add_model,
+                ),
+                onClick = if (autoModels) onRefreshModels else onAddModel,
             )
+            if (models.isNotEmpty()) {
+                AppIconButton(
+                    icon = if (modelsExpanded) AppIcon.Collapse else AppIcon.Expand,
+                    contentDescription = stringResource(
+                        if (modelsExpanded) {
+                            Res.string.detail_models_collapse_cd
+                        } else {
+                            Res.string.detail_models_expand_cd
+                        },
+                    ),
+                    onClick = { modelsExpanded = !modelsExpanded },
+                )
+            }
         }
 
         if (models.isEmpty()) {
             AppText(
                 text = stringResource(
-                    if (row.settings.probeModels) {
+                    if (autoModels) {
                         Res.string.detail_models_empty_auto
                     } else {
                         Res.string.detail_models_empty_manual
@@ -799,11 +825,15 @@ private fun KeyCard(
                     vertical = tokens.itemSpacing,
                 ),
             )
-        } else {
+        } else if (modelsExpanded) {
             models.forEachIndexed { index, model ->
                 ModelRow(
                     row = model,
-                    onClick = { onEditModel(model) },
+                    // 这一页不重复模型的可达性与协议：协议同一家的模型几乎全一样，
+                    // 可达性没有 Key 页的探测入口，摆在这里都是只看不动的字。
+                    showProbe = false,
+                    showProtocol = false,
+                    onClick = if (autoModels) null else ({ onEditModel(model) }),
                 )
                 if (index != models.lastIndex) {
                     AppDivider()
@@ -821,79 +851,114 @@ private fun loginMethodLabel(method: LoginMethod): String = when (method) {
     LoginMethod.LINUX_DO -> stringResource(Res.string.login_method_linuxdo)
 }
 
+/**
+ * 头部信息卡：备注、官网与协议。
+ *
+ * 官网那一行**就是**域名行，不再另外摆一条「官网: https://…」的动作行——同一个地址
+ * 出现两次，第二次还带着箭头，读起来像另一个入口。整行可点，点了打开浏览器。
+ *
+ * 右侧是官网连通性延迟，只在**连通**时出现（失败没有可显示的耗时，硬给一个数
+ * 反而像"通了但很慢"）；它与左侧两行文字上下居中，行高不吃亏。
+ */
 @Composable
-private fun HeaderCard(
-    state: ProviderDetailUiState,
-    onRefreshBalance: () -> Unit,
-) {
+private fun InfoCard(state: ProviderDetailUiState) {
     val tokens = LocalAppTokens.current
     val provider = state.provider
+    val website = provider.websiteUrl?.takeIf { it.isNotBlank() }
     AppCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = tokens.screenPadding),
     ) {
-        val note = provider.note
-        if (note != null) {
-            AppText(text = note, style = AppTextStyle.Body)
-        }
-        AppText(
-            text = provider.host,
-            style = AppTextStyle.Secondary,
-            color = appSecondaryTextColor,
-            fontFamily = tokens.monoFontFamily,
-        )
-        provider.websiteUrl?.takeIf { it.isNotBlank() }?.let { website ->
-            AppActionRow(
-                text = stringResource(Res.string.editor_website) + ": " + website,
-                onClick = { openExternalUrl(website) },
-                modifier = Modifier.padding(top = 4.dp),
-                inset = false,
-            )
-        }
         Row(
-            modifier = Modifier.padding(top = tokens.itemSpacing),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            provider.protocols.forEach { protocol -> AppChip(text = protocolLabel(protocol)) }
-        }
-        provider.reachabilityLatencyMs?.let { latency ->
-            AppText(
-                text = stringResource(Res.string.detail_reachability_latency, latency),
-                style = AppTextStyle.Footnote,
-                color = appSecondaryTextColor,
-                modifier = Modifier.padding(top = tokens.itemSpacing),
-            )
-        }
-        // 余额：三种状态要可区分（§9.3）——有金额 / 查询失败 / 没配置。
-        val balance = provider.balance
-        val balanceFailed = balance == null && provider.balanceFailed
-        Row(
-            modifier = Modifier.padding(top = tokens.itemSpacing),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
+                provider.note?.let { note ->
+                    AppText(text = note, style = AppTextStyle.Body)
+                }
+                val site = website ?: provider.host
+                if (site.isNotBlank()) {
+                    // 不设 maxLines：这是唯一完整展示官网地址的地方，截断会让人看不出
+                    // 到底是哪个域名。长了就换行，右侧的延迟照样与整块上下居中。
+                    AppText(
+                        text = site,
+                        style = AppTextStyle.Secondary,
+                        color = appSecondaryTextColor,
+                        fontFamily = tokens.monoFontFamily,
+                        modifier = if (website == null) {
+                            Modifier
+                        } else {
+                            Modifier.clickable { openExternalUrl(website) }
+                        },
+                    )
+                }
+            }
+            provider.reachabilityLatencyMs?.let { latency ->
                 AppText(
-                    text = stringResource(Res.string.detail_provider_balance_total),
+                    text = stringResource(Res.string.detail_reachability_latency, latency),
                     style = AppTextStyle.Footnote,
                     color = appSecondaryTextColor,
                 )
+            }
+        }
+        // 协议 = 这家所有模型的协议并集（在 ViewModel 里算好）。配了某个协议但一个
+        // 模型都没跑它，就不该在这里出现。
+        if (provider.protocols.isNotEmpty()) {
+            Row(
+                modifier = Modifier.padding(top = tokens.itemSpacing),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                provider.protocols.forEach { protocol -> AppChip(text = protocolLabel(protocol)) }
+            }
+        }
+    }
+}
+
+/**
+ * 余额卡。金额与「什么时候查的」必须一起给：一个没有时间的数字，用户没法判断
+ * 它是刚查到的还是三天前的。三种状态在这里都可分辨——有金额 / 查询失败 / 还没查过。
+ */
+@Composable
+private fun BalanceCard(state: ProviderDetailUiState) {
+    val tokens = LocalAppTokens.current
+    val provider = state.provider
+    val balance = provider.balance
+    val balanceFailed = balance == null && provider.balanceFailed
+    AppCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = tokens.screenPadding),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AppText(
+                text = stringResource(Res.string.detail_provider_balance_total),
+                style = AppTextStyle.Footnote,
+                color = appSecondaryTextColor,
+                modifier = Modifier.weight(1f),
+            )
+            provider.balanceCheckedAt?.let { checkedAt ->
                 AppText(
-                    text = when {
-                        balance != null -> balance.toDisplay()
-                        balanceFailed -> stringResource(Res.string.balance_failed_section)
-                        else -> stringResource(Res.string.dashboard_balance_none)
-                    },
-                    style = if (balanceFailed) AppTextStyle.Secondary else AppTextStyle.Title,
-                    color = if (balanceFailed) LocalStatusPalette.current.warn else Color.Unspecified,
+                    text = relativeLabel(state.nowMs, checkedAt),
+                    style = AppTextStyle.Footnote,
+                    color = appSecondaryTextColor,
                 )
             }
-            AppIconButton(
-                icon = AppIcon.Refresh,
-                contentDescription = stringResource(Res.string.detail_balance_refresh),
-                onClick = onRefreshBalance,
-            )
         }
+        AppText(
+            text = when {
+                balance != null -> balance.toDisplay()
+                balanceFailed -> stringResource(Res.string.balance_failed_section)
+                else -> stringResource(Res.string.detail_balance_not_checked)
+            },
+            style = if (balanceFailed) AppTextStyle.Secondary else AppTextStyle.Title,
+            color = if (balanceFailed) LocalStatusPalette.current.warn else Color.Unspecified,
+            modifier = Modifier.padding(top = 4.dp),
+        )
     }
 }
 

@@ -107,7 +107,6 @@ class RoomBackupStore constructor(
                     label = key.label,
                     note = key.note,
                     secret = secret.concatToString(),
-                    enabled = key.enabled,
                     sortOrder = key.sortOrder,
                     settings = settings?.let { entity ->
                         BackupKeySettings(
@@ -182,7 +181,6 @@ class RoomBackupStore constructor(
                 displayName = entity.displayName,
                 source = entity.source,
                 discoveredVia = entity.discoveredVia,
-                enabled = entity.enabled,
                 favorite = entity.favorite,
                 needsReview = entity.needsReview,
                 catalogKey = entity.catalogKey,
@@ -302,7 +300,6 @@ class RoomBackupStore constructor(
                     note = key.note,
                     secretEnc = ByteArray(0),
                     fingerprint = fingerprint,
-                    enabled = key.enabled,
                     sortOrder = key.sortOrder,
                     createdAt = stamp,
                     updatedAt = stamp,
@@ -420,7 +417,6 @@ class RoomBackupStore constructor(
                 displayName = model.displayName,
                 source = model.source,
                 discoveredVia = model.discoveredVia,
-                enabled = model.enabled,
                 favorite = model.favorite,
                 needsReview = model.needsReview,
                 catalogKey = model.catalogKey,

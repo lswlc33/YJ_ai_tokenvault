@@ -49,8 +49,6 @@ interface ApiKeyRepository {
     /** 解出余额访问令牌明文。返回的数组归调用方擦。 */
     suspend fun revealBalanceToken(id: Long): CharArray?
 
-    suspend fun setEnabled(id: Long, enabled: Boolean)
-
     /** 删除这把 Key（连同它的 KeySettings 与模型）。返回可撤销句柄。 */
     suspend fun delete(id: Long): UndoableDeletion?
 

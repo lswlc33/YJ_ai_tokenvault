@@ -53,6 +53,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -97,6 +98,28 @@ class ProbeEngine constructor(
     private var modelJob: Job? = null
     private var statusJob: Job? = null
     private var quickModelJob: Job? = null
+
+    /**
+     * 一轮结束的通知，给界面发"探测结果"提示用。
+     *
+     * 为什么由引擎发而不是让每个页面自己等：[start] / [probeProvider] / [probeKey] 全是
+     * 发起即返回，页面拿不到"什么时候跑完"。放在这里一处发，四处都能收到同一个结论。
+     */
+    data class RoundResult(
+        val total: Int,
+        val ok: Int,
+        val fail: Int,
+        val cancelled: Boolean,
+    )
+
+    /** 模型列表刷新结束的通知。discovered 是本轮拿到的模型条数。 */
+    data class ModelRefreshResult(val discovered: Int, val failed: Boolean)
+
+    private val _roundResults = MutableSharedFlow<RoundResult>(extraBufferCapacity = 8)
+    val roundResults: SharedFlow<RoundResult> = _roundResults.asSharedFlow()
+
+    private val _modelResults = MutableSharedFlow<ModelRefreshResult>(extraBufferCapacity = 8)
+    val modelResults: SharedFlow<ModelRefreshResult> = _modelResults.asSharedFlow()
 
     private val _progress = MutableStateFlow<ProbeProgress?>(null)
     val progress: StateFlow<ProbeProgress?> = _progress.asStateFlow()
@@ -181,7 +204,9 @@ class ProbeEngine constructor(
         modelJob = scope.launch {
             autoLocker.pauseIdleLock()
             try {
-                refreshModelsInner(providerId, keyId)
+                // 结果在编排外面发：里面有好几条提前返回（没开自动获取 / 没有可用 Key），
+                // 只有在唯一出口发才能保证"开始刷新"之后一定有"刷完了"。
+                _modelResults.tryEmit(refreshModelsInner(providerId, keyId))
             } finally {
                 autoLocker.resumeIdleLock()
             }
@@ -189,21 +214,21 @@ class ProbeEngine constructor(
         return true
     }
 
-    private suspend fun refreshModelsInner(providerId: Long, keyId: Long?) {
+    private suspend fun refreshModelsInner(providerId: Long, keyId: Long?): ModelRefreshResult {
         val provider = providers.observeSummaries().first()
             .map { it.provider }
             .firstOrNull { it.id == providerId }
-            ?: return
+            ?: return ModelRefreshResult(discovered = 0, failed = true)
 
         val selectedKeys = keys.observeAll().first()
             .filter {
                 it.providerId == providerId &&
-                    it.enabled &&
                     (keyId == null || it.id == keyId) &&
                     it.settings.probe.enabled &&
                     it.settings.probe.models
             }
-        if (selectedKeys.isEmpty()) return
+        // 没开自动获取：什么都没做，但这不是失败——按钮本来就是给自动获取用的。
+        if (selectedKeys.isEmpty()) return ModelRefreshResult(discovered = 0, failed = false)
 
         val profileList = clientProfiles.observeAll().first()
         val defaultProfile = profileList.firstOrNull { it.builtinKey == "default" }
@@ -309,19 +334,22 @@ class ProbeEngine constructor(
             message = "models refreshed",
             detail = "provider=$providerId tasks=${tasks.size} ok=$ok fail=$fail models=$discovered",
         )
+        return ModelRefreshResult(discovered = discovered, failed = fail > 0 && ok == 0)
     }
 
     /**
      * 只刷新供应商可达性延迟。这个入口绝不 reveal 密钥，也不更新密钥健康，
      * 供仪表盘 / 管理页右上角的刷新按钮与余额查询并列使用。
+     *
+     * @param providerId 只查这一家的官网；null 表示全部（首页 / 管理页的批量刷新）。
      */
-    fun refreshReachability(): Boolean {
+    fun refreshReachability(providerId: Long? = null): Boolean {
         if (statusJob?.isActive == true) return false
         if (!session.isUnlocked) return false
         statusJob = scope.launch {
             autoLocker.pauseIdleLock()
             try {
-                refreshReachabilityInner()
+                refreshReachabilityInner(providerId)
             } finally {
                 autoLocker.resumeIdleLock()
             }
@@ -329,10 +357,10 @@ class ProbeEngine constructor(
         return true
     }
 
-    private suspend fun refreshReachabilityInner() {
+    private suspend fun refreshReachabilityInner(providerId: Long?) {
         val providerList = providers.observeSummaries().first()
             .map { it.provider }
-            .filter { !it.websiteUrl.isNullOrBlank() }
+            .filter { !it.websiteUrl.isNullOrBlank() && (providerId == null || it.id == providerId) }
         if (providerList.isEmpty()) return
 
         for (provider in providerList) {
@@ -559,7 +587,7 @@ class ProbeEngine constructor(
         val sniffEnabled = settings.observeSniffClientProfile().first()
 
         val plan: ProbePlan = ProbePlanBuilder.build(providerList) { pid ->
-            allKeys.filter { it.providerId == pid && it.enabled }
+            allKeys.filter { it.providerId == pid }
         }
 
         fun profileOf(id: Long?): ClientProfile? =
@@ -760,7 +788,7 @@ class ProbeEngine constructor(
         // 独立的 GET。这条路径只在必要時触发，避免常见场景双倍请求。
         allKeys
             .filter { key ->
-                key.enabled && key.settings.probe.enabled && key.settings.probe.models &&
+                key.settings.probe.enabled && key.settings.probe.models &&
                     tasks.none { it.keyId == key.id }
             }
             .forEach { key -> refreshModelsInner(key.providerId, key.id) }
@@ -837,6 +865,7 @@ class ProbeEngine constructor(
             detail = "total=$total ok=$ok fail=$fail cancelled=$cancelled",
         )
         _progress.value = null
+        _roundResults.tryEmit(RoundResult(total = total, ok = ok, fail = fail, cancelled = cancelled))
     }
 
     // ------------------------------------------------------------------ 组装

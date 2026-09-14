@@ -18,7 +18,6 @@ class ProbePlanBuilderTest {
     private fun key(
         id: Long,
         providerId: Long,
-        enabled: Boolean = true,
         baseUrl: String = "https://api$providerId.example.test/v1",
         protocols: Set<Protocol> = setOf(Protocol.CHAT),
         probe: KeyProbeSettings = KeyProbeSettings(),
@@ -29,7 +28,6 @@ class ProbePlanBuilderTest {
         note = "",
         secretEnc = ByteArray(0),
         fingerprint = "fp$id",
-        enabled = enabled,
         settings = KeySettings(
             apiBaseUrl = baseUrl,
             apiRoot = baseUrl.removeSuffix("/v1"),
@@ -64,18 +62,17 @@ class ProbePlanBuilderTest {
     }
 
     @Test
-    fun `L2 只为启用的 Key 生成`() {
+    fun `每把 Key 都生成 L2`() {
         val p = provider(1)
         val keys = listOf(
-            key(10, 1, enabled = true),
-            key(11, 1, enabled = false),
-            key(12, 2, enabled = true),
+            key(10, 1),
+            key(11, 1),
+            key(12, 1),
         )
         val plan = ProbePlanBuilder.build(listOf(p)) { pid -> keys.filter { it.providerId == pid } }
 
         val l2 = plan.tasks.filter { it.level == ProbeLevel.L2_KEY_VALIDITY }
-        assertEquals(1, l2.size)
-        assertEquals(10L, l2.single().keyId)
+        assertEquals(setOf(10L, 11L, 12L), l2.map { it.keyId }.toSet())
     }
 
     @Test
@@ -100,12 +97,12 @@ class ProbePlanBuilderTest {
     }
 
     @Test
-    fun `host 预算基数等于该 host 的启用 Key 数`() {
+    fun `host 预算基数等于该 host 的 Key 数`() {
         val p = provider(1)
-        val keys = listOf(key(10, 1), key(11, 1), key(12, 1, enabled = false))
+        val keys = listOf(key(10, 1), key(11, 1), key(12, 1))
         val plan = ProbePlanBuilder.build(listOf(p)) { pid -> keys.filter { it.providerId == pid } }
 
-        assertEquals(2, plan.perHostKeyAndModelCount["api1.example.test"])
+        assertEquals(3, plan.perHostKeyAndModelCount["api1.example.test"])
     }
 
     @Test

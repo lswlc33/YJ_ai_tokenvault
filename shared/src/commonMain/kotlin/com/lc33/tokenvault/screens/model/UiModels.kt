@@ -38,7 +38,11 @@ data class UiProviderRow(
     val note: String?,
     val websiteUrl: String? = null,
     val host: String,
-    val protocols: List<String>,
+    /**
+     * 这家实际用到的协议（取所有模型的协议并集）。**只有供应商详情页用它**：
+     * 列表页的合集卡片不画协议——协议属于 Key，并成一排 chip 会被读成"这家支持这些"。
+     */
+    val protocols: List<String> = emptyList(),
     val colorIndex: Int,
     val pinned: Boolean,
     val groupId: Long?,
@@ -63,6 +67,15 @@ data class UiProviderRow(
      * 会在余额明细里被列到“查询失败”下面，于是用户去查一个不存在的故障。
      */
     val balanceFailed: Boolean = false,
+    /**
+     * 余额查询**配置过**：这家至少有一把 Key 选了余额类型。
+     *
+     * 与"有金额"是两件事。配了但还没查过，详情页也要摆出这一块（金额位置写"还没有查询过"）；
+     * 一次都没配的供应商则整块不出现——否则会永远挂着一句"还没有配置"占屏。
+     */
+    val balanceConfigured: Boolean = false,
+    /** 余额快照的查询时间。null = 还没查过。 */
+    val balanceCheckedAt: Long? = null,
     val health: UiHealth,
     /** `lastOutcome` 是瞬时类时为真：主状态仍是上一次的持久结论（红线 11）。 */
     val staleThisRound: Boolean = false,
@@ -99,10 +112,11 @@ data class UiKeyRow(
      * `relativeBucketOf` + `relativeTimeLabel` 现做——那两个函数本来就是为此拆开的。
      */
     val checkedAt: Long?,
-    val enabled: Boolean,
     val sortOrder: Int,
     val balance: UiMoney? = null,
     val balanceFailed: Boolean = false,
+    /** 余额快照的查询时间。null = 还没查过（与"有金额"是两回事）。 */
+    val balanceCheckedAt: Long? = null,
     val settings: UiKeySettingsSummary = UiKeySettingsSummary(),
 )
 
@@ -140,7 +154,6 @@ data class UiModelRow(
     val protocol: String,
     val source: UiModelSource,
     val health: UiHealth,
-    val enabled: Boolean,
     val contextLabel: String?,
     val lastSeenAt: Long? = null,
     val probedAt: Long? = null,

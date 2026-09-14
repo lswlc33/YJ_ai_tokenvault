@@ -134,10 +134,9 @@ data class ModelEntity(
     /** `manual` | `discovered`。手动录入的**永不被自动同步改动**（红线 13）。 */
     val source: String = "manual",
 
-    /** 这一行从哪个协议的列表里发现的。"上游消失即停用"只在同协议内生效（红线 30）。 */
+    /** 这一行从哪个协议的列表里发现的。"上游消失即删除"只在同协议内生效（红线 30）。 */
     val discoveredVia: String? = null,
 
-    val enabled: Boolean = true,
     val favorite: Boolean = false,
     val needsReview: Boolean = false,
     val catalogKey: String? = null,
@@ -209,9 +208,13 @@ data class ProbeRunEntity(
 /**
  * 日志。
  *
- * [message] 与 [detail] **入库前必须过 `Redactor.scrub`**（红线 32）。这一层不做脱敏——
- * 脱敏需要"当前会话已知的秘密"，那是 `VaultSession` 的知识；放在这里会变成
- * "有时候脱敏了有时候没脱"。
+ * [message] / [detail] / 三个报文列**入库前都必须过 `Redactor.scrub`**（红线 32）。
+ * 这一层不做脱敏——脱敏需要"当前会话已知的秘密"，那是 `VaultSession` 的知识；
+ * 放在这里会变成"有时候脱敏了有时候没脱"。
+ *
+ * [requestUrl] / [requestBody] / [responseBody] 只有 HTTP 类日志才填（"网络请求需要完整
+ * 记录"），点击这类日志进详情页看原文。**请求头永不落库**：那里是 `Authorization`，
+ * 而 body 里的密钥由凭据列表那道脱敏兜住。
  */
 @Entity(
     tableName = "audit_log",
@@ -229,6 +232,11 @@ data class AuditLogEntity(
     val runId: Long? = null,
     val message: String,
     val detail: String? = null,
+
+    /** 请求地址（已去掉 query 与 fragment，路径保留）。 */
+    val requestUrl: String? = null,
+    val requestBody: String? = null,
+    val responseBody: String? = null,
 )
 
 /**

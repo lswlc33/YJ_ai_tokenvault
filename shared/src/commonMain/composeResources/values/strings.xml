@@ -78,7 +78,6 @@
     <string name="manage_default_key">Default</string>
     <string name="manage_source_manual">Manual</string>
     <string name="manage_source_discovered">Discovered</string>
-    <string name="manage_disabled">Disabled</string>
     <string name="manage_local_only">Local record only</string>
     <string name="manage_keys_ratio">%1$d / %2$d keys</string>
     <string name="manage_models_count">%1$d models</string>
@@ -281,6 +280,11 @@
     <string name="log_clear_confirm_title">Clear all logs?</string>
     <string name="log_clear_confirm_body">Log entries cannot be recovered. Your data and settings are not affected.</string>
     <string name="log_title">Log</string>
+    <string name="log_detail_title">Request preview</string>
+    <string name="log_detail_request_url">Request URL</string>
+    <string name="log_detail_response_body">Response body</string>
+    <string name="log_detail_request_body">Request body</string>
+    <string name="log_detail_body_empty">(empty)</string>
     <string name="log_empty_title">No entries</string>
     <string name="log_empty">Probes, balances, backups, network requests and data changes show up here, redacted before they are written.</string>
 
@@ -570,6 +574,7 @@
 
     <!-- ==================== M1 lock gate: onboarding, unlock ==================== -->
     <string name="dialog_cancel">Cancel</string>
+    <string name="common_close">Close</string>
 
     <!-- Snackbar feedback. Every message shows a close button; only deletions add an undo action. -->
     <string name="common_undo">Undo</string>
@@ -583,6 +588,11 @@
     <string name="feedback_account_saved">Account saved</string>
     <string name="feedback_probe_key_sent">Probing this key…</string>
     <string name="feedback_probe_started">Probe started</string>
+    <string name="feedback_probe_all_ok">Probe finished, all succeeded</string>
+    <string name="feedback_probe_has_failure">Probe finished with failures, see the log</string>
+    <string name="feedback_probe_nothing">Nothing to probe</string>
+    <string name="feedback_models_refresh_failed">Model list refresh failed</string>
+    <string name="feedback_models_refreshing">Refreshing the model list…</string>
     <string name="feedback_model_saved">Model saved</string>
     <string name="feedback_group_added">Group added</string>
     <string name="feedback_group_renamed">Group renamed</string>
@@ -596,7 +606,6 @@
     <string name="feedback_clipboard_empty">Clipboard is empty</string>
     <string name="feedback_probe_cancelled">Probe cancelled</string>
     <string name="feedback_balance_refreshed">Balances refreshed</string>
-    <string name="feedback_status_refreshed">Status refreshed</string>
     <string name="feedback_models_refreshed">Model list refreshed</string>
     <string name="feedback_model_probed">Model probed</string>
     <string name="feedback_probe_retried">Retrying failed items</string>
@@ -677,7 +686,7 @@
     <string name="detail_account_password">Password</string>
     <string name="detail_balance_refresh">Check balance</string>
     <string name="detail_probe_provider">Probe this provider</string>
-    <string name="detail_key_view">View</string>
+    <string name="detail_key_view">View key</string>
     <string name="detail_key_connection_base_url">Base URL</string>
     <string name="detail_key_connection_protocol">Protocols</string>
     <string name="detail_key_connection_auth">Auth style</string>
@@ -692,7 +701,7 @@
     <string name="detail_key_more_cd">More actions</string>
     <string name="detail_probe_key">Probe this key</string>
     <string name="detail_probe_model_cd">Probe this model</string>
-    <string name="detail_provider_balance_total">Provider total</string>
+    <string name="detail_provider_balance_total">Total balance</string>
     <string name="detail_key_balance_value">This key: %1$s %2$s</string>
     <string name="protocol_chat">Chat</string>
     <string name="protocol_responses">Responses</string>
@@ -716,11 +725,16 @@
     <string name="detail_model_id">Model ID</string>
     <string name="detail_model_display_name">Display name</string>
     <string name="detail_model_protocol">Protocol</string>
-    <string name="detail_model_enabled">Enabled</string>
     <string name="detail_model_delete">Delete this model?</string>
     <string name="detail_model_delete_action">Delete model</string>
     <string name="detail_models_quick_hint">Long-press a model to send one short request.</string>
-    <string name="detail_reachability_latency">Provider latency: %1$d ms</string>
+    <string name="detail_models_count_auto">%1$d models (auto-synced)</string>
+    <string name="detail_models_count_manual">%1$d models</string>
+    <string name="detail_reachability_latency">%1$d ms</string>
+    <string name="detail_key_full_content">Full key contents</string>
+    <string name="detail_models_count_short">%1$d</string>
+    <string name="detail_models_expand_cd">Expand models</string>
+    <string name="detail_models_collapse_cd">Collapse models</string>
     <string name="detail_account_login_methods">Login methods</string>
     <string name="detail_add_account">Add account</string>
     <string name="login_method_password">Password login</string>
@@ -731,6 +745,8 @@
     <string name="login_method_github">GitHub</string>
     <string name="login_method_linuxdo">LINUX DO</string>
     <string name="refresh_status_cd">Refresh balance and provider latency</string>
+    <string name="probe_provider_cd">Probe everything for this provider</string>
+    <string name="detail_balance_not_checked">Not queried yet</string>
 
     <!-- Probe defaults. -->
     <string name="editor_probe_model_reachability">Model reachability probe (quick)</string>
@@ -746,7 +762,6 @@
     <string name="about_open_source_summary">View the libraries included in this app and their licenses.</string>
     <string name="key_sort_up">Move up</string>
     <string name="key_sort_down">Move down</string>
-    <string name="key_enabled">Enabled</string>
     <string name="key_settings_title">Key settings</string>    <string name="licenses_title">Open-source licenses</string>
     <string name="licenses_intro">Libraries included in this app and their licenses.</string>
     <string name="licenses_copyright_label">Copyright</string>

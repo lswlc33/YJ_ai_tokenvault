@@ -14,19 +14,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.health_stale_this_round
-import tokenvault.shared.generated.resources.balance_failed_section
 import tokenvault.shared.generated.resources.manage_context
-import tokenvault.shared.generated.resources.detail_key_balance_value
 import tokenvault.shared.generated.resources.detail_key_models_refresh
 import tokenvault.shared.generated.resources.detail_account_password
-import tokenvault.shared.generated.resources.manage_default_key
-import tokenvault.shared.generated.resources.manage_disabled
 import tokenvault.shared.generated.resources.manage_keys_ratio
 import tokenvault.shared.generated.resources.manage_latency
 import tokenvault.shared.generated.resources.manage_latency_time
@@ -189,19 +184,13 @@ internal fun ProviderRow(
                 }
             }
         }
+        // 协议不在这里画：它属于 Key（同一家可以有的 Key 走 Chat、有的走 Anthropic），
+        // 在一张合集卡片上并成一排 chip 只能表达"这家用过这些协议"，读起来却像"这家支持这些"。
+        // 要看协议就进详情页——那里按 Key 说清楚。
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = tokens.itemSpacing),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            row.protocols.forEach { protocol -> AppChip(text = protocolLabel(protocol)) }
-        }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
         ) {
             AppText(
@@ -249,6 +238,23 @@ private fun SelectionMark(selected: Boolean) {
     }
 }
 
+/**
+ * 密钥行。供应商预览与密钥预览两处共用，行里只有三样东西：
+ *
+ * ```
+ * ● 可达性   备注
+ * sk-xxxx…xxxx        （半遮盖）
+ * 222 毫秒 · 3 分钟前
+ * ```
+ *
+ * 三条边界：
+ *
+ * - **余额不在这里**。它是独立的一块（供应商预览有合计卡，密钥预览有单独的卡），
+ *   混进这行会让"这一行说的是什么"变得说不清。
+ * - **不在这里写密钥名称**：名称是卡片/页面的标题级信息，行里放不下两段标题，
+ *   放进来还会把"可达性"挤到第二行。
+ * - 时间用 [relativeLabel]，相对时间的文案与分档都在 `strings.xml` 里。
+ */
 @Composable
 internal fun KeyRow(
     row: UiKeyRow,
@@ -273,50 +279,57 @@ internal fun KeyRow(
             AppIconTint(icon = AppIcon.Forward, size = 18.dp, tint = appSecondaryTextColor)
         },
     ) {
-        AppText(text = row.label, style = AppTextStyle.Body, maxLines = 1)
-        AppText(
-            text = row.masked,
-            style = AppTextStyle.Footnote,
-            color = appSecondaryTextColor,
-            fontFamily = tokens.monoFontFamily,
-            maxLines = 1,
-        )
         Row(
-            modifier = Modifier.padding(top = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             StatusDot(color = colorOf(row.health), label = labelOf(row.health))
-            val balance = row.balance
-            when {
-                balance != null -> AppText(
-                    text = stringResource(
-                        Res.string.detail_key_balance_value,
-                        balance.currency,
-                        balance.amount,
-                    ),
-                    style = AppTextStyle.Footnote,
-                )
-                row.balanceFailed -> AppText(
-                    text = stringResource(Res.string.balance_failed_section),
+            if (row.note.isNotBlank()) {
+                AppText(
+                    text = row.note,
                     style = AppTextStyle.Footnote,
                     color = appSecondaryTextColor,
+                    maxLines = 1,
                 )
             }
         }
+        AppText(
+            text = row.masked,
+            style = AppTextStyle.Body,
+            fontFamily = tokens.monoFontFamily,
+            maxLines = 1,
+            modifier = Modifier.padding(top = 4.dp),
+        )
         if (timingText != null) {
             AppText(
                 text = timingText,
                 style = AppTextStyle.Footnote,
                 color = appSecondaryTextColor,
+                modifier = Modifier.padding(top = 4.dp),
             )
         }
     }
 }
 
+/**
+ * 模型行。
+ *
+ * 形状由四条决定：
+ *
+ * 1. **探测结论挪到右侧**：结论就一个词（可用 / 未探测），单独占一行会把每个模型撑到
+ *    三行高，一屏看不了几个。放到右侧与整行上下居中后，模型行稳定在两行。
+ * 2. **没开模型可达探测就不画结论**（[showProbe]）：那种情况下结论恒为「未探测」，
+ *    摆一排灰点是在反复说明"这里没有信息"。右侧那时是空的，也省掉了那点宽度。
+ * 3. **协议可选**（[showProtocol]）：协议在一份模型列表里往往整列相同（就是一个站
+ *    提供的接口形态），一屏排二十个一模一样的 chip 只是在占地方。供应商预览页不画它。
+ * 4. **自动获取的列表不可点**：[onClick] 为空时不画箭头、不响应点击——列表由上游同步
+ *    维护，改一个下次同步就会被覆盖的字段没有意义（红线 13）。
+ */
 @Composable
 internal fun ModelRow(
     row: UiModelRow,
+    showProbe: Boolean,
+    showProtocol: Boolean = true,
     onClick: (() -> Unit)? = null,
     onLongPress: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
@@ -327,21 +340,29 @@ internal fun ModelRow(
         onClick = onClick,
         onLongPress = onLongPress,
         endActions = {
-            AppIconTint(icon = AppIcon.Forward, size = 18.dp, tint = appSecondaryTextColor)
+            if (showProbe) {
+                StatusDot(color = colorOf(row.health), label = labelOf(row.health))
+            }
+            // 箭头只在"点得动"时出现：它在这套界面里的含义是"还能进下一页 / 打开编辑"。
+            if (onClick != null) {
+                AppIconTint(icon = AppIcon.Forward, size = 18.dp, tint = appSecondaryTextColor)
+            }
         },
     ) {
         AppText(
             text = row.modelId,
             style = AppTextStyle.Body,
             fontFamily = tokens.monoFontFamily,
-            color = if (row.enabled) Color.Unspecified else appSecondaryTextColor,
             maxLines = 1,
         )
         Row(
             modifier = Modifier.padding(top = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            AppChip(text = protocolLabel(row.protocol))
+            if (showProtocol) {
+                AppChip(text = protocolLabel(row.protocol))
+            }
             AppChip(
                 text = stringResource(
                     when (row.source) {
@@ -350,19 +371,12 @@ internal fun ModelRow(
                     },
                 ),
             )
-            if (!row.enabled) AppChip(text = stringResource(Res.string.manage_disabled))
-        }
-        Row(
-            modifier = Modifier.padding(top = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            StatusDot(color = colorOf(row.health), label = labelOf(row.health))
             row.contextLabel?.let { context ->
                 AppText(
                     text = stringResource(Res.string.manage_context, context),
                     style = AppTextStyle.Footnote,
                     color = appSecondaryTextColor,
+                    maxLines = 1,
                 )
             }
         }

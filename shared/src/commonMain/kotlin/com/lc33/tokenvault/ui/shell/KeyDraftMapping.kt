@@ -33,7 +33,6 @@ fun ApiKey.toDraft(profiles: List<ClientProfile>): KeyDraft = KeyDraft(
     providerId = providerId,
     label = label,
     note = note,
-    enabled = enabled,
     sortOrder = sortOrder,
     baseUrl = settings.apiBaseUrl,
     protocols = settings.supportedProtocols,

@@ -37,7 +37,7 @@ class BalanceEngine constructor(
     suspend fun refreshAll(): Int {
         val allKeys = keys.observeAll().first()
         var refreshed = 0
-        for (key in allKeys.filter { it.enabled && it.settings.probe.enabled && it.settings.probe.balance }) {
+        for (key in allKeys.filter { it.settings.probe.enabled && it.settings.probe.balance }) {
             if (key.settings.balanceKind == BalanceKind.NONE) continue
             if (refreshKey(key) != null) refreshed++
         }
@@ -47,7 +47,7 @@ class BalanceEngine constructor(
     suspend fun refresh(providerId: Long, keyId: Long? = null): List<BalanceSnapshot> {
         val provider = providers.find(providerId) ?: return emptyList()
         val selected = keys.observeByProvider(providerId).first()
-            .filter { it.enabled && (keyId == null || it.id == keyId) }
+            .filter { keyId == null || it.id == keyId }
         return selected.mapNotNull { key ->
             if (!key.settings.probe.enabled || !key.settings.probe.balance) return@mapNotNull null
             refreshKey(key)

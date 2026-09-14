@@ -11,6 +11,7 @@ import com.lc33.tokenvault.domain.Protocol
  * API 密钥。
  *
  * v3 起 [settings] 保存全部请求与探测配置；`isDefault` 已取消，排序本身就是优先级。
+ * 没有「启用 / 停用」这一档：不想用了就删掉，一份半死的配置比没有配置更难排查。
  */
 data class ApiKey(
     val id: Long = 0,
@@ -19,7 +20,6 @@ data class ApiKey(
     val note: String = "",
     val secretEnc: ByteArray,
     val fingerprint: String,
-    val enabled: Boolean = true,
     val settings: KeySettings,
 
     val health: KeyHealth = KeyHealth.UNKNOWN,
@@ -43,7 +43,6 @@ data class ApiKey(
             note == other.note &&
             secretEnc.contentEquals(other.secretEnc) &&
             fingerprint == other.fingerprint &&
-            enabled == other.enabled &&
             settings == other.settings &&
             health == other.health &&
             lastOutcome == other.lastOutcome &&
@@ -119,7 +118,7 @@ data class ProviderAccount(
     }
 }
 
-/** 模型。协议属于它，不属于供应商（红线 18）。 */
+/** 模型。协议属于它，不属于供应商（红线 18）。没有启用状态：上游没了就删除（红线 13）。 */
 data class AiModel(
     val id: Long = 0,
     val providerId: Long,
@@ -129,7 +128,6 @@ data class AiModel(
     val displayName: String? = null,
     val source: ModelSource = ModelSource.MANUAL,
     val discoveredVia: Protocol? = null,
-    val enabled: Boolean = true,
     val favorite: Boolean = false,
     val needsReview: Boolean = false,
     val catalogKey: String? = null,

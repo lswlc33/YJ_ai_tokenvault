@@ -147,11 +147,6 @@ class RoomApiKeyRepository constructor(
         }
     }
 
-    override suspend fun setEnabled(id: Long, enabled: Boolean) {
-        dao.setEnabled(id, enabled, now())
-        audit.recordSafe(LogLevel.INFO, LogCategory.VAULT, "api key enabled changed", "id=$id enabled=$enabled", keyId = id)
-    }
-
     override suspend fun delete(id: Long): UndoableDeletion? {
         val undo = restorer?.deleteKey(id)
         if (restorer == null) dao.delete(id)

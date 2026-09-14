@@ -1,11 +1,13 @@
 package com.lc33.tokenvault.ui.shell
 
+import com.lc33.tokenvault.domain.BalanceKind
 import com.lc33.tokenvault.domain.BalanceState
 import com.lc33.tokenvault.domain.KeyHealth
 import com.lc33.tokenvault.domain.ModelProbeState
 import com.lc33.tokenvault.domain.ModelSource
 import com.lc33.tokenvault.balance.FormatMoney
 import com.lc33.tokenvault.domain.ProbeOutcome
+import com.lc33.tokenvault.domain.Protocol
 import com.lc33.tokenvault.domain.model.AiModel
 import com.lc33.tokenvault.domain.model.ApiKey
 import com.lc33.tokenvault.domain.model.BalanceSnapshot
@@ -136,10 +138,12 @@ fun ProviderSummary.toRow(
     health: UiHealth,
     balance: BalanceSnapshot?,
     host: String,
-    protocols: List<String>,
+    /** 只有供应商详情页传它；列表页的卡片不画协议。 */
+    protocols: List<String> = emptyList(),
     keys: List<UiKeyRow> = emptyList(),
     staleThisRound: Boolean = false,
     lastProbeAt: Long? = null,
+    balanceConfigured: Boolean = false,
 ): UiProviderRow =
     UiProviderRow(
         id = provider.id,
@@ -159,6 +163,8 @@ fun ProviderSummary.toRow(
         balance = balance.toUiMoney(),
         // “试过但失败”与“压根没查过”必须分开（§9.3），而 toUiMoney 两者都给 null
         balanceFailed = balance?.failed == true,
+        balanceConfigured = balanceConfigured,
+        balanceCheckedAt = balance?.checkedAt,
         health = health,
         staleThisRound = staleThisRound,
         sortOrder = provider.sortOrder,
@@ -167,20 +173,32 @@ fun ProviderSummary.toRow(
         keys = keys,
     )
 
-/** 供应商合集展示用的 host：取排序第一的启用 Key。没有 Key 时给空串。 */
+/** 供应商合集展示用的 host：取排序第一把 Key。没有 Key 时给空串。 */
 fun providerHostOf(keys: List<ApiKey>): String =
-    keys.filter { it.enabled }
-        .minWithOrNull(compareBy({ it.sortOrder }, { it.id }))
+    keys.minWithOrNull(compareBy({ it.sortOrder }, { it.id }))
         ?.settings?.apiRoot
         ?.let { hostOf(it) }
         .orEmpty()
 
-/** 供应商合集展示用的协议集合：合并所有启用 Key 的协议，顺序保持枚举声明。 */
-fun providerProtocolsOf(keys: List<ApiKey>): List<String> =
-    keys.filter { it.enabled }
-        .flatMap { it.settings.supportedProtocols }
-        .distinct()
+/**
+ * 供应商合集展示用的协议集合。 *
+ * 取这家**所有模型**的协议并集，而不是 Key 上配的 `supportedProtocols`：
+ * 配了不等于用得上，一个协议只要有模型在跑就说明这家真的走它。顺序保持枚举声明，
+ * 同一协议的多个模型只出一枚 chip。
+ */
+fun providerProtocolsOf(models: List<AiModel>): List<String> =
+    Protocol.entries
+        .filter { protocol -> models.any { it.protocol == protocol } }
         .map { it.wireName }
+
+/**
+ * 这家配置过余额查询没有：只要有一把 Key 选了余额类型就算配过。
+ *
+ * 余额类型挂在 Key 上（v3 起），所以"这家配没配"只能由它的 Key 合集回答。
+ * 没配的供应商不展示余额块。
+ */
+fun balanceConfiguredOf(keys: List<ApiKey>): Boolean =
+    keys.any { it.settings.balanceKind != BalanceKind.NONE }
 
 /**
  * 分组筛选条。**第一枚是「全部」那个伪分组**（`id == null`，不入库）。
@@ -211,10 +229,10 @@ fun ApiKey.toRow(masked: String, clientProfileName: String? = null): UiKeyRow = 
     health = health.toUi(),
     latencyMs = latencyMs,
     checkedAt = checkedAt,
-    enabled = enabled,
     sortOrder = sortOrder,
     balance = balance.toUiMoney(),
     balanceFailed = balance?.failed == true,
+    balanceCheckedAt = balance?.checkedAt,
     settings = UiKeySettingsSummary(
         apiBaseUrl = settings.apiBaseUrl,
         apiRoot = settings.apiRoot,
@@ -238,7 +256,7 @@ fun ApiKey.toRow(masked: String, clientProfileName: String? = null): UiKeyRow = 
 /**
  * 模型 → 详情页模型行。
  *
- * 只读明文列（modelId / displayName / protocol / source / enabled），不碰任何密文——
+ * 只读明文列（modelId / displayName / protocol / source），不碰任何密文——
  * 模型本来就不加密（红线 24 只加密密钥与账号密码）。`probeState` 是模型的探测结论，
  * 分档对齐 [KeyHealth.toUi]：NOT_FOUND 是"模型名写错"，用户能改，标 Error；
  * NO_ACCESS / ERROR 是配置或瞬时问题，标 Warn。
@@ -260,7 +278,6 @@ fun AiModel.toRow(): UiModelRow = UiModelRow(
         ModelProbeState.NO_ACCESS, ModelProbeState.ERROR -> UiHealth.Warn
         ModelProbeState.UNKNOWN -> UiHealth.Unknown
     },
-    enabled = enabled,
     contextLabel = displayName,
     lastSeenAt = lastSeenAt,
     probedAt = probedAt,
@@ -333,12 +350,12 @@ fun contentCountsOf(summaries: List<ProviderSummary>): ContentCounts = ContentCo
 )
 
 /**
- * 密钥健康分布。只算**已启用**的密钥，理由见 [contentCountsOf]。
+ * 密钥健康分布。
  *
  * 只读 `health`（持久结论），不看 `lastOutcome`：一次限流不该把分布图染成红的（红线 11）。
  */
 fun healthBreakdownOf(keys: List<ApiKey>): HealthBreakdown {
-    val buckets = keys.filter { it.enabled }.groupingBy { it.health.toUi() }.eachCount()
+    val buckets = keys.groupingBy { it.health.toUi() }.eachCount()
     return HealthBreakdown(
         ok = buckets[UiHealth.Ok] ?: 0,
         warn = buckets[UiHealth.Warn] ?: 0,
