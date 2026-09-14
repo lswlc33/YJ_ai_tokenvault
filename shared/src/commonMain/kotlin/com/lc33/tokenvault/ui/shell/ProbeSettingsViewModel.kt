@@ -11,11 +11,11 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
- * 探测设置页（§13.4）里**已经接真**的状态源。
+ * 探测设置页（§13.4）的状态源。
  *
- * 客户端嗅探开关的权威是 `app_settings.sniffClientProfile`；新建供应商的五个默认探测开关
- * 存在 `app_settings.defaultProbe`（红线 31）。后者不是总开关——只在新供应商
- * 落进编辑页草稿那一刻被读一次，之后每家独立（红线 36）。
+ * 客户端嗅探开关的权威是 `app_settings.sniffClientProfile`；新建密钥的五个默认探测开关
+ * 存在 `app_settings.defaultProbe`（红线 31）。后者不是总开关——只在**新建 Key 落进
+ * 编辑页草稿那一刻**被读一次（`KeyEditorViewModel.defaultDraft`），之后每把独立（红线 36）。
  */
 class ProbeSettingsViewModel constructor(
     private val settings: SettingsRepository,

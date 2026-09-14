@@ -8,6 +8,7 @@ import com.lc33.tokenvault.domain.model.ApiKey
 import com.lc33.tokenvault.domain.repo.ApiKeyRepository
 import com.lc33.tokenvault.domain.repo.ClientProfileRepository
 import com.lc33.tokenvault.domain.repo.ModelRepository
+import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.domain.repo.UndoableDeletion
 import com.lc33.tokenvault.endpoint.EndpointError
 import com.lc33.tokenvault.endpoint.NormalizeResult
@@ -35,6 +36,7 @@ class KeyEditorViewModel constructor(
     private val keys: ApiKeyRepository,
     private val modelsRepository: ModelRepository,
     private val profilesRepository: ClientProfileRepository,
+    private val settings: SettingsRepository,
     private val probeEngine: ProbeEngine,
     private val providerId: Long,
     private val keyId: Long,
@@ -95,7 +97,9 @@ class KeyEditorViewModel constructor(
             val profileList = profilesRepository.observeAll().first()
             val key = keyId.takeIf { it != 0L }?.let { keys.find(it) }
             currentKey = key
-            _draft.value = key?.toDraft(profileList) ?: KeyDraft(providerId = providerId)
+            // 新建时用「探测」设置页里的那五个默认值当草稿初值。之前这里是写死的
+            // `KeyDraft()`，于是那一页的开关改了什么都不影响——界面在，功能不存在。
+            _draft.value = key?.toDraft(profileList) ?: defaultDraft()
             _loaded.value = true
 
             val observedProviderId = key?.providerId ?: providerId
@@ -108,6 +112,9 @@ class KeyEditorViewModel constructor(
             }
         }
     }
+
+    private suspend fun defaultDraft(): KeyDraft =
+        settings.observeDefaultProbeSettings().first().toNewKeyDraft(providerId)
 
     fun onChange(next: KeyDraft) {
         _saveError.value = null

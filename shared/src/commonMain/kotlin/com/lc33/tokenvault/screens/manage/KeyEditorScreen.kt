@@ -72,8 +72,6 @@ import tokenvault.shared.generated.resources.editor_balance_custom_method
 import tokenvault.shared.generated.resources.editor_balance_custom_path
 import tokenvault.shared.generated.resources.editor_balance_custom_used_path
 import tokenvault.shared.generated.resources.editor_balance_custom_value_path
-import tokenvault.shared.generated.resources.editor_balance_enabled
-import tokenvault.shared.generated.resources.editor_balance_enabled_summary
 import tokenvault.shared.generated.resources.editor_balance_kind
 import tokenvault.shared.generated.resources.editor_balance_kind_summary
 import tokenvault.shared.generated.resources.editor_balance_token
@@ -107,8 +105,6 @@ import tokenvault.shared.generated.resources.editor_probe_model_reachability
 import tokenvault.shared.generated.resources.editor_probe_model_reachability_summary
 import tokenvault.shared.generated.resources.editor_probe_quick_model
 import tokenvault.shared.generated.resources.editor_probe_quick_model_summary
-import tokenvault.shared.generated.resources.editor_probe_models
-import tokenvault.shared.generated.resources.editor_probe_models_summary
 import tokenvault.shared.generated.resources.editor_probe_reachability
 import tokenvault.shared.generated.resources.editor_probe_reachability_summary
 import tokenvault.shared.generated.resources.editor_save
@@ -330,6 +326,9 @@ fun KeyEditorScreen(
             }
 
             if (draft.id != 0L) {
+                // 「模型」区这一个开关就是 `probeModels` 的唯一入口：它的效果（自动同步 /
+                // 手动增删）就在正下方，拨完立刻看得见。探测权限区不再重复放一遍同一个
+                // 字段的开关——两个手柄管一个值，用户只会以为改错了地方。
                 item { SectionTitle(text = stringResource(Res.string.detail_models_section)) }
                 item {
                     AppPreferenceGroup {
@@ -410,24 +409,18 @@ fun KeyEditorScreen(
 
             }
 
+            // 「余额」只留一个控件：查询类型。它第一项就是「不查」，本身已经是开关，
+            // 再并一个「余额查询」开关就是同一个 `balanceKindIndex` 的两个手柄——
+            // 拨哪个另一个都跟着动，用户看到的是"这里怎么有两处都在管余额"。
             item { SectionTitle(text = stringResource(Res.string.editor_section_balance)) }
             item {
                 AppPreferenceGroup {
-                    AppSwitchRow(
-                        title = stringResource(Res.string.editor_balance_enabled),
-                        summary = stringResource(Res.string.editor_balance_enabled_summary),
-                        checked = draft.balanceKindIndex != 0,
-                        onCheckedChange = { enabled ->
-                            onChange(draft.copy(balanceKindIndex = if (enabled) 1 else 0))
-                        },
-                    )
                     AppDropdownRow(
                         title = stringResource(Res.string.editor_balance_kind),
                         summary = stringResource(Res.string.editor_balance_kind_summary),
                         items = stringArrayResource(Res.array.balance_kinds).toList(),
                         selectedIndex = draft.balanceKindIndex,
                         onSelect = { onChange(draft.copy(balanceKindIndex = it)) },
-                        enabled = draft.balanceKindIndex != 0,
                     )
                 }
             }
@@ -496,15 +489,12 @@ fun KeyEditorScreen(
                         summary = stringResource(Res.string.editor_probe_balance_summary),
                         checked = draft.probeBalance,
                         onCheckedChange = { onChange(draft.copy(probeBalance = it)) },
-                        enabled = draft.probeEnabled,
+                        // 没选查询类型时这一项没有对象可查：把开关灰掉，而不是让它
+                        // 看起来开着却什么都不做。
+                        enabled = draft.probeEnabled && draft.balanceKindIndex != 0,
                     )
-                    AppSwitchRow(
-                        title = stringResource(Res.string.editor_probe_models),
-                        summary = stringResource(Res.string.editor_probe_models_summary),
-                        checked = draft.probeModels,
-                        onCheckedChange = { onChange(draft.copy(probeModels = it)) },
-                        enabled = draft.probeEnabled,
-                    )
+                    // 「模型列表检测」不在这里再放一遍：它就是上面「模型」区的
+                    // `probeModels`，同一个字段两个开关。
                     AppSwitchRow(
                         title = stringResource(Res.string.editor_probe_model_reachability),
                         summary = stringResource(Res.string.editor_probe_model_reachability_summary),

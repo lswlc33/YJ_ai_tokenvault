@@ -449,10 +449,8 @@
     <string name="editor_probe_quick_model">Quick model test</string>
     <string name="editor_probe_quick_model_summary">Allow long-pressing a model in the key detail list to probe it immediately.</string>
     <string name="editor_section_balance">Balance</string>
-    <string name="editor_balance_enabled">Balance query</string>
-    <string name="editor_balance_enabled_summary">When enabled, choose a query type and fill in its parameters.</string>
     <string name="editor_balance_kind">Query type</string>
-    <string name="editor_balance_kind_summary">Management API to query</string>
+    <string name="editor_balance_kind_summary">Pick “None” to turn balance queries off</string>
     <string name="editor_balance_token">Access token</string>
     <string name="editor_balance_token_hint">A separate token from the provider's account settings, not your API key</string>
     <string name="editor_balance_user_id">User ID</string>
@@ -564,13 +562,14 @@
     <string name="editor_probe_reachability_summary">Fetches the model list once. Costs nothing.</string>
     <string name="editor_probe_keys">Key validity</string>
     <string name="editor_probe_keys_summary">Costs nothing when the model list endpoint requires authentication. Otherwise a verdict needs a real call, which is manual only.</string>
-    <string name="editor_probe_balance">Balance query</string>
-    <string name="editor_probe_balance_summary">Queries the management API. Costs nothing.</string>
+    <string name="editor_probe_balance">Query balance during probes</string>
+    <string name="editor_probe_balance_summary">Requires a query type set under Balance above; unavailable until then.</string>
+    <string name="editor_probe_balance_default_summary">Whether a new key queries balance during probes by default.</string>
     <string name="editor_probe_models">Model list detection</string>
     <string name="editor_probe_models_summary">When on, model lists are updated per key during probing. When off, models are maintained manually.</string>
-    <string name="probe_section_defaults">Defaults for new providers</string>
-    <string name="probe_defaults_notice">The switches below are only the defaults used when you add a provider. Each provider keeps its own copy afterwards, because gateways differ: some forbid automated checks in their terms, some rate-limit after three requests. Changing a default here does not affect providers you already have.</string>
-    <string name="probe_defaults_goto_manage">Review providers individually</string>
+    <string name="probe_section_defaults">Defaults for new keys</string>
+    <string name="probe_defaults_notice">The switches below are only the defaults used when you add a key. Each key keeps its own copy afterwards, because gateways differ: some forbid automated checks in their terms, some rate-limit after three requests. Changing a default here does not affect keys you already have.</string>
+    <string name="probe_defaults_goto_manage">Review keys individually</string>
 
     <!-- ==================== M1 lock gate: onboarding, unlock ==================== -->
     <string name="dialog_cancel">Cancel</string>

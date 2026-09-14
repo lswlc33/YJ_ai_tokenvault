@@ -473,13 +473,14 @@ class ProviderDetailViewModel constructor(
         accountCount: Int,
     ): UiProviderRow {
         val aggregateBalance = aggregateBalanceOf(keyList)
-        val firstSettings = keyList.firstOrNull()?.settings
         return UiProviderRow(
             id = id,
             name = name,
             note = note,
             websiteUrl = websiteUrl,
-            host = firstSettings?.apiRoot?.let { hostOf(it) }.orEmpty(),
+            // 与列表页用同一个 helper：不再是这里的 firstOrNull，而是"排序第一把"，
+            // 两边算同一件事就必须走同一段代码。
+            host = providerHostOf(keyList),
             // 协议 = 这家所有模型的协议并集，和管理页 / 仪表盘同一个定义
             protocols = providerProtocolsOf(models),
             colorIndex = color ?: 0,

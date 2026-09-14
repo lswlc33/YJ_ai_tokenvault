@@ -265,14 +265,44 @@ interface ProbeRunDao {
     suspend fun clear()
 }
 
+/**
+ * 日志列表的轻量投影：**不带请求体 / 返回体**。
+ *
+ * 那两列单条上限 8KB（`HttpEngine.MAX_BODY_CHARS`），列表一次取 500 条就是几 MB 文本，
+ * 而列表上一个字都不画它们——点开详情页才按 id 单独取（[AuditLogDao.findById]）。
+ * `requestUrl` 留着：列表要靠它判断"这条能不能点开"。
+ */
+data class AuditLogSummary(
+    val id: Long,
+    val at: Long,
+    val level: String,
+    val category: String,
+    val providerId: Long?,
+    val keyId: Long?,
+    val runId: Long?,
+    val message: String,
+    val detail: String?,
+    val requestUrl: String?,
+)
+
 @Dao
 interface AuditLogDao {
 
-    @Query("SELECT * FROM audit_log ORDER BY at DESC LIMIT :limit")
-    fun observeRecent(limit: Int): Flow<List<AuditLogEntity>>
+    @Query(
+        """
+        SELECT id, at, level, category, providerId, keyId, runId, message, detail, requestUrl
+        FROM audit_log ORDER BY at DESC LIMIT :limit
+        """,
+    )
+    fun observeRecent(limit: Int): Flow<List<AuditLogSummary>>
 
-    @Query("SELECT * FROM audit_log WHERE level IN (:levels) ORDER BY at DESC LIMIT :limit")
-    fun observeRecentByLevels(levels: List<String>, limit: Int): Flow<List<AuditLogEntity>>
+    @Query(
+        """
+        SELECT id, at, level, category, providerId, keyId, runId, message, detail, requestUrl
+        FROM audit_log WHERE level IN (:levels) ORDER BY at DESC LIMIT :limit
+        """,
+    )
+    fun observeRecentByLevels(levels: List<String>, limit: Int): Flow<List<AuditLogSummary>>
 
     @Query("SELECT * FROM audit_log WHERE providerId = :providerId ORDER BY at DESC LIMIT :limit")
     fun observeByProvider(providerId: Long, limit: Int): Flow<List<AuditLogEntity>>

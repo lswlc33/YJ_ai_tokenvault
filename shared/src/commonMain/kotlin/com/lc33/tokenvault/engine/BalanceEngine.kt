@@ -3,6 +3,7 @@ package com.lc33.tokenvault.engine
 import com.lc33.tokenvault.balance.BalanceParseException
 import com.lc33.tokenvault.balance.BalanceRegistry
 import com.lc33.tokenvault.balance.NewApiAdapter
+import com.lc33.tokenvault.crypto.KnownSecrets
 import com.lc33.tokenvault.crypto.zeroize
 import com.lc33.tokenvault.domain.BalanceKind
 import com.lc33.tokenvault.domain.model.ApiKey
@@ -31,6 +32,14 @@ class BalanceEngine constructor(
     private val clientProfiles: ClientProfileRepository,
     private val engine: HttpEngine,
     private val audit: AuditLogRepository,
+    /**
+     * 登记这一轮 reveal 出来的明文，供 [Redactor] 的第一道使用。
+     *
+     * **这一步不能省**：余额接口（尤其 new-api 系的 `/api/user/self`）会把访问令牌
+     * 连同邮箱一起回显，而现在响应体会落进日志——不登记就只剩正则兜底，而
+     * base64 形态的令牌不匹配任何一条正则（见 [Redactor] 的说明）。
+     */
+    private val knownSecrets: KnownSecrets,
     private val now: () -> Long,
     private val placeholders: Map<String, String>,
 ) {
@@ -67,7 +76,7 @@ class BalanceEngine constructor(
                 keys.revealBalanceToken(key.id)
             } catch (_: Exception) {
                 null
-            }
+            }?.also { knownSecrets.add(it) }
         } else {
             null
         }
@@ -83,7 +92,11 @@ class BalanceEngine constructor(
                 }
             }
 
-            val keySecret = if (adapter.kind.usesOwnToken) null else revealKey(key.id)
+            val keySecret = if (adapter.kind.usesOwnToken) {
+                null
+            } else {
+                revealKey(key.id)?.also { knownSecrets.add(it) }
+            }
             try {
                 val request = withClientProfile(
                     adapter.buildRequest(settings, keySecret, token),
@@ -125,7 +138,6 @@ class BalanceEngine constructor(
     } catch (_: Exception) {
         null
     }
-
     private fun withClientProfile(request: ProbeRequest, profile: ClientProfile?): ProbeRequest =
         request.copy(
             headers = HeaderAssembler.assemble(

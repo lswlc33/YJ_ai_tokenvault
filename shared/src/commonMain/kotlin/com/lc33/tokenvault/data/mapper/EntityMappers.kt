@@ -3,6 +3,7 @@ package com.lc33.tokenvault.data.mapper
 import com.lc33.tokenvault.data.dao.ApiKeyWithSettingsRow
 import com.lc33.tokenvault.data.dao.ProviderSummaryRow
 import com.lc33.tokenvault.data.entity.ApiKeyEntity
+import com.lc33.tokenvault.data.dao.AuditLogSummary
 import com.lc33.tokenvault.data.entity.AuditLogEntity
 import com.lc33.tokenvault.data.entity.ClientProfileEntity
 import com.lc33.tokenvault.data.entity.GroupEntity
@@ -326,6 +327,22 @@ fun ClientProfile.toEntity(): ClientProfileEntity = ClientProfileEntity(
 )
 
 // ------------------------------------------------------------------ audit_log
+
+/**
+ * 列表用的投影 → 领域模型。报文两列恒为 null：列表本来就不画它们，
+ * 详情页会按 id 重新取整行（[AuditLogEntity.toDomain]）。
+ */
+fun AuditLogSummary.toDomain(): AuditEntry = AuditEntry(
+    id = id,
+    at = at,
+    level = LogLevel.fromWireName(level),
+    category = LogCategory.fromWireName(category),
+    providerId = providerId,
+    keyId = keyId,
+    message = message,
+    detail = detail,
+    requestUrl = requestUrl,
+)
 
 fun AuditLogEntity.toDomain(): AuditEntry = AuditEntry(
     id = id,

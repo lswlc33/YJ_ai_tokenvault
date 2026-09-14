@@ -7,6 +7,7 @@ import androidx.compose.ui.Modifier
 import org.jetbrains.compose.resources.stringResource
 import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.editor_probe_balance
+import tokenvault.shared.generated.resources.editor_probe_balance_default_summary
 import tokenvault.shared.generated.resources.editor_probe_keys
 import tokenvault.shared.generated.resources.editor_probe_models
 import tokenvault.shared.generated.resources.editor_probe_model_reachability
@@ -92,6 +93,7 @@ fun ProbeSettingsScreen(
                 )
                 AppSwitchRow(
                     title = stringResource(Res.string.editor_probe_balance),
+                    summary = stringResource(Res.string.editor_probe_balance_default_summary),
                     checked = defaultProbeBalance,
                     onCheckedChange = onDefaultProbeBalanceChange,
                 )

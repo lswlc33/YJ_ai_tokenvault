@@ -2,8 +2,11 @@ package com.lc33.tokenvault
 
 import com.lc33.tokenvault.domain.AutoLockPolicy
 import com.lc33.tokenvault.domain.ClipboardClearPolicy
+import com.lc33.tokenvault.domain.model.LogRetention
 import com.lc33.tokenvault.domain.model.PredictiveBackExitDirection
 import com.lc33.tokenvault.domain.model.PredictiveBackStyle
+import com.lc33.tokenvault.ui.shell.KEY_AUTH_STYLES
+import com.lc33.tokenvault.ui.shell.KEY_BALANCE_KINDS
 import com.lc33.tokenvault.ui.theme.AppColorSchemeMode
 import java.io.File
 import org.junit.Assert.assertTrue
@@ -233,6 +236,34 @@ class ArchitectureRulesTest {
         fail(
             "剪贴板清除下拉按下标取值，两边数量必须一致（§7.5）：",
             arrayItemCountMismatches("clipboard_clear_options", ClipboardClearPolicy.OPTIONS.size, "ClipboardClearPolicy.OPTIONS"),
+        )
+    }
+
+    /**
+     * 密钥设置页那两个下拉。
+     *
+     * 它们和上面五个是同一类风险，但**漏在防线之外**很久了：`auth_styles` /
+     * `balance_kinds` 都是按下标写进 `KeyDraft`（`authStyleIndex` / `balanceKindIndex`），
+     * 存库时再按下标查 `KEY_AUTH_STYLES` / `KEY_BALANCE_KINDS`。少一项或顺序变了，
+     * 表现是**把余额查询类型写错**——比如把 new-api 存成 DeepSeek，用户不会发现，
+     * 只会看到"余额总是查不到"。所以补进这条机器检查里。
+     */
+    @Test
+    fun `密钥设置下拉的选项数与代码表一致`() {
+        fail(
+            "密钥设置页的下拉按下标取值，两边数量必须一致：",
+            arrayItemCountMismatches("auth_styles", KEY_AUTH_STYLES.size, "KEY_AUTH_STYLES") +
+                arrayItemCountMismatches("balance_kinds", KEY_BALANCE_KINDS.size, "KEY_BALANCE_KINDS"),
+        )
+    }
+
+    @Test
+    fun `日志保留期下拉的选项数与枚举一致`() {
+        // 同一类风险，且后果是数据：错位一格就是「选 7 天得到 30 天」，或者反过来
+        // 把 7 天读成永久，日志再也不会被清理。
+        fail(
+            "日志保留期下拉按下标取值，两边数量必须一致：",
+            arrayItemCountMismatches("log_retention_options", LogRetention.entries.size, "LogRetention"),
         )
     }
 

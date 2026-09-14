@@ -2,6 +2,7 @@ package com.lc33.tokenvault.ui.shell
 
 import com.lc33.tokenvault.domain.AuthStyle
 import com.lc33.tokenvault.domain.BalanceKind
+import com.lc33.tokenvault.domain.DefaultProbeSettings
 import com.lc33.tokenvault.domain.Protocol
 import com.lc33.tokenvault.domain.model.ApiKey
 import com.lc33.tokenvault.domain.model.ClientProfile
@@ -27,6 +28,21 @@ val KEY_BALANCE_KINDS: List<BalanceKind> = listOf(
 )
 
 val KEY_AUTH_STYLES: List<AuthStyle> = listOf(AuthStyle.AUTO, AuthStyle.BEARER, AuthStyle.X_API_KEY)
+
+/**
+ * 新建 Key 的草稿初值：探测那几档取自设置页的默认值（[DefaultProbeSettings]）。
+ *
+ * 抽成纯函数是为了能被测试守住——这段逻辑曾经缺失：编辑页直接 `KeyDraft()`，
+ * 于是「探测」设置页里那五个"新建时的默认值"改了什么都不影响，界面在、功能不在。
+ */
+fun DefaultProbeSettings.toNewKeyDraft(providerId: Long): KeyDraft = KeyDraft(
+    providerId = providerId,
+    probeReachability = reachability,
+    probeKeys = keys,
+    probeBalance = balance,
+    probeModels = models,
+    probeModelReachability = modelReachability,
+)
 
 fun ApiKey.toDraft(profiles: List<ClientProfile>): KeyDraft = KeyDraft(
     id = id,

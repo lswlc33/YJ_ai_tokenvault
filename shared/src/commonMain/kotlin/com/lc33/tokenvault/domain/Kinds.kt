@@ -76,9 +76,14 @@ enum class ProbeLevel(val wireName: String, val costsQuota: Boolean) {
     L1_REACHABILITY("l1", costsQuota = false),
 
     /**
-     * 密钥有效性。用该 Key 发 L1；**若该站 models 路由不鉴权则升级为真实推理调用**，
-     * 那一次就要花钱了——所以它的 costsQuota 是"取决于站点"，这里按最坏情况标真。
-     * 设置里的 `autoProbeAllowUpgradedL2` 控制自动路径上允不允许这次升级（§8.3）。
+     * 密钥有效性。**当前实现**是拿该 Key 走一次 `GET {models}`，零成本
+     * （`costsQuota` 按最坏情况标真，见下）。
+     *
+     * 已知局限（改之前先读这里）：models 路由**不鉴权**的站点上，任何密钥都会拿到
+     * 2xx，于是坏密钥被标成可用。真实调用（`ProbeRequestBuilder.inference`）目前只在
+     * 手动长按模型那条 L3 路径上发（红线 36：要花钱的不进自动路径），所以这里没有
+     * "未鉴权就升级为推理调用"——那段升级逻辑并不存在，别再照着旧注释去接设置项。
+     * `costsQuota = true` 是因为"若将来允许升级，这一次就会花钱"，按最坏情况标记。
      */
     L2_KEY_VALIDITY("l2", costsQuota = true),
 

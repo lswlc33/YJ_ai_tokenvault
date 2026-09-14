@@ -448,10 +448,8 @@
     <string name="editor_probe_quick_model">快捷测试模型</string>
     <string name="editor_probe_quick_model_summary">允许在密钥详情页的模型列表中长按快速探测该模型。</string>
     <string name="editor_section_balance">余额</string>
-    <string name="editor_balance_enabled">余额查询</string>
-    <string name="editor_balance_enabled_summary">开启后请选择查询方式并填写对应参数。</string>
     <string name="editor_balance_kind">查询类型</string>
-    <string name="editor_balance_kind_summary">选择要查询的管理接口</string>
+    <string name="editor_balance_kind_summary">选「不查」即关闭余额查询</string>
     <string name="editor_balance_token">访问令牌</string>
     <string name="editor_balance_token_hint">在中转站个人安全设置中获取的独立令牌，不是 API 密钥</string>
     <string name="editor_balance_user_id">用户 ID</string>
@@ -560,13 +558,15 @@
     <string name="editor_probe_reachability_summary">获取一次模型列表，不产生费用。</string>
     <string name="editor_probe_keys">密钥有效性</string>
     <string name="editor_probe_keys_summary">模型列表接口需要鉴权时不产生费用；不需要鉴权时需通过真实调用判断，仅支持手动执行。</string>
-    <string name="editor_probe_balance">余额查询</string>
-    <string name="editor_probe_balance_summary">查询管理接口，不产生费用。</string>
+    <string name="editor_probe_balance">探测时查询余额</string>
+    <string name="editor_probe_balance_summary">需要在上面「余额」里先选好查询类型；未选时此项不可用。</string>
+    <!-- 全局「探测」设置页那一份：那里是新建密钥的默认值，没有可选的余额类型在近旁。 -->
+    <string name="editor_probe_balance_default_summary">新建密钥时默认随探测一起查余额。</string>
     <string name="editor_probe_models">模型列表检测</string>
     <string name="editor_probe_models_summary">开启后探测时按密钥自动更新模型列表，关闭后需手动添加和编辑模型。</string>
-    <string name="probe_section_defaults">新建供应商时的默认值</string>
-    <string name="probe_defaults_notice">以下开关仅作为新建供应商时的默认值。每个供应商会保存各自的设置，因为不同中转站的限制不同：有的在条款中禁止自动化检测，有的请求三次即触发限流。修改此处的默认值不会影响已有供应商。</string>
-    <string name="probe_defaults_goto_manage">逐个查看供应商</string>
+    <string name="probe_section_defaults">新建密钥时的默认值</string>
+    <string name="probe_defaults_notice">以下开关仅作为新建密钥时的默认值。每把密钥会保存各自的设置，因为不同中转站的限制不同：有的在条款中禁止自动化检测，有的请求三次即触发限流。修改此处的默认值不会影响已有的密钥。</string>
+    <string name="probe_defaults_goto_manage">逐个查看密钥</string>
 
     <!-- ==================== M1 锁闸：引导、解锁 ==================== -->
     <string name="dialog_cancel">取消</string>
