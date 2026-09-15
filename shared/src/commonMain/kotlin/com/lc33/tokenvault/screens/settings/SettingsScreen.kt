@@ -4,7 +4,9 @@ import com.lc33.tokenvault.platform.APP_VERSION_NAME
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -171,6 +173,9 @@ fun SettingsScreen(
                     )
                 }
             }
+
+            // 滑到底的呼吸空间：内容画到窗口底部（透出玻璃底栏），不垫就会贴边。
+            item { Spacer(modifier = Modifier.height(tokens.sectionSpacing)) }
         }
     }
 }

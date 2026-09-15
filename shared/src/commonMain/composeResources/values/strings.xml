@@ -52,13 +52,12 @@
     <string name="dashboard_probe_last_updated">Last updated: %1$s</string>
     <string name="dashboard_probe_title">Last probe</string>
     <string name="dashboard_probe_never">Not probed yet</string>
-    <string name="dashboard_probe_start">Start probe</string>
     <string name="dashboard_probe_detail">View details</string>
     <string name="dashboard_probe_finished">Finished %1$s · %2$s</string>
     <string name="dashboard_probe_counts">%1$d checked · %2$d ok · %3$d failed · %4$d skipped</string>
-    <string name="dashboard_probe_running">%1$d / %2$d · %3$s</string>
+    <string name="dashboard_probe_running">Requesting %1$d / %2$d · %3$s</string>
+    <string name="dashboard_probe_complete">Probe finished</string>
     <string name="dashboard_probe_no_autolock">Auto-lock is paused while a probe is running</string>
-    <string name="dashboard_probe_cancel">Cancel</string>
     <string name="dashboard_backup_title">Backup</string>
     <string name="dashboard_backup_never">No backup yet. Forgetting your PIN or switching devices would make the data unrecoverable.</string>
     <string name="dashboard_backup_last">Last backup %1$s · %2$s</string>
@@ -76,8 +75,6 @@
     <string name="manage_tab_accounts">Accounts</string>
     <string name="manage_pinned">Pinned</string>
     <string name="manage_default_key">Default</string>
-    <string name="manage_source_manual">Manual</string>
-    <string name="manage_source_discovered">Discovered</string>
     <string name="manage_local_only">Local record only</string>
     <string name="manage_keys_ratio">%1$d / %2$d keys</string>
     <string name="manage_models_count">%1$d models</string>
@@ -443,6 +440,10 @@
     <string name="editor_balance_custom_used_path">Used field path</string>
     <string name="editor_balance_custom_currency">Currency</string>
     <string name="editor_error_missing_secret">Enter an API key.</string>
+    <string name="editor_error_missing_name">Enter a name.</string>
+    <string name="editor_default_key_name">Key %1$d</string>
+    <string name="editor_default_account_name">Account %1$d</string>
+    <string name="editor_default_provider_name">Provider %1$d</string>
     <string name="editor_error_invalid_timeout">Timeout must be a positive integer, or blank.</string>
     <string name="editor_error_no_protocols">Select at least one protocol.</string>
     <string name="editor_error_save_failed">Save failed. Your input is preserved.</string>
@@ -603,7 +604,6 @@
     <string name="feedback_account_saved">Account saved</string>
     <string name="feedback_probe_key_sent">Probing this key…</string>
     <string name="feedback_probe_started">Probe started</string>
-    <string name="feedback_probe_all_ok">Probe finished, all succeeded</string>
     <string name="feedback_probe_has_failure">Probe finished with failures, see the log</string>
     <string name="feedback_probe_nothing">Nothing to probe</string>
     <string name="feedback_models_refresh_failed">Model list refresh failed</string>
@@ -692,7 +692,6 @@
     <string name="detail_key_label_hint">Distinguishes multiple keys of the same provider. Can be left empty.</string>
     <string name="detail_key_secret">Key</string>
     <string name="detail_key_secret_hint">Paste it in; it is encrypted before being written to the database.</string>
-    <string name="detail_key_sheet_title">This key</string>
     <string name="detail_key_set_default">Set as default</string>
     <string name="detail_key_delete_title">Delete this key?</string>
     <string name="detail_key_delete_body">Deletion cannot be undone. If it is the default key, the first enabled key in order takes over automatically.</string>
@@ -717,7 +716,7 @@
     <string name="detail_probe_key">Probe this key</string>
     <string name="detail_probe_model_cd">Probe this model</string>
     <string name="detail_provider_balance_total">Total balance</string>
-    <string name="detail_key_balance_value">This key: %1$s %2$s</string>
+    <string name="detail_key_balance_value">%1$s %2$s</string>
     <string name="protocol_chat">Chat</string>
     <string name="protocol_responses">Responses</string>
     <string name="protocol_anthropic">Anthropic</string>
@@ -731,7 +730,6 @@
     <string name="groups_delete_title">Delete this group?</string>
     <string name="groups_delete_body">The providers in it are not deleted; they fall back to All.</string>
     <!-- Key-bound models, quick model probing, and account login methods. -->
-    <string name="detail_models_source">Source</string>
     <string name="detail_models_section">Models</string>
     <string name="detail_models_empty_auto">No model yet. Refresh this key or wait for the next probe.</string>
     <string name="detail_models_empty_manual">No model yet. Add one manually.</string>

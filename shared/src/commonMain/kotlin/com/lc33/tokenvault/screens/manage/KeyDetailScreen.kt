@@ -69,8 +69,6 @@ import tokenvault.shared.generated.resources.detail_models_empty_manual
 import tokenvault.shared.generated.resources.editor_profile_default
 import tokenvault.shared.generated.resources.manage_latency
 import tokenvault.shared.generated.resources.manage_latency_time
-import tokenvault.shared.generated.resources.manage_source_discovered
-import tokenvault.shared.generated.resources.manage_source_manual
 import tokenvault.shared.generated.resources.detail_edit_cd
 import tokenvault.shared.generated.resources.detail_key_full_content
 import tokenvault.shared.generated.resources.detail_models_refresh
@@ -78,7 +76,6 @@ import tokenvault.shared.generated.resources.detail_models_count_auto
 import tokenvault.shared.generated.resources.detail_models_count_manual
 import tokenvault.shared.generated.resources.detail_key_balance_value
 import tokenvault.shared.generated.resources.detail_models_section
-import tokenvault.shared.generated.resources.detail_models_source
 import tokenvault.shared.generated.resources.detail_key_more_cd
 import tokenvault.shared.generated.resources.detail_key_connection
 import tokenvault.shared.generated.resources.detail_probe_key
@@ -199,28 +196,33 @@ fun KeyDetailScreen(
                         .fillMaxWidth()
                         .padding(horizontal = tokens.screenPadding),
                 ) {
-                    // 与供应商预览里的密钥行同一套顺序：可达性 + 备注 / 遮蔽串 / 延迟 + 时间。
-                    // 余额不在这里——它是独立一张卡，混进来会让"这一行说的是什么"说不清。
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        StatusDot(color = colorOf(key.health), label = labelOf(key.health))
-                        if (key.note.isNotBlank()) {
-                            AppText(
-                                text = key.note,
-                                style = AppTextStyle.Footnote,
-                                color = appSecondaryTextColor,
-                                maxLines = 1,
-                            )
-                        }
+                    // 与列表里的密钥行同一套形态：备注 / 遮蔽串 / 延迟 + 时间，
+                    // 可达性放右侧（左边挤不下，用户点名的要求）。余额不在这里——
+                    // 它是独立一张卡，混进来会让"这一行说的是什么"说不清。
+                    if (key.note.isNotBlank()) {
+                        AppText(
+                            text = key.note,
+                            style = AppTextStyle.Footnote,
+                            color = appSecondaryTextColor,
+                            maxLines = 1,
+                        )
                     }
-                    AppText(
-                        text = key.masked,
-                        style = AppTextStyle.Body,
-                        fontFamily = tokens.monoFontFamily,
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        AppText(
+                            text = key.masked,
+                            style = AppTextStyle.Body,
+                            fontFamily = tokens.monoFontFamily,
+                            modifier = Modifier
+                                .weight(1f, fill = false)
+                                .padding(top = 4.dp),
+                            maxLines = 1,
+                        )
+                        StatusDot(color = colorOf(key.health), label = labelOf(key.health))
+                    }
                     val timingText = when {
                         key.latencyMs != null && key.checkedAt != null -> stringResource(
                             Res.string.manage_latency_time,
@@ -410,25 +412,24 @@ fun KeyDetailScreen(
                 }
             }
 
-            item { Spacer(modifier = Modifier.height(tokens.sectionSpacing)) }
+            item { Spacer(modifier = Modifier.height(tokens.sectionSpacing + tokens.itemSpacing)) }
         }
     }
 
-    AppBottomSheet(
+    // 查看密钥用 Dialog 而不是 BottomSheet：内容只有一段明文 + 两个动作，
+    // 居中的小对话框更贴合"看一眼"的时长，BottomSheet 那种半屏面板显得隆重。
+    // 按钮是弹层里的收尾动作，走 AppDialogTextButton（弹层允许按钮，页面主体不允许）。
+    AppDialog(
         show = revealedText != null,
         onDismissRequest = onCloseReveal,
         title = stringResource(Res.string.detail_key_view),
     ) {
-        // 面板里只有两件事：看清这串明文、把它复制走。所以是一段内容 + 两个按钮，
-        // 不夹说明文字，也不再多一个行入口。
-        AppPreferenceGroup(inset = false) {
-            AppValueRow(
-                title = stringResource(Res.string.detail_key_full_content),
-                value = revealedText.orEmpty(),
-                stacked = true,
-                mono = true,
-            )
-        }
+        AppValueRow(
+            title = stringResource(Res.string.detail_key_full_content),
+            value = revealedText.orEmpty(),
+            stacked = true,
+            mono = true,
+        )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -471,16 +472,6 @@ fun KeyDetailScreen(
             AppValueRow(
                 title = stringResource(Res.string.detail_model_protocol),
                 value = protocolLabel(model.protocol),
-            )
-            AppValueRow(
-                title = stringResource(Res.string.detail_models_source),
-                value = stringResource(
-                    if (model.source == com.lc33.tokenvault.screens.model.UiModelSource.Manual) {
-                        Res.string.manage_source_manual
-                    } else {
-                        Res.string.manage_source_discovered
-                    },
-                ),
             )
             Row(
                 modifier = Modifier

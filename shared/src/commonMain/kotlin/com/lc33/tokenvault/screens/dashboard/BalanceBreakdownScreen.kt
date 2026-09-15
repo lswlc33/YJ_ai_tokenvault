@@ -95,7 +95,7 @@ fun BalanceBreakdownScreen(
                 .fillMaxSize()
                 .appTopBarScroll(scrollState),
             contentPadding = padding,
-            verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
+            verticalArrangement = Arrangement.spacedBy(tokens.sectionSpacing),
         ) {
             byCurrency.forEach { (currency, rows) ->
                 item { SectionTitle(text = currency) }
@@ -118,7 +118,8 @@ fun BalanceBreakdownScreen(
                     FailedRow(failedProviders[index], onOpenProvider)
                 }
             }
-            item { Spacer(modifier = Modifier.height(tokens.sectionSpacing)) }
+            // 滑到底的呼吸空间：内容画到窗口底部（透出玻璃底栏），不垫就会贴边。
+            item { Spacer(modifier = Modifier.height(tokens.itemSpacing)) }
         }
     }
 }

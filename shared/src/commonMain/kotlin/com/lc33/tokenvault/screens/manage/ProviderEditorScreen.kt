@@ -40,6 +40,7 @@ import tokenvault.shared.generated.resources.back_cd
 import tokenvault.shared.generated.resources.editor_color
 import tokenvault.shared.generated.resources.editor_group
 import tokenvault.shared.generated.resources.editor_name
+import tokenvault.shared.generated.resources.editor_error_missing_name
 import tokenvault.shared.generated.resources.editor_note
 import tokenvault.shared.generated.resources.editor_pinned
 import tokenvault.shared.generated.resources.provider_colors
@@ -57,6 +58,7 @@ import tokenvault.shared.generated.resources.provider_editor_title
 fun ProviderEditorScreen(
     draft: ProviderDraft,
     groupNames: List<String>,
+    nameMissing: Boolean,
     onChange: (ProviderDraft) -> Unit,
     onBack: () -> Unit,
     onSave: (ProviderDraft) -> Unit,
@@ -123,7 +125,16 @@ fun ProviderEditorScreen(
                     ),
                     verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
                 ) {
-                    AppTextField(state = name, label = stringResource(Res.string.editor_name))
+                    // 名称必填：空名称的供应商在列表里只剩色块与域名，认不出是谁。
+                    AppTextField(
+                        state = name,
+                        label = stringResource(Res.string.editor_name),
+                        errorText = if (nameMissing && name.text.isBlank()) {
+                            stringResource(Res.string.editor_error_missing_name)
+                        } else {
+                            null
+                        },
+                    )
                     AppTextField(state = note, label = stringResource(Res.string.editor_note))
                     AppTextField(state = website, label = stringResource(Res.string.editor_website))
                 }

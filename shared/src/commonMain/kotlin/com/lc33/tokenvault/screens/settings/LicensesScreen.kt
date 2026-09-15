@@ -1,6 +1,8 @@
 package com.lc33.tokenvault.screens.settings
 
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -108,6 +110,9 @@ fun LicensesScreen(onBack: () -> Unit) {
                     }
                 }
             }
+
+            // 滑到底的呼吸空间：内容画到窗口底部（透出玻璃底栏），不垫就会贴边。
+            item { Spacer(modifier = Modifier.height(tokens.sectionSpacing)) }
         }
     }
 

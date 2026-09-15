@@ -171,14 +171,20 @@ class ManageViewModel constructor(
     /**
      * 顶栏刷新：发起一次全量探测（密钥 L1/L2 + 开了自动获取的模型列表）+ 官网连通性 + 余额。
      * "跑完了没有"由 [ProbeEngine.roundResults] 统一告诉界面，提示在 Shell 层收口。
+     *
+     * [excludeProbe] 为 true 时只发连通性与余额：探测那一发由调用方先经 [startProbe]
+     * 判断"这一轮有没有真的启动"（引擎正在跑就不重复发，探测要花钱），再决定要不要提示。
      */
-    fun refreshStatus() {
+    fun refreshStatus(excludeProbe: Boolean = false) {
         viewModelScope.launch {
             probeEngine.refreshReachability()
             runCatching { balanceEngine.refreshAll() }
         }
-        probeEngine.start()
+        if (!excludeProbe) probeEngine.start()
     }
+
+    /** 供刷新入口判断"这一轮有没有真的启动"。false = 引擎已在跑 / 锁定态。 */
+    fun startProbe(): Boolean = probeEngine.start()
 
     fun onSelectGroup(id: Long?) {
         selectedGroupId.value = id

@@ -28,10 +28,8 @@ import tokenvault.shared.generated.resources.manage_latency_time
 import tokenvault.shared.generated.resources.manage_local_only
 import tokenvault.shared.generated.resources.manage_models_count
 import tokenvault.shared.generated.resources.manage_pinned
-import tokenvault.shared.generated.resources.manage_source_discovered
 import tokenvault.shared.generated.resources.login_method_github
 import tokenvault.shared.generated.resources.login_method_linuxdo
-import tokenvault.shared.generated.resources.manage_source_manual
 import tokenvault.shared.generated.resources.protocol_anthropic
 import tokenvault.shared.generated.resources.protocol_chat
 import tokenvault.shared.generated.resources.protocol_responses
@@ -41,7 +39,6 @@ import com.lc33.tokenvault.screens.model.UiAccountRow
 import com.lc33.tokenvault.screens.model.UiHealth
 import com.lc33.tokenvault.screens.model.UiKeyRow
 import com.lc33.tokenvault.screens.model.UiModelRow
-import com.lc33.tokenvault.screens.model.UiModelSource
 import com.lc33.tokenvault.screens.model.UiProviderRow
 import com.lc33.tokenvault.ui.common.StatusDot
 import com.lc33.tokenvault.ui.common.colorOf
@@ -159,13 +156,16 @@ internal fun ProviderRow(
             Column(horizontalAlignment = Alignment.End) {
                 val balance = row.balance
                 if (balance != null) {
+                    // 有了金额就不再画"可用"：能查出余额必然可达，两个结论并排反而像
+                    // 在说两件事。延迟保留——它说的不是"通不通"而是"多快"。
                     AppText(
                         text = "${balance.currency} ${balance.amount}",
                         style = AppTextStyle.Body,
                         maxLines = 1,
                     )
+                } else {
+                    StatusDot(color = colorOf(row.health), label = labelOf(row.health))
                 }
-                StatusDot(color = colorOf(row.health), label = labelOf(row.health))
                 row.reachabilityLatencyMs?.let { latency ->
                     AppText(
                         text = stringResource(Res.string.manage_latency, latency),
@@ -242,17 +242,18 @@ private fun SelectionMark(selected: Boolean) {
  * 密钥行。供应商预览与密钥预览两处共用，行里只有三样东西：
  *
  * ```
- * ● 可达性   备注
- * sk-xxxx…xxxx        （半遮盖）
+ * 备注
+ * sk-xxxx…xxxx        ● 可达性 >
  * 222 毫秒 · 3 分钟前
  * ```
+ *
+ * 状态在右侧与箭头同列（用户点名的要求：原来挤在左边，备注一长就换行）。
  *
  * 三条边界：
  *
  * - **余额不在这里**。它是独立的一块（供应商预览有合计卡，密钥预览有单独的卡），
  *   混进这行会让"这一行说的是什么"变得说不清。
- * - **不在这里写密钥名称**：名称是卡片/页面的标题级信息，行里放不下两段标题，
- *   放进来还会把"可达性"挤到第二行。
+ * - **不在这里写密钥名称**：名称是卡片/页面的标题级信息，行里放不下两段标题。
  * - 时间用 [relativeLabel]，相对时间的文案与分档都在 `strings.xml` 里。
  */
 @Composable
@@ -276,22 +277,17 @@ internal fun KeyRow(
         modifier = modifier,
         onClick = onClick,
         endActions = {
+            StatusDot(color = colorOf(row.health), label = labelOf(row.health))
             AppIconTint(icon = AppIcon.Forward, size = 18.dp, tint = appSecondaryTextColor)
         },
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            StatusDot(color = colorOf(row.health), label = labelOf(row.health))
-            if (row.note.isNotBlank()) {
-                AppText(
-                    text = row.note,
-                    style = AppTextStyle.Footnote,
-                    color = appSecondaryTextColor,
-                    maxLines = 1,
-                )
-            }
+        if (row.note.isNotBlank()) {
+            AppText(
+                text = row.note,
+                style = AppTextStyle.Footnote,
+                color = appSecondaryTextColor,
+                maxLines = 1,
+            )
         }
         AppText(
             text = row.masked,
@@ -363,14 +359,6 @@ internal fun ModelRow(
             if (showProtocol) {
                 AppChip(text = protocolLabel(row.protocol))
             }
-            AppChip(
-                text = stringResource(
-                    when (row.source) {
-                        UiModelSource.Manual -> Res.string.manage_source_manual
-                        UiModelSource.Discovered -> Res.string.manage_source_discovered
-                    },
-                ),
-            )
             row.contextLabel?.let { context ->
                 AppText(
                     text = stringResource(Res.string.manage_context, context),

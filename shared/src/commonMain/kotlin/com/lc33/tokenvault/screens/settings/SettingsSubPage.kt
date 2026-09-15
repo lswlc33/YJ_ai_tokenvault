@@ -1,6 +1,8 @@
 package com.lc33.tokenvault.screens.settings
 
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.runtime.Composable
@@ -15,6 +17,7 @@ import com.lc33.tokenvault.ui.miuix.AppScaffold
 import com.lc33.tokenvault.ui.miuix.AppTopBar
 import com.lc33.tokenvault.ui.miuix.appTopBarScroll
 import com.lc33.tokenvault.ui.miuix.rememberAppTopBarScrollState
+import com.lc33.tokenvault.ui.theme.LocalAppTokens
 
 /**
  * 二级设置页的共用外壳：带返回的 topBar + 一个可滚动列表。
@@ -52,7 +55,11 @@ fun SettingsSubPage(
                 .fillMaxSize()
                 .appTopBarScroll(scrollState),
             contentPadding = padding,
-            content = content,
-        )
+        ) {
+            content()
+            // 列表末尾预留呼吸空间：内容画到窗口底部（为了透出玻璃底栏），
+            // 不垫这一段的话最后一行会贴着底栏药丸边缘。
+            item { Spacer(modifier = Modifier.height(LocalAppTokens.current.sectionSpacing)) }
+        }
     }
 }

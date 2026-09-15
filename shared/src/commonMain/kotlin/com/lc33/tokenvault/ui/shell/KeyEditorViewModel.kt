@@ -42,6 +42,8 @@ class KeyEditorViewModel constructor(
     private val knownSecrets: KnownSecrets,
     private val providerId: Long,
     private val keyId: Long,
+    /** 新建 Key 的默认名（「密钥 N」）。由界面注入：ViewModel 读不到资源（红线 19）。 */
+    private val defaultKeyLabel: (Int) -> String,
 ) : ViewModel() {
 
     /**
@@ -63,6 +65,7 @@ class KeyEditorViewModel constructor(
 
     enum class SaveError {
         MissingSecret,
+        MissingName,
         InvalidTimeout,
         NoProtocols,
         SaveFailed,
@@ -125,7 +128,12 @@ class KeyEditorViewModel constructor(
             currentKey = key
             // 新建时用「探测」设置页里的那五个默认值当草稿初值。之前这里是写死的
             // `KeyDraft()`，于是那一页的开关改了什么都不影响——界面在，功能不存在。
-            _draft.value = key?.toDraft(profileList) ?: defaultDraft()
+            // 名称预填「密钥 N」（N = 这家已有的密钥数 + 1）：空名称会让卡片标题落到
+            // 兜底串、布局随长度抖动，所以新建就给一个能直接保存的名字。
+            // 文案来自界面注入（ViewModel 读不到资源，红线 19）。
+            _draft.value = key?.toDraft(profileList) ?: defaultDraft().copy(
+                label = defaultKeyLabel(existingKeyCount() + 1),
+            )
             key?.let { revealSecrets(it.id) }
             _loaded.value = true
 
@@ -169,6 +177,10 @@ class KeyEditorViewModel constructor(
     private suspend fun defaultDraft(): KeyDraft =
         settings.observeDefaultProbeSettings().first().toNewKeyDraft(providerId)
 
+    /** 新建 Key 的默认名从哪取序号：这家现有密钥数。 */
+    private suspend fun existingKeyCount(): Int =
+        keys.observeAll().first().count { it.providerId == providerId }
+
     fun onChange(next: KeyDraft) {
         _saveError.value = null
         _draft.value = next
@@ -183,6 +195,13 @@ class KeyEditorViewModel constructor(
         secret: CharArray?,
         balanceToken: CharArray?,
     ) {
+        // 名称必填：空名称会让卡片标题落到兜底串，列表布局随长度抖动（用户点名的问题）。
+        if (draft.label.isBlank()) {
+            secret?.zeroize()
+            balanceToken?.zeroize()
+            _saveError.value = SaveError.MissingName
+            return
+        }
         if (draft.protocols.isEmpty()) {
             secret?.zeroize()
             balanceToken?.zeroize()

@@ -51,13 +51,12 @@
     <string name="dashboard_probe_last_updated">上次更新：%1$s</string>
     <string name="dashboard_probe_title">上次探测</string>
     <string name="dashboard_probe_never">尚未探测</string>
-    <string name="dashboard_probe_start">开始探测</string>
     <string name="dashboard_probe_detail">查看明细</string>
     <string name="dashboard_probe_finished">完成于 %1$s · 耗时 %2$s</string>
     <string name="dashboard_probe_counts">共 %1$d 项 · 成功 %2$d · 失败 %3$d · 未探测 %4$d</string>
-    <string name="dashboard_probe_running">%1$d / %2$d · %3$s</string>
+    <string name="dashboard_probe_running">正在请求 %1$d / %2$d · %3$s</string>
+    <string name="dashboard_probe_complete">探测完成</string>
     <string name="dashboard_probe_no_autolock">探测进行中不会自动锁定</string>
-    <string name="dashboard_probe_cancel">取消</string>
     <string name="dashboard_backup_title">备份</string>
     <string name="dashboard_backup_never">尚未备份。忘记 PIN 或更换设备将无法恢复数据。</string>
     <string name="dashboard_backup_last">上次备份 %1$s · %2$s</string>
@@ -75,8 +74,6 @@
     <string name="manage_tab_accounts">账号</string>
     <string name="manage_pinned">置顶</string>
     <string name="manage_default_key">默认</string>
-    <string name="manage_source_manual">手动</string>
-    <string name="manage_source_discovered">发现</string>
     <string name="manage_local_only">仅本地记录</string>
     <string name="manage_keys_ratio">%1$d / %2$d 张可用</string>
     <string name="manage_models_count">%1$d 个模型</string>
@@ -442,6 +439,10 @@
     <string name="editor_balance_custom_used_path">已用字段路径</string>
     <string name="editor_balance_custom_currency">币种</string>
     <string name="editor_error_missing_secret">请填写 API Key。</string>
+    <string name="editor_error_missing_name">请填写名称。</string>
+    <string name="editor_default_key_name">密钥 %1$d</string>
+    <string name="editor_default_account_name">账号 %1$d</string>
+    <string name="editor_default_provider_name">供应商 %1$d</string>
     <string name="editor_error_invalid_timeout">超时时间必须是正整数，或留空。</string>
     <string name="editor_error_no_protocols">至少选择一个协议。</string>
     <string name="editor_error_save_failed">保存失败，输入内容已保留。</string>
@@ -601,7 +602,6 @@
     <string name="feedback_account_saved">账号已保存</string>
     <string name="feedback_probe_key_sent">正在探测该密钥…</string>
     <string name="feedback_probe_started">已开始探测</string>
-    <string name="feedback_probe_all_ok">探测完成，全部成功</string>
     <string name="feedback_probe_has_failure">探测完成，有失败项，详见日志</string>
     <string name="feedback_probe_nothing">没有可探测的项目</string>
     <string name="feedback_models_refresh_failed">模型列表刷新失败</string>
@@ -689,7 +689,6 @@
     <string name="detail_key_label_hint">用于区分同一供应商的多把密钥，可留空。</string>
     <string name="detail_key_secret">密钥</string>
     <string name="detail_key_secret_hint">粘贴即可，写入数据库前会先加密。</string>
-    <string name="detail_key_sheet_title">这把密钥</string>
     <string name="detail_key_set_default">设为默认</string>
     <string name="detail_key_delete_title">删除这把密钥？</string>
     <string name="detail_key_delete_body">删除后无法恢复。若为默认密钥，排序最前的已启用密钥将自动接替。</string>
@@ -714,7 +713,7 @@
     <string name="detail_probe_key">探测这把密钥</string>
     <string name="detail_probe_model_cd">探测这个模型</string>
     <string name="detail_provider_balance_total">余额合计</string>
-    <string name="detail_key_balance_value">本 Key：%1$s %2$s</string>
+    <string name="detail_key_balance_value">%1$s %2$s</string>
     <string name="protocol_chat">Chat</string>
     <string name="protocol_responses">Responses</string>
     <string name="protocol_anthropic">Anthropic</string>
@@ -728,7 +727,6 @@
     <string name="groups_delete_title">删掉这个分组？</string>
     <string name="groups_delete_body">其中的供应商不会被删除，它们会回到「全部」。</string>
     <!-- 绑定密钥的模型、快捷模型探测与账号登录方式。 -->
-    <string name="detail_models_source">来源</string>
     <string name="detail_models_section">模型</string>
     <string name="detail_models_empty_auto">还没有模型。刷新该密钥，或等待下次探测自动更新。</string>
     <string name="detail_models_empty_manual">还没有模型。请手动添加。</string>

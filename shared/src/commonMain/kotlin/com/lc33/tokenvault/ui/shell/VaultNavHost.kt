@@ -87,7 +87,6 @@ import tokenvault.shared.generated.resources.feedback_logs_cleared
 import tokenvault.shared.generated.resources.feedback_model_probed
 import tokenvault.shared.generated.resources.feedback_models_refreshing
 import tokenvault.shared.generated.resources.feedback_pin_changed
-import tokenvault.shared.generated.resources.feedback_probe_cancelled
 import tokenvault.shared.generated.resources.feedback_probe_started
 import tokenvault.shared.generated.resources.feedback_probe_key_sent
 import tokenvault.shared.generated.resources.feedback_probe_results_cleared
@@ -96,6 +95,8 @@ import tokenvault.shared.generated.resources.feedback_profile_saved
 import tokenvault.shared.generated.resources.feedback_provider_saved
 import tokenvault.shared.generated.resources.feedback_undone
 import tokenvault.shared.generated.resources.feedback_undo_failed
+import tokenvault.shared.generated.resources.editor_default_key_name
+import tokenvault.shared.generated.resources.editor_default_provider_name
 import tokenvault.shared.generated.resources.editor_group_none
 import tokenvault.shared.generated.resources.editor_url_err_empty
 import tokenvault.shared.generated.resources.editor_url_err_host
@@ -170,8 +171,7 @@ fun VaultNavHost(
             val vm: DashboardViewModel = koinViewModel()
             val dashboard by vm.state.collectAsStateWithLifecycle()
             val feedback = LocalAppFeedback.current
-            val probeStarted = stringResource(Res.string.feedback_probe_started)
-            val probeCancelled = stringResource(Res.string.feedback_probe_cancelled)
+            val probeStartedText = stringResource(Res.string.feedback_probe_started)
             val balanceRefreshed = stringResource(Res.string.feedback_balance_refreshed)
             DashboardScreen(
                 state = dashboard,
@@ -179,20 +179,16 @@ fun VaultNavHost(
                 // 三个一级页平级，压在栈上会让返回语义变成"回到总览"。
                 onOpenManage = { pager.animateToPage(topLevelIndexOf(ManageRoute)) },
                 onOpenProbeDetail = { navigate(ProbeRunRoute) },
-                onStartProbe = {
-                    if (vm.startProbe()) feedback?.post(AppFeedback(probeStarted))
-                },
-                onCancelProbe = {
-                    vm.cancelProbe()
-                    feedback?.post(AppFeedback(probeCancelled))
-                },
                 onRefreshBalance = {
                     vm.refreshBalance()
                     feedback?.post(AppFeedback(balanceRefreshed))
                 },
                 onRefreshStatus = {
-                    vm.refreshStatus()
-                    feedback?.post(AppFeedback(probeStarted))
+                    // 重复点击不叠加：引擎正在跑就不发起第二轮（探测要花钱），
+                    // 但余额刷新可以继续，用户按它通常是"再试一次"。
+                    val probeStarted = vm.startProbe()
+                    vm.refreshStatus(excludeProbe = true)
+                    if (probeStarted) feedback?.post(AppFeedback(probeStartedText))
                 },
             )
         }
@@ -204,6 +200,7 @@ fun VaultNavHost(
             val allLabel = stringResource(Res.string.group_all)
             LaunchedEffect(allLabel) { vm.setAllGroupLabel(allLabel) }
             val feedback = LocalAppFeedback.current
+            val probeStartedText = stringResource(Res.string.feedback_probe_started)
             val undoLabel = stringResource(Res.string.common_undo)
             val undone = stringResource(Res.string.feedback_undone)
             val undoFailed = stringResource(Res.string.feedback_undo_failed)
@@ -211,7 +208,6 @@ fun VaultNavHost(
             val groupAdded = stringResource(Res.string.feedback_group_added)
             val groupRenamed = stringResource(Res.string.feedback_group_renamed)
             val groupDeleted = stringResource(Res.string.feedback_group_deleted)
-            val probeStarted = stringResource(Res.string.feedback_probe_started)
             LaunchedEffect(vm) {
                 vm.events.collect { event ->
                     when (event) {
@@ -242,8 +238,10 @@ fun VaultNavHost(
                 onOpenGroups = { navigate(GroupsRoute) },
                 onNewProvider = { navigate(ProviderEditorRoute()) },
                 onRefreshStatus = {
-                    vm.refreshStatus()
-                    feedback?.post(AppFeedback(probeStarted))
+                    // 与首页同一条规则：引擎正在跑就不发第二轮，但连通性 / 余额照刷。
+                    val probeStarted = vm.startProbe()
+                    vm.refreshStatus(excludeProbe = true)
+                    if (probeStarted) feedback?.post(AppFeedback(probeStartedText))
                 },
                 onQueryChange = vm::onQueryChange,
                 onEnterSelection = vm::enterSelection,
@@ -440,7 +438,16 @@ fun VaultNavHost(
             }
 
             is KeyEditorRoute -> {
-                val vm: KeyEditorViewModel = koinViewModel(parameters = { parametersOf(route.providerId, route.keyId) })
+                // 默认名（「密钥 N」）的模板在组合期解析一次，真正格式化发生在 VM 的
+                // init 协程里（那时已不在组合上下文，stringResource 用不了）。
+                // 序号 N 由 VM 数现有密钥后回填 %1$d。
+                val keyLabelTemplate = stringResource(Res.string.editor_default_key_name)
+                val defaultKeyLabel: (Int) -> String = { n ->
+                    keyLabelTemplate.format(n)
+                }
+                val vm: KeyEditorViewModel = koinViewModel(
+                    parameters = { parametersOf(route.providerId, route.keyId, defaultKeyLabel) },
+                )
                 val draft by vm.draft.collectAsStateWithLifecycle()
                 val profiles by vm.profiles.collectAsStateWithLifecycle()
                 val loaded by vm.loaded.collectAsStateWithLifecycle()
@@ -746,10 +753,21 @@ fun VaultNavHost(
 
         // 剩下这几个还是 M0.8 立起来的空壳，内容各归各的里程碑（见 §16）
             is ProviderEditorRoute -> {
-            val vm: ProviderEditorViewModel = koinViewModel(parameters = { parametersOf(route.id) })
+            // 新建供应商的默认名（「供应商 N」）：模板在组合期解析（红线 19），
+            // 序号由 VM 数完现有供应商后回填。
+            val providerLabelTemplate = stringResource(Res.string.editor_default_provider_name)
+            val vm: ProviderEditorViewModel = koinViewModel(
+                parameters = {
+                    parametersOf(
+                        route.id,
+                        { n: Int -> providerLabelTemplate.format(n) },
+                    )
+                },
+            )
             val draft by vm.draft.collectAsStateWithLifecycle()
             val groups by vm.groups.collectAsStateWithLifecycle()
             val loaded by vm.loaded.collectAsStateWithLifecycle()
+            val nameMissing by vm.nameMissing.collectAsStateWithLifecycle()
             val feedback = LocalAppFeedback.current
             val providerSaved = stringResource(Res.string.feedback_provider_saved)
             LaunchedEffect(vm) {
@@ -767,6 +785,7 @@ fun VaultNavHost(
                 ProviderEditorScreen(
                     draft = draft,
                     groupNames = listOf(ungrouped) + groups.map { it.name },
+                    nameMissing = nameMissing,
                     onChange = vm::onChange,
                     onBack = back,
                     onSave = vm::onSave,

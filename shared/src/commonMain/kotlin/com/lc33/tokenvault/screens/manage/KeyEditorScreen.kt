@@ -85,6 +85,7 @@ import tokenvault.shared.generated.resources.editor_discard_confirm
 import tokenvault.shared.generated.resources.editor_discard_summary
 import tokenvault.shared.generated.resources.editor_discard_title
 import tokenvault.shared.generated.resources.editor_error_invalid_timeout
+import tokenvault.shared.generated.resources.editor_error_missing_name
 import tokenvault.shared.generated.resources.editor_error_missing_secret
 import tokenvault.shared.generated.resources.editor_error_no_protocols
 import tokenvault.shared.generated.resources.editor_error_save_failed
@@ -166,6 +167,7 @@ fun KeyEditorScreen(
     val initialDraft = remember { draft }
     var showDiscard by remember { mutableStateOf(false) }
     var secretError by remember { mutableStateOf(false) }
+    var nameError by remember { mutableStateOf(false) }
     var timeoutError by remember { mutableStateOf(false) }
     var addModel by remember { mutableStateOf(false) }
     var editingModel by remember { mutableStateOf<UiModelRow?>(null) }
@@ -218,11 +220,13 @@ fun KeyEditorScreen(
 
     fun submit() {
         val missingSecret = draft.id == 0L && secret.text.isBlank()
+        val missingName = label.text.isBlank()
         val timeoutText = timeout.text.trim()
         val badTimeout = timeoutText.isNotEmpty() && (timeoutText.toIntOrNull() == null || timeoutText.toInt() <= 0)
         secretError = missingSecret
+        nameError = missingName
         timeoutError = badTimeout
-        if (missingSecret || badTimeout || draft.protocols.isEmpty()) return
+        if (missingSecret || missingName || badTimeout || draft.protocols.isEmpty()) return
         val next = currentDraft.copy(
             label = label.text.trim(),
             note = note.text.trim(),
@@ -282,7 +286,13 @@ fun KeyEditorScreen(
                     modifier = Modifier.padding(horizontal = tokens.screenPadding),
                     verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
                 ) {
-                    AppTextField(state = label, label = stringResource(Res.string.editor_name))
+                    // 名称必填：空名称会让标题落到兜底串、布局抖动，所以新建预填默认名、
+                    // 清空则拦下保存并说明原因。
+                    AppTextField(
+                        state = label,
+                        label = stringResource(Res.string.editor_name),
+                        errorText = if (nameError) stringResource(Res.string.editor_error_missing_name) else null,
+                    )
                     AppTextField(state = note, label = stringResource(Res.string.editor_note))
                     AppSecretTextField(
                         state = secret,
@@ -575,6 +585,7 @@ fun KeyEditorScreen(
                         text = stringResource(
                             when (error) {
                                 KeyEditorViewModel.SaveError.MissingSecret -> Res.string.editor_error_missing_secret
+                                KeyEditorViewModel.SaveError.MissingName -> Res.string.editor_error_missing_name
                                 KeyEditorViewModel.SaveError.InvalidTimeout -> Res.string.editor_error_invalid_timeout
                                 KeyEditorViewModel.SaveError.NoProtocols -> Res.string.editor_error_no_protocols
                                 KeyEditorViewModel.SaveError.SaveFailed -> Res.string.editor_error_save_failed

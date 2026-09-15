@@ -32,14 +32,12 @@ import tokenvault.shared.generated.resources.dashboard_counts_title
 import tokenvault.shared.generated.resources.dashboard_health_all_ok
 import tokenvault.shared.generated.resources.dashboard_health_empty
 import tokenvault.shared.generated.resources.dashboard_health_title
-import tokenvault.shared.generated.resources.dashboard_probe_cancel
 import tokenvault.shared.generated.resources.dashboard_probe_counts
 import tokenvault.shared.generated.resources.dashboard_probe_key_label
 import tokenvault.shared.generated.resources.dashboard_probe_last_updated
 import tokenvault.shared.generated.resources.dashboard_probe_provider_label
 import tokenvault.shared.generated.resources.dashboard_probe_detail
 import tokenvault.shared.generated.resources.dashboard_probe_finished
-import tokenvault.shared.generated.resources.dashboard_probe_start
 import tokenvault.shared.generated.resources.dashboard_probe_never
 import tokenvault.shared.generated.resources.dashboard_probe_no_autolock
 import tokenvault.shared.generated.resources.dashboard_probe_running
@@ -64,7 +62,6 @@ import com.lc33.tokenvault.ui.common.durationSeconds
 import com.lc33.tokenvault.ui.common.labelOf
 import com.lc33.tokenvault.ui.common.messageOf
 import com.lc33.tokenvault.ui.common.relativeLabel
-import com.lc33.tokenvault.ui.miuix.AppAccentCard
 import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppDivider
 import com.lc33.tokenvault.ui.miuix.AppIcon
@@ -72,9 +69,11 @@ import com.lc33.tokenvault.ui.miuix.AppIconButton
 import com.lc33.tokenvault.ui.miuix.AppLinearProgress
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppActionRow
+import com.lc33.tokenvault.ui.miuix.AppLayerBackdrop
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.appOnPrimaryColor
 import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
+import com.lc33.tokenvault.ui.miuix.liquid.AppGlassCard
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
 import com.lc33.tokenvault.ui.theme.LocalStatusPalette
 
@@ -94,9 +93,17 @@ internal fun BalanceCard(
     balance: BalanceSummary,
     nowMs: Long,
     onRefresh: () -> Unit,
+    /**
+     * 卡片要采样的背景层。**必须是不含这张卡片的层**（见 [DashboardScreen] 的说明）；
+     * null 时退回实色主色底（测试 / 预览）。
+     */
+    blurBackdrop: AppLayerBackdrop?,
 ) {
     val tokens = LocalAppTokens.current
-    AppAccentCard(modifier = cardModifier()) {
+    AppGlassCard(
+        blurBackdrop = blurBackdrop,
+        modifier = cardModifier(),
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -134,7 +141,7 @@ internal fun BalanceCard(
                 color = appOnPrimaryColor,
                 modifier = Modifier.padding(top = tokens.itemSpacing),
             )
-            return@AppAccentCard
+            return@AppGlassCard
         }
         balance.perCurrency.forEachIndexed { index, money ->
             AppText(
@@ -274,17 +281,18 @@ internal fun AttentionCard(items: List<AttentionItem>, onOpenProvider: (Long) ->
 }
 
 /**
- * 探测区。**拆成多张卡**：状态卡（上次探测）与两张进度卡（供应商 / 密钥）。
+ * 探测区。**拆成多张卡**：状态卡（上一轮 / 进行中）与两张进度卡（供应商 / 密钥）。
  *
  * 以前三块挤在一张卡里，标签、计数、细进度条一行接一行，读起来分不清哪条属于谁；
  * 拆开之后每张卡只讲一件事，各自有完整的卡片内边距。
+ *
+ * **这一区没有动作入口**：开始 / 取消探测都由顶栏刷新承担（探测要花钱，入口收敛到
+ * 一处反而更明确），这里只讲进度与上一轮结果。
  */
 @Composable
 internal fun ProbeCard(
     state: DashboardUiState,
     onOpenDetail: () -> Unit,
-    onStart: () -> Unit,
-    onCancel: () -> Unit,
 ) {
     val tokens = LocalAppTokens.current
     val progress = state.progress
@@ -293,8 +301,6 @@ internal fun ProbeCard(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
     ) {
-        // 状态卡只讲状态；开始/取消探测是一条独立入口，不塞进描述里，
-        // 否则整张卡看起来像"点它才会开始探测"。
         AppCard(modifier = cardModifier()) {
             CardTitle(stringResource(Res.string.dashboard_probe_title))
             when {
@@ -336,35 +342,6 @@ internal fun ProbeCard(
                         modifier = Modifier.padding(top = tokens.itemSpacing),
                     )
                 }
-            }
-        }
-
-        // 探测入口单独成组：进行中是「取消」，其余是「开始」；有上一轮结果时
-        // 再给一条「查看明细」。这三者都是动作，不塞进上面的状态卡。
-        AppCard(modifier = cardModifier()) {
-            if (progress != null) {
-                AppActionRow(
-                    text = stringResource(Res.string.dashboard_probe_cancel),
-                    onClick = onCancel,
-                    modifier = Modifier.fillMaxWidth(),
-                    inset = false,
-                )
-            } else {
-                AppActionRow(
-                    text = stringResource(Res.string.dashboard_probe_start),
-                    onClick = onStart,
-                    modifier = Modifier.fillMaxWidth(),
-                    inset = false,
-                )
-            }
-            // 从未探测过时没有明细可看，不给这条入口（点进去只有空态）。
-            if (lastRun != null && progress == null) {
-                AppActionRow(
-                    text = stringResource(Res.string.dashboard_probe_detail),
-                    onClick = onOpenDetail,
-                    modifier = Modifier.fillMaxWidth(),
-                    inset = false,
-                )
             }
         }
 

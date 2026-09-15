@@ -58,6 +58,8 @@ import tokenvault.shared.generated.resources.detail_account_delete_body
 import tokenvault.shared.generated.resources.login_method_password
 import tokenvault.shared.generated.resources.detail_add_key
 import tokenvault.shared.generated.resources.detail_balance_not_checked
+import tokenvault.shared.generated.resources.editor_default_account_name
+import tokenvault.shared.generated.resources.editor_error_missing_name
 import tokenvault.shared.generated.resources.detail_edit_cd
 import tokenvault.shared.generated.resources.detail_keys_empty
 import tokenvault.shared.generated.resources.detail_models_refresh
@@ -299,7 +301,7 @@ fun ProviderDetailScreen(
                 }
             }
 
-            item { Spacer(modifier = Modifier.height(tokens.sectionSpacing)) }
+            item { Spacer(modifier = Modifier.height(tokens.sectionSpacing + tokens.itemSpacing)) }
         }
     }
 
@@ -348,9 +350,14 @@ fun ProviderDetailScreen(
         },
     )
 
+    // 新建账号的默认名（「账号 N」）：先在组合期把序号与模板拼好，再交给表单。
+    // 表单的默认值 lambda 不在组合上下文里，不能就地调 stringResource。
+    val nextAccountLabel = stringResource(Res.string.editor_default_account_name, state.accounts.size + 1)
+
     AccountEditorSheet(
         target = accountEditor,
         revealed = revealedAccount,
+        defaultNewLabel = { nextAccountLabel },
         onDismiss = {
             accountEditor = null
             // 明文只在编辑层存活期间存在；关掉就擦（红线 1）。
@@ -467,10 +474,15 @@ private fun AccountEditorSheet(
     onCopy: (Long) -> Unit,
     onSave: (String, String, CharArray?, CharArray?, Set<LoginMethod>, Boolean) -> Unit,
     onDelete: (Long) -> Unit,
+    /** 新建账号的默认名（「账号 N」）。由页面注入：这一层读不到资源上限的序号。 */
+    defaultNewLabel: () -> String = { "" },
 ) {
     val tokens = LocalAppTokens.current
     val account = (target as? AccountEditorTarget.Edit)?.account
-    val label = rememberAppTextFieldState(account?.label.orEmpty())
+    // 新建时预填默认名：空名称会让账号行的标题落到兜底串（用户点名的问题）。
+    val label = rememberAppTextFieldState(
+        if (account != null) account.label else defaultNewLabel(),
+    )
     val note = rememberAppTextFieldState(account?.note.orEmpty())
     val username = rememberSecretTextFieldState()
     val password = rememberSecretTextFieldState()
@@ -487,7 +499,14 @@ private fun AccountEditorSheet(
     var passwordConcealed by remember(target) { mutableStateOf(true) }
 
     LaunchedEffect(target) {
-        label.setText(account?.label.orEmpty())
+        label.setText(
+            when (target) {
+                is AccountEditorTarget.Edit -> target.account.label
+                // 切到 New 时重新取一次默认名：连续新建两个账号，序号要往后走。
+                AccountEditorTarget.New -> defaultNewLabel()
+                null -> ""
+            },
+        )
         note.setText(account?.note.orEmpty())
         username.clear()
         password.clear()
@@ -536,6 +555,8 @@ private fun AccountEditorSheet(
         AppTextField(
             state = label,
             label = stringResource(Res.string.editor_name),
+            // 名称必填：空名称的账号在列表里只剩遮蔽串，认不出是哪个账号。
+            errorText = if (label.text.isBlank()) stringResource(Res.string.editor_error_missing_name) else null,
         )
         AppTextField(
             state = note,
@@ -603,6 +624,8 @@ private fun AccountEditorSheet(
         AppDialogTextButton(
             text = stringResource(Res.string.editor_save),
             onClick = {
+                // 名称必填：为空不保存。输入框下方已有错误说明，这里直接拦住。
+                if (label.text.isBlank()) return@AppDialogTextButton
                 val usernameChars = username.chars.takeIf { it.isNotEmpty() }
                 val passwordChars = password.chars.takeIf { it.isNotEmpty() }
                 username.clear()

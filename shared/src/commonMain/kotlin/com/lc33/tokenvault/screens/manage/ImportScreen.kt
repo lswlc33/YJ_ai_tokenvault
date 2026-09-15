@@ -118,6 +118,7 @@ fun ImportScreen(
                 .imePadding()
                 .appTopBarScroll(scrollState),
             contentPadding = padding,
+            verticalArrangement = Arrangement.spacedBy(tokens.sectionSpacing),
         ) {
             item { SectionTitle(text = stringResource(Res.string.import_section_paste)) }
             item {
@@ -203,7 +204,8 @@ fun ImportScreen(
                 }
             }
 
-            item { Spacer(modifier = Modifier.height(tokens.sectionSpacing)) }
+            // 滑到底的呼吸空间：内容画到窗口底部（透出玻璃底栏），不垫就会贴边。
+            item { Spacer(modifier = Modifier.height(tokens.itemSpacing)) }
         }
     }
 

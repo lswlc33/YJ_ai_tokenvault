@@ -83,9 +83,6 @@ class DashboardViewModel constructor(
     /** 仪表盘“开始探测”。结果与进度由 ProbeEngine 的状态流回 UI。 */
     fun startProbe(): Boolean = probeEngine.start()
 
-    /** 仪表盘“取消探测”。 */
-    fun cancelProbe() = probeEngine.cancel()
-
     /**
      * 刷新所有已配置余额查询的供应商（§9.3 的刷新图标）。逐家查、逐家落库，
      * 结果经 [providers.observeSummaries] 那条订阅自然流回 UI——不用手动通知（红线 10）。
@@ -100,15 +97,17 @@ class DashboardViewModel constructor(
      * 顶栏刷新：一次把该发的都发出去——全量探测（密钥 L1/L2 + 开了自动获取的模型列表）、
      * 官网连通性、余额。
      *
-     * 三件事各跑各的 Job、互不阻塞；"跑完了没有"由 [ProbeEngine.roundResults] 统一告诉界面，
-     * 所以这里不返回、也不发提示（提示在 Shell 层收口，见 `VaultShell`）。
+     * [excludeProbe] 为 true 时**只发**官网连通性与余额——探测那一发由调用方先用
+     * [startProbe] 的返回值判断"这轮有没有真的启动"（正在跑就不重复发，探测要花钱），
+     * 再决定要不要提示“已开始”。两条路径拆开是为了让“重复点击不叠加请求”和
+     * “余额可以随时再刷”互不妨碍。
      */
-    fun refreshStatus() {
+    fun refreshStatus(excludeProbe: Boolean = false) {
         viewModelScope.launch {
             probeEngine.refreshReachability()
             runCatching { balanceEngine.refreshAll() }
         }
-        probeEngine.start()
+        if (!excludeProbe) probeEngine.start()
     }
 
     private fun Snapshot.balanceByProvider(): Map<Long, com.lc33.tokenvault.domain.model.BalanceSnapshot?> =

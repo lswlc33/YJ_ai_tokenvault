@@ -25,9 +25,9 @@ import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.platform.Haptics
 import com.lc33.tokenvault.platform.PlatformBackHandler
 import tokenvault.shared.generated.resources.Res
+import tokenvault.shared.generated.resources.dashboard_probe_complete
 import tokenvault.shared.generated.resources.feedback_models_refresh_failed
 import tokenvault.shared.generated.resources.feedback_models_refreshed
-import tokenvault.shared.generated.resources.feedback_probe_all_ok
 import tokenvault.shared.generated.resources.feedback_probe_has_failure
 import tokenvault.shared.generated.resources.feedback_probe_nothing
 import tokenvault.shared.generated.resources.nav_dashboard
@@ -76,9 +76,9 @@ fun VaultShell() {
     // 结果。**两处都在 Shell 级说**，页面只负责发"开始"那一条——否则每个页面各写一套，
     // 迟早有页面只发开始不发结果，用户看到的就是"点了没反应"。
     val probeEngine: ProbeEngine = koinInject()
-    val probeAllOk = stringResource(Res.string.feedback_probe_all_ok)
     val probeHasFailure = stringResource(Res.string.feedback_probe_has_failure)
     val probeNothing = stringResource(Res.string.feedback_probe_nothing)
+    val probeFinished = stringResource(Res.string.dashboard_probe_complete)
     val modelsRefreshed = stringResource(Res.string.feedback_models_refreshed)
     val modelsRefreshFailed = stringResource(Res.string.feedback_models_refresh_failed)
     LaunchedEffect(probeEngine) {
@@ -87,7 +87,7 @@ fun VaultShell() {
                 val message = when {
                     result.cancelled -> null
                     result.total == 0 -> probeNothing
-                    result.fail == 0 -> probeAllOk
+                    result.fail == 0 -> probeFinished
                     else -> probeHasFailure
                 }
                 message?.let { feedback?.post(AppFeedback(it)) }

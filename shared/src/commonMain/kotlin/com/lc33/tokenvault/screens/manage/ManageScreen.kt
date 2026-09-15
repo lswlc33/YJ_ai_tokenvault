@@ -362,6 +362,14 @@ private fun ProviderList(
                 )
             }
         }
-        item { Spacer(modifier = Modifier.height(tokens.fabListBottomSpace)) }
+        // 多选态有删除 FAB，末尾要让出药丸；普通态只留呼吸空间（内容画到窗口底部
+        // 透出玻璃底栏，不垫就会贴边）。
+        item {
+            Spacer(
+                modifier = Modifier.height(
+                    if (selecting) tokens.fabListBottomSpace else tokens.sectionSpacing,
+                ),
+            )
+        }
     }
 }
