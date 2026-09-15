@@ -438,12 +438,11 @@ fun VaultNavHost(
             }
 
             is KeyEditorRoute -> {
-                // 默认名（「密钥 N」）的模板在组合期解析一次，真正格式化发生在 VM 的
+                // 默认名（「密钥 N」）的模板在组合期解析一次，真正取用发生在 VM 的
                 // init 协程里（那时已不在组合上下文，stringResource 用不了）。
-                // 序号 N 由 VM 数现有密钥后回填 %1$d。
                 val keyLabelTemplate = stringResource(Res.string.editor_default_key_name)
                 val defaultKeyLabel: (Int) -> String = { n ->
-                    keyLabelTemplate.format(n)
+                    defaultNameFromTemplate(keyLabelTemplate, n)
                 }
                 val vm: KeyEditorViewModel = koinViewModel(
                     parameters = { parametersOf(route.providerId, route.keyId, defaultKeyLabel) },
@@ -760,7 +759,7 @@ fun VaultNavHost(
                 parameters = {
                     parametersOf(
                         route.id,
-                        { n: Int -> providerLabelTemplate.format(n) },
+                        { n: Int -> defaultNameFromTemplate(providerLabelTemplate, n) },
                     )
                 },
             )
@@ -1228,3 +1227,14 @@ private enum class PendingSyncAction {
 
 /** 待恢复的包字节 + 口令（口令用完必须擦）。 */
 private class PendingRestore(val bytes: ByteArray, val password: CharArray)
+
+/**
+ * 把资源模板里的 `%1$d` 换成序号，得到「密钥 1」这样的默认名。
+ *
+ * 为什么不用 `String.format`：它是 **JVM 专有**的扩展，Kotlin/Native 上没有，
+ * 用了 iOS 目标直接编译失败（2026-09-15 CI 的 ios job 就是这么红的）。
+ * 这里的模板只有一个占位符，做一次朴素替换即可，也顺手避开了把数字按平台规则本地化的问题
+ * ——序号是标识用的，不该被千分位之类影响。
+ */
+internal fun defaultNameFromTemplate(template: String, index: Int): String =
+    template.replace("%1\$d", index.toString())
