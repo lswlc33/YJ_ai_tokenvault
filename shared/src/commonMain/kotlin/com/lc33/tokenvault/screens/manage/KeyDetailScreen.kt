@@ -196,51 +196,52 @@ fun KeyDetailScreen(
                         .fillMaxWidth()
                         .padding(horizontal = tokens.screenPadding),
                 ) {
-                    // 与列表里的密钥行同一套形态：备注 / 遮蔽串 / 延迟 + 时间，
-                    // 可达性放右侧（左边挤不下，用户点名的要求）。余额不在这里——
-                    // 它是独立一张卡，混进来会让"这一行说的是什么"说不清。
-                    if (key.note.isNotBlank()) {
-                        AppText(
-                            text = key.note,
-                            style = AppTextStyle.Footnote,
-                            color = appSecondaryTextColor,
-                            maxLines = 1,
-                        )
-                    }
+                    // 左边一列讲这把 Key 是什么（备注 / 遮蔽串 / 延迟 + 时间），
+                    // 可达性单独摆在**卡片右缘**、与整块内容上下居中——它说的是整把 Key 的
+                    // 结论，不是某一行文字的注解（贴在那串遮蔽串右边会被读成"标题的角标"）。
+                    // 余额不在这里：它是独立一张卡，混进来会让"这一行说的是什么"说不清。
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        AppText(
-                            text = key.masked,
-                            style = AppTextStyle.Body,
-                            fontFamily = tokens.monoFontFamily,
-                            modifier = Modifier
-                                .weight(1f, fill = false)
-                                .padding(top = 4.dp),
-                            maxLines = 1,
-                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            if (key.note.isNotBlank()) {
+                                AppText(
+                                    text = key.note,
+                                    style = AppTextStyle.Footnote,
+                                    color = appSecondaryTextColor,
+                                    maxLines = 1,
+                                )
+                            }
+                            AppText(
+                                text = key.masked,
+                                style = AppTextStyle.Body,
+                                fontFamily = tokens.monoFontFamily,
+                                maxLines = 1,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                            val timingText = when {
+                                key.latencyMs != null && key.checkedAt != null -> stringResource(
+                                    Res.string.manage_latency_time,
+                                    stringResource(Res.string.manage_latency, key.latencyMs),
+                                    relativeLabel(state.nowMs, key.checkedAt),
+                                )
+                                key.latencyMs != null ->
+                                    stringResource(Res.string.manage_latency, key.latencyMs)
+                                key.checkedAt != null -> relativeLabel(state.nowMs, key.checkedAt)
+                                else -> null
+                            }
+                            if (timingText != null) {
+                                AppText(
+                                    text = timingText,
+                                    style = AppTextStyle.Footnote,
+                                    color = appSecondaryTextColor,
+                                    modifier = Modifier.padding(top = 4.dp),
+                                )
+                            }
+                        }
                         StatusDot(color = colorOf(key.health), label = labelOf(key.health))
-                    }
-                    val timingText = when {
-                        key.latencyMs != null && key.checkedAt != null -> stringResource(
-                            Res.string.manage_latency_time,
-                            stringResource(Res.string.manage_latency, key.latencyMs),
-                            relativeLabel(state.nowMs, key.checkedAt),
-                        )
-                        key.latencyMs != null ->
-                            stringResource(Res.string.manage_latency, key.latencyMs)
-                        key.checkedAt != null -> relativeLabel(state.nowMs, key.checkedAt)
-                        else -> null
-                    }
-                    if (timingText != null) {
-                        AppText(
-                            text = timingText,
-                            style = AppTextStyle.Footnote,
-                            color = appSecondaryTextColor,
-                            modifier = Modifier.padding(top = 4.dp),
-                        )
                     }
                 }
             }

@@ -242,10 +242,18 @@ fun KeyEditorScreen(
         )
         // 只交**改过**的那两段：原值已经在输入框里了，原样交回去会让每一次保存
         // 都重新加密一遍同一个明文（还多一条审计日志）。null = 没动，保留原值。
+        //
+        // "改没改"必须在这里（点击这一刻）用**活取值**算，不能复用组合期算好的
+        // [secretChanged] 快照：快照一旦滞后，填好的密钥会被当成"没动"交上去，
+        // 保存报的却是"请填写 API Key"——2026-09-15 实测踩到过这个坑。
+        // 新建 Key 更没有"原值"可言，填了什么就交什么。
+        val secretNow = secret.chars
+        val tokenNow = balanceToken.chars
+        val newKey = draft.id == 0L
         onSave(
             next,
-            secret.chars.takeIf { secretChanged },
-            balanceToken.chars.takeIf { tokenChanged },
+            if (newKey) secretNow else secretNow.takeIf { secret.text != revealed.secret.orEmpty() },
+            if (newKey) tokenNow else tokenNow.takeIf { balanceToken.text != revealed.balanceToken.orEmpty() },
         )
     }
 

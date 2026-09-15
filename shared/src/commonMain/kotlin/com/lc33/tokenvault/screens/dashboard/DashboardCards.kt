@@ -62,6 +62,7 @@ import com.lc33.tokenvault.ui.common.durationSeconds
 import com.lc33.tokenvault.ui.common.labelOf
 import com.lc33.tokenvault.ui.common.messageOf
 import com.lc33.tokenvault.ui.common.relativeLabel
+import com.lc33.tokenvault.ui.miuix.AppAccentCard
 import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppDivider
 import com.lc33.tokenvault.ui.miuix.AppIcon
@@ -69,11 +70,9 @@ import com.lc33.tokenvault.ui.miuix.AppIconButton
 import com.lc33.tokenvault.ui.miuix.AppLinearProgress
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppActionRow
-import com.lc33.tokenvault.ui.miuix.AppLayerBackdrop
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.appOnPrimaryColor
 import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
-import com.lc33.tokenvault.ui.miuix.liquid.AppGlassCard
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
 import com.lc33.tokenvault.ui.theme.LocalStatusPalette
 
@@ -93,17 +92,12 @@ internal fun BalanceCard(
     balance: BalanceSummary,
     nowMs: Long,
     onRefresh: () -> Unit,
-    /**
-     * 卡片要采样的背景层。**必须是不含这张卡片的层**（见 [DashboardScreen] 的说明）；
-     * null 时退回实色主色底（测试 / 预览）。
-     */
-    blurBackdrop: AppLayerBackdrop?,
 ) {
     val tokens = LocalAppTokens.current
-    AppGlassCard(
-        blurBackdrop = blurBackdrop,
-        modifier = cardModifier(),
-    ) {
+    // 实色主色底。曾经试过玻璃材质（背景模糊 + vibrancy + 动态光斑）来"彰显高级感"，
+    // 结果是显示异常，已按用户要求回退——这条路上还有一个坑：被采样的背景层若包含
+    // 卡片自己，渲染树每帧加深，几秒后 RenderThread 栈溢出闪退。
+    AppAccentCard(modifier = cardModifier()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -141,7 +135,7 @@ internal fun BalanceCard(
                 color = appOnPrimaryColor,
                 modifier = Modifier.padding(top = tokens.itemSpacing),
             )
-            return@AppGlassCard
+            return@AppAccentCard
         }
         balance.perCurrency.forEachIndexed { index, money ->
             AppText(
