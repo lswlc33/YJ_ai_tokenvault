@@ -9,6 +9,7 @@ fun Provider.toDraft(groupIndex: Int): ProviderDraft = ProviderDraft(
     name = name,
     note = note.orEmpty(),
     website = websiteUrl.orEmpty(),
+    checkWebsite = checkWebsite,
     groupIndex = groupIndex,
     colorIndex = color ?: 0,
     pinned = pinned,
@@ -21,6 +22,7 @@ fun ProviderDraft.toProvider(existing: Provider?, groups: List<Group>): Provider
         name = name,
         note = note.ifBlank { null },
         websiteUrl = website.ifBlank { null },
+        checkWebsite = checkWebsite,
         groupId = if (groupIndex == 0) {
             null
         } else {

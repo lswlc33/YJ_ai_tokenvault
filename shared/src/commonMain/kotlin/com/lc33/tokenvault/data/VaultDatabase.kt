@@ -63,7 +63,7 @@ abstract class VaultDatabase : RoomDatabase() {
     abstract fun appSettingDao(): AppSettingDao
 
     companion object {
-        const val VERSION = 6
+        const val VERSION = 7
         const val FILE_NAME = "vault.db"
 
         val MIGRATION_1_2: Migration = object : Migration(1, 2) {
@@ -476,6 +476,21 @@ abstract class VaultDatabase : RoomDatabase() {
                 connection.execSQL("ALTER TABLE audit_log ADD COLUMN requestUrl TEXT")
                 connection.execSQL("ALTER TABLE audit_log ADD COLUMN requestBody TEXT")
                 connection.execSQL("ALTER TABLE audit_log ADD COLUMN responseBody TEXT")
+            }
+        }
+
+        /**
+         * v7：供应商多一个「允许检查官网连通性」。
+         *
+         * 一条 `ADD COLUMN` 即可——单列，没有列要删或改类型，不必重建表。
+         * **默认 0（关）**：老库里已经填了官网地址的那些家，不会因为升级就突然开始被 ping；
+         * 用户在新版本里明确打开之后才发请求。
+         */
+        val MIGRATION_6_7: Migration = object : Migration(6, 7) {
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL(
+                    "ALTER TABLE providers ADD COLUMN checkWebsite INTEGER NOT NULL DEFAULT 0",
+                )
             }
         }
     }

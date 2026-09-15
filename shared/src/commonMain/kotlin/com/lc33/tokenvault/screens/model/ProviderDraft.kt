@@ -6,6 +6,11 @@ data class ProviderDraft(
     val name: String = "",
     val note: String = "",
     val website: String = "",
+    /**
+     * 允许 ping 官网检测连通性。**默认关**：这会真的向那家发一次请求，
+     * 得用户在设置页里明确打开（供应商设置页那个开关）。
+     */
+    val checkWebsite: Boolean = false,
     val groupIndex: Int = 0,
     val colorIndex: Int = 0,
     val pinned: Boolean = false,

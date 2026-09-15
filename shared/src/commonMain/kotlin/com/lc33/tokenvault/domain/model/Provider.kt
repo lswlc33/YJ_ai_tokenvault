@@ -32,6 +32,11 @@ data class Provider(
     val name: String,
     val note: String? = null,
     val websiteUrl: String? = null,
+    /**
+     * 允许 ping 官网检测连通性。默认关（v7 起）：这是"要不要让设备去敲那家的站"，
+     * 得用户明确答应；关掉时 [website] 会一直停在"没查过"。
+     */
+    val checkWebsite: Boolean = false,
     val website: WebsiteStatus = WebsiteStatus(),
     val groupId: Long? = null,
     val color: Int? = null,

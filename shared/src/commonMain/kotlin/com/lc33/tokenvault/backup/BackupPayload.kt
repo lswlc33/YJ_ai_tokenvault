@@ -50,6 +50,11 @@ data class BackupProvider(
     val name: String,
     val note: String? = null,
     val websiteUrl: String? = null,
+    /**
+     * 允许 ping 官网检测连通性（v7 起的开关）。属于**配置**不是探测结果，要搬；
+     * 旧备份里没有这一段，缺省按"关"——正是它的默认值。
+     */
+    val checkWebsite: Boolean = false,
     val apiBaseUrl: String = "",
     val apiRoot: String = "",
     val apiVersion: String = "v1",

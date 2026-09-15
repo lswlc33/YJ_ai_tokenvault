@@ -167,6 +167,7 @@
     <string name="detail_models_refresh">刷新模型</string>
     <string name="detail_key_models_refresh">刷新这把密钥的模型</string>
     <string name="detail_accounts_empty">该供应商还没有平台账号。仅保存在本地，应用不会代为填写。</string>
+    <string name="detail_accounts_empty_placeholder">还未添加账号</string>
     <!-- Appearance -->
     <string name="appearance_section_theme">主题</string>
     <string name="appearance_color_scheme">配色模式</string>
@@ -408,6 +409,8 @@
     <string name="editor_name">名称</string>
     <string name="editor_note">备注</string>
     <string name="editor_website">官网</string>
+    <string name="editor_check_website">允许检查官网连通性</string>
+    <string name="editor_check_website_summary">打开后才会访问这个官网，检测它是否可用。默认关闭：这会向该网站发出一次请求。</string>
     <string name="editor_base_url">API 请求地址</string>
     <string name="editor_base_url_hint">只填到路径，不要包含问号后的参数，粘贴供应商提供的 Base URL 即可。</string>
     <string name="editor_preview_title">将生成以下地址</string>
@@ -683,6 +686,7 @@
     <string name="onboarding_calibrating_note">此步骤仅执行一次且无法取消；密钥派生没有可报告的中间进度，因此不显示百分比。</string>
 
     <!-- M3：供应商详情页的密钥管理。 -->
+    <string name="detail_keys_empty_placeholder">还未添加密钥</string>
     <string name="detail_keys_empty">该供应商还没有密钥。没有密钥无法探测，也无法查询余额。</string>
     <string name="detail_add_key">添加密钥</string>
     <string name="detail_key_label">标签</string>

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.lc33.tokenvault.domain.model.Group
 import com.lc33.tokenvault.domain.repo.GroupRepository
 import com.lc33.tokenvault.domain.repo.ProviderRepository
+import com.lc33.tokenvault.engine.ProbeEngine
 import com.lc33.tokenvault.screens.model.ProviderDraft
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -22,6 +23,7 @@ import kotlinx.coroutines.launch
 class ProviderEditorViewModel constructor(
     private val providers: ProviderRepository,
     private val groupRepository: GroupRepository,
+    private val probeEngine: ProbeEngine,
     private val providerId: Long,
     /** 新建供应商的默认名（「供应商 N」，N 由它自己格式化）。由界面注入：VM 读不到资源。 */
     private val defaultProviderLabel: (Int) -> String = { "" },
@@ -88,7 +90,13 @@ class ProviderEditorViewModel constructor(
         }
         _nameMissing.value = false
         viewModelScope.launch {
-            providers.save(draft.toProvider(loadedProvider, groups.value))
+            val savedId = providers.save(draft.toProvider(loadedProvider, groups.value))
+            // 刚打开「允许检查官网连通性」的话，立刻去查一次——不然用户拨了开关、
+            // 页面上却是空的，要等下一次全量刷新才看得到结果，很像没生效。
+            // 关掉时不查（那正是关它的意思），已有结果保留着也不算错。
+            if (draft.checkWebsite) {
+                probeEngine.refreshReachability(savedId)
+            }
             _saved.tryEmit(Unit)
         }
     }

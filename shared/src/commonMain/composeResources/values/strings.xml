@@ -168,6 +168,7 @@
     <string name="detail_models_refresh">Refresh models</string>
     <string name="detail_key_models_refresh">Refresh models for this key</string>
     <string name="detail_accounts_empty">No platform account for this provider. Stored locally and never filled in for you.</string>
+    <string name="detail_accounts_empty_placeholder">No account added yet</string>
     <!-- Appearance -->
     <string name="appearance_section_theme">Theme</string>
     <string name="appearance_color_scheme">Color scheme</string>
@@ -409,6 +410,8 @@
     <string name="editor_name">Name</string>
     <string name="editor_note">Note</string>
     <string name="editor_website">Website</string>
+    <string name="editor_check_website">Check website reachability</string>
+    <string name="editor_check_website_summary">When on, the app pings this website to see whether it is reachable. Off by default: it sends a request to that site.</string>
     <string name="editor_base_url">API base URL</string>
     <string name="editor_base_url_hint">Path only, with no query string. Paste the "base URL" given by the provider.</string>
     <string name="editor_preview_title">Generated endpoints</string>
@@ -686,6 +689,7 @@
     <string name="onboarding_calibrating_note">This runs once and cannot be cancelled. Key derivation has no reportable intermediate progress, so no percentage is shown.</string>
 
     <!-- M3: key management on the provider detail page. -->
+    <string name="detail_keys_empty_placeholder">No key added yet</string>
     <string name="detail_keys_empty">No key yet. A provider without a key cannot be probed and its balance cannot be read.</string>
     <string name="detail_add_key">Add key</string>
     <string name="detail_key_label">Label</string>

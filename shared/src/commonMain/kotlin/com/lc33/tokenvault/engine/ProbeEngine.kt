@@ -362,9 +362,16 @@ class ProbeEngine constructor(
     }
 
     private suspend fun refreshReachabilityInner(providerId: Long?) {
+        // 只查**用户允许查**的那些家：`checkWebsite` 是"要不要让这台设备去敲那家的站"
+        // （v7 起的开关，默认关）。没有这个开关就去 ping 用户没点过头的地址，
+        // 等于替他做了个对外请求的决定。
         val providerList = providers.observeSummaries().first()
             .map { it.provider }
-            .filter { !it.websiteUrl.isNullOrBlank() && (providerId == null || it.id == providerId) }
+            .filter {
+                it.checkWebsite &&
+                    !it.websiteUrl.isNullOrBlank() &&
+                    (providerId == null || it.id == providerId)
+            }
         if (providerList.isEmpty()) return
 
         for (provider in providerList) {

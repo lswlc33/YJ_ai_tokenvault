@@ -38,6 +38,7 @@ import com.lc33.tokenvault.domain.Protocol
 import com.lc33.tokenvault.screens.model.UiAccountRow
 import com.lc33.tokenvault.screens.model.UiHealth
 import com.lc33.tokenvault.screens.model.UiKeyRow
+import com.lc33.tokenvault.screens.model.UiMoney
 import com.lc33.tokenvault.screens.model.UiModelRow
 import com.lc33.tokenvault.screens.model.UiProviderRow
 import com.lc33.tokenvault.ui.common.StatusDot
@@ -239,21 +240,36 @@ private fun SelectionMark(selected: Boolean) {
 }
 
 /**
+ * 密钥行右侧那一格该不该显示**余额**（而不是状态点）。
+ *
+ * 条件两条缺一不可：**查到了金额**，且**这把钥匙是可用的**。
+ * 理由：能读出余额本身就是"钥匙有效"的更强证据，再并排一个「可用」是同一结论说两遍。
+ * 反过来，钥匙不可用时即使库里有旧金额也不该拿它顶掉状态——那会让故障看起来像正常。
+ *
+ * 抽成纯函数是为了能在 JVM 单测里钉住这两条（显示规则容易被后续改动放松）。
+ */
+internal fun keyRowShowsBalance(row: UiKeyRow): UiMoney? =
+    row.balance?.takeIf { row.health == UiHealth.Ok }
+
+/**
  * 密钥行。供应商预览与密钥预览两处共用，行里只有三样东西：
  *
  * ```
  * 备注
- * sk-xxxx…xxxx        ● 可达性 >
+ * sk-xxxx…xxxx        USD 12.34 >
  * 222 毫秒 · 3 分钟前
  * ```
  *
- * 状态在右侧与箭头同列（用户点名的要求：原来挤在左边，备注一长就换行）。
+ * 右侧那一格在同一位子上说两件事之一（用户点名的形态）：
+ *
+ * - **余额查到了、这把钥匙也可用** → 显示**余额**（小字号，与时间同级）。
+ *   能读出余额本身就是"钥匙有效"的更强证据，再摆一个「可用」是同一结论说两遍；
+ * - 其余情况 → 显示状态点（未探测 / 失败 / 不可用）。
  *
  * 三条边界：
  *
- * - **余额不在这里**。它是独立的一块（供应商预览有合计卡，密钥预览有单独的卡），
- *   混进这行会让"这一行说的是什么"变得说不清。
- * - **不在这里写密钥名称**：名称是卡片/页面的标题级信息，行里放不下两段标题。
+ * - **密钥名称不在这里**：名称是卡片/页面的标题级信息，行里放不下两段标题。
+ * - 余额只在上面那个条件下占位，不是"余额列"——它替的是状态点，不是新增一列。
  * - 时间用 [relativeLabel]，相对时间的文案与分档都在 `strings.xml` 里。
  */
 @Composable
@@ -272,12 +288,24 @@ internal fun KeyRow(
         latencyText != null -> latencyText
         else -> checkedText
     }
+    // 余额替代"可用"的条件：查到了金额 **且** 这把钥匙是 Ok。
+    val balanceInsteadOfHealth = keyRowShowsBalance(row)
 
     AppBasicRow(
         modifier = modifier,
         onClick = onClick,
         endActions = {
-            StatusDot(color = colorOf(row.health), label = labelOf(row.health))
+            if (balanceInsteadOfHealth != null) {
+                AppText(
+                    text = "${balanceInsteadOfHealth.currency} ${balanceInsteadOfHealth.amount}",
+                    style = AppTextStyle.Footnote,
+                    color = appSecondaryTextColor,
+                    maxLines = 1,
+                    modifier = Modifier.align(Alignment.CenterVertically),
+                )
+            } else {
+                StatusDot(color = colorOf(row.health), label = labelOf(row.health))
+            }
             AppIconTint(icon = AppIcon.Forward, size = 18.dp, tint = appSecondaryTextColor)
         },
     ) {

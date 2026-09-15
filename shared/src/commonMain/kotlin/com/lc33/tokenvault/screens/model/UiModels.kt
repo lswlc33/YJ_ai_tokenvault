@@ -88,6 +88,11 @@ data class UiProviderRow(
      * 用它排；null 表示从没探测过，排最后。
      */
     val lastProbeAt: Long? = null,
+    /**
+     * 用户是否允许 ping 这家官网（v7 起的开关，默认关）。详情页据此决定要不要展示延迟：
+     * 关掉之后旧的延迟值还在库里，直接画出来会被读成"刚查过 / 还在查"。
+     */
+    val checkWebsite: Boolean = false,
     val reachabilityLatencyMs: Long? = null,
     val keys: List<UiKeyRow> = emptyList(),
 )

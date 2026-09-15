@@ -189,7 +189,10 @@ fun ProviderSummary.toRow(
         staleThisRound = staleThisRound,
         sortOrder = provider.sortOrder,
         lastProbeAt = lastProbeAt,
-        reachabilityLatencyMs = provider.website.latencyMs,
+        checkWebsite = provider.checkWebsite,
+        // 关掉开关时不给旧延迟：库里那份是上次探测的存量，而"关掉了"和"刚查过"
+        // 在界面上长得一样就说不清了。
+        reachabilityLatencyMs = provider.website.latencyMs.takeIf { provider.checkWebsite },
         keys = keys,
     )
 

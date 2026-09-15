@@ -50,6 +50,7 @@ import tokenvault.shared.generated.resources.dialog_cancel
 import tokenvault.shared.generated.resources.login_method_github
 import tokenvault.shared.generated.resources.login_method_linuxdo
 import tokenvault.shared.generated.resources.detail_accounts_empty
+import tokenvault.shared.generated.resources.detail_accounts_empty_placeholder
 import tokenvault.shared.generated.resources.detail_add_account
 import tokenvault.shared.generated.resources.detail_account_keep_secret
 import tokenvault.shared.generated.resources.detail_account_delete
@@ -63,6 +64,7 @@ import tokenvault.shared.generated.resources.editor_error_missing_name
 import tokenvault.shared.generated.resources.detail_edit_cd
 import tokenvault.shared.generated.resources.detail_keys_empty
 import tokenvault.shared.generated.resources.detail_models_refresh
+import tokenvault.shared.generated.resources.detail_keys_empty_placeholder
 import tokenvault.shared.generated.resources.probe_provider_cd
 import tokenvault.shared.generated.resources.detail_section_accounts
 import tokenvault.shared.generated.resources.detail_section_keys
@@ -81,7 +83,9 @@ import com.lc33.tokenvault.domain.Protocol
 import com.lc33.tokenvault.screens.model.ProviderDetailUiState
 import com.lc33.tokenvault.screens.model.UiKeyRow
 import com.lc33.tokenvault.screens.model.UiModelRow
+import com.lc33.tokenvault.screens.model.UiProviderRow
 import com.lc33.tokenvault.ui.common.relativeLabel
+import com.lc33.tokenvault.ui.miuix.AppWideDialog
 import com.lc33.tokenvault.ui.miuix.AppBottomSheet
 import com.lc33.tokenvault.ui.miuix.AppActionRow
 import com.lc33.tokenvault.ui.miuix.AppCard
@@ -198,8 +202,11 @@ fun ProviderDetailScreen(
             contentPadding = padding,
             verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
         ) {
-            item { InfoCard(state) }
-
+            // 信息卡没有可显示的内容时整块不画：备注、官网、协议都没有的一家
+            // （刚建好还没填）只会剩一张空卡占着首屏。
+            if (hasProviderInfo(state.provider)) {
+                item { InfoCard(state) }
+            }
             // 余额独立成卡，且只在真的配了查询时才出现：`余额合计 / 金额 / 更新时间`
             // 是一组信息，塞进信息卡会和备注、官网挤成一片；而没配查询时它永远是
             // 一句"还没有配置"，摆在那里只是占屏。
@@ -230,13 +237,10 @@ fun ProviderDetailScreen(
                 }
             }
             if (state.keys.isEmpty()) {
-                item {
-                    HintCard(
-                        text = stringResource(Res.string.detail_keys_empty),
-                        actionText = stringResource(Res.string.detail_add_key),
-                        onAction = { showAddDialog = true },
-                    )
-                }
+                // 空态只给一句灰字。区块标题那一行右侧已经有加号按钮，再摆一条
+                // 「添加密钥」入口就是同一件事画两遍——而且行入口带箭头，读起来
+                // 像"点进去还有下一页"，实际只是弹同一个添加弹层。
+                item { HintText(stringResource(Res.string.detail_keys_empty_placeholder)) }
             } else {
                 items(state.keys.size) { index ->
                     val row = state.keys[index]
@@ -273,13 +277,8 @@ fun ProviderDetailScreen(
                 }
             }
             if (state.accounts.isEmpty()) {
-                item {
-                    HintCard(
-                        text = stringResource(Res.string.detail_accounts_empty),
-                        actionText = stringResource(Res.string.detail_add_account),
-                        onAction = { accountEditor = AccountEditorTarget.New },
-                    )
-                }
+                // 同上：加号已经在标题行里，空态只留一句灰字。
+                item { HintText(stringResource(Res.string.detail_accounts_empty_placeholder)) }
             } else {
                 item {
                     AppCard(
@@ -412,9 +411,12 @@ fun ProviderDetailScreen(
     )
 }
 
-/** 空态的一句话 + 一个入口。 */
+/**
+ * 空态的一句话。**只有字、没有入口**：区块标题行右侧已经有加号按钮，
+ * 这里再给一条带箭头的行入口就是同一件事画两遍，而且行入口读起来像"还能进下一页"。
+ */
 @Composable
-private fun HintCard(text: String, actionText: String, onAction: () -> Unit) {
+private fun HintText(text: String) {
     val tokens = LocalAppTokens.current
     AppCard(
         modifier = Modifier
@@ -422,15 +424,15 @@ private fun HintCard(text: String, actionText: String, onAction: () -> Unit) {
             .padding(horizontal = tokens.screenPadding),
     ) {
         AppText(text = text, style = AppTextStyle.Secondary, color = appSecondaryTextColor)
-        AppActionRow(
-            text = actionText,
-            onClick = onAction,
-            modifier = Modifier.padding(top = tokens.itemSpacing),
-        )
     }
 }
 
-/** 新增密钥：先选导入方式，再进入对应流程。 */
+/**
+ * 新增密钥：先选导入方式，再进入对应流程。
+ *
+ * 用**宽版**弹层 + 并排两个标准按钮：这是"二选一"的动作，两条并排一眼能比；
+ * 以前是两个带箭头的行入口，读起来像"点进去还有下一页"，而其实点了就直接开流程。
+ */
 @Composable
 private fun AddKeyDialog(
     show: Boolean,
@@ -440,23 +442,29 @@ private fun AddKeyDialog(
 ) {
     val tokens = LocalAppTokens.current
 
-    AppDialog(
+    AppWideDialog(
         show = show,
         onDismissRequest = onDismiss,
         title = stringResource(Res.string.detail_add_key),
     ) {
-        AppActionRow(
-            text = stringResource(Res.string.import_title),
-            onClick = onCurlImport,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        AppActionRow(
-            text = stringResource(Res.string.import_manual),
-            onClick = onManualAddKey,
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = tokens.itemSpacing),
-        )
+            horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
+        ) {
+            AppDialogTextButton(
+                text = stringResource(Res.string.import_title),
+                onClick = onCurlImport,
+                modifier = Modifier.weight(1f),
+            )
+            AppDialogTextButton(
+                text = stringResource(Res.string.import_manual),
+                onClick = onManualAddKey,
+                modifier = Modifier.weight(1f),
+                primary = true,
+            )
+        }
     }
 }
 
@@ -551,120 +559,140 @@ private fun AccountEditorSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
         ) {
-        AppTextField(
-            state = label,
-            label = stringResource(Res.string.editor_name),
-            // 名称必填：空名称的账号在列表里只剩遮蔽串，认不出是哪个账号。
-            errorText = if (label.text.isBlank()) stringResource(Res.string.editor_error_missing_name) else null,
-        )
-        AppTextField(
-            state = note,
-            label = stringResource(Res.string.editor_note),
-            modifier = Modifier.padding(top = tokens.itemSpacing),
-        )
-        // 三种登录方式都是「开 / 关」，用开关而不是 chip：chip 让"选中"看起来像筛选，
-        // 而这里每一项都是一个独立的是非题；开关也自带 ON/OFF 文字，比只有颜色的
-        // 选中态更好读（红线 17：状态不能只靠颜色）。
-        AppText(
-            text = stringResource(Res.string.detail_account_login_methods),
-            style = AppTextStyle.Footnote,
-            color = appSecondaryTextColor,
-            modifier = Modifier.padding(top = tokens.itemSpacing),
-        )
-        AppPreferenceGroup(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 4.dp),
-            inset = false,
-        ) {
-            LoginMethod.entries.forEach { method ->
-                AppSwitchRow(
-                    title = loginMethodLabel(method),
-                    checked = method in methods,
-                    onCheckedChange = { enabled ->
-                        methods = if (enabled) methods + method else methods - method
+            // 名称与备注各自成块：两条都是"填字"，但说的是两件事（这条账号叫什么 /
+            // 它是干嘛的），并成一张卡会让两块文字挤成一段。
+            AppCard(modifier = Modifier.fillMaxWidth()) {
+                AppTextField(
+                    state = label,
+                    label = stringResource(Res.string.editor_name),
+                    // 名称必填：空名称的账号在列表里只剩遮蔽串，认不出是哪个账号。
+                    errorText = if (label.text.isBlank()) {
+                        stringResource(Res.string.editor_error_missing_name)
+                    } else {
+                        null
                     },
                 )
             }
-            // 密码登录不是 LoginMethod 枚举的一员（枚举只有 GitHub / LINUX DO），
-            // 它由 usesPassword 单独承载，所以第三行手动补上。
-            AppSwitchRow(
-                title = stringResource(Res.string.login_method_password),
-                checked = usesPassword,
-                onCheckedChange = { usesPassword = it },
-            )
-        }
-        if (usesPassword) {
-            // 用户名与密码直接预填进输入框（查看与编辑合一），密码默认遮蔽，
-            // 右侧眼睛展开。明文只在弹层存活期间留在输入框里，关掉即擦。
-            val revealCd = stringResource(Res.string.secret_reveal_cd)
-            val concealCd = stringResource(Res.string.secret_conceal_cd)
-            AppSecretTextField(
-                state = username,
-                label = stringResource(Res.string.detail_account_username),
-                supportingText = account?.let { stringResource(Res.string.detail_account_keep_secret) },
-                modifier = Modifier.padding(top = tokens.itemSpacing),
-                concealed = usernameConcealed,
-                toggleConcealDescription = if (usernameConcealed) revealCd else concealCd,
-                onToggleConceal = { usernameConcealed = !usernameConcealed },
-            )
-            AppSecretTextField(
-                state = password,
-                label = stringResource(Res.string.detail_account_password),
-                supportingText = account?.let { stringResource(Res.string.detail_account_keep_secret) },
-                modifier = Modifier.padding(top = tokens.itemSpacing),
-                concealed = passwordConcealed,
-                toggleConcealDescription = if (passwordConcealed) revealCd else concealCd,
-                onToggleConceal = { passwordConcealed = !passwordConcealed },
-            )
-        }
-        // 保存用按钮而不是行入口：它是这个表单的收尾动作，必须一眼看出"填完了按这里"，
-        // 行入口（带箭头那一类）读起来像"还能进下一页"。
-        AppDialogTextButton(
-            text = stringResource(Res.string.editor_save),
-            onClick = {
-                // 名称必填：为空不保存。输入框下方已有错误说明，这里直接拦住。
-                if (label.text.isBlank()) return@AppDialogTextButton
-                val usernameChars = username.chars.takeIf { it.isNotEmpty() }
-                val passwordChars = password.chars.takeIf { it.isNotEmpty() }
-                username.clear()
-                password.clear()
-                onSave(label.text, note.text, usernameChars, passwordChars, methods, usesPassword)
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = tokens.itemSpacing),
-            primary = true,
-        )
-        account?.let { row ->
-            // 复制与删除都是对这条账号的动作，包成一组摆在表单最后。
-            // 只有确实解出了凭据才给「复制」：这条账号可能只记了登录方式（没有用户名密码），
-            // 那种情况下复制是无内容的死按钮。
-            val canCopy = revealed?.accountId == row.id &&
-                (revealed.username != null || revealed.password != null)
-            AppPreferenceGroup(
-                modifier = Modifier.padding(top = tokens.itemSpacing),
-                inset = false,
-            ) {
-                if (canCopy) {
-                    AppActionRow(
-                        text = stringResource(Res.string.secret_copy_cd),
-                        onClick = { onCopy(row.id) },
-                        modifier = Modifier.fillMaxWidth(),
+            AppCard(modifier = Modifier.fillMaxWidth()) {
+                AppTextField(
+                    state = note,
+                    label = stringResource(Res.string.editor_note),
+                )
+            }
+            // 三种登录方式都是「开 / 关」，用开关而不是 chip：chip 让"选中"看起来像筛选，
+            // 而这里每一项都是一个独立的是非题；开关也自带 ON/OFF 文字，比只有颜色的
+            // 选中态更好读（红线 17：状态不能只靠颜色）。
+            // 登录方式本身成一块（一张卡 + 一个标题），与上面的文字块分开。
+            AppCard(modifier = Modifier.fillMaxWidth()) {
+                AppText(
+                    text = stringResource(Res.string.detail_account_login_methods),
+                    style = AppTextStyle.Footnote,
+                    color = appSecondaryTextColor,
+                )
+                AppPreferenceGroup(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    inset = false,
+                ) {
+                    LoginMethod.entries.forEach { method ->
+                        AppSwitchRow(
+                            title = loginMethodLabel(method),
+                            checked = method in methods,
+                            onCheckedChange = { enabled ->
+                                methods = if (enabled) methods + method else methods - method
+                            },
+                        )
+                    }
+                    // 密码登录不是 LoginMethod 枚举的一员（枚举只有 GitHub / LINUX DO），
+                    // 它由 usesPassword 单独承载，所以第三行手动补上。
+                    AppSwitchRow(
+                        title = stringResource(Res.string.login_method_password),
+                        checked = usesPassword,
+                        onCheckedChange = { usesPassword = it },
                     )
                 }
-                    AppActionRow(
+            }
+            if (usesPassword) {
+                // 凭据单独成块：这两格是这一层里唯一的秘密，和"登录方式有哪些"不是一回事，
+                // 摆在同一张卡里会让开关与输入框混成一片。
+                AppCard(modifier = Modifier.fillMaxWidth()) {
+                    // 用户名与密码直接预填进输入框（查看与编辑合一），密码默认遮蔽，
+                    // 右侧眼睛展开。明文只在弹层存活期间留在输入框里，关掉即擦。
+                    val revealCd = stringResource(Res.string.secret_reveal_cd)
+                    val concealCd = stringResource(Res.string.secret_conceal_cd)
+                    AppSecretTextField(
+                        state = username,
+                        label = stringResource(Res.string.detail_account_username),
+                        supportingText = account?.let { stringResource(Res.string.detail_account_keep_secret) },
+                        concealed = usernameConcealed,
+                        toggleConcealDescription = if (usernameConcealed) revealCd else concealCd,
+                        onToggleConceal = { usernameConcealed = !usernameConcealed },
+                    )
+                    AppSecretTextField(
+                        state = password,
+                        label = stringResource(Res.string.detail_account_password),
+                        supportingText = account?.let { stringResource(Res.string.detail_account_keep_secret) },
+                        modifier = Modifier.padding(top = tokens.itemSpacing),
+                        concealed = passwordConcealed,
+                        toggleConcealDescription = if (passwordConcealed) revealCd else concealCd,
+                        onToggleConceal = { passwordConcealed = !passwordConcealed },
+                    )
+                }
+            }
+            // 复制是一条独立动作，单独成块；下面那排按钮是收尾动作，两者不同类。
+            // 只有确实解出了凭据才给「复制」：这条账号可能只记了登录方式（没有用户名密码），
+            // 那种情况下复制是无内容的死按钮。
+            account?.let { row ->
+                val canCopy = revealed?.accountId == row.id &&
+                    (revealed.username != null || revealed.password != null)
+                if (canCopy) {
+                    AppCard(modifier = Modifier.fillMaxWidth()) {
+                        AppActionRow(
+                            text = stringResource(Res.string.secret_copy_cd),
+                            onClick = { onCopy(row.id) },
+                            modifier = Modifier.fillMaxWidth(),
+                            inset = false,
+                        )
+                    }
+                }
+            }
+            // 收尾动作一排按钮：编辑时左「删除」右「保存」，新建时只有「保存」占满整行。
+            // 两个都是按钮（不是行入口）：它们是这一层的结局，必须一眼看出按哪个。
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = tokens.itemSpacing),
+                horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
+            ) {
+                account?.let { row ->
+                    AppDialogTextButton(
                         text = stringResource(Res.string.detail_account_delete),
                         onClick = {
                             username.clear()
                             password.clear()
                             onDelete(row.id)
                         },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.weight(1f),
                     )
+                }
+                AppDialogTextButton(
+                    text = stringResource(Res.string.editor_save),
+                    onClick = {
+                        // 名称必填：为空不保存。输入框下方已有错误说明，这里直接拦住。
+                        if (label.text.isBlank()) return@AppDialogTextButton
+                        val usernameChars = username.chars.takeIf { it.isNotEmpty() }
+                        val passwordChars = password.chars.takeIf { it.isNotEmpty() }
+                        username.clear()
+                        password.clear()
+                        onSave(label.text, note.text, usernameChars, passwordChars, methods, usesPassword)
+                    },
+                    modifier = Modifier.weight(1f),
+                    primary = true,
+                )
             }
-        }
         }
     }
 }
@@ -883,6 +911,21 @@ private fun loginMethodLabel(method: LoginMethod): String = when (method) {
  * 右侧是官网连通性延迟，只在**连通**时出现（失败没有可显示的耗时，硬给一个数
  * 反而像"通了但很慢"）；它与左侧两行文字上下居中，行高不吃亏。
  */
+/**
+ * 信息卡有没有东西可画。
+ *
+ * 抽成纯函数是为了能在 JVM 单测里钉住它——"这家什么都没填"是个正常状态（刚建好），
+ * 而空卡片占着首屏是实打实的视觉噪音。
+ *
+ * 判定只看**这家自己记着的**三样：备注、官网地址、协议（由模型并集算出）。
+ * host 不算：它是从 Key 的 apiRoot 推出来的，没有 Key 时是空串，而有 Key 时
+ * 也已经有别的内容要画了。
+ */
+internal fun hasProviderInfo(provider: UiProviderRow): Boolean =
+    !provider.note.isNullOrBlank() ||
+        !provider.websiteUrl.isNullOrBlank() ||
+        provider.protocols.isNotEmpty()
+
 @Composable
 private fun InfoCard(state: ProviderDetailUiState) {
     val tokens = LocalAppTokens.current
@@ -892,8 +935,7 @@ private fun InfoCard(state: ProviderDetailUiState) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = tokens.screenPadding),
-    ) {
-        Row(
+    ) {        Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {

@@ -39,7 +39,11 @@ class MigrationV4ToV5Test {
             // 真实升级也是这样一路过来的，只测一跳会漏掉"5→6 在 4→5 之后还能不能跑"。
             val database = Room.databaseBuilder<VaultDatabase>(name = dbFile.absolutePath)
                 .setDriver(BundledSQLiteDriver())
-                .addMigrations(VaultDatabase.MIGRATION_4_5, VaultDatabase.MIGRATION_5_6)
+                .addMigrations(
+                    VaultDatabase.MIGRATION_4_5,
+                    VaultDatabase.MIGRATION_5_6,
+                    VaultDatabase.MIGRATION_6_7,
+                )
                 .build()
 
             val key = database.apiKeyDao().findRaw(1L)
@@ -71,7 +75,7 @@ class MigrationV4ToV5Test {
             createDatabase(dbFile, version = 5)
             val database = Room.databaseBuilder<VaultDatabase>(name = dbFile.absolutePath)
                 .setDriver(BundledSQLiteDriver())
-                .addMigrations(VaultDatabase.MIGRATION_5_6)
+                .addMigrations(VaultDatabase.MIGRATION_5_6, VaultDatabase.MIGRATION_6_7)
                 .build()
 
             // 老日志（迁移前就写好的）三列是 null，不该被迁移搞坏。
@@ -100,6 +104,28 @@ class MigrationV4ToV5Test {
         }
     }
 
+    @Test
+    fun `v6 库迁到 v7 后多了 checkWebsite 且默认关`() = runBlocking {
+        val dir = createTempDirectory(prefix = "vault-migration-v7-").toFile()
+        try {
+            val dbFile = File(dir, "vault.db")
+            createDatabase(dbFile, version = 6)
+            val database = Room.databaseBuilder<VaultDatabase>(name = dbFile.absolutePath)
+                .setDriver(BundledSQLiteDriver())
+                .addMigrations(VaultDatabase.MIGRATION_6_7)
+                .build()
+
+            // 老数据原样保留，新列按"默认关"落库——升级不该让老供应商突然开始被 ping。
+            val provider = database.providerDao().findById(1L)
+            assertEquals("p", provider?.name)
+            assertEquals(false, provider?.checkWebsite)
+
+            database.close()
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
     /**
      * 用导出 schema 造库：建表语句与索引一律取自对应的 json。
      * 手写一遍 DDL 就测不出"迁移漏了某个索引"这类事故了——索引对不上同样会让 Room 报错。
@@ -109,13 +135,25 @@ class MigrationV4ToV5Test {
         try {
             exportedSchema(version).forEach { statement -> connection.execSQL(statement) }
             connection.execSQL("PRAGMA user_version = $version")
-            connection.execSQL(
-                """
-                INSERT INTO providers (id, name, note, websiteUrl, websiteLatencyMs, websiteCheckedAt,
-                    websiteError, groupId, color, pinned, sortOrder, createdAt, updatedAt)
-                VALUES (1, 'p', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0, 1, 1)
-                """.trimIndent(),
-            )
+            // v7 起 providers 多了 checkWebsite；按版本给对列，否则插不进去。
+            if (version >= 7) {
+                connection.execSQL(
+                    """
+                    INSERT INTO providers (id, name, note, websiteUrl, checkWebsite, websiteLatencyMs,
+                        websiteCheckedAt, websiteError, groupId, color, pinned, sortOrder,
+                        createdAt, updatedAt)
+                    VALUES (1, 'p', NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, 0, 0, 1, 1)
+                    """.trimIndent(),
+                )
+            } else {
+                connection.execSQL(
+                    """
+                    INSERT INTO providers (id, name, note, websiteUrl, websiteLatencyMs, websiteCheckedAt,
+                        websiteError, groupId, color, pinned, sortOrder, createdAt, updatedAt)
+                    VALUES (1, 'p', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0, 1, 1)
+                    """.trimIndent(),
+                )
+            }
             if (version <= 4) {
                 // v4 的 api_keys 还有 enabled 列，v5 起没有；造库时按版本给对。
                 connection.execSQL(

@@ -6,6 +6,7 @@ import com.lc33.tokenvault.domain.model.BalanceSnapshot
 import com.lc33.tokenvault.domain.model.KeySettings
 import com.lc33.tokenvault.domain.model.Provider
 import com.lc33.tokenvault.domain.model.ProviderSummary
+import com.lc33.tokenvault.domain.model.WebsiteStatus
 import com.lc33.tokenvault.screens.model.AttentionKind
 import com.lc33.tokenvault.screens.model.UiHealth
 import com.lc33.tokenvault.screens.model.UiMoney
@@ -263,5 +264,28 @@ class DashboardAggregationTest {
             thresholds = thresholds,
         )
         assertEquals(listOf("Mid", "Alpha", "Zeta"), items.map { it.providerName })
+    }
+
+    /**
+     * 「允许检查官网连通性」关掉后，界面不该再看到存量延迟。
+     *
+     * 库里那份 latency 是上次探测留下的，而"关掉了"与"刚查过"在界面上长得一模一样
+     * ——都只是一行「123 毫秒」——那就说不清这台设备到底还在不在 ping 它。
+     */
+    @Test
+    fun `关掉官网检查后不把旧延迟交给界面`() {
+        fun row(checkWebsite: Boolean) = summary(
+            Provider(
+                id = 1,
+                name = "p",
+                websiteUrl = "https://api.example.com",
+                checkWebsite = checkWebsite,
+                website = WebsiteStatus(latencyMs = 123, checkedAt = 1, error = null),
+            ),
+        ).toRow(health = UiHealth.Ok, balance = null, host = "")
+
+        assertEquals(123L, row(checkWebsite = true).reachabilityLatencyMs)
+        assertTrue(row(checkWebsite = true).checkWebsite)
+        assertNull(row(checkWebsite = false).reachabilityLatencyMs, "关掉开关后旧延迟不该传到界面")
     }
 }

@@ -46,6 +46,11 @@ data class ProviderEntity(
     val name: String,
     val note: String? = null,
     val websiteUrl: String? = null,
+    /**
+     * 是否允许 ping 这个官网来检测连通性。**默认关**（v7 新增）：这会真的向那家发出
+     * 一次请求，属于"要不要让这台设备去敲它的站"，得由用户明确答应。
+     */
+    val checkWebsite: Boolean = false,
     val websiteLatencyMs: Long? = null,
     val websiteCheckedAt: Long? = null,
     val websiteError: String? = null,

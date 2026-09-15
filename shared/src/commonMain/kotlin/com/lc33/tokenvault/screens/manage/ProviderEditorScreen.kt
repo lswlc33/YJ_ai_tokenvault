@@ -43,6 +43,8 @@ import tokenvault.shared.generated.resources.editor_name
 import tokenvault.shared.generated.resources.editor_error_missing_name
 import tokenvault.shared.generated.resources.editor_note
 import tokenvault.shared.generated.resources.editor_pinned
+import tokenvault.shared.generated.resources.editor_check_website
+import tokenvault.shared.generated.resources.editor_check_website_summary
 import tokenvault.shared.generated.resources.provider_colors
 import tokenvault.shared.generated.resources.editor_section_basic
 import tokenvault.shared.generated.resources.editor_section_look
@@ -137,6 +139,20 @@ fun ProviderEditorScreen(
                     )
                     AppTextField(state = note, label = stringResource(Res.string.editor_note))
                     AppTextField(state = website, label = stringResource(Res.string.editor_website))
+                }
+            }
+            // 「允许检查官网连通性」单独成块，紧跟官网地址：它说的就是上面那一条地址
+            // （要不要去 ping 它），放进外观那一组会读成"这一家长什么样"。
+            item {
+                AppPreferenceGroup(
+                    modifier = Modifier.padding(vertical = tokens.itemSpacing),
+                ) {
+                    AppSwitchRow(
+                        title = stringResource(Res.string.editor_check_website),
+                        summary = stringResource(Res.string.editor_check_website_summary),
+                        checked = draft.checkWebsite,
+                        onCheckedChange = { onChange(draft.copy(checkWebsite = it)) },
+                    )
                 }
             }
 
