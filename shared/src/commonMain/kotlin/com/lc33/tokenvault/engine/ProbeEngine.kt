@@ -268,6 +268,7 @@ class ProbeEngine constructor(
             )
             if (response.status == 429) {
                 engine.onRateLimited(task.host)
+                fail++
                 break
             }
 
@@ -294,7 +295,7 @@ class ProbeEngine constructor(
                         health = classification.health.wireName,
                         lastOutcome = classification.outcome.wireName,
                         detail = scrubbedDetail,
-                        httpStatus = null,
+                        httpStatus = classification.httpStatus,
                         latencyMs = response.latencyMs,
                         checkedAt = now(),
                         okAt = if (classification.outcome == ProbeOutcome.SUCCESS) now() else null,
@@ -304,7 +305,7 @@ class ProbeEngine constructor(
                         id = keyIdForTask,
                         lastOutcome = classification.outcome.wireName,
                         detail = scrubbedDetail,
-                        httpStatus = null,
+                        httpStatus = classification.httpStatus,
                         checkedAt = now(),
                     )
                 }
@@ -1055,6 +1056,7 @@ class ProbeEngine constructor(
                     outcome = classification.outcome,
                     health = classification.health,
                     detail = classification.detail,
+                    httpStatus = classification.httpStatus,
                     latencyMs = response.latencyMs,
                 )
             }
@@ -1095,7 +1097,7 @@ class ProbeEngine constructor(
                 health = health.wireName,
                 lastOutcome = result.outcome.wireName,
                 detail = result.detail,
-                httpStatus = null,
+                httpStatus = result.httpStatus,
                 latencyMs = result.latencyMs,
                 checkedAt = stamp,
                 okAt = if (result.outcome == ProbeOutcome.SUCCESS) stamp else null,
@@ -1105,7 +1107,7 @@ class ProbeEngine constructor(
                 id = keyId,
                 lastOutcome = result.outcome.wireName,
                 detail = result.detail,
-                httpStatus = null,
+                httpStatus = result.httpStatus,
                 checkedAt = stamp,
             )
         }

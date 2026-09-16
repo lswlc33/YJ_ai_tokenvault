@@ -6,7 +6,7 @@ interface BackupStore {
     suspend fun clearAll()
     suspend fun findOrInsertGroup(group: BackupGroup): Long
     suspend fun findOrInsertProfile(profile: BackupProfile): Long
-    suspend fun findProviderId(name: String, websiteUrl: String?): Long?
+    suspend fun findProviderId(name: String, apiRoot: String): Long?
     suspend fun insertProvider(provider: BackupProvider, groupId: Long?): Long
     suspend fun keyExists(providerId: Long, secret: String): Boolean
     suspend fun insertKey(providerId: Long, key: BackupApiKey, profileId: Long?): Long

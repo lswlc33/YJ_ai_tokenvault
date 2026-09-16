@@ -57,6 +57,7 @@ data class ProbeItemResult(
     /** 改写健康结论时非空。 */
     val health: KeyHealth? = null,
     val detail: String? = null,
+    val httpStatus: Int? = null,
     val latencyMs: Long? = null,
 
     /** 原始响应体。只给引擎做模型列表解析，绝不直接进 UI 或日志。 */

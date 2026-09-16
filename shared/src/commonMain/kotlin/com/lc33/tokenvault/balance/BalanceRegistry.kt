@@ -15,7 +15,6 @@ import kotlinx.serialization.json.jsonObject
  */
 object BalanceRegistry {
 
-    private val newApi = NewApiAdapter()
     private val deepSeek = DeepSeekAdapter()
     private val openRouter = OpenRouterAdapter()
     private val siliconFlow = BuiltinBalanceAdapters.siliconflow()
@@ -25,7 +24,7 @@ object BalanceRegistry {
 
     /** 按供应商的 [BalanceKind] 选适配器。`none` / 认不出来的返回 null（跳过）。 */
     fun forSettings(settings: KeySettings): BalanceAdapter? = when (settings.balanceKind) {
-        BalanceKind.NEWAPI -> newApi
+        BalanceKind.NEWAPI -> NewApiAdapter(settings.quotaPerUnit)
         BalanceKind.DEEPSEEK -> deepSeek
         BalanceKind.OPENROUTER -> openRouter
         BalanceKind.SILICONFLOW -> siliconFlow

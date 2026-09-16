@@ -51,6 +51,12 @@ class AutoLocker(
      */
     @Volatile
     var timeout: AutoLockTimeout = AutoLockPolicy.DEFAULT
+        set(value) {
+            guard.withLock {
+                field = value
+                rescheduleBackgroundLockLocked()
+            }
+        }
 
     /**
      * 前台空闲锁定开关（§7.4）。开 = [AutoLockPolicy.IDLE_LOCK_SECONDS] 秒不摸屏幕就锁。
@@ -61,6 +67,12 @@ class AutoLocker(
      */
     @Volatile
     var idleLock: Boolean = false
+        set(value) {
+            guard.withLock {
+                field = value
+                if (value) startIdleTimerLocked() else cancelIdleLocked()
+            }
+        }
 
     /** 屏幕关闭即锁定（§7.4）。开 = 收到 `ACTION_SCREEN_OFF` 当场锁。默认关。 */
     @Volatile
@@ -97,14 +109,7 @@ class AutoLocker(
             if (!session.isUnlocked) return@withLock
             val after = timeout as? AutoLockTimeout.After ?: return@withLock
             backgroundedAtMs = elapsedRealtimeMs()
-            pending?.cancel()
-            pending = scope.launch {
-                delay(after.seconds * MILLIS_PER_SECOND)
-                guard.withLock {
-                    backgroundedAtMs = null
-                    lockIfUnlocked()
-                }
-            }
+            scheduleBackgroundLockLocked(after, backgroundedAtMs!!)
         }
     }
 
@@ -193,6 +198,34 @@ class AutoLocker(
         idleJob = scope.launch {
             delay(AutoLockPolicy.IDLE_LOCK_SECONDS * MILLIS_PER_SECOND)
             guard.withLock {
+                lockIfUnlocked()
+            }
+        }
+    }
+
+    /** 设置在后台期间变化时，用新时限替换旧的延时任务。调用方须持有 [guard]。 */
+    private fun rescheduleBackgroundLockLocked() {
+        val since = backgroundedAtMs ?: return
+        pending?.cancel()
+        pending = null
+        val after = timeout as? AutoLockTimeout.After ?: return
+        scheduleBackgroundLockLocked(after, since)
+    }
+
+    /** 按进入后台的实际时刻计算剩余时间，不能因改设置而重新赠送一段时限。 */
+    private fun scheduleBackgroundLockLocked(after: AutoLockTimeout.After, since: Long) {
+        val elapsed = (elapsedRealtimeMs() - since).coerceAtLeast(0)
+        val remaining = after.seconds * MILLIS_PER_SECOND - elapsed
+        if (remaining <= 0) {
+            backgroundedAtMs = null
+            lockIfUnlocked()
+            return
+        }
+        pending?.cancel()
+        pending = scope.launch {
+            delay(remaining)
+            guard.withLock {
+                backgroundedAtMs = null
                 lockIfUnlocked()
             }
         }

@@ -521,6 +521,10 @@ fun matchesQuery(row: UiProviderRow, groupName: String?, query: String): Boolean
     return haystacks.any { it.contains(q) }
 }
 
+/** 当前分组筛选；null 代表“全部”。 */
+fun matchesGroup(row: UiProviderRow, selectedGroupId: Long?): Boolean =
+    selectedGroupId == null || row.groupId == selectedGroupId
+
 /**
  * 分组名查表：把 `groupId` 换成名字，供搜索与排序用。null 分组（未分组）返回 null。
  */

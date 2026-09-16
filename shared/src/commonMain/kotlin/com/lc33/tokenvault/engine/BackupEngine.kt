@@ -179,9 +179,8 @@ class BackupEngine constructor(
         var imported = 0
         for (provider in payload.providers) {
             val ref = provider.name to provider.apiRoot
-            val providerLookup = provider.name to (provider.websiteUrl ?: provider.apiRoot)
             val existingId = if (mode != RestoreMode.OVERWRITE) {
-                store.findProviderId(providerLookup.first, providerLookup.second)
+                store.findProviderId(provider.name, provider.apiRoot)
             } else {
                 null
             }

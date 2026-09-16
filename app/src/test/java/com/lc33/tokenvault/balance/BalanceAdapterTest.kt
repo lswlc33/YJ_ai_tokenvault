@@ -59,6 +59,14 @@ class BalanceAdapterTest {
     }
 
     @Test
+    fun `newapi uses persisted calibrated quota per unit`() {
+        val snapshot = NewApiAdapter(calibratedQuotaPerUnit = 100_000.0)
+            .parse(200, """{"data":{"quota":250000,"used_quota":50000}}""")
+        assertEquals(2.5, snapshot.amount!!, 1e-9)
+        assertEquals(0.5, snapshot.used!!, 1e-9)
+    }
+
+    @Test
     fun `newapi 缺 data 抛解析失败`() {
         val adapter = NewApiAdapter()
         val e = runCatching { adapter.parse(200, """{"success":true}""") }.exceptionOrNull()

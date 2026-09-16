@@ -85,7 +85,7 @@ object ProbePlanBuilder {
                             url = endpoints.modelsUrl,
                             clientProfileId = settings.clientProfileId,
                             authStyle = settings.authStyle,
-                            allowInsecure = endpoints.insecure,
+                            allowInsecure = settings.allowInsecure,
                         )
                     }
                 }
@@ -103,7 +103,7 @@ object ProbePlanBuilder {
                         url = endpoints.modelsUrl,
                         clientProfileId = settings.clientProfileId,
                         authStyle = settings.authStyle,
-                        allowInsecure = endpoints.insecure,
+                        allowInsecure = settings.allowInsecure,
                     )
                 }
             }

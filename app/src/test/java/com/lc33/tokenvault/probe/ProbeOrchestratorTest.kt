@@ -34,6 +34,7 @@ class ProbeOrchestratorTest {
         host: String = "a.example.com",
         level: ProbeLevel = ProbeLevel.L1_REACHABILITY,
         keyId: Long? = null,
+        allowInsecure: Boolean = false,
     ) = ProbeTask(
         id = id,
         level = level,
@@ -44,6 +45,7 @@ class ProbeOrchestratorTest {
         keyId = keyId,
         url = "https://$host/v1/models",
         headers = listOf("Authorization" to "Bearer test"),
+        allowInsecure = allowInsecure,
     )
 
     private fun okResponse() = ProbeResponse(status = 200, body = "{}", latencyMs = 5)
@@ -207,5 +209,20 @@ class ProbeOrchestratorTest {
         val results = orchestrator.run(emptyList()).toList()
         assertTrue(results.isEmpty())
         assertEquals(0, callCount)
+    }
+
+    @Test
+    fun `task insecure flag is forwarded to transport`() = runTest {
+        var received: Boolean? = null
+        val orchestrator = ProbeOrchestrator(
+            transport = ProbeTransport { _, allowInsecure ->
+                received = allowInsecure
+                okResponse()
+            },
+            nowMillis = { 0L },
+        )
+
+        orchestrator.run(listOf(task("http", allowInsecure = true))).toList()
+        assertEquals(true, received)
     }
 }

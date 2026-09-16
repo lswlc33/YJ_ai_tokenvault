@@ -65,6 +65,7 @@ object ModelMerger {
 
         for (existingModel in existing) {
             val fetchedModel = fetchedByProtocol[existingModel.modelId]
+                ?.takeIf { existingModel.protocol == thisProtocol }
             if (fetchedModel != null) {
                 // 两边都有 → touch lastSeenAt。
                 toTouch += existingModel.id
@@ -86,12 +87,12 @@ object ModelMerger {
             if (fetchedModel.modelId in seen) continue
             // 库里可能已有同 modelId 但不同协议的行——那种情况 above 已经 touch 了，
             // 这里只处理"库里完全没有这个 modelId"的。
-            if (existing.any { it.modelId == fetchedModel.modelId }) continue
+            if (existing.any { it.modelId == fetchedModel.modelId && it.protocol == thisProtocol }) continue
             toInsert += fetchedModel
         }
 
         return ModelMergePlan(
-            toInsert = toInsert.distinctBy { it.modelId },
+            toInsert = toInsert.distinctBy { it.modelId to it.protocol },
             toTouch = toTouch.distinct(),
             toDelete = toDelete.distinct(),
         )

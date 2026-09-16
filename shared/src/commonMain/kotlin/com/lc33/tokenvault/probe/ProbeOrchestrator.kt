@@ -117,7 +117,7 @@ class ProbeOrchestrator(
                     body = task.body,
                     protocol = task.protocol,
                 ),
-                allowInsecure = false,
+                allowInsecure = task.allowInsecure,
             )
 
             hostLastRequest[host] = nowMillis()
@@ -147,6 +147,7 @@ class ProbeOrchestrator(
                     outcome = classification.outcome,
                     health = classification.health,
                     detail = classification.detail,
+                    httpStatus = classification.httpStatus,
                     latencyMs = response.latencyMs,
                     body = response.body,
                 ),

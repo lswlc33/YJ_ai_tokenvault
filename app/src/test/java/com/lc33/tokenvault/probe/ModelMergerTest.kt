@@ -108,4 +108,14 @@ class ModelMergerTest {
         )
         assertTrue(plan.toInsert.isEmpty())
     }
+
+    @Test
+    fun `same model id on different protocol is inserted`() {
+        val plan = ModelMerger.merge(
+            existing = listOf(model(1, "shared-model", protocol = Protocol.CHAT)),
+            fetched = listOf(fetched("shared-model", Protocol.ANTHROPIC)),
+            thisProtocol = Protocol.ANTHROPIC,
+        )
+        assertEquals(listOf(NewDiscoveredModel("shared-model", Protocol.ANTHROPIC)), plan.toInsert)
+    }
 }

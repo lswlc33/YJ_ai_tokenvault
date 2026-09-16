@@ -65,7 +65,8 @@ class BalanceEngine constructor(
 
     private suspend fun refreshKey(key: ApiKey): BalanceSnapshot? {
         val settings = key.settings
-        val adapter = BalanceRegistry.forSettings(settings) ?: return null
+        var effectiveSettings = settings
+        var adapter = BalanceRegistry.forSettings(effectiveSettings) ?: return null
 
         val profileList = clientProfiles.observeAll().first()
         val defaultProfile = profileList.firstOrNull { it.builtinKey == "default" }
@@ -82,13 +83,16 @@ class BalanceEngine constructor(
         }
 
         try {
-            if (adapter is NewApiAdapter) {
-                val calibrated = tryCalibrate(adapter, settings, profile)
+            val newApiAdapter = adapter as? NewApiAdapter
+            if (newApiAdapter != null) {
+                val calibrated = tryCalibrate(newApiAdapter, settings, profile)
                 if (calibrated != null) {
+                    effectiveSettings = settings.copy(quotaPerUnit = calibrated, quotaCalibrated = true)
                     keys.updateSettings(
                         id = key.id,
-                        settings = settings.copy(quotaPerUnit = calibrated, quotaCalibrated = true),
+                        settings = effectiveSettings,
                     )
+                    adapter = BalanceRegistry.forSettings(effectiveSettings) ?: return null
                 }
             }
 
@@ -99,10 +103,10 @@ class BalanceEngine constructor(
             }
             try {
                 val request = withClientProfile(
-                    adapter.buildRequest(settings, keySecret, token),
+                    adapter.buildRequest(effectiveSettings, keySecret, token),
                     profile,
                 )
-                val response = engine.execute(request, allowInsecure = settings.allowInsecure)
+                val response = engine.execute(request, allowInsecure = effectiveSettings.allowInsecure)
                 val snapshot = response.error?.let { error ->
                     BalanceSnapshot(
                         amount = null,

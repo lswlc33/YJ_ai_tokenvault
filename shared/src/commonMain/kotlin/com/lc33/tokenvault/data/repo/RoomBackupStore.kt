@@ -76,11 +76,13 @@ class RoomBackupStore constructor(
         val providerEntities = providerDao.findAll()
         val providerById = providerEntities.associateBy { it.id }
         val keyRows = keyDao.findAll()
+        val providerApiRootById = providerEntities.associate { provider ->
+            provider.id to keyRows.firstOrNull { it.key.providerId == provider.id }
+                ?.settings?.apiRoot.orEmpty()
+        }
 
         val groups = groupDao.findAll().map { BackupGroup(it.name, it.sortOrder) }
         val providers = providerEntities.map { entity ->
-            val firstKeyRoot = keyRows.firstOrNull { it.key.providerId == entity.id }
-                ?.settings?.apiRoot.orEmpty()
             BackupProvider(
                 name = entity.name,
                 note = entity.note,
@@ -90,7 +92,7 @@ class RoomBackupStore constructor(
                 color = entity.color,
                 pinned = entity.pinned,
                 sortOrder = entity.sortOrder,
-                apiRoot = entity.websiteUrl.orEmpty(),
+                apiRoot = providerApiRootById[entity.id].orEmpty(),
             )
         }
 
@@ -104,7 +106,7 @@ class RoomBackupStore constructor(
             try {
                 BackupApiKey(
                     providerName = providerById[key.providerId]?.name.orEmpty(),
-                    providerApiRoot = providerById[key.providerId]?.websiteUrl.orEmpty(),
+                    providerApiRoot = providerApiRootById[key.providerId].orEmpty(),
                     label = key.label,
                     note = key.note,
                     secret = secret.concatToString(),
@@ -150,7 +152,7 @@ class RoomBackupStore constructor(
             try {
                 BackupAccount(
                     providerName = providerById[entity.providerId]?.name.orEmpty(),
-                    providerApiRoot = providerById[entity.providerId]?.websiteUrl.orEmpty(),
+                    providerApiRoot = providerApiRootById[entity.providerId].orEmpty(),
                     label = entity.label,
                     username = username?.concatToString(),
                     password = password?.concatToString(),
@@ -168,7 +170,7 @@ class RoomBackupStore constructor(
         val models = modelDao.findAll().map { entity ->
             BackupModel(
                 providerName = providerById[entity.providerId]?.name.orEmpty(),
-                providerApiRoot = providerById[entity.providerId]?.websiteUrl.orEmpty(),
+                providerApiRoot = providerApiRootById[entity.providerId].orEmpty(),
                 keySecret = keyRows.firstOrNull { it.key.id == entity.keyId }?.let { row ->
                     val chars = revealSecret(row.key)
                     try {
@@ -254,8 +256,11 @@ class RoomBackupStore constructor(
         )
     }
 
-    override suspend fun findProviderId(name: String, websiteUrl: String?): Long? =
-        providerDao.findAll().firstOrNull { it.name == name && it.websiteUrl == websiteUrl }?.id
+    override suspend fun findProviderId(name: String, apiRoot: String): Long? =
+        providerDao.findAll().firstOrNull { provider ->
+            provider.name == name &&
+                keyDao.findByProvider(provider.id).firstOrNull()?.settings?.apiRoot.orEmpty() == apiRoot
+        }?.id
 
     override suspend fun insertProvider(provider: BackupProvider, groupId: Long?): Long {
         val stamp = now()

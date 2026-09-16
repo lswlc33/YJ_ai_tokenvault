@@ -87,6 +87,13 @@ class ManageSearchSortTest {
         assertTrue(matchesQuery(row(1, "OpenAI Router"), null, "  openai  "))
     }
 
+    @Test
+    fun `选中分组时仅显示该分组`() {
+        assertTrue(matchesGroup(row(1, "Work", groupId = 1), 1))
+        assertFalse(matchesGroup(row(2, "Personal", groupId = 2), 1))
+        assertTrue(matchesGroup(row(3, "Ungrouped"), null))
+    }
+
     // ---------------------------------------------------------------- 排序
 
     @Test

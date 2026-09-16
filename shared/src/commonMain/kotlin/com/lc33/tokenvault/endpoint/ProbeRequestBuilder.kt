@@ -2,6 +2,9 @@ package com.lc33.tokenvault.endpoint
 
 import com.lc33.tokenvault.domain.AuthStyle
 import com.lc33.tokenvault.domain.Protocol
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
  * 三协议的请求构造（计划.md §5.2 那张表 + §8.3 的 L1/L2）。
@@ -111,12 +114,31 @@ object ProbeRequestBuilder {
 
     // ------------------------------------------------------------------ 极简 body
 
-    private fun chatBody(modelId: String, prompt: String): String =
-        """{"model":"$modelId","messages":[{"role":"user","content":"$prompt"}],"max_tokens":$MINIMAL_MAX_TOKENS}"""
+    private fun chatBody(modelId: String, prompt: String): String = buildJsonObject {
+        put("model", modelId)
+        put("messages", buildJsonArray {
+            add(buildJsonObject {
+                put("role", "user")
+                put("content", prompt)
+            })
+        })
+        put("max_tokens", MINIMAL_MAX_TOKENS)
+    }.toString()
 
-    private fun responsesBody(modelId: String, prompt: String): String =
-        """{"model":"$modelId","input":"$prompt","max_output_tokens":$MINIMAL_MAX_TOKENS}"""
+    private fun responsesBody(modelId: String, prompt: String): String = buildJsonObject {
+        put("model", modelId)
+        put("input", prompt)
+        put("max_output_tokens", MINIMAL_MAX_TOKENS)
+    }.toString()
 
-    private fun anthropicBody(modelId: String, prompt: String): String =
-        """{"model":"$modelId","max_tokens":$MINIMAL_MAX_TOKENS,"messages":[{"role":"user","content":"$prompt"}]}"""
+    private fun anthropicBody(modelId: String, prompt: String): String = buildJsonObject {
+        put("model", modelId)
+        put("max_tokens", MINIMAL_MAX_TOKENS)
+        put("messages", buildJsonArray {
+            add(buildJsonObject {
+                put("role", "user")
+                put("content", prompt)
+            })
+        })
+    }.toString()
 }

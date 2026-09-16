@@ -27,7 +27,9 @@ import kotlinx.serialization.json.longOrNull
  * - **`quota_display_type` 不是必选**：JustDoWork 有、Agent Router 没有。读不到就按 USD，
  *   不因缺字段整条失败。
  */
-class NewApiAdapter : BalanceAdapter {
+class NewApiAdapter(
+    private val calibratedQuotaPerUnit: Double? = null,
+) : BalanceAdapter {
 
     override val kind: BalanceKind = BalanceKind.NEWAPI
 
@@ -85,6 +87,7 @@ class NewApiAdapter : BalanceAdapter {
     /** 从 `/api/user/self` 的 data 里读 `quota_per_unit`（部分站会带，没带用默认）。 */
     private fun providerQuotaPerUnit(data: kotlinx.serialization.json.JsonObject): Double =
         data["quota_per_unit"]?.jsonPrimitive?.doubleOrNull
+            ?: calibratedQuotaPerUnit?.takeIf { it > 0.0 }
             ?: BalanceKind.NEWAPI_DEFAULT_QUOTA_PER_UNIT
 
     private val json = Json { ignoreUnknownKeys = true }

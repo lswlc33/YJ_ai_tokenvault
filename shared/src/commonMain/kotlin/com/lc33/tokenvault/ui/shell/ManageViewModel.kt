@@ -156,7 +156,10 @@ class ManageViewModel constructor(
             )
         }
         // 搜索 → 排序，都发生在内存里（红线 10：数据从 Flow 来，不回数据层重查）。
-        val filtered = rows.filter { matchesQuery(it, groupNameOf(snap.groups, it.groupId), ctrl.query) }
+        val filtered = rows.filter {
+            matchesGroup(it, ctrl.selected) &&
+                matchesQuery(it, groupNameOf(snap.groups, it.groupId), ctrl.query)
+        }
         ManageUiState(
             loading = false,
             query = ctrl.query,

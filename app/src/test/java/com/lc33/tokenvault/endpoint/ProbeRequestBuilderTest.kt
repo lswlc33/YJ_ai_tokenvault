@@ -1,6 +1,7 @@
 package com.lc33.tokenvault.endpoint
 
 import com.lc33.tokenvault.domain.Protocol
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -90,5 +91,21 @@ class ProbeRequestBuilderTest {
             null,
         )
         assertEquals(listOf("Authorization" to "Bearer yj-probe-invalid"), req.headers)
+    }
+
+    @Test
+    fun `inference body escapes arbitrary strings`() {
+        val body = requireNotNull(
+            ProbeRequestBuilder.inference(
+                "https://api.example.com/v1/chat/completions",
+                Protocol.CHAT,
+                "sk-test".toCharArray(),
+                "model\"quoted",
+                prompt = "line1\nline2\\path",
+            ).body,
+        )
+        val parsed = Json.parseToJsonElement(body).toString()
+        assertTrue(parsed.contains("model\\\"quoted"))
+        assertTrue(parsed.contains("line1\\nline2\\\\path"))
     }
 }
