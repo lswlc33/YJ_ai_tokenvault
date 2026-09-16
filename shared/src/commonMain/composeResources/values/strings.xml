@@ -75,7 +75,6 @@
     <string name="manage_tab_accounts">Accounts</string>
     <string name="manage_pinned">Pinned</string>
     <string name="manage_default_key">Default</string>
-    <string name="manage_local_only">Local record only</string>
     <string name="manage_keys_ratio">%1$d / %2$d keys</string>
     <string name="manage_models_count">%1$d models</string>
     <string name="manage_latency">%1$d ms</string>
@@ -312,6 +311,8 @@
     <string name="sync_webdav_directory_label">Remote directory</string>
     <string name="sync_webdav_username_label">Username</string>
     <string name="sync_webdav_password_label">Password</string>
+    <string name="sync_webdav_password_reveal">Show password</string>
+    <string name="sync_webdav_password_hide">Hide password</string>
     <string name="sync_webdav_credentials_keep">Saved credentials are kept; only a new value overwrites them</string>
     <string name="sync_webdav_credentials_required">Initial setup needs both username and password</string>
     <string name="sync_webdav_insecure_required">Allow insecure HTTP</string>
@@ -450,11 +451,11 @@
     <string name="editor_error_invalid_timeout">Timeout must be a positive integer, or blank.</string>
     <string name="editor_error_no_protocols">Select at least one protocol.</string>
     <string name="editor_error_save_failed">Save failed. Your input is preserved.</string>
-    <string name="editor_probe_quick_model">Quick model test</string>
-    <string name="editor_probe_quick_model_summary">Allow long-pressing a model in the key detail list to probe it immediately.</string>
     <string name="editor_section_balance">Balance</string>
+    <string name="editor_balance_enabled">Enable balance queries</string>
+    <string name="editor_balance_enabled_summary">When off, nothing is queried and the settings below are saved for later only.</string>
     <string name="editor_balance_kind">Query type</string>
-    <string name="editor_balance_kind_summary">Pick “None” to turn balance queries off</string>
+    <string name="editor_balance_kind_summary">Which adapter reads the balance</string>
     <string name="editor_balance_token">Access token</string>
     <string name="editor_balance_token_hint">A separate token from the provider's account settings, not your API key</string>
     <string name="editor_key_keep_secret">Clearing this field keeps the current key; it is not deleted.</string>
@@ -475,7 +476,6 @@
     <string name="editor_discard_summary">Your input will be discarded.</string>
     <string name="editor_discard_confirm">Discard</string>
     <string-array name="balance_kinds">
-        <item>Do not query</item>
         <item>new-api / one-api</item>
         <item>DeepSeek official</item>
         <item>OpenRouter</item>
@@ -574,7 +574,7 @@
     <string name="balance_empty_desc">A balance query is set per provider, in the provider editor.</string>
     <string name="balance_failed_hint">Could not read the balance; this is not the same as a balance of zero.</string>
     <!-- Per-provider probe switches (invariant 36) -->
-    <string name="editor_section_probe">Probing</string>
+    <string name="editor_section_probe">Probe settings</string>
     <string name="editor_probe_enabled">Allow probing this provider</string>
     <string name="editor_probe_enabled_summary">Turn this off for providers whose terms forbid automated checks</string>
     <string name="editor_probe_disabled_note">This provider will not receive any probe requests, including manual probes, scheduled probes and "retry failed items".</string>

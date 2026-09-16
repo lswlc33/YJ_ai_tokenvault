@@ -17,8 +17,15 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
+/**
+ * 余额适配器的可选项。**不含 [BalanceKind.NONE]**——"不查"由编辑页的
+ * 「启用余额查询」开关表达，不在下拉里再给一次。两个手柄管同一个字段，
+ * 拨哪个另一个都跟着动，用户看到的是"这里怎么有两处都在管余额"。
+ *
+ * 顺序必须与 `balance_kinds` 两份 string-array 一一对应（下标即取值），
+ * `ArchitectureRulesTest` 会校验数量。
+ */
 val KEY_BALANCE_KINDS: List<BalanceKind> = listOf(
-    BalanceKind.NONE,
     BalanceKind.NEWAPI,
     BalanceKind.DEEPSEEK,
     BalanceKind.OPENROUTER,
@@ -34,6 +41,9 @@ val KEY_AUTH_STYLES: List<AuthStyle> = listOf(AuthStyle.AUTO, AuthStyle.BEARER, 
  *
  * 抽成纯函数是为了能被测试守住——这段逻辑曾经缺失：编辑页直接 `KeyDraft()`，
  * 于是「探测」设置页里那五个"新建时的默认值"改了什么都不影响，界面在、功能不在。
+ *
+ * `probeQuickModel` 跟着 `modelReachability` 一起给：编辑页把这两个字段画成一个开关，
+ * 而引擎要两个都为真才发快捷探测。只给前者的话，默认打开时开关显示为开、长按却没反应。
  */
 fun DefaultProbeSettings.toNewKeyDraft(providerId: Long): KeyDraft = KeyDraft(
     providerId = providerId,
@@ -42,6 +52,7 @@ fun DefaultProbeSettings.toNewKeyDraft(providerId: Long): KeyDraft = KeyDraft(
     probeBalance = balance,
     probeModels = models,
     probeModelReachability = modelReachability,
+    probeQuickModel = modelReachability,
 )
 
 fun ApiKey.toDraft(profiles: List<ClientProfile>): KeyDraft = KeyDraft(
@@ -57,7 +68,8 @@ fun ApiKey.toDraft(profiles: List<ClientProfile>): KeyDraft = KeyDraft(
     pathOverrideAnthropic = settings.pathOverrides[Protocol.ANTHROPIC].orEmpty(),
     timeoutSeconds = settings.timeoutSeconds?.toString().orEmpty(),
     allowInsecure = settings.allowInsecure,
-    balanceKindIndex = KEY_BALANCE_KINDS.indexOf(settings.balanceKind).coerceAtLeast(0),
+    balanceKindIndex = balanceKindIndexOf(settings.balanceKind),
+    balanceEnabled = settings.balanceKind != BalanceKind.NONE,
     balanceUserId = settings.balanceUserId.orEmpty(),
     balanceMethod = settings.balanceConfig.jsonString("method").ifBlank { "GET" },
     balancePath = settings.balanceConfig.jsonString("path"),
@@ -96,9 +108,15 @@ fun KeyDraft.toSettings(
             else -> profiles.getOrNull(profileIndex - 1)?.id ?: existing?.clientProfileId
         },
         timeoutSeconds = timeoutSeconds.trim().toIntOrNull(),
-        balanceKind = KEY_BALANCE_KINDS.getOrElse(balanceKindIndex) { BalanceKind.NONE },
+        balanceKind = if (balanceEnabled) {
+            KEY_BALANCE_KINDS.getOrElse(balanceKindIndex) { BalanceKind.NEWAPI }
+        } else {
+            // 开关关掉就是「不查」。适配器选择留在草稿里（下拉仍显示、仍能改），
+            // 重新打开时接着用，不用再挑一次。
+            BalanceKind.NONE
+        },
         balanceUserId = balanceUserId.ifBlank { null },
-        balanceConfig = if (KEY_BALANCE_KINDS.getOrElse(balanceKindIndex) { BalanceKind.NONE } == BalanceKind.CUSTOM_JSON) {
+        balanceConfig = if (effectiveBalanceKind() == BalanceKind.CUSTOM_JSON) {
             buildJsonObject {
                 put("method", balanceMethod.ifBlank { "GET" }.uppercase())
                 put("path", balancePath.trim())
@@ -125,6 +143,22 @@ private fun profileIndexOf(clientProfileId: Long?, profiles: List<ClientProfile>
     if (clientProfileId == null) return 0
     val index = profiles.indexOfFirst { it.id == clientProfileId }
     return if (index < 0) 0 else index + 1
+}
+
+/**
+ * 落库的余额适配器 → 下拉下标。
+ *
+ * [BalanceKind.NONE]（以及任何不认识的 kind）落到 0，也就是第一个真实适配器；
+ * 它不会因此变成"开着"——开关由 `balanceEnabled` 单独记着，两者一对照就还原得回来。
+ */
+private fun balanceKindIndexOf(kind: BalanceKind): Int =
+    KEY_BALANCE_KINDS.indexOf(kind).takeIf { it >= 0 } ?: 0
+
+/** 草稿里**生效的**适配器：开关关掉时视为无，用于决定要不要写 `balanceConfig`。 */
+private fun KeyDraft.effectiveBalanceKind(): BalanceKind = if (balanceEnabled) {
+    KEY_BALANCE_KINDS.getOrElse(balanceKindIndex) { BalanceKind.NEWAPI }
+} else {
+    BalanceKind.NONE
 }
 
 private val balanceJson = Json { ignoreUnknownKeys = true }

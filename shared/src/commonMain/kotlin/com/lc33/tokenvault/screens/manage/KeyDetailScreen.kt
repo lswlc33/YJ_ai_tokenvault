@@ -393,11 +393,17 @@ fun KeyDetailScreen(
                             // 自动获取的列表不给编辑入口（同供应商详情页）：点开一个
                             // 下次同步就会被覆盖的字段没有意义。
                             val editable = !key.settings.probeModels
+                            // 编辑页把这两个字段当一个开关写，但老库里可能只开了其中一个
+                            // （v4 迁移是从 modelReachability 抄过去的，之后就各自能改）。
+                            // 引擎要两个都真才会发探测，所以界面也按"两个都真"来画：
+                            // 只开一个却显示可达性标签、长按却没反应，比不显示更费解。
+                            val quickProbeEnabled =
+                                key.settings.probeModelReachability && key.settings.probeQuickModel
                             ModelRow(
                                 row = model,
                                 showProbe = key.settings.probeModelReachability,
                                 onClick = if (editable) ({ selectedModel = model }) else null,
-                                onLongPress = if (key.settings.probeQuickModel) {
+                                onLongPress = if (quickProbeEnabled) {
                                     // 只传模型 id：协议由引擎按 Chat → Anthropic 试探，
                                     // 这一行记的协议不参与（它只是用户当初填的值）。
                                     { onProbeModel(model.modelId) }

@@ -74,7 +74,6 @@
     <string name="manage_tab_accounts">账号</string>
     <string name="manage_pinned">置顶</string>
     <string name="manage_default_key">默认</string>
-    <string name="manage_local_only">仅本地记录</string>
     <string name="manage_keys_ratio">%1$d / %2$d 张可用</string>
     <string name="manage_models_count">%1$d 个模型</string>
     <string name="manage_latency">%1$d 毫秒</string>
@@ -311,6 +310,8 @@
     <string name="sync_webdav_directory_label">远程目录</string>
     <string name="sync_webdav_username_label">用户名</string>
     <string name="sync_webdav_password_label">密码</string>
+    <string name="sync_webdav_password_reveal">显示密码</string>
+    <string name="sync_webdav_password_hide">隐藏密码</string>
     <string name="sync_webdav_credentials_keep">已保存的凭据会保留，输入新值才会覆盖</string>
     <string name="sync_webdav_credentials_required">首次配置需要同时填用户名和密码</string>
     <string name="sync_webdav_insecure_required">允许明文 HTTP</string>
@@ -449,11 +450,11 @@
     <string name="editor_error_invalid_timeout">超时时间必须是正整数，或留空。</string>
     <string name="editor_error_no_protocols">至少选择一个协议。</string>
     <string name="editor_error_save_failed">保存失败，输入内容已保留。</string>
-    <string name="editor_probe_quick_model">快捷测试模型</string>
-    <string name="editor_probe_quick_model_summary">允许在密钥详情页的模型列表中长按快速探测该模型。</string>
     <string name="editor_section_balance">余额</string>
+    <string name="editor_balance_enabled">启用余额查询</string>
+    <string name="editor_balance_enabled_summary">关闭后不做任何查询，下方设置仅保存备用</string>
     <string name="editor_balance_kind">查询类型</string>
-    <string name="editor_balance_kind_summary">选「不查」即关闭余额查询</string>
+    <string name="editor_balance_kind_summary">用哪个适配器读取余额</string>
     <string name="editor_balance_token">访问令牌</string>
     <string name="editor_balance_token_hint">在中转站个人安全设置中获取的独立令牌，不是 API 密钥</string>
     <string name="editor_key_keep_secret">清空则保留原密钥，不会把它删掉。</string>
@@ -474,7 +475,6 @@
     <string name="editor_discard_summary">已填写的内容将被丢弃。</string>
     <string name="editor_discard_confirm">放弃</string>
     <string-array name="balance_kinds">
-        <item>不查</item>
         <item>new-api / one-api</item>
         <item>DeepSeek 官方</item>
         <item>OpenRouter</item>
@@ -571,7 +571,7 @@
     <string name="balance_empty_desc">余额查询按供应商单独配置，请在供应商编辑页设置。</string>
     <string name="balance_failed_hint">无法读取余额，与余额为 0 不同</string>
     <!-- Per-provider probe switches (invariant 36) -->
-    <string name="editor_section_probe">探测</string>
+    <string name="editor_section_probe">探测设置</string>
     <string name="editor_probe_enabled">允许探测这一家</string>
     <string name="editor_probe_enabled_summary">若服务条款不允许自动化检测，请关闭此项</string>
     <string name="editor_probe_disabled_note">该供应商不会收到任何探测请求，包括手动探测、定时探测与「重试失败项」。</string>

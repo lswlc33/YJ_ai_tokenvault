@@ -125,7 +125,9 @@ import tokenvault.shared.generated.resources.sync_webdav_credentials_keep
 import tokenvault.shared.generated.resources.sync_webdav_credentials_required
 import tokenvault.shared.generated.resources.sync_webdav_directory_label
 import tokenvault.shared.generated.resources.sync_webdav_insecure_required
+import tokenvault.shared.generated.resources.sync_webdav_password_hide
 import tokenvault.shared.generated.resources.sync_webdav_password_label
+import tokenvault.shared.generated.resources.sync_webdav_password_reveal
 import tokenvault.shared.generated.resources.sync_webdav_settings
 import tokenvault.shared.generated.resources.sync_webdav_title
 import tokenvault.shared.generated.resources.sync_webdav_url_invalid
@@ -956,6 +958,8 @@ private fun SyncRouteContent(
 
     var showWebDavSettings by remember { mutableStateOf(false) }
     var webDavError by remember { mutableStateOf<String?>(null) }
+    // 每次打开都从"挡住"开始：上次看过的明文不该替下一次做决定。
+    var webDavPasswordRevealed by remember { mutableStateOf(false) }
     var allowInsecure by remember { mutableStateOf(false) }
     var remoteBackups by remember { mutableStateOf<List<String>?>(null) }
     val webDavUrlState = rememberAppTextFieldState()
@@ -1027,6 +1031,7 @@ private fun SyncRouteContent(
             allowInsecure = webDavConfig.allowInsecure
             webDavUsernameState.clear()
             webDavPasswordState.clear()
+            webDavPasswordRevealed = false
             webDavError = null
             showWebDavSettings = true
         },
@@ -1074,6 +1079,7 @@ private fun SyncRouteContent(
         onDismissRequest = {
             webDavUsernameState.clear()
             webDavPasswordState.clear()
+            webDavPasswordRevealed = false
             showWebDavSettings = false
         },
         title = webDavTitle,
@@ -1103,6 +1109,7 @@ private fun SyncRouteContent(
                 )
                 webDavUsernameState.clear()
                 webDavPasswordState.clear()
+                webDavPasswordRevealed = false
                 showWebDavSettings = false
             }
         },
@@ -1116,7 +1123,7 @@ private fun SyncRouteContent(
             state = webDavDirectoryState,
             label = stringResource(Res.string.sync_webdav_directory_label),
         )
-        AppSecretTextField(
+        AppTextField(
             state = webDavUsernameState,
             label = stringResource(Res.string.sync_webdav_username_label),
             supportingText = if (webDavConfig.hasCredentials) {
@@ -1128,6 +1135,17 @@ private fun SyncRouteContent(
         AppSecretTextField(
             state = webDavPasswordState,
             label = stringResource(Res.string.sync_webdav_password_label),
+            // 账号密码是用户自己填的 WebDAV 凭据，不是本机要保护的秘密：账号直接显示，
+            // 密码默认挡住（旁边有人时不该亮着），点小眼睛可以看回明文，省得对着打错的串猜。
+            concealed = !webDavPasswordRevealed,
+            toggleConcealDescription = stringResource(
+                if (webDavPasswordRevealed) {
+                    Res.string.sync_webdav_password_hide
+                } else {
+                    Res.string.sync_webdav_password_reveal
+                },
+            ),
+            onToggleConceal = { webDavPasswordRevealed = !webDavPasswordRevealed },
         )
         AppSwitchRow(
             title = stringResource(Res.string.sync_webdav_insecure_required),

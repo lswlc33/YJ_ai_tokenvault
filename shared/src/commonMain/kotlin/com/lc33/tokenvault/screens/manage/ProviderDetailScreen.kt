@@ -1,5 +1,10 @@
 package com.lc33.tokenvault.screens.manage
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -876,18 +881,28 @@ private fun KeyCard(
                     vertical = tokens.itemSpacing,
                 ),
             )
-        } else if (modelsExpanded) {
-            models.forEachIndexed { index, model ->
-                ModelRow(
-                    row = model,
-                    // 这一页不重复模型的可达性与协议：协议同一家的模型几乎全一样，
-                    // 可达性没有 Key 页的探测入口，摆在这里都是只看不动的字。
-                    showProbe = false,
-                    showProtocol = false,
-                    onClick = if (autoModels) null else ({ onEditModel(model) }),
-                )
-                if (index != models.lastIndex) {
-                    AppDivider()
+        } else {
+            // 展开/收起给高度过渡：列表可能有几十行，一帧跳开会让人分不清是"展开了"
+            // 还是"页面被替换了"。同时淡入淡出——只滑高度的话，收起时文字会被裁着走。
+            AnimatedVisibility(
+                visible = modelsExpanded,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut(),
+            ) {
+                Column {
+                    models.forEachIndexed { index, model ->
+                        ModelRow(
+                            row = model,
+                            // 这一页不重复模型的可达性与协议：协议同一家的模型几乎全一样，
+                            // 可达性没有 Key 页的探测入口，摆在这里都是只看不动的字。
+                            showProbe = false,
+                            showProtocol = false,
+                            onClick = if (autoModels) null else ({ onEditModel(model) }),
+                        )
+                        if (index != models.lastIndex) {
+                            AppDivider()
+                        }
+                    }
                 }
             }
         }

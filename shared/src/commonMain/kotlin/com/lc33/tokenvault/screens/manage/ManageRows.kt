@@ -25,7 +25,6 @@ import tokenvault.shared.generated.resources.detail_account_password
 import tokenvault.shared.generated.resources.manage_keys_ratio
 import tokenvault.shared.generated.resources.manage_latency
 import tokenvault.shared.generated.resources.manage_latency_time
-import tokenvault.shared.generated.resources.manage_local_only
 import tokenvault.shared.generated.resources.manage_models_count
 import tokenvault.shared.generated.resources.manage_pinned
 import tokenvault.shared.generated.resources.login_method_github
@@ -414,7 +413,6 @@ internal fun AccountRow(
         modifier = modifier,
         onClick = onClick,
         endActions = {
-            AppChip(text = stringResource(Res.string.manage_local_only))
             AppIconTint(icon = AppIcon.Forward, size = 18.dp, tint = appSecondaryTextColor)
         },
     ) {

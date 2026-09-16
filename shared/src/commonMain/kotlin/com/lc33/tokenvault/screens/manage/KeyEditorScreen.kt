@@ -20,11 +20,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.lc33.tokenvault.domain.BalanceKind
 import com.lc33.tokenvault.domain.Protocol
 import com.lc33.tokenvault.platform.PlatformBackHandler
 import com.lc33.tokenvault.screens.model.KeyDraft
 import com.lc33.tokenvault.screens.model.UiModelRow
 import com.lc33.tokenvault.ui.common.relativeLabel
+import com.lc33.tokenvault.ui.shell.KEY_BALANCE_KINDS
 import com.lc33.tokenvault.ui.miuix.AppActionRow
 import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppDialog
@@ -74,6 +76,8 @@ import tokenvault.shared.generated.resources.editor_balance_custom_path
 import tokenvault.shared.generated.resources.editor_balance_custom_used_path
 import tokenvault.shared.generated.resources.editor_balance_custom_value_path
 import tokenvault.shared.generated.resources.editor_key_keep_secret
+import tokenvault.shared.generated.resources.editor_balance_enabled
+import tokenvault.shared.generated.resources.editor_balance_enabled_summary
 import tokenvault.shared.generated.resources.editor_balance_kind
 import tokenvault.shared.generated.resources.editor_balance_kind_summary
 import tokenvault.shared.generated.resources.editor_balance_token
@@ -106,8 +110,6 @@ import tokenvault.shared.generated.resources.editor_probe_keys
 import tokenvault.shared.generated.resources.editor_probe_keys_summary
 import tokenvault.shared.generated.resources.editor_probe_model_reachability
 import tokenvault.shared.generated.resources.editor_probe_model_reachability_summary
-import tokenvault.shared.generated.resources.editor_probe_quick_model
-import tokenvault.shared.generated.resources.editor_probe_quick_model_summary
 import tokenvault.shared.generated.resources.editor_probe_reachability
 import tokenvault.shared.generated.resources.editor_probe_reachability_summary
 import tokenvault.shared.generated.resources.editor_save
@@ -117,6 +119,7 @@ import tokenvault.shared.generated.resources.editor_section_advanced
 import tokenvault.shared.generated.resources.editor_section_balance
 import tokenvault.shared.generated.resources.editor_section_basic
 import tokenvault.shared.generated.resources.editor_section_client
+import tokenvault.shared.generated.resources.editor_section_probe
 import tokenvault.shared.generated.resources.editor_section_endpoint
 import tokenvault.shared.generated.resources.editor_timeout
 import tokenvault.shared.generated.resources.editor_timeout_hint
@@ -479,18 +482,43 @@ fun KeyEditorScreen(
 
             }
 
-            // 「余额」只留一个控件：查询类型。它第一项就是「不查」，本身已经是开关，
-            // 再并一个「余额查询」开关就是同一个 `balanceKindIndex` 的两个手柄——
-            // 拨哪个另一个都跟着动，用户看到的是"这里怎么有两处都在管余额"。
+            // 「余额」区：总开关 + 查询类型 + 凭据。
+            //
+            // 开关是这里唯一的"开不开"手柄，它落库为 `BalanceKind.NONE` 或某个真实适配器；
+            // 下拉里因此**不再有**「不查」那一项——两个手柄管同一个字段，拨哪个另一个都跟着动，
+            // 用户看到的是"这里怎么有两处都在管余额"。
+            //
+            // 关掉时下方的下拉与凭据照常显示、照常保存：这一区在关掉之后仍然是
+            // "把配置记下来备用"的地方，而不是被清空的表单。
             item { SectionTitle(text = stringResource(Res.string.editor_section_balance)) }
             item {
                 AppPreferenceGroup {
+                    AppSwitchRow(
+                        title = stringResource(Res.string.editor_balance_enabled),
+                        summary = stringResource(Res.string.editor_balance_enabled_summary),
+                        checked = draft.balanceEnabled,
+                        onCheckedChange = { onChange(draft.copy(balanceEnabled = it)) },
+                    )
                     AppDropdownRow(
                         title = stringResource(Res.string.editor_balance_kind),
                         summary = stringResource(Res.string.editor_balance_kind_summary),
                         items = stringArrayResource(Res.array.balance_kinds).toList(),
                         selectedIndex = draft.balanceKindIndex,
                         onSelect = { onChange(draft.copy(balanceKindIndex = it)) },
+                    )
+                    // 「探测时查询余额」紧跟在它描述的那个开关后面，而不是留在下面的
+                    // 「探测设置」里：它回答的正是上面这个开关打开之后会发生什么，
+                    // 隔着整个凭据区摆到另一组，读起来像一件不相干的事。
+                    AppSwitchRow(
+                        title = stringResource(Res.string.editor_probe_balance),
+                        summary = stringResource(Res.string.editor_probe_balance_summary),
+                        checked = draft.probeBalance,
+                        onCheckedChange = { onChange(draft.copy(probeBalance = it)) },
+                        // 两个前置条件缺一不可：余额查询没开时没有对象可查，探测总闸
+                        // 没开时（下面那一组）这一项也不会被走到——`BalanceEngine` 两条
+                        // 查询路径都要求 `probe.enabled && probe.balance`。与其让它看起来
+                        // 开着却什么都不做，不如灰掉。
+                        enabled = draft.balanceEnabled && draft.probeEnabled,
                     )
                 }
             }
@@ -499,8 +527,8 @@ fun KeyEditorScreen(
                     modifier = Modifier.padding(horizontal = tokens.screenPadding),
                     verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
                 ) {
-                    when (draft.balanceKindIndex) {
-                        1 -> {
+                    when (KEY_BALANCE_KINDS.getOrNull(draft.balanceKindIndex)) {
+                        BalanceKind.NEWAPI -> {
                             // 编辑时这个框里就是**存着的那串令牌**（new-api 的个人访问令牌），
                             // 默认可见、眼睛可遮——理由同上面的密钥：看不见就没法核对。
                             AppSecretTextField(
@@ -516,7 +544,7 @@ fun KeyEditorScreen(
                                 label = stringResource(Res.string.editor_balance_user_id),
                             )
                         }
-                        6 -> {
+                        BalanceKind.CUSTOM_JSON -> {
                             AppTextField(state = balanceMethod, label = stringResource(Res.string.editor_balance_custom_method))
                             AppTextField(state = balancePath, label = stringResource(Res.string.editor_balance_custom_path))
                             AppTextField(
@@ -532,11 +560,14 @@ fun KeyEditorScreen(
                                 label = stringResource(Res.string.editor_balance_custom_currency),
                             )
                         }
+                        // NEWAPI 与 CUSTOM_JSON 之外都是内置适配器，没有额外字段要填；
+                        // 下标越界（`getOrNull` 给了 null）也落到这里，不画任何输入框。
+                        else -> Unit
                     }
                 }
             }
 
-            item { SectionTitle(text = stringResource(Res.string.editor_probe_enabled)) }
+            item { SectionTitle(text = stringResource(Res.string.editor_section_probe)) }
             item {
                 AppPreferenceGroup {
                     AppSwitchRow(
@@ -559,30 +590,27 @@ fun KeyEditorScreen(
                         onCheckedChange = { onChange(draft.copy(probeKeys = it)) },
                         enabled = draft.probeEnabled,
                     )
-                    AppSwitchRow(
-                        title = stringResource(Res.string.editor_probe_balance),
-                        summary = stringResource(Res.string.editor_probe_balance_summary),
-                        checked = draft.probeBalance,
-                        onCheckedChange = { onChange(draft.copy(probeBalance = it)) },
-                        // 没选查询类型时这一项没有对象可查：把开关灰掉，而不是让它
-                        // 看起来开着却什么都不做。
-                        enabled = draft.probeEnabled && draft.balanceKindIndex != 0,
-                    )
+                    // 「探测时查询余额」已移到上面「余额」区，紧跟它依赖的那个开关。
                     // 「模型列表检测」不在这里再放一遍：它就是上面「模型」区的
                     // `probeModels`，同一个字段两个开关。
+                    //
+                    // 模型可达性只留这一个开关：引擎要 `modelReachability && quickModelProbe`
+                    // 同时为真才发快捷探测，第二个开关关了它就不会亮，开了它也未必生效——
+                    // 那是个严格从属的开关，不是独立设置。两处消费方（模型行是否显示
+                    // 可达性标签、长按是否触发探测）本来就是同一件事的两个面，所以一次写两个字段。
                     AppSwitchRow(
                         title = stringResource(Res.string.editor_probe_model_reachability),
                         summary = stringResource(Res.string.editor_probe_model_reachability_summary),
                         checked = draft.probeModelReachability,
-                        onCheckedChange = { onChange(draft.copy(probeModelReachability = it)) },
+                        onCheckedChange = {
+                            onChange(
+                                draft.copy(
+                                    probeModelReachability = it,
+                                    probeQuickModel = it,
+                                ),
+                            )
+                        },
                         enabled = draft.probeEnabled,
-                    )
-                    AppSwitchRow(
-                        title = stringResource(Res.string.editor_probe_quick_model),
-                        summary = stringResource(Res.string.editor_probe_quick_model_summary),
-                        checked = draft.probeQuickModel,
-                        onCheckedChange = { onChange(draft.copy(probeQuickModel = it)) },
-                        enabled = draft.probeEnabled && draft.probeModelReachability,
                     )
                 }
             }

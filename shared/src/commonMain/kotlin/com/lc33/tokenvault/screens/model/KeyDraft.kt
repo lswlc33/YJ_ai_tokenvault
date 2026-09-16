@@ -16,7 +16,10 @@ data class KeyDraft(
     val pathOverrideAnthropic: String = "",
     val timeoutSeconds: String = "",
     val allowInsecure: Boolean = false,
+    /** 下拉下标，指向 [com.lc33.tokenvault.ui.shell.KEY_BALANCE_KINDS]（**不含** NONE）。 */
     val balanceKindIndex: Int = 0,
+    /** 「启用余额查询」总开关。关掉即落库为 `BalanceKind.NONE`，下方选择照常保存。 */
+    val balanceEnabled: Boolean = false,
     val balanceUserId: String = "",
     val balanceMethod: String = "GET",
     val balancePath: String = "",

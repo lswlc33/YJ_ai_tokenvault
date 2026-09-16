@@ -1009,19 +1009,20 @@ fun AppTextField(
 }
 
 /**
- * 装明文秘密的输入框（恢复密钥、备份口令、平台密码）。
+ * 装明文秘密的输入框（恢复密钥、备份口令、平台密码）。**默认不遮蔽**——文本框自己
+ * 不遮挡内容，遮蔽是调用方通过 [concealed] 打开的（`concealed` 只改**显示**，走
+ * `outputTransformation` 换成圆点，明文仍在 `state` 里）。
  *
- * 与 [AppTextField] 的差别只有键盘配置，但那正是重点：默认的文本键盘会把输入内容喂给
- * 输入法的联想与"个性化学习"，于是这段明文之后会以候选词的形式出现在**任何人**面前——
- * 这正是 `PinPad` 宁可自己画一个数字盘也不用系统键盘的理由（§7.5），而恢复密钥比 PIN 更值钱。
- * `KeyboardType.Password` 会让输入法关掉联想与记忆。
+ * 输入法关联想靠 [onToggleConceal] 而非文本框类型：给了眼睛按钮的格子用
+ * `KeyboardType.Password`（默认的文本键盘会把输入内容喂给输入法的"个性化学习"，
+ * 于是这段明文之后会以候选词的形式出现在**任何人**面前——这正是 `PinPad` 宁可自己
+ * 画一个数字盘也不用系统键盘的理由（§7.5），而恢复密钥比 PIN 更值钱）；没给眼睛按钮
+ * 的格子用普通键盘，因为它的内容本来就要一直显示在屏幕上。
  *
  * [onDone] 非空时回车键变成「完成」并直接提交：这一格常常是一屏里唯一的输入，
  * 让用户先收起键盘再去找按钮，等于让他盲着点。
  *
- * [concealed] 与 [onToggleConceal] 给"要回显已有明文、但默认不露"的场合（平台账号编辑）：
- * 前者只改**显示**（走 `outputTransformation` 换成圆点，明文仍在 `state` 里），
- * 后者非空时右侧出现眼睛按钮。默认 `false` / `null`，与以前完全一致。
+ * [toggleConcealDescription] 非空时右侧出现眼睛按钮，点它切 [concealed]。
  */
 @Composable
 fun AppSecretTextField(
@@ -1041,8 +1042,11 @@ fun AppSecretTextField(
             state = state.state,
             modifier = Modifier.fillMaxWidth(),
             label = label,
+            // 没有眼睛按钮（也就是调用方没打算遮蔽）的格子用普通键盘：Password 键盘会让
+            // 输入法关掉联想，WebDAV 用户名里输中文时很难受；而这类格子的内容本来就要
+            // 一直显示在屏幕上，藏键盘类型没有意义。带眼睛按钮的仍用 Password 键盘。
             keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Password,
+                keyboardType = if (onToggleConceal == null) KeyboardType.Text else KeyboardType.Password,
                 autoCorrectEnabled = false,
                 imeAction = if (onDone == null) ImeAction.Default else ImeAction.Done,
             ),
