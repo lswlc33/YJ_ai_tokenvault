@@ -118,5 +118,9 @@ data object UpdateRoute : VaultRoute
 @Serializable
 data object LicensesRoute : VaultRoute
 
+/** 会员介绍页（纯展示的娱乐功能）。入口是设置页顶部那张会员卡。 */
+@Serializable
+data object MemberRoute : VaultRoute
+
 @Serializable
 data object AboutRoute : VaultRoute

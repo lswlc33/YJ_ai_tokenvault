@@ -63,6 +63,7 @@ import com.lc33.tokenvault.ui.shell.LockViewModel
 import com.lc33.tokenvault.ui.shell.LogViewModel
 import com.lc33.tokenvault.ui.shell.LogEntryViewModel
 import com.lc33.tokenvault.ui.shell.ManageViewModel
+import com.lc33.tokenvault.ui.shell.MemberViewModel
 import com.lc33.tokenvault.ui.shell.ProbeRunViewModel
 import com.lc33.tokenvault.ui.shell.ProbeSettingsViewModel
 import com.lc33.tokenvault.ui.shell.ProfileEditorViewModel
@@ -247,6 +248,7 @@ val viewModelModule = module {
     viewModelOf(::LogViewModel)
     viewModelOf(::LogEntryViewModel)
     viewModelOf(::ManageViewModel)
+    viewModelOf(::MemberViewModel)
     viewModelOf(::ProbeRunViewModel)
     viewModelOf(::ProbeSettingsViewModel)
     viewModelOf(::ProfileEditorViewModel)

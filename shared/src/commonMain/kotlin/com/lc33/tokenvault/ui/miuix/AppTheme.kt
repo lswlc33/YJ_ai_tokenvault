@@ -10,7 +10,9 @@ import com.lc33.tokenvault.ui.theme.AppColorSchemeMode
 import com.lc33.tokenvault.ui.theme.AppTokens
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
 import com.lc33.tokenvault.ui.theme.LocalProviderPalette
+import com.lc33.tokenvault.ui.theme.LocalMemberPalette
 import com.lc33.tokenvault.ui.theme.LocalStatusPalette
+import com.lc33.tokenvault.ui.theme.memberPaletteFor
 import com.lc33.tokenvault.ui.theme.providerPaletteFor
 import com.lc33.tokenvault.ui.theme.statusPaletteFor
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
@@ -48,6 +50,7 @@ fun AppTheme(
     }
     val statusPalette = remember(dark) { statusPaletteFor(dark) }
     val providerPalette = remember(dark) { providerPaletteFor(dark) }
+    val memberPalette = remember(dark) { memberPaletteFor(dark) }
     // 状态栏图标明暗随主题走：浅色主题要深色图标，否则白底白字看不清（问题 4）。
     PlatformStatusBarAppearance(dark = dark)
     MiuixTheme(controller = controller) {
@@ -55,6 +58,7 @@ fun AppTheme(
             LocalAppTokens provides DefaultTokens,
             LocalStatusPalette provides statusPalette,
             LocalProviderPalette provides providerPalette,
+            LocalMemberPalette provides memberPalette,
             LocalAppDarkTheme provides dark,
             content = content,
         )

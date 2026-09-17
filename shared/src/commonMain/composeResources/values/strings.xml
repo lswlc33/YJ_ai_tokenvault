@@ -93,6 +93,27 @@
     <string name="settings_title">Settings</string>
     <string name="settings_member_title">Lifetime Member</string>
     <string name="settings_member_expiry">Expires 2099-99-99</string>
+    <string name="settings_member_idle_summary">Not a member yet</string>
+    <string name="settings_member_hint">Tap to see member perks</string>
+
+    <!-- Member (display only — nothing here changes behaviour) -->
+    <string name="member_badge">MEMBER</string>
+    <string name="member_page_title">Membership</string>
+    <string name="member_hero_title">YuanJi Member</string>
+    <string name="member_hero_subtitle">A badge on the settings card, and the warm feeling of being seen.</string>
+    <string name="member_hero_expiry">Valid for 8,999,999,999 days</string>
+    <string name="member_privileges_section">Perks</string>
+    <string name="member_privilege_card">A big blue badge</string>
+    <string name="member_privilege_card_summary">The setting card turns blue and wears a gold badge. It is the whole idea.</string>
+    <string name="member_privilege_status">Status you can feel</string>
+    <string name="member_privilege_status_summary">Distinguished. Certified. Slightly faster in spirit.</string>
+    <string name="member_privilege_flow">Smoother, somehow</string>
+    <string name="member_privilege_flow_summary">Nothing was optimised, but it does look quicker now.</string>
+    <string name="member_privilege_security">More secure, allegedly</string>
+    <string name="member_privilege_security_summary">Your data key is exactly as safe as before. Which is very safe.</string>
+    <string name="member_disclaimer">This is a joke feature. Nothing here grants any real capability, no behaviour changes, and no data is involved. Long-press the card for 5 seconds to go back to being a regular user.</string>
+    <string name="member_buy_free">Free for a limited time</string>
+    <string name="member_cancel">Cancel</string>
     <string name="settings_group_settings">General</string>
     <string name="settings_group_sync">Sync</string>
     <string name="settings_group_about">About</string>

@@ -92,6 +92,27 @@
     <string name="settings_title">设置</string>
     <string name="settings_member_title">永久会员</string>
     <string name="settings_member_expiry">过期时间 2099-99-99</string>
+    <string name="settings_member_idle_summary">还不是会员</string>
+    <string name="settings_member_hint">点击查看会员特权</string>
+
+    <!-- 会员（纯展示，不改变任何行为） -->
+    <string name="member_badge">会员</string>
+    <string name="member_page_title">会员</string>
+    <string name="member_hero_title">元记会员</string>
+    <string name="member_hero_subtitle">一个蓝得发亮的身份标识，以及被认真对待的感觉。</string>
+    <string name="member_hero_expiry">有效期 8999999999 天</string>
+    <string name="member_privileges_section">会员特权</string>
+    <string name="member_privilege_card">一块蓝色大卡标识</string>
+    <string name="member_privilege_card_summary">设置页那张卡会变成蓝色，并戴上一枚金色角标。整件事就是这个。</string>
+    <string name="member_privilege_status">尊贵的身份象征</string>
+    <string name="member_privilege_status_summary">尊贵。已认证。气质上更快了一些。</string>
+    <string name="member_privilege_flow">提高软件流畅度</string>
+    <string name="member_privilege_flow_summary">没有做任何优化，但看起来确实顺了一点。</string>
+    <string name="member_privilege_security">增加安全性</string>
+    <string name="member_privilege_security_summary">数据密钥和之前一样安全——也就是非常安全。</string>
+    <string name="member_disclaimer">这是一个娱乐功能：这里没有任何一项真的能做什么，不会改变任何行为，也不涉及任何数据。长按设置页那张卡 5 秒可以退回普通用户。</string>
+    <string name="member_buy_free">限时免费</string>
+    <string name="member_cancel">取消</string>
     <string name="settings_group_settings">通用</string>
     <string name="settings_group_sync">同步</string>
     <string name="settings_group_about">关于</string>

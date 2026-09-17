@@ -11,6 +11,7 @@ import com.lc33.tokenvault.probe.ProbeClassifier
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -469,5 +470,50 @@ class SettingsRepositoryTest {
         assertEquals(listOf(7, 30, 90, null), LogRetention.entries.map { it.days })
         assertEquals(LogRetention.THIRTY_DAYS, LogRetention.fromDays(30))
         assertEquals(LogRetention.SEVEN_DAYS, LogRetention.fromDays(null))
+    }
+
+    // ---------------------------------------------------------------- 会员（娱乐功能）
+
+    @Test
+    fun `会员没写过时是普通用户`() = runTest {
+        // 默认必须是 false：这张卡在会员功能引入之前就是普通用户的样子，
+        // 默认 true 会让所有存量用户开机即"成为会员"。
+        assertEquals(false, repo.observeMember().first())
+    }
+
+    @Test
+    fun `买会员与取消会员都能往返`() = runTest {
+        repo.setMember(true)
+        assertEquals(true, repo.observeMember().first())
+        repo.setMember(false)
+        assertEquals(false, repo.observeMember().first())
+    }
+
+    @Test
+    fun `会员坏值落回普通用户`() = runTest {
+        // 与其它开关同一条规矩：读方向单向容错，认不出来就当没开。
+        dao.put(com.lc33.tokenvault.data.entity.AppSettingEntity(key = "member", value = "yes"))
+        assertEquals(false, repo.observeMember().first())
+    }
+
+    @Test
+    fun `会员这一项不进审计日志`() = runTest {
+        // 别的设置项改了都会记一条审计。会员标记不改变任何行为，记进去只是噪音，
+        // 而审计日志是给排查问题用的——这条钉住"别人后续顺手给它补上 auditChange"。
+        val auditDao = FakeAuditLogDao()
+        val audited = RoomSettingsRepository(
+            dao,
+            RoomAuditLogRepository(auditDao, com.lc33.tokenvault.crypto.Redactor()) { 0L },
+        )
+
+        audited.setMember(true)
+        assertTrue(
+            "会员不应留痕",
+            auditDao.rows.none { it.message.contains("member") || it.detail.orEmpty().contains("member") },
+        )
+
+        // 对照组：同一个仓库改别的设置项是会留痕的，否则上面那条断言是空转。
+        audited.setIdleLock(true)
+        assertTrue(auditDao.rows.any { it.detail.orEmpty().contains("idleLockSeconds") })
     }
 }

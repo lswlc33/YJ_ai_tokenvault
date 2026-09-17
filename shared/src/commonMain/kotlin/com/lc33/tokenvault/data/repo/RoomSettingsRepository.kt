@@ -210,6 +210,21 @@ class RoomSettingsRepository constructor(
         audit.recordSafe(LogLevel.INFO, LogCategory.VAULT, "setting changed", "key=$key")
     }
 
+    /**
+     * 会员标记（娱乐功能，纯展示）。
+     *
+     * 与其它开关的唯一区别是**它不该进审计日志**：别的项都是"用户改了某个行为"，
+     * 而这一项不改变任何行为——把它记进审计只会让日志里多出一条没有后果的噪音，
+     * 而审计日志是给排查问题用的。所以这里不调 [auditChange]。
+     */
+    override fun observeMember(): Flow<Boolean> = dao.observeAll()
+        .map { rows -> rows.firstOrNull { it.key == KEY_MEMBER }?.value.toBooleanSafe() }
+        .distinctUntilChanged()
+
+    override suspend fun setMember(enabled: Boolean) {
+        dao.put(AppSettingEntity(key = KEY_MEMBER, value = enabled.toString()))
+    }
+
     private companion object {
         /**
          * 键名照 §7.4 里的写法。
@@ -249,6 +264,9 @@ class RoomSettingsRepository constructor(
         const val KEY_PREDICTIVE_BACK_STYLE = "predictiveBackStyle"
 
         const val KEY_PREDICTIVE_BACK_EXIT_DIRECTION = "predictiveBackExitDirection"
+
+        /** 会员标记。纯展示，不进审计日志（见 [observeMember]）。 */
+        const val KEY_MEMBER = "member"
 
         /**
          * 阈值 → JSON 对象（键 = 币种代码，值 = 金额）。

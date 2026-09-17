@@ -165,4 +165,15 @@ interface SettingsRepository {
     fun observePredictiveBackExitDirection(): Flow<PredictiveBackExitDirection>
 
     suspend fun setPredictiveBackExitDirection(direction: PredictiveBackExitDirection)
+
+    /**
+     * 是不是「会员」。设置页顶部那张卡的形态由它决定。
+     *
+     * **这是纯展示的娱乐开关，不承载任何权限**：没有任何功能读它来决定"能不能做某事"，
+     * 也没有任何数据依赖它。所以它既不进 boot、也不加密，就是 `app_settings` 里一个布尔键。
+     * **没写过时发 false**（普通用户），与这张卡引入之前的表现一致。
+     */
+    fun observeMember(): Flow<Boolean>
+
+    suspend fun setMember(enabled: Boolean)
 }

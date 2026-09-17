@@ -42,6 +42,7 @@ import com.lc33.tokenvault.screens.settings.DataScreen
 import com.lc33.tokenvault.screens.settings.LicensesScreen
 import com.lc33.tokenvault.screens.settings.LogDetailScreen
 import com.lc33.tokenvault.screens.settings.LogScreen
+import com.lc33.tokenvault.screens.settings.MemberScreen
 import com.lc33.tokenvault.screens.settings.ProbeSettingsScreen
 import com.lc33.tokenvault.screens.settings.ProfileEditorScreen
 import com.lc33.tokenvault.screens.settings.ProfileListScreen
@@ -262,7 +263,10 @@ fun VaultNavHost(
         }
 
             is SettingsRoute -> {
+            val memberVm: MemberViewModel = koinViewModel()
+            val member by memberVm.isMember.collectAsStateWithLifecycle()
             SettingsScreen(
+                member = member,
                 onOpenAppearance = { navigate(AppearanceRoute) },
                 onOpenSecurity = { navigate(SecurityRoute) },
                 onOpenProbeSettings = { navigate(ProbeSettingsRoute) },
@@ -272,6 +276,19 @@ fun VaultNavHost(
                 onOpenSync = { navigate(SyncRoute) },
                 onOpenAbout = { navigate(AboutRoute) },
                 onOpenUpdate = { navigate(UpdateRoute) },
+                onOpenMember = { navigate(MemberRoute) },
+                onRevertMember = memberVm::onCancel,
+            )
+        }
+
+            is MemberRoute -> {
+            val vm: MemberViewModel = koinViewModel()
+            val member by vm.isMember.collectAsStateWithLifecycle()
+            MemberScreen(
+                member = member,
+                onBack = back,
+                onPurchase = vm::onPurchase,
+                onCancel = vm::onCancel,
             )
         }
 
