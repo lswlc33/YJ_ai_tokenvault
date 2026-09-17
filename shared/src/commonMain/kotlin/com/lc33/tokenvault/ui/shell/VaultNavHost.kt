@@ -16,6 +16,7 @@ import com.lc33.tokenvault.domain.model.PredictiveBackExitDirection
 import com.lc33.tokenvault.endpoint.EndpointError
 import com.lc33.tokenvault.domain.model.PredictiveBackStyle
 import com.lc33.tokenvault.engine.RestoreMode
+import com.lc33.tokenvault.platform.BiometricPromptText
 import com.lc33.tokenvault.platform.nowMillis
 import com.lc33.tokenvault.platform.openAppLocaleSettings
 import com.lc33.tokenvault.platform.openExternalUrl
@@ -67,6 +68,11 @@ import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 import tokenvault.shared.generated.resources.clipboard_label_account
 import tokenvault.shared.generated.resources.clipboard_label_api_key
+import tokenvault.shared.generated.resources.clipboard_label_base_url
+import tokenvault.shared.generated.resources.clipboard_label_model_id
+import tokenvault.shared.generated.resources.biometric_prompt_cancel
+import tokenvault.shared.generated.resources.biometric_prompt_enable_subtitle
+import tokenvault.shared.generated.resources.biometric_prompt_enable_title
 import tokenvault.shared.generated.resources.common_undo
 import tokenvault.shared.generated.resources.feedback_account_deleted
 import tokenvault.shared.generated.resources.feedback_copied
@@ -374,6 +380,8 @@ fun VaultNavHost(
                 val revealed by vm.revealed.collectAsStateWithLifecycle()
                 val feedback = LocalAppFeedback.current
                 val keyClipboardLabel = stringResource(Res.string.clipboard_label_api_key)
+                val baseUrlClipboardLabel = stringResource(Res.string.clipboard_label_base_url)
+                val modelClipboardLabel = stringResource(Res.string.clipboard_label_model_id)
                 val keyDeleted = stringResource(Res.string.feedback_key_deleted)
                 val keyUndone = stringResource(Res.string.feedback_undone)
                 val keyUndoFailed = stringResource(Res.string.feedback_undo_failed)
@@ -422,6 +430,9 @@ fun VaultNavHost(
                             onReveal = vm::reveal,
                             onCopyRevealed = { vm.copyRevealed(keyClipboardLabel) },
                             onCloseReveal = vm::closeReveal,
+                            onCopyKey = { vm.copyKey(keyClipboardLabel) },
+                            onCopyBaseUrl = { vm.copyBaseUrl(baseUrlClipboardLabel, stateValue.key.settings.apiBaseUrl) },
+                            onCopyModelId = { modelId -> vm.copyModelId(modelClipboardLabel, modelId) },
                             onProbe = vm::probeKey,
                             onProbeModel = { modelId ->
                                 vm.probeModel(modelId)
@@ -548,15 +559,31 @@ fun VaultNavHost(
             val idleLock by vm.idleLock.collectAsStateWithLifecycle()
             val lockOnScreenOff by vm.lockOnScreenOff.collectAsStateWithLifecycle()
             val clipboardClearIndex by vm.clipboardClearIndex.collectAsStateWithLifecycle()
+            val biometricEnabled by vm.biometricEnabled.collectAsStateWithLifecycle()
+            val biometricAvailable by vm.biometricAvailable.collectAsStateWithLifecycle()
+            val biometricBusy by vm.biometricBusy.collectAsStateWithLifecycle()
+            // 启用时的系统验证框文案在组合期解析（VM 读不到资源），点开关时连同结果一起交给 VM。
+            val enableTitle = stringResource(Res.string.biometric_prompt_enable_title)
+            val enableSubtitle = stringResource(Res.string.biometric_prompt_enable_subtitle)
+            val promptCancel = stringResource(Res.string.biometric_prompt_cancel)
             SecurityScreen(
                 autoLockIndex = autoLockIndex,
                 idleLock = idleLock,
                 lockOnScreenOff = lockOnScreenOff,
                 clipboardClearIndex = clipboardClearIndex,
+                biometricEnabled = biometricEnabled,
+                biometricAvailable = biometricAvailable,
+                biometricBusy = biometricBusy,
                 onAutoLockIndexChange = vm::onAutoLockIndexChange,
                 onIdleLockChange = vm::onIdleLockChange,
                 onLockOnScreenOffChange = vm::onLockOnScreenOffChange,
                 onClipboardClearIndexChange = vm::onClipboardClearIndexChange,
+                onBiometricChange = { enabled ->
+                    vm.onBiometricChange(
+                        enabled,
+                        BiometricPromptText(enableTitle, enableSubtitle, promptCancel),
+                    )
+                },
                 onBack = back,
                 onChangePin = { navigate(ChangePinRoute) },
                 onLockNow = vm::onLockNow,

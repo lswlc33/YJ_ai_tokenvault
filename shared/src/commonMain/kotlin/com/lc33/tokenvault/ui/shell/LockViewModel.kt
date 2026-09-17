@@ -6,6 +6,10 @@ import com.lc33.tokenvault.crypto.zeroize
 import com.lc33.tokenvault.domain.LockPhase
 import com.lc33.tokenvault.domain.PinPolicy
 import com.lc33.tokenvault.platform.AutoLocker
+import com.lc33.tokenvault.platform.BiometricPromptText
+import com.lc33.tokenvault.platform.BiometricUnlockOutcome
+import com.lc33.tokenvault.platform.BiometricVault
+import com.lc33.tokenvault.platform.BootState
 import com.lc33.tokenvault.platform.BootStore
 import com.lc33.tokenvault.platform.UnlockResult
 import com.lc33.tokenvault.platform.VaultSession
@@ -16,8 +20,11 @@ import com.lc33.tokenvault.screens.lock.PinError
 import com.lc33.tokenvault.screens.lock.UnlockUiState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -40,6 +47,7 @@ class LockViewModel constructor(
     private val session: VaultSession,
     private val bootStore: BootStore,
     private val autoLocker: AutoLocker,
+    private val vault: BiometricVault,
 ) : ViewModel() {
 
     private val _phase = MutableStateFlow<LockPhase>(LockPhase.Loading)
@@ -47,6 +55,14 @@ class LockViewModel constructor(
 
     private val _uiState = MutableStateFlow(LockUiState())
     val uiState: StateFlow<LockUiState> = _uiState.asStateFlow()
+
+    /**
+     * 该不该在锁屏上画生物识别入口：开关开着**且**这台设备现在能用。
+     * 从 boot 派生（红线 31），不自己记一份——换指纹导致凭据失效时由解锁流程把 boot 关掉。
+     */
+    val biometricAvailable: StateFlow<Boolean> = bootStore.revision
+        .map { readBiometricEnabled() && vault.isAvailable() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, readBiometricEnabled() && vault.isAvailable())
 
     /** PIN 缓冲。私有、可擦、不进 UiState。 */
     private var pinBuffer = CharArray(MAX_PIN)
@@ -185,6 +201,54 @@ class LockViewModel constructor(
             }
         }
     }
+
+    // ------------------------------------------------------------------ 生物识别解锁（§7.3）
+
+    /**
+     * 用生物识别解锁。验证与取 DEK 都在 [BiometricVault] 里完成，成功时 DEK 已交给
+     * [VaultSession]，这里只推进阶段。
+     *
+     * 凭据失效（换指纹 / Keychain 项没了）时做三件事（红线 5）：删平台凭据、关开关、清包裹，
+     * 然后退回 PIN——只清一半会留下"开关开着但永远解不开"的状态。
+     */
+    fun unlockWithBiometric(prompt: BiometricPromptText) {
+        if (busy()) return
+        viewModelScope.launch {
+            setBusy(true)
+            val outcome = vault.unlock(currentBiometricBlob(), prompt)
+            setBusy(false)
+            when (outcome) {
+                BiometricUnlockOutcome.Success -> {
+                    clearError()
+                    _phase.value = LockPhase.Unlocked
+                }
+
+                BiometricUnlockOutcome.Cancelled -> {
+                    // 用户取消：什么都不做，红灯留着让他接着输 PIN。
+                }
+
+                BiometricUnlockOutcome.Invalidated -> {
+                    vault.disable()
+                    bootStore.update {
+                        it.copy(biometricEnabled = false, dekWrappedByBiometric = null)
+                    }
+                    _phase.value = session.refresh()
+                    clearError()
+                }
+
+                is BiometricUnlockOutcome.Error -> {
+                    _phase.value = session.refresh()
+                    clearError()
+                }
+            }
+        }
+    }
+
+    private fun readBiometricEnabled(): Boolean =
+        (bootStore.read() as? BootState.Ok)?.record?.biometricEnabled == true
+
+    private fun currentBiometricBlob(): ByteArray? =
+        (bootStore.read() as? BootState.Ok)?.record?.dekWrappedByBiometric
 
     // ------------------------------------------------------------------ 引导
 

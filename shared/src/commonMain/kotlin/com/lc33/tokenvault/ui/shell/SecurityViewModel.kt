@@ -8,6 +8,11 @@ import com.lc33.tokenvault.domain.ClipboardClearPolicy
 import com.lc33.tokenvault.domain.PinPolicy
 import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.platform.AutoLocker
+import com.lc33.tokenvault.platform.BiometricEnableOutcome
+import com.lc33.tokenvault.platform.BiometricPromptText
+import com.lc33.tokenvault.platform.BiometricVault
+import com.lc33.tokenvault.platform.BootState
+import com.lc33.tokenvault.platform.BootStore
 import com.lc33.tokenvault.platform.UnlockResult
 import com.lc33.tokenvault.platform.VaultSession
 import com.lc33.tokenvault.screens.lock.ChangePinStep
@@ -44,6 +49,8 @@ class SecurityViewModel constructor(
     private val session: VaultSession,
     private val autoLocker: AutoLocker,
     private val settings: SettingsRepository,
+    private val vault: BiometricVault,
+    private val bootStore: BootStore,
 ) : ViewModel() {
 
     private val _changePin = MutableStateFlow(ChangePinUiState())
@@ -168,6 +175,54 @@ class SecurityViewModel constructor(
         newPin = null
         _changePin.value = ChangePinUiState()
     }
+
+    // ------------------------------------------------------------------ 生物识别解锁（§7.3）
+
+    /**
+     * 这台设备此刻能不能用强生物识别。硬件能力不会在我们进程活着的时候变，
+     * 所以在构造时问一次即可；用户去系统里录了指纹再回来，重进这一页会拿到新的 VM。
+     */
+    val biometricAvailable: StateFlow<Boolean> = MutableStateFlow(vault.isAvailable()).asStateFlow()
+
+    /**
+     * 开关的当前值。**从 boot 派生而不自己记一份**（红线 31）：平台侧凭据失效时
+     * （换指纹、Keychain 项没了）由解锁流程把 boot 关掉，自己记一份就会画着"已开启"。
+     */
+    val biometricEnabled: StateFlow<Boolean> = bootStore.revision
+        .map { readBiometricEnabled() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, readBiometricEnabled())
+
+    /** 正在跑启用/关闭流程（要弹系统验证框）。界面据此把开关暂时按住。 */
+    private val _biometricBusy = MutableStateFlow(false)
+    val biometricBusy: StateFlow<Boolean> = _biometricBusy.asStateFlow()
+
+    /**
+     * 开关生物识别。开启时验证并包裹 DEK，成功才写 boot；关闭时删平台凭据并清包裹。
+     *
+     * 取消或失败都**不写 boot**，于是开关的状态流仍读回旧值、界面自动弹回，不需要额外的回滚。
+     */
+    fun onBiometricChange(enabled: Boolean, prompt: BiometricPromptText) {
+        if (_biometricBusy.value) return
+        if (enabled && !vault.isAvailable()) return
+        viewModelScope.launch {
+            if (enabled) {
+                _biometricBusy.value = true
+                val outcome = vault.enable(prompt)
+                _biometricBusy.value = false
+                if (outcome is BiometricEnableOutcome.Success) {
+                    bootStore.update {
+                        it.copy(biometricEnabled = true, dekWrappedByBiometric = outcome.blob)
+                    }
+                }
+            } else {
+                vault.disable()
+                bootStore.update { it.copy(biometricEnabled = false, dekWrappedByBiometric = null) }
+            }
+        }
+    }
+
+    private fun readBiometricEnabled(): Boolean =
+        (bootStore.read() as? BootState.Ok)?.record?.biometricEnabled == true
 
     // ------------------------------------------------------------------ 立即锁定
 

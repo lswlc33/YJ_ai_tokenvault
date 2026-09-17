@@ -9,6 +9,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.fragment.app.FragmentActivity
 import com.lc33.tokenvault.platform.AutoLocker
+import com.lc33.tokenvault.platform.BiometricActivityHolder
 import com.lc33.tokenvault.ui.shell.AppRoot
 import org.koin.android.ext.android.inject
 
@@ -34,6 +35,21 @@ class MainActivity : FragmentActivity() {
         enableEdgeToEdge()
         registerReceiver(screenOffReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF))
         setContent { AppRoot() }
+    }
+
+    /**
+     * 把当前前台 Activity 交给生物识别层（§7.3）：`BiometricPrompt` 只接受
+     * `FragmentActivity`，而平台层拿不到 Compose 的 LocalContext。
+     */
+    override fun onResume() {
+        super.onResume()
+        BiometricActivityHolder.current = this
+    }
+
+    override fun onPause() {
+        // 只认正在前台的这一个：切走之后不该还能对着旧 Activity 弹验证框。
+        if (BiometricActivityHolder.current === this) BiometricActivityHolder.current = null
+        super.onPause()
     }
 
     override fun onDestroy() {

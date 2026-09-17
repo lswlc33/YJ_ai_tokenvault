@@ -3,6 +3,10 @@ package com.lc33.tokenvault.ui.shell
 import com.lc33.tokenvault.domain.LockPhase
 import com.lc33.tokenvault.domain.PinPolicy
 import com.lc33.tokenvault.platform.AutoLocker
+import com.lc33.tokenvault.platform.BiometricEnableOutcome
+import com.lc33.tokenvault.platform.BiometricPromptText
+import com.lc33.tokenvault.platform.BiometricUnlockOutcome
+import com.lc33.tokenvault.platform.BiometricVault
 import com.lc33.tokenvault.platform.BootState
 import com.lc33.tokenvault.platform.FileBootStore
 import com.lc33.tokenvault.platform.VaultSession
@@ -73,7 +77,20 @@ class LockViewModelTest {
         session = session,
         bootStore = store,
         autoLocker = autoLocker,
+        vault = unavailableBiometric,
     )
+
+    /** 这套用例只测 PIN 那条路，生物识别一律"这台设备用不了"。 */
+    private val unavailableBiometric = object : BiometricVault {
+        override fun isAvailable(): Boolean = false
+        override suspend fun enable(prompt: BiometricPromptText): BiometricEnableOutcome =
+            BiometricEnableOutcome.Unavailable
+
+        override suspend fun unlock(blob: ByteArray?, prompt: BiometricPromptText): BiometricUnlockOutcome =
+            BiometricUnlockOutcome.Invalidated
+
+        override fun disable() = Unit
+    }
 
     private fun record() = (store.read() as? BootState.Ok)?.record
 

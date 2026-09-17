@@ -4,10 +4,13 @@ import android.os.Build
 import androidx.room.Room
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.lc33.tokenvault.data.VaultDatabase
+import com.lc33.tokenvault.platform.AndroidBiometricVault
 import com.lc33.tokenvault.platform.AndroidSecureClipboard
+import com.lc33.tokenvault.platform.BiometricVault
 import com.lc33.tokenvault.platform.BootStore
 import com.lc33.tokenvault.platform.FileBootStore
 import com.lc33.tokenvault.platform.SecureClipboard
+import com.lc33.tokenvault.platform.VaultSession
 import com.lc33.tokenvault.platform.appContext
 import com.lc33.tokenvault.platform.applyHandWrittenSchema
 import java.io.File
@@ -52,6 +55,10 @@ actual val platformModule: Module = module {
 
     single<SecureClipboard> {
         AndroidSecureClipboard(appContext, get(named(Qualifiers.APP_SCOPE)), get())
+    }
+
+    single<BiometricVault> {
+        AndroidBiometricVault(appContext, get<VaultSession>())
     }
 
     single(named(Qualifiers.PLACEHOLDERS)) {

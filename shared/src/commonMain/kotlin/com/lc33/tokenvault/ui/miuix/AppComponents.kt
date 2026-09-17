@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -225,6 +226,10 @@ fun SectionTitle(
  *
  * 不用 `enabled = false` 去掉按压反馈：那会同时把标题与值换成禁用色（一片灰）。
  * 不给 `onClick` 就已经不可点、没有波纹，文字保持正常颜色。
+ *
+ * [onLongPress] 非空时长按整行触发（Base URL 这类"看一眼想抄走"的值用），
+ * 只监听长按、不注册点击：`onClick` 留空，行仍然没有点击波纹，语义与只读一致。
+ * 关闭指示波纹（`indication = null`）——一个只读行不该因为长按被抄走而看起来像按钮。
  */
 @Composable
 fun AppValueRow(
@@ -235,11 +240,26 @@ fun AppValueRow(
     stacked: Boolean = false,
     /** 值用等宽字族。URL、密钥遮蔽串这类值用它。 */
     mono: Boolean = false,
+    /** 非空时长按整行触发。用于"长按复制"这类不占用点击的补充动作。 */
+    onLongPress: (() -> Unit)? = null,
 ) {
     val tokens = LocalAppTokens.current
     val valueFamily = if (mono) tokens.monoFontFamily else null
+    val rowModifier = if (onLongPress == null) {
+        modifier
+    } else {
+        modifier.combinedClickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null,
+            onClick = {},
+            onLongClick = {
+                Haptics.tap()
+                onLongPress()
+            },
+        )
+    }
     BasicComponent(
-        modifier = modifier,
+        modifier = rowModifier,
         title = title,
         insideMargin = BasicComponentDefaults.InsideMargin,
         bottomAction = if (stacked) {

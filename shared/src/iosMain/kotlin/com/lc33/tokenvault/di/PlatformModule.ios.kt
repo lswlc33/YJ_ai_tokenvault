@@ -1,10 +1,13 @@
 package com.lc33.tokenvault.di
 
 import com.lc33.tokenvault.platform.APP_VERSION_NAME
+import com.lc33.tokenvault.platform.BiometricVault
 import com.lc33.tokenvault.platform.BootStore
+import com.lc33.tokenvault.platform.IosBiometricVault
 import com.lc33.tokenvault.platform.IosBootStore
 import com.lc33.tokenvault.platform.IosSecureClipboard
 import com.lc33.tokenvault.platform.SecureClipboard
+import com.lc33.tokenvault.platform.VaultSession
 import com.lc33.tokenvault.platform.createVaultDatabase
 import org.koin.core.module.Module
 import org.koin.core.qualifier.named
@@ -24,6 +27,8 @@ actual val platformModule: Module = module {
     single<BootStore> { IosBootStore(IosBootStore.defaultDirectory()) }
 
     single<SecureClipboard> { IosSecureClipboard(get(named(Qualifiers.APP_SCOPE)), get()) }
+
+    single<BiometricVault> { IosBiometricVault(get<VaultSession>()) }
 
     single(named(Qualifiers.PLACEHOLDERS)) {
         mapOf(

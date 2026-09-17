@@ -200,6 +200,9 @@
     <string name="security_section_credential">凭据</string>
     <string name="security_change_pin">修改 PIN 或改用口令</string>
     <string name="security_change_pin_summary">仅重新加密数据密钥，不修改任何数据，可立即完成</string>
+    <string name="security_biometric">允许使用生物识别验证</string>
+    <string name="security_biometric_summary">它是通向同一个数据密钥的另一条路，不是第二道锁。凭据由硬件安全存储保管，重新录入指纹会让它自动失效。</string>
+    <string name="security_biometric_unavailable">这台设备还没录入指纹或人脸，或强生物识别不可用</string>
     <string name="security_section_lock">自动锁定</string>
     <string name="security_lock_now">立即锁定</string>
     <string name="security_lock_now_summary">清除内存中的数据密钥并返回锁屏，不会删除任何数据。</string>
@@ -655,6 +658,14 @@
         <item quantity="other">还可输错 %1$d 次，之后将进入等待</item>
     </plurals>
     <string name="unlock_next_waits">再输入错误一次将进入等待</string>
+    <string name="unlock_biometric">用生物识别解锁</string>
+
+    <!-- 系统生物识别弹窗。它由系统画、不由我们画，所以文案必须能独立成句。 -->
+    <string name="biometric_prompt_unlock_title">解锁元记</string>
+    <string name="biometric_prompt_unlock_subtitle">验证一下是你，才能解开数据密钥</string>
+    <string name="biometric_prompt_enable_title">启用生物识别解锁</string>
+    <string name="biometric_prompt_enable_subtitle">验证一下是你，把这台设备与你的金库绑定</string>
+    <string name="biometric_prompt_cancel">改用 PIN</string>
 
     <!-- 改 PIN（设置 · 安全） -->
     <string name="change_pin_title">修改 PIN</string>
@@ -723,6 +734,8 @@
     <string name="protocol_anthropic">Anthropic</string>
     <string name="clipboard_label_api_key">元记密钥</string>
     <string name="clipboard_label_account">元记密码</string>
+    <string name="clipboard_label_base_url">元记地址</string>
+    <string name="clipboard_label_model_id">元记模型</string>
     <string name="editor_group_none">未分组</string>
     <string name="editor_profile_default">默认（不伪装）</string>
     <string name="groups_add_title">新建分组</string>

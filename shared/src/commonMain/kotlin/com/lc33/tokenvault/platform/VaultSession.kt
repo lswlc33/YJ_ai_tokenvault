@@ -204,6 +204,48 @@ class VaultSession(
         return UnlockResult.WrongCredential(updated.backoff())
     }
 
+    /**
+     * 用生物识别那条路取回的明文 DEK 解锁（§7.3）。
+     *
+     * **[candidate] 的所有权交出去**：成功时它直接成为会话的 DEK（锁定时统一擦除），
+     * 失败或长度不对时由这里擦掉。调用方**不要**在移交之后再擦它。
+     *
+     * 只校验长度：[DekEnvelope] 包裹出来的 DEK 固定 32 字节，长度对不上说明平台给回的是
+     * 别的东西（不该发生），这时宁可不解锁也不算"成功"。
+     */
+    fun unlockWithDek(candidate: ByteArray): UnlockResult = guard.withLock {
+        if (candidate.size != DekEnvelope.DEK_BYTES) {
+            candidate.zeroize()
+            return@withLock UnlockResult.Unavailable("unexpected DEK length ${candidate.size}")
+        }
+        val record = when (val state = bootStore.read()) {
+            is BootState.Ok -> state.record
+            BootState.Missing -> {
+                candidate.zeroize()
+                return@withLock UnlockResult.Unavailable("no boot record")
+            }
+            is BootState.Corrupt -> {
+                candidate.zeroize()
+                return@withLock UnlockResult.Unavailable(state.reason)
+            }
+        }
+        // 生物识别不参与 PIN 的失败计数：拿不到凭据是"这条路失效了"，
+        // 不是"PIN 猜错了"，不该累加退避罚用户。
+        adoptDek(candidate)
+        bootStore.update { it.copy(pinFailCount = 0, pinLockUntil = null) }
+        phase = LockPhase.Unlocked
+        return@withLock UnlockResult.Success
+    }
+
+    /**
+     * 借用明文 DEK，**只给生物识别的启用流程用**：那一处必须把 DEK 交给 Keystore / Keychain
+     * 去包裹，而那两个接口只收字节。**不提供"复制一份 DEK 出去"的 API**——复制出去的那一份
+     * 没人负责擦。锁定态抛 [VaultLockedException]。
+     */
+    fun <R> withDek(block: (ByteArray) -> R): R = guard.withLock {
+        block(dek ?: throw VaultLockedException())
+    }
+
     // ------------------------------------------------------------------ 锁定与借用
 
     /** 锁定：清零 DEK 与两个子密钥，**不关库**（§6.1 推论 1）。 */

@@ -22,6 +22,12 @@ import kotlinx.serialization.Serializable
  * **阶段1 迁移**：删掉恢复密钥与生物识别两条路，只留 PIN。`recoveryKdf` /
  * `dekWrappedByRecovery` / `dekWrappedByBiometric` / `biometricEnabled` 四个字段随之移除。
  * 相应地，备份口令也改回沿用 PIN（不再有独立备份口令）。
+ *
+ * **生物识别回归（2026-09-18）**：重新加回 `biometricEnabled` /
+ * `dekWrappedByBiometric` 两项。`biometricEnabled` 是开关的**唯一权威存储**（红线 31）——
+ * 锁屏页在解锁前就要知道该不该画生物识别入口，所以只能放 boot。
+ * Android 把 Keystore 包裹的密文放 `dekWrappedByBiometric`；iOS 的凭据由 Keychain 的
+ * 访问控制自己保管，这一项在 iOS 上恒为 null。
  */
 @Serializable
 data class BootRecord(
@@ -39,6 +45,16 @@ data class BootRecord(
 
     @Serializable(with = ByteArrayAsBase64::class)
     val dekWrappedByPin: ByteArray? = null,
+
+    /** 是否允许用生物识别代替 PIN 解锁。默认关。**开关的唯一权威存储**（红线 31）。 */
+    val biometricEnabled: Boolean = false,
+
+    /**
+     * Android 侧用 Keystore 硬件密钥包裹的 DEK 密文。iOS 不用它（凭据在 Keychain）。
+     * 只有 [biometricEnabled] 为真、且平台是 Android 时才非空。
+     */
+    @Serializable(with = ByteArrayAsBase64::class)
+    val dekWrappedByBiometric: ByteArray? = null,
 
     /** 连续解锁失败次数。**杀进程不清零**，所以它必须在这里而不是内存里。 */
     val pinFailCount: Int = 0,
@@ -63,6 +79,8 @@ data class BootRecord(
             onboarded == other.onboarded &&
             pinKdf == other.pinKdf &&
             dekWrappedByPin.contentEquals(other.dekWrappedByPin) &&
+            biometricEnabled == other.biometricEnabled &&
+            dekWrappedByBiometric.contentEquals(other.dekWrappedByBiometric) &&
             pinFailCount == other.pinFailCount &&
             pinLockUntil == other.pinLockUntil &&
             themeMode == other.themeMode &&
@@ -75,6 +93,8 @@ data class BootRecord(
         result = 31 * result + onboarded.hashCode()
         result = 31 * result + (pinKdf?.hashCode() ?: 0)
         result = 31 * result + (dekWrappedByPin?.contentHashCode() ?: 0)
+        result = 31 * result + biometricEnabled.hashCode()
+        result = 31 * result + (dekWrappedByBiometric?.contentHashCode() ?: 0)
         result = 31 * result + pinFailCount
         result = 31 * result + (pinLockUntil?.hashCode() ?: 0)
         result = 31 * result + themeMode.hashCode()
@@ -84,9 +104,12 @@ data class BootRecord(
 
     /** 刻意不打印任何密文与盐。这个记录会进日志与错误消息。 */
     override fun toString(): String =
-        "BootRecord(format=$format, onboarded=$onboarded, " +
+        "BootRecord(format=$format, onboarded=$onboarded, biometric=$biometricEnabled, " +
             "pinFailCount=$pinFailCount, wraps=[" +
-            listOfNotNull(dekWrappedByPin?.let { "pin" }).joinToString("/") +
+            listOfNotNull(
+                dekWrappedByPin?.let { "pin" },
+                dekWrappedByBiometric?.let { "bio" },
+            ).joinToString("/") +
             "])"
 
     companion object {

@@ -94,6 +94,12 @@ fun KeyDetailScreen(
     onReveal: () -> Unit,
     onCopyRevealed: () -> Unit,
     onCloseReveal: () -> Unit,
+    /** 长按密钥卡：直接复制密钥明文（不进查看弹窗）。 */
+    onCopyKey: () -> Unit,
+    /** 长按 Base URL 行：复制连接地址。 */
+    onCopyBaseUrl: () -> Unit,
+    /** 长按模型行：长按探测关闭时复制模型 ID。 */
+    onCopyModelId: (String) -> Unit,
     onProbe: () -> Unit,
     onProbeModel: (String) -> Unit,
     onRefreshModels: () -> Unit,
@@ -195,6 +201,8 @@ fun KeyDetailScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = tokens.screenPadding),
+                    // 长按整张卡直接复制密钥：查看弹窗是为"看一眼"准备的，抄走不必多这一步。
+                    onLongPress = onCopyKey,
                 ) {
                     // 左边一列讲这把 Key 是什么（备注 / 遮蔽串 / 延迟 + 时间），
                     // 可达性单独摆在**卡片右缘**、与整块内容上下居中——它说的是整把 Key 的
@@ -303,6 +311,8 @@ fun KeyDetailScreen(
                         value = key.settings.apiBaseUrl,
                         stacked = true,
                         mono = true,
+                        // 长按这一行直接复制地址：URL 往往要贴到终端或浏览器里，抄走最省事。
+                        onLongPress = onCopyBaseUrl,
                     )
                     AppValueRow(
                         title = stringResource(Res.string.detail_key_connection_protocol),
@@ -403,12 +413,15 @@ fun KeyDetailScreen(
                                 row = model,
                                 showProbe = key.settings.probeModelReachability,
                                 onClick = if (editable) ({ selectedModel = model }) else null,
+                                // 长按有两种用途，同一时刻只取一种：
+                                // - 开了长按探测（模型可达性 + 快速探测都开）→ 发一次真花钱的探测；
+                                // - 没开 → 复制模型 ID（模型名常要贴进配置里，这是那一档下唯一有用的长按动作）。
                                 onLongPress = if (quickProbeEnabled) {
                                     // 只传模型 id：协议由引擎按 Chat → Anthropic 试探，
                                     // 这一行记的协议不参与（它只是用户当初填的值）。
                                     { onProbeModel(model.modelId) }
                                 } else {
-                                    null
+                                    { onCopyModelId(model.modelId) }
                                 },
                             )
                             if (index != state.models.lastIndex) {

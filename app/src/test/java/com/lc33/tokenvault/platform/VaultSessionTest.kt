@@ -267,4 +267,35 @@ class VaultSessionTest {
         session.lock()
         assertThrows(VaultLockedException::class.java) { session.changePin(pin.copyOf()) }
     }
+
+    // ------------------------------------------------------------------ 生物识别那条路（§7.3）
+
+    @Test
+    fun `用生物识别取回的 DEK 能解锁`() {
+        onboard()
+        // 平台层就是这么拿到 DEK 的：锁内短暂借用、拷一份出来交给 Keystore / Keychain。
+        val dek = session.withDek { it.copyOf() }
+        session.lock()
+        assertFalse(session.isUnlocked)
+
+        assertEquals(UnlockResult.Success, session.unlockWithDek(dek))
+        assertTrue(session.isUnlocked)
+    }
+
+    @Test
+    fun `长度不对的 DEK 不解锁且被擦掉`() {
+        onboard()
+        session.lock()
+        val bad = ByteArray(16) { 7 }
+        assertTrue(session.unlockWithDek(bad) is UnlockResult.Unavailable)
+        assertFalse(session.isUnlocked)
+        assertArrayEquals(ByteArray(16), bad)
+    }
+
+    @Test
+    fun `锁定态取 DEK 抛 VaultLockedException`() {
+        onboard()
+        session.lock()
+        assertThrows(VaultLockedException::class.java) { session.withDek { it } }
+    }
 }

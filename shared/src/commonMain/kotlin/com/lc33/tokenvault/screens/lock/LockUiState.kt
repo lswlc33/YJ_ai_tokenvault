@@ -125,6 +125,8 @@ data class LockCallbacks(
     /** 敲了一个字符。 */
     val onPinDigit: (Char) -> Unit = {},
     val onPinBackspace: () -> Unit = {},
+    /** 点了锁屏上的"用生物识别解锁"。仅在设备支持且开关开着时可见。 */
+    val onBiometricUnlock: () -> Unit = {},
 
     // ---- 引导
     val onOnboardingNext: () -> Unit = {},

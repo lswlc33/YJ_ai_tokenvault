@@ -1,6 +1,10 @@
 package com.lc33.tokenvault.di
 
 import com.lc33.tokenvault.platform.APP_VERSION_NAME
+import com.lc33.tokenvault.platform.BiometricEnableOutcome
+import com.lc33.tokenvault.platform.BiometricPromptText
+import com.lc33.tokenvault.platform.BiometricUnlockOutcome
+import com.lc33.tokenvault.platform.BiometricVault
 import com.lc33.tokenvault.platform.BootStore
 import com.lc33.tokenvault.platform.FileBootStore
 import com.lc33.tokenvault.platform.SecureClipboard
@@ -57,6 +61,21 @@ actual val platformModule: Module = module {
             override fun copy(label: String, value: CharArray, autoClearSeconds: Int) = Unit
             override fun clearNow() = Unit
             override fun read(): String? = null
+        }
+    }
+
+    // JVM 只用来跑单测，没有系统生物识别可谈：诚实地说"这台设备用不了"，
+    // 于是设置页那个开关在测试里恒为禁用，不会假装能开关。
+    single<BiometricVault> {
+        object : BiometricVault {
+            override fun isAvailable(): Boolean = false
+            override suspend fun enable(prompt: BiometricPromptText): BiometricEnableOutcome =
+                BiometricEnableOutcome.Unavailable
+
+            override suspend fun unlock(blob: ByteArray?, prompt: BiometricPromptText): BiometricUnlockOutcome =
+                BiometricUnlockOutcome.Invalidated
+
+            override fun disable() = Unit
         }
     }
 

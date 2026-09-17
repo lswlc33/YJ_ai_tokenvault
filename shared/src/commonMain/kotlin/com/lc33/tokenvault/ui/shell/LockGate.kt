@@ -26,6 +26,7 @@ fun LockGate(
     phase: LockPhase,
     state: LockUiState,
     callbacks: LockCallbacks,
+    biometricAvailable: Boolean,
     content: @Composable () -> Unit,
 ) {
     when (phase) {
@@ -40,6 +41,7 @@ fun LockGate(
             locked = phase,
             state = state.unlock,
             callbacks = callbacks,
+            biometricAvailable = biometricAvailable,
         )
 
         LockPhase.Unlocked -> content()

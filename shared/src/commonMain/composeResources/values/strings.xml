@@ -201,6 +201,9 @@
     <string name="security_section_credential">Credentials</string>
     <string name="security_change_pin">Change PIN or use a passphrase</string>
     <string name="security_change_pin_summary">Re-encrypts only the data key, so it completes instantly and changes no records</string>
+    <string name="security_biometric">Unlock with biometrics</string>
+    <string name="security_biometric_summary">Another route to the same data key, not a second lock. It is kept in hardware-backed storage and re-enrolling a fingerprint invalidates it.</string>
+    <string name="security_biometric_unavailable">This device has no enrolled fingerprint or face, or strong biometrics is unavailable</string>
     <string name="security_section_lock">Auto-lock</string>
     <string name="security_lock_now">Lock now</string>
     <string name="security_lock_now_summary">Clears the data key from memory and returns to the lock screen. No data is deleted.</string>
@@ -658,6 +661,14 @@
         <item quantity="other">%1$d more incorrect attempts before a waiting period</item>
     </plurals>
     <string name="unlock_next_waits">The next wrong attempt starts a waiting period</string>
+    <string name="unlock_biometric">Unlock with biometrics</string>
+
+    <!-- System biometric prompt. The system draws this dialog, so the text must stand alone. -->
+    <string name="biometric_prompt_unlock_title">Unlock YuanJi</string>
+    <string name="biometric_prompt_unlock_subtitle">Verify it is you to unlock the data key</string>
+    <string name="biometric_prompt_enable_title">Enable biometric unlock</string>
+    <string name="biometric_prompt_enable_subtitle">Verify it is you to bind this device to your vault</string>
+    <string name="biometric_prompt_cancel">Use PIN instead</string>
 
     <!-- Change PIN (settings, Security) -->
     <string name="change_pin_title">Change PIN</string>
@@ -726,6 +737,8 @@
     <string name="protocol_anthropic">Anthropic</string>
     <string name="clipboard_label_api_key">YuanJi key</string>
     <string name="clipboard_label_account">YuanJi password</string>
+    <string name="clipboard_label_base_url">YuanJi URL</string>
+    <string name="clipboard_label_model_id">YuanJi model</string>
     <string name="editor_group_none">Ungrouped</string>
     <string name="editor_profile_default">Default (no disguise)</string>
     <string name="groups_add_title">New group</string>

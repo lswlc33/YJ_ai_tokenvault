@@ -161,6 +161,10 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.cryptography.provider.jdk)
             implementation(libs.ktor.client.okhttp)
+            // 生物识别（§7.3）：BiometricPrompt 只接受 FragmentActivity（androidx.biometric
+            // 1.1.0 没有纯 Context 的构造器），所以这两个依赖只挂在 androidMain。
+            implementation(libs.androidx.biometric)
+            implementation(libs.androidx.fragment.ktx)
         }
 
         // iOS 端用 Apple provider（CryptoKit 原生）。

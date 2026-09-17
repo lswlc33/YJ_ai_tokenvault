@@ -5,10 +5,16 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
+import com.lc33.tokenvault.platform.BiometricPromptText
 import com.lc33.tokenvault.screens.lock.LockCallbacks
 import com.lc33.tokenvault.ui.miuix.AppTheme
+import tokenvault.shared.generated.resources.Res
+import tokenvault.shared.generated.resources.biometric_prompt_cancel
+import tokenvault.shared.generated.resources.biometric_prompt_unlock_subtitle
+import tokenvault.shared.generated.resources.biometric_prompt_unlock_title
 
 /**
  * 整棵树的根。
@@ -26,6 +32,7 @@ fun AppRoot() {
     val vm: LockViewModel = koinViewModel()
     val phase by vm.phase.collectAsStateWithLifecycle()
     val uiState by vm.uiState.collectAsStateWithLifecycle()
+    val biometricAvailable by vm.biometricAvailable.collectAsStateWithLifecycle()
 
     val appearance: AppearanceViewModel = koinViewModel()
     val logMaintenance: com.lc33.tokenvault.engine.LogMaintenance = koinInject()
@@ -37,10 +44,23 @@ fun AppRoot() {
 
     // LockCallbacks 必须 remember 一次：它是 @Immutable，但 Compose 比的是实例相等，
     // 每次重组新建一份就跳不过重组——而这一层的重组会带着整棵锁屏树一起重跑。
-    val callbacks = remember(vm) {
+    // 验证框文案跟语言走，所以把它们一起放进 remember 的键里。
+    val biometricTitle = stringResource(Res.string.biometric_prompt_unlock_title)
+    val biometricSubtitle = stringResource(Res.string.biometric_prompt_unlock_subtitle)
+    val biometricCancel = stringResource(Res.string.biometric_prompt_cancel)
+    val callbacks = remember(vm, biometricTitle, biometricSubtitle, biometricCancel) {
         LockCallbacks(
             onPinDigit = vm::onPinDigit,
             onPinBackspace = vm::onPinBackspace,
+            onBiometricUnlock = {
+                vm.unlockWithBiometric(
+                    BiometricPromptText(
+                        title = biometricTitle,
+                        subtitle = biometricSubtitle,
+                        cancel = biometricCancel,
+                    ),
+                )
+            },
             onOnboardingNext = vm::onOnboardingNext,
             onOnboardingBack = vm::onOnboardingBack,
             // 从备份恢复要走 SAF 选文件，那是 M9 的事。现在按不动比按了没反应好，
@@ -51,7 +71,12 @@ fun AppRoot() {
     }
 
     AppTheme(mode = colorScheme) {
-        LockGate(phase = phase, state = uiState, callbacks = callbacks) {
+        LockGate(
+            phase = phase,
+            state = uiState,
+            callbacks = callbacks,
+            biometricAvailable = biometricAvailable,
+        ) {
             VaultShell()
         }
     }

@@ -16,6 +16,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.unlock_backoff
+import tokenvault.shared.generated.resources.unlock_biometric
 import tokenvault.shared.generated.resources.unlock_busy
 import tokenvault.shared.generated.resources.unlock_free_left
 import tokenvault.shared.generated.resources.unlock_next_waits
@@ -23,6 +24,7 @@ import tokenvault.shared.generated.resources.unlock_subtitle
 import tokenvault.shared.generated.resources.unlock_title
 import com.lc33.tokenvault.domain.LockPhase
 import com.lc33.tokenvault.domain.UnlockBackoff
+import com.lc33.tokenvault.ui.miuix.AppActionButton
 import com.lc33.tokenvault.ui.miuix.AppLinearProgress
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
@@ -33,7 +35,8 @@ import com.lc33.tokenvault.ui.theme.LocalStatusPalette
 /**
  * 解锁页（§7.2、§7.4）。
  *
- * 阶段1 迁移后只有 PIN 一条解锁路，生物识别与恢复密钥入口已删。
+ * 两条解锁路：PIN（主路）与生物识别（可选，设备支持且用户在设置里开了才画入口）。
+ * 生物识别不是第二道锁，而是通向同一个数据密钥的另一条路（§7.3），所以它不改变 PIN 的地位。
  *
  * 页面不持有明文 PIN：敲键只上报字符，满位由持有明文的那一侧自动提交（见 [UnlockUiState]）。
  */
@@ -42,6 +45,7 @@ fun UnlockScreen(
     locked: LockPhase.Locked,
     state: UnlockUiState,
     callbacks: LockCallbacks,
+    biometricAvailable: Boolean,
 ) {
     val tokens = LocalAppTokens.current
     val remaining = rememberRemainingSeconds(locked.backoff)
@@ -69,6 +73,18 @@ fun UnlockScreen(
             remainingSeconds = remaining,
         )
         Spacer(Modifier.height(tokens.itemSpacing))
+
+        // 退避倒计时里不给生物识别入口：那会把"等 30 秒"变成"绕过它"，
+        // 而退避防的正是拿到已锁手机的人一条条试。
+        if (biometricAvailable && remaining == 0) {
+            AppActionButton(
+                text = stringResource(Res.string.unlock_biometric),
+                onClick = callbacks.onBiometricUnlock,
+                enabled = !state.busy,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(tokens.itemSpacing))
+        }
 
         PinKeypad(
             onDigit = callbacks.onPinDigit,

@@ -138,6 +138,42 @@ class KeyDetailViewModel constructor(
         _events.trySend(Event.Copied)
     }
 
+    /**
+     * 长按密钥卡直接复制密钥明文，**不展开弹窗**。
+     *
+     * 与 [reveal] 不同的是它不进 `_revealed`：用户要的是"抄走"，不是"看一眼"，所以
+     * 明文只活到 [clipboard] 收走为止、随即擦掉。仍登记进 [knownSecrets]，让脱敏器
+     * 知道这段明文已经出现过（与 [reveal] 同一道防线）。
+     */
+    fun copyKey(label: String) {
+        viewModelScope.launch {
+            val plain = withContext(Dispatchers.Default) {
+                runCatching { keys.reveal(keyId) }.getOrNull()
+            } ?: return@launch
+            try {
+                knownSecrets.add(plain)
+                clipboard.copy(label, plain, SecureClipboard.DEFAULT_AUTO_CLEAR_SECONDS)
+                _events.trySend(Event.Copied)
+            } finally {
+                plain.zeroize()
+            }
+        }
+    }
+
+    /** 长按连接信息里的 Base URL 复制。它不是秘密，不进脱敏清单，用完即弃。 */
+    fun copyBaseUrl(label: String, url: String) {
+        if (url.isBlank()) return
+        clipboard.copy(label, url.toCharArray(), SecureClipboard.DEFAULT_AUTO_CLEAR_SECONDS)
+        _events.trySend(Event.Copied)
+    }
+
+    /** 长按模型行复制模型 ID。仅在长按探测关闭时用（开启时长按留给探测）。 */
+    fun copyModelId(label: String, modelId: String) {
+        if (modelId.isBlank()) return
+        clipboard.copy(label, modelId.toCharArray(), SecureClipboard.DEFAULT_AUTO_CLEAR_SECONDS)
+        _events.trySend(Event.Copied)
+    }
+
     fun closeReveal() {
         revealedPlain?.zeroize()
         revealedPlain = null
