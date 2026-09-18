@@ -121,6 +121,7 @@ import tokenvault.shared.generated.resources.sync_mode_merge
 import tokenvault.shared.generated.resources.sync_mode_overwrite
 import tokenvault.shared.generated.resources.sync_passphrase_hint
 import tokenvault.shared.generated.resources.sync_passphrase_prompt
+import tokenvault.shared.generated.resources.sync_passphrase_required
 import tokenvault.shared.generated.resources.sync_remote_count
 import tokenvault.shared.generated.resources.sync_restore_mode
 import tokenvault.shared.generated.resources.sync_result_exported
@@ -985,6 +986,7 @@ private fun SyncRouteContent(
 
     val passphrasePrompt = stringResource(Res.string.sync_passphrase_prompt)
     val passphraseHint = stringResource(Res.string.sync_passphrase_hint)
+    val passphraseRequired = stringResource(Res.string.sync_passphrase_required)
     val confirm = stringResource(Res.string.sync_confirm)
     val exported = stringResource(Res.string.sync_result_exported)
     val webDavTitle = stringResource(Res.string.sync_webdav_title)
@@ -994,6 +996,10 @@ private fun SyncRouteContent(
 
     var pendingAction by remember { mutableStateOf<PendingSyncAction?>(null) }
     val passphraseState = rememberSecretTextFieldState()
+    // 「默认沿用 PIN」的实现边界写在这里：口令得由用户亲手输，应用不保存 PIN。
+    // 留空直接继续会产出一把用空口令加密的备份——之后用 PIN 永远解不开，比报错更糟。
+    // 所以在确认时挡住空口令，把"为什么"说清楚。
+    var passphraseError by remember { mutableStateOf<String?>(null) }
 
     var restoreModePicker by remember { mutableStateOf(false) }
     var pendingRestore by remember { mutableStateOf<PendingRestore?>(null) }
@@ -1088,11 +1094,18 @@ private fun SyncRouteContent(
         show = pendingAction != null,
         onDismissRequest = {
             passphraseState.clear()
+            passphraseError = null
             pendingAction = null
         },
         title = passphrasePrompt,
         confirmText = confirm,
         onConfirm = {
+            if (passphraseState.chars.isEmpty()) {
+                // 空口令的备份之后用 PIN 解不开（Pbkdf2Kdf 只认输入），拦住比失败好。
+                passphraseError = passphraseRequired
+                return@AppDialog
+            }
+            passphraseError = null
             when (pendingAction) {
                 PendingSyncAction.Export -> filePicker.pickExport()
                 PendingSyncAction.Import -> filePicker.pickImport()
@@ -1115,6 +1128,7 @@ private fun SyncRouteContent(
             state = passphraseState,
             label = passphraseHint,
             singleLine = true,
+            errorText = passphraseError,
         )
     }
 

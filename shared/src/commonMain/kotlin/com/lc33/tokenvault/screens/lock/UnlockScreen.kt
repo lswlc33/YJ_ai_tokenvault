@@ -8,6 +8,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import org.jetbrains.compose.resources.pluralStringResource
@@ -16,7 +21,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.unlock_backoff
-import tokenvault.shared.generated.resources.unlock_biometric
 import tokenvault.shared.generated.resources.unlock_busy
 import tokenvault.shared.generated.resources.unlock_free_left
 import tokenvault.shared.generated.resources.unlock_next_waits
@@ -24,7 +28,6 @@ import tokenvault.shared.generated.resources.unlock_subtitle
 import tokenvault.shared.generated.resources.unlock_title
 import com.lc33.tokenvault.domain.LockPhase
 import com.lc33.tokenvault.domain.UnlockBackoff
-import com.lc33.tokenvault.ui.miuix.AppActionButton
 import com.lc33.tokenvault.ui.miuix.AppLinearProgress
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
@@ -52,6 +55,17 @@ fun UnlockScreen(
     val inputEnabled = !state.busy && remaining == 0
     val error = state.error
 
+    // 开了生物识别就优先自动弹验证框：回前台 / 手动锁定时，手指已经在 Home 上，
+    // 再让系统弹一次指纹就能直接进，不用先点开键盘。只弹一次：用户取消后不反复骚扰，
+    // 下一次锁定（重新组合）才会再弹。
+    var autoBiometricFired by remember { mutableStateOf(false) }
+    LaunchedEffect(biometricAvailable, remaining, state.busy) {
+        if (biometricAvailable && remaining == 0 && !state.busy && !autoBiometricFired) {
+            autoBiometricFired = true
+            callbacks.onBiometricUnlock()
+        }
+    }
+
     LockPage {
         LockPageHeader(
             title = stringResource(Res.string.unlock_title),
@@ -74,22 +88,15 @@ fun UnlockScreen(
         )
         Spacer(Modifier.height(tokens.itemSpacing))
 
-        // 退避倒计时里不给生物识别入口：那会把"等 30 秒"变成"绕过它"，
-        // 而退避防的正是拿到已锁手机的人一条条试。
-        if (biometricAvailable && remaining == 0) {
-            AppActionButton(
-                text = stringResource(Res.string.unlock_biometric),
-                onClick = callbacks.onBiometricUnlock,
-                enabled = !state.busy,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(tokens.itemSpacing))
-        }
-
         PinKeypad(
             onDigit = callbacks.onPinDigit,
             onBackspace = callbacks.onPinBackspace,
             enabled = inputEnabled,
+            // 退避倒计时里不给生物识别入口：那会把"等 30 秒"变成"绕过它"，
+            // 而退避防的正是拿到已锁手机的人一条条试。入口画在「7」下方的空档，
+            // 正好把键盘第四行补满。
+            biometricAvailable = biometricAvailable && remaining == 0,
+            onBiometricUnlock = callbacks.onBiometricUnlock,
         )
     }
 }

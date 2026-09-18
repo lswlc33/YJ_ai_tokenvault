@@ -7,6 +7,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import org.jetbrains.compose.resources.stringResource
 import tokenvault.shared.generated.resources.Res
@@ -23,6 +27,7 @@ import tokenvault.shared.generated.resources.settings_member_hint
 import tokenvault.shared.generated.resources.settings_member_idle_summary
 import tokenvault.shared.generated.resources.settings_member_title
 import tokenvault.shared.generated.resources.member_badge
+import tokenvault.shared.generated.resources.member_expiry_countdown
 import tokenvault.shared.generated.resources.settings_group_about
 import tokenvault.shared.generated.resources.settings_group_settings
 import tokenvault.shared.generated.resources.settings_group_sync
@@ -46,6 +51,7 @@ import com.lc33.tokenvault.ui.miuix.AppTopBar
 import com.lc33.tokenvault.ui.miuix.SectionTitle
 import com.lc33.tokenvault.ui.miuix.appTopBarScroll
 import com.lc33.tokenvault.ui.miuix.rememberAppTopBarScrollState
+import com.lc33.tokenvault.ui.shell.MemberCountdown
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
 
 /**
@@ -54,8 +60,10 @@ import com.lc33.tokenvault.ui.theme.LocalAppTokens
  * 这一页是**导航面板**而不是巨型表单：原来七组挤在一页要滚四五屏，而其中大半
  * 是一年碰一次的东西。四块分别是设置 / 同步 / 关于 / 更新，具体项都在二级页。
  *
- * 顶部那张会员卡是**纯娱乐的展示**：轻点进会员介绍页，会员长按 5 秒退回普通用户。
- * 它不接任何权限，[member] 只决定画哪一种卡面（见 `MemberViewModel`）。
+ * 顶部那张会员卡是**纯娱乐的展示**：普通用户轻点进会员介绍页；会员每点一次
+ * 到期时间减 10 年，点满 10 次取消会员身份。计数是页面级状态——切走标签页或
+ * 重启应用都会清零（pager 会销毁离屏页的组合），于是"再次进入设置回到初始"
+ * 不用额外记账。不承载任何权限，[member] 只决定画哪一种卡面（见 `MemberViewModel`）。
  */
 @Composable
 fun SettingsScreen(
@@ -74,6 +82,20 @@ fun SettingsScreen(
 ) {
     val scrollState = rememberAppTopBarScrollState()
     val tokens = LocalAppTokens.current
+    // 会员卡"点一次减 10 年"的计数。刻意用 remember 而不是 rememberSaveable：
+    // 切走标签页 / 重启都要回到初始（这是娱乐，不该被记住）。
+    var memberTapCount by remember { mutableStateOf(0) }
+    val memberExpiryYear = MemberCountdown.expiryYear(memberTapCount)
+    val onMemberCardTap = {
+        if (!member) {
+            onOpenMember()
+        } else if (MemberCountdown.shouldRevert(memberTapCount + 1)) {
+            memberTapCount = 0
+            onRevertMember()
+        } else {
+            memberTapCount += 1
+        }
+    }
     AppScaffold(
         topBar = {
             AppTopBar(
@@ -93,16 +115,16 @@ fun SettingsScreen(
                     member = member,
                     title = stringResource(Res.string.settings_member_title),
                     subtitle = stringResource(
-                        if (member) {
-                            Res.string.settings_member_expiry
-                        } else {
-                            Res.string.settings_member_idle_summary
+                        when {
+                            !member -> Res.string.settings_member_idle_summary
+                            memberTapCount == 0 -> Res.string.settings_member_expiry
+                            else -> Res.string.member_expiry_countdown
                         },
+                        memberExpiryYear,
                     ),
                     badge = stringResource(Res.string.member_badge),
                     hint = stringResource(Res.string.settings_member_hint),
-                    onOpen = onOpenMember,
-                    onRevert = onRevertMember,
+                    onClick = onMemberCardTap,
                     modifier = Modifier.padding(
                         start = tokens.screenPadding,
                         end = tokens.screenPadding,

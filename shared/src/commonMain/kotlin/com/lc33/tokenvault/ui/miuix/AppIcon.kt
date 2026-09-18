@@ -25,6 +25,7 @@ import top.yukonga.miuix.kmp.icon.extended.Lock
 import top.yukonga.miuix.kmp.icon.extended.More
 import top.yukonga.miuix.kmp.icon.extended.Ok
 import top.yukonga.miuix.kmp.icon.extended.Paste
+import top.yukonga.miuix.kmp.icon.extended.Recording
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.icon.extended.Report
 import top.yukonga.miuix.kmp.icon.extended.Search
@@ -87,6 +88,9 @@ enum class AppIcon {
     /** 锁屏页的图标。与 [Key] 现在是同一个图形，但语义不同：那个是"一张密钥"，这个是"已锁定"。 */
     Locked,
 
+    /** 锁屏键盘左下角的生物识别入口。用录音圆点的图形（MIUIX 没有指纹图形）。 */
+    Recording,
+
     // 状态与设置块
     Ok,
     Warning,
@@ -132,6 +136,7 @@ internal fun AppIcon.imageVector(): ImageVector = when (this) {
     AppIcon.Tune -> MiuixIcons.Tune
     AppIcon.Backspace -> MiuixIcons.Clear
     AppIcon.Locked -> MiuixIcons.Lock
+    AppIcon.Recording -> MiuixIcons.Recording
 
     AppIcon.Ok -> MiuixIcons.Ok
     AppIcon.Warning -> MiuixIcons.Report

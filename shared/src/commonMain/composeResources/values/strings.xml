@@ -93,6 +93,7 @@
     <string name="settings_title">Settings</string>
     <string name="settings_member_title">Lifetime Member</string>
     <string name="settings_member_expiry">Expires 2099-99-99</string>
+    <string name="member_expiry_countdown">Expires %1$d-99-99</string>
     <string name="settings_member_idle_summary">Not a member yet</string>
     <string name="settings_member_hint">Tap to see member perks</string>
 
@@ -358,6 +359,7 @@
     <string name="sync_passphrase_summary">Defaults to your PIN. A 6-digit PIN is easily cracked offline, so set a long passphrase before uploading a backup to the cloud.</string>
     <string name="sync_passphrase_prompt">Enter the backup passphrase</string>
     <string name="sync_passphrase_hint">Defaults to your PIN</string>
+    <string name="sync_passphrase_required">The passphrase is empty. It defaults to your PIN, so enter your current PIN (or a long passphrase).</string>
     <string name="sync_result_exported">Backup exported</string>
     <string name="sync_result_restored">Restored %1$d providers</string>
     <string name="sync_result_failed">Failed: %1$s</string>
@@ -682,7 +684,7 @@
         <item quantity="other">%1$d more incorrect attempts before a waiting period</item>
     </plurals>
     <string name="unlock_next_waits">The next wrong attempt starts a waiting period</string>
-    <string name="unlock_biometric">Unlock with biometrics</string>
+    <string name="pin_biometric_cd">Unlock with biometrics</string>
 
     <!-- System biometric prompt. The system draws this dialog, so the text must stand alone. -->
     <string name="biometric_prompt_unlock_title">Unlock YuanJi</string>

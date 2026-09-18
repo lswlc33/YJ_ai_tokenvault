@@ -20,6 +20,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.pin_backspace_cd
+import tokenvault.shared.generated.resources.pin_biometric_cd
 import tokenvault.shared.generated.resources.pin_dots_cd
 import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppKeyButton
@@ -76,6 +77,9 @@ fun PinKeypad(
     onBackspace: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    /** 锁屏页专用：为真时左下角空档画生物识别入口（录音圆点）。 */
+    biometricAvailable: Boolean = false,
+    onBiometricUnlock: () -> Unit = {},
 ) {
     Column(
         modifier = modifier.widthIn(max = 320.dp),
@@ -94,8 +98,19 @@ fun PinKeypad(
             }
         }
         KeyRow {
-            // 左下角留空：这里放任何东西都会被误触——拇指从「7」滑下来正好落在这个位置。
-            Box(modifier = Modifier.weight(1f))
+            // 左下角：开了生物识别就放解锁入口（正好在「7」的下沿、把第四行补满），
+            // 没开就留空——不是装饰，是防止拇指从「7」滑下来误触别的东西。
+            if (biometricAvailable) {
+                AppKeyIconButton(
+                    icon = AppIcon.Recording,
+                    contentDescription = stringResource(Res.string.pin_biometric_cd),
+                    onClick = onBiometricUnlock,
+                    modifier = Modifier.weight(1f),
+                    enabled = enabled,
+                )
+            } else {
+                Box(modifier = Modifier.weight(1f))
+            }
             AppKeyButton(
                 label = "0",
                 onClick = { onDigit('0') },

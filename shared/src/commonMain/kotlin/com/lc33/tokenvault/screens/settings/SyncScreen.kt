@@ -46,6 +46,10 @@ import com.lc33.tokenvault.ui.theme.LocalStatusPalette
  *
  * 页面主体只有行入口；所有需要输入或确认的动作都放在弹层里。WebDAV 凭据
  * 不回显，改地址或目录时可以保留原凭据，只有输入了新值才覆盖。
+ *
+ * 顶部那张状态卡里的「立即备份」是**上下文相关**的：配置好 WebDAV 就上传到远端，
+ * 没配置就导出成本地文件——同一颗按钮，永远做"把现在的库备份一份"这件事，
+ * 只是落点跟着配置走。
  */
 @Composable
 fun SyncScreen(
@@ -63,7 +67,7 @@ fun SyncScreen(
 ) {
     val tokens = LocalAppTokens.current
     SettingsSubPage(titleRes = Res.string.sync_title, onBack = onBack) {
-        item { StatusCard(backup, onExport) }
+        item { StatusCard(backup, webDavConfig.isReady, onExport, onUploadWebDav) }
 
         item { SectionTitle(text = stringResource(Res.string.sync_section_local)) }
         item {
@@ -139,7 +143,12 @@ fun SyncScreen(
 }
 
 @Composable
-private fun StatusCard(backup: BackupStatus, onExport: () -> Unit) {
+private fun StatusCard(
+    backup: BackupStatus,
+    webDavReady: Boolean,
+    onExport: () -> Unit,
+    onUploadWebDav: () -> Unit,
+) {
     val tokens = LocalAppTokens.current
     val palette = LocalStatusPalette.current
     // 备份状态与「立即备份」分开：描述卡只讲状态，入口单独一行，
@@ -177,7 +186,9 @@ private fun StatusCard(backup: BackupStatus, onExport: () -> Unit) {
     ) {
         AppActionRow(
             text = stringResource(Res.string.dashboard_backup_now),
-            onClick = onExport,
+            // 配置好 WebDAV 就上传到远端，否则导出成本地文件：用户按的是"把库备份一份"，
+            // 落点跟着配置走，而不是让他在两个入口里猜。
+            onClick = if (webDavReady) onUploadWebDav else onExport,
             modifier = Modifier.fillMaxWidth(),
         )
     }

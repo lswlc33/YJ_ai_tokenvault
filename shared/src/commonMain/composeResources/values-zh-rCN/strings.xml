@@ -92,6 +92,7 @@
     <string name="settings_title">设置</string>
     <string name="settings_member_title">永久会员</string>
     <string name="settings_member_expiry">过期时间 2099-99-99</string>
+    <string name="member_expiry_countdown">过期时间 %1$d-99-99</string>
     <string name="settings_member_idle_summary">还不是会员</string>
     <string name="settings_member_hint">点击查看会员特权</string>
 
@@ -357,6 +358,7 @@
     <string name="sync_passphrase_summary">默认使用 PIN。6 位数字 PIN 在离线场景下很容易被破解，上传到云端前建议单独设置长口令。</string>
     <string name="sync_passphrase_prompt">输入备份口令</string>
     <string name="sync_passphrase_hint">默认沿用 PIN</string>
+    <string name="sync_passphrase_required">备份口令不能为空；默认沿用 PIN，请输入当前 PIN（或改用长口令）。</string>
     <string name="sync_result_exported">备份已导出</string>
     <string name="sync_result_restored">已恢复 %1$d 家供应商</string>
     <string name="sync_result_failed">失败：%1$s</string>
@@ -679,7 +681,7 @@
         <item quantity="other">还可输错 %1$d 次，之后将进入等待</item>
     </plurals>
     <string name="unlock_next_waits">再输入错误一次将进入等待</string>
-    <string name="unlock_biometric">用生物识别解锁</string>
+    <string name="pin_biometric_cd">用生物识别解锁</string>
 
     <!-- 系统生物识别弹窗。它由系统画、不由我们画，所以文案必须能独立成句。 -->
     <string name="biometric_prompt_unlock_title">解锁元记</string>
