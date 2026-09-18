@@ -112,7 +112,7 @@
     <string name="member_privilege_flow_summary">Nothing was optimised, but it does look quicker now.</string>
     <string name="member_privilege_security">More secure, allegedly</string>
     <string name="member_privilege_security_summary">Your data key is exactly as safe as before. Which is very safe.</string>
-    <string name="member_disclaimer">This is a joke feature. Nothing here grants any real capability, no behaviour changes, and no data is involved. Long-press the card for 5 seconds to go back to being a regular user.</string>
+    <string name="member_disclaimer">This is a joke feature. Nothing here grants any real capability, no behaviour changes, and no data is involved. Tap the card repeatedly to go back to being a regular user.</string>
     <string name="member_buy_free">Free for a limited time</string>
     <string name="member_cancel">Cancel</string>
     <string name="settings_group_settings">General</string>
@@ -561,7 +561,7 @@
     <string name="import_duplicate_title">This key already exists</string>
     <string name="import_duplicate_body">A key with the same value already exists under this provider. Import it anyway?</string>
     <string name="import_duplicate_continue">Import anyway</string>
-    <string name="import_title">Key cURL import</string>
+    <string name="import_title">cURL import</string>
     <string name="import_manual">Manual import</string>
     <string name="import_section_paste">cURL commands</string>
     <string name="import_paste_label">cURL command</string>

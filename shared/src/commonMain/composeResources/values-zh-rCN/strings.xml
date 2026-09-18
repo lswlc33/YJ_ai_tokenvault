@@ -111,7 +111,7 @@
     <string name="member_privilege_flow_summary">没有做任何优化，但看起来确实顺了一点。</string>
     <string name="member_privilege_security">增加安全性</string>
     <string name="member_privilege_security_summary">数据密钥和之前一样安全——也就是非常安全。</string>
-    <string name="member_disclaimer">这是一个娱乐功能：这里没有任何一项真的能做什么，不会改变任何行为，也不涉及任何数据。长按设置页那张卡 5 秒可以退回普通用户。</string>
+    <string name="member_disclaimer">多次点击卡片可以退回普通用户。</string>
     <string name="member_buy_free">限时免费</string>
     <string name="member_cancel">取消</string>
     <string name="settings_group_settings">通用</string>
@@ -560,7 +560,7 @@
     <string name="import_duplicate_title">这个密钥已经存在</string>
     <string name="import_duplicate_body">当前供应商下已有相同密钥，仍然继续导入吗？</string>
     <string name="import_duplicate_continue">继续导入</string>
-    <string name="import_title">密钥 cURL 导入</string>
+    <string name="import_title">cURL导入</string>
     <string name="import_manual">手动导入</string>
     <string name="import_section_paste">cURL 命令</string>
     <string name="import_paste_label">cURL 命令</string>
