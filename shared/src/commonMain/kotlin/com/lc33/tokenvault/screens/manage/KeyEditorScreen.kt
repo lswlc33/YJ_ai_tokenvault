@@ -70,6 +70,7 @@ import tokenvault.shared.generated.resources.detail_models_section
 import tokenvault.shared.generated.resources.editor_allow_insecure
 import tokenvault.shared.generated.resources.editor_auth_style
 import tokenvault.shared.generated.resources.editor_auth_style_summary
+import tokenvault.shared.generated.resources.editor_balance_access_key_id
 import tokenvault.shared.generated.resources.editor_balance_custom_currency
 import tokenvault.shared.generated.resources.editor_balance_custom_method
 import tokenvault.shared.generated.resources.editor_balance_custom_path
@@ -80,6 +81,8 @@ import tokenvault.shared.generated.resources.editor_balance_enabled
 import tokenvault.shared.generated.resources.editor_balance_enabled_summary
 import tokenvault.shared.generated.resources.editor_balance_kind
 import tokenvault.shared.generated.resources.editor_balance_kind_summary
+import tokenvault.shared.generated.resources.editor_balance_secret_access_key
+import tokenvault.shared.generated.resources.editor_balance_secret_access_key_hint
 import tokenvault.shared.generated.resources.editor_balance_token
 import tokenvault.shared.generated.resources.editor_balance_token_hint
 import tokenvault.shared.generated.resources.editor_balance_user_id
