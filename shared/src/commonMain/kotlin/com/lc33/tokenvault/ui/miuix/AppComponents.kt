@@ -9,9 +9,14 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -595,6 +600,10 @@ fun AppDialog(
  * 叠一层 `screenPadding`：叠了就是 40dp，弹层里的行比页面里的行明显内缩一截。
  * 要用项目的 16dp 就改 MIUIX 那一个参数，别在内容里再补一次。
  * 纵向另给 `itemSpacing`——MIUIX 那个 `insideMargin` 的纵向是 0。
+ *
+ * 底部还要垫一段导航条 inset：MIUIX 的 `defaultWindowInsetsPadding` 只加 `imePadding`，
+ * 完全不处理 systemBars——不补这一条，弹层收尾的按钮会压在手势小白条上（全应用弹层同病，
+ * 所以在包装层一次修掉，而不是每个页面各自加）。
  */
 @Composable
 fun AppBottomSheet(
@@ -615,6 +624,7 @@ fun AppBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom))
                 .padding(vertical = tokens.itemSpacing),
             verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
             content = content,

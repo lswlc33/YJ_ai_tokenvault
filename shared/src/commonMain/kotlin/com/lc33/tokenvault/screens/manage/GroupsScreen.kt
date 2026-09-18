@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
@@ -17,6 +18,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import tokenvault.shared.generated.resources.Res
@@ -73,6 +76,9 @@ import com.lc33.tokenvault.ui.theme.LocalAppTokens
  *
  * 「全部」是不可编辑、不可删除、不可拖动的伪分组。删除真实分组只把供应商落回
  * 未分组，不删除供应商。
+ *
+ * 排序模式让分组与供应商**同时**进入排序：两侧各有一对上下移按钮，顶栏的保存
+ * 一次性提交两个顺序；退出排序模式（返回或不保存）两边都不落库。
  */
 @Composable
 fun GroupsScreen(
@@ -83,6 +89,7 @@ fun GroupsScreen(
     onRename: (Long, String) -> Unit,
     onDelete: (Long) -> Unit,
     onSetProviderGroup: (Long, Long?) -> Unit,
+    onReorderGroups: (List<Long>) -> Unit,
     onReorderProviders: (List<Long>) -> Unit,
 ) {
     val scrollState = rememberAppTopBarScrollState()
@@ -96,21 +103,25 @@ fun GroupsScreen(
     var pendingDelete by remember { mutableStateOf<UiGroup?>(null) }
     var sorting by remember { mutableStateOf(false) }
     var ordered by remember(providers) { mutableStateOf(providers.sortedBy { it.sortOrder }) }
+    // 分组列表本身已按 sortOrder 排好（DAO 查询保证），排序态只在内存里换位置，保存才落库。
+    var orderedGroups by remember(groups) { mutableStateOf(realGroups) }
     val newGroup = UiGroup(id = null, name = "", providerCount = 0)
 
     fun leaveSorting() {
         sorting = false
         ordered = providers.sortedBy { it.sortOrder }
+        orderedGroups = realGroups
     }
 
-    fun move(index: Int, delta: Int) {
+    /** 把 [index] 处的元素与相邻一格互换；越界返回 null 表示不动。 */
+    fun <T> moved(list: List<T>, index: Int, delta: Int): List<T>? {
         val target = index + delta
-        if (index !in ordered.indices || target !in ordered.indices) return
-        val next = ordered.toMutableList()
+        if (index !in list.indices || target !in list.indices) return null
+        val next = list.toMutableList()
         val current = next[index]
         next[index] = next[target]
         next[target] = current
-        ordered = next
+        return next
     }
 
     AppScaffold(
@@ -131,6 +142,7 @@ fun GroupsScreen(
                             icon = AppIcon.Ok,
                             contentDescription = stringResource(Res.string.editor_save),
                             onClick = {
+                                onReorderGroups(orderedGroups.mapNotNull { it.id })
                                 onReorderProviders(ordered.map { it.id })
                                 leaveSorting()
                             },
@@ -139,7 +151,11 @@ fun GroupsScreen(
                         AppIconButton(
                             icon = AppIcon.Sort,
                             contentDescription = stringResource(Res.string.groups_sort_providers),
-                            onClick = { sorting = true; ordered = providers.sortedBy { it.sortOrder } },
+                            onClick = {
+                                sorting = true
+                                ordered = providers.sortedBy { it.sortOrder }
+                                orderedGroups = realGroups
+                            },
                         )
                     }
                 },
@@ -167,7 +183,12 @@ fun GroupsScreen(
                         .fillMaxWidth()
                         .padding(horizontal = tokens.screenPadding),
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    // 40dp = MIUIX IconButton 的最小高。分组行右侧各带一枚 40dp 的图标按钮，
+                    // 「全部」这一行没有按钮，不垫同样的最小高就会比下面的自定义分组矮一截。
+                    Row(
+                        modifier = Modifier.heightIn(min = 40.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         AppText(text = allLabel, style = AppTextStyle.Body, modifier = Modifier.weight(1f))
                         AppText(
                             text = pluralStringResource(
@@ -181,7 +202,43 @@ fun GroupsScreen(
                     }
                 }
             }
-            if (realGroups.isEmpty()) {
+            if (sorting) {
+                // 排序模式下分组行只留上下移：改名与删除弹窗会把排序状态打断，
+                // 「全部」按规格固定不可排序（见 none.md 编辑供应商列表）。
+                items(orderedGroups.size) { index ->
+                    val group = orderedGroups[index]
+                    AppCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = tokens.screenPadding),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            AppText(
+                                text = group.name,
+                                style = AppTextStyle.Body,
+                                maxLines = 1,
+                                modifier = Modifier.weight(1f),
+                            )
+                            AppText(
+                                text = pluralStringResource(
+                                    Res.plurals.groups_count,
+                                    group.providerCount,
+                                    group.providerCount,
+                                ),
+                                style = AppTextStyle.Footnote,
+                                color = appSecondaryTextColor,
+                            )
+                            SortMoveButtons(
+                                index = index,
+                                lastIndex = orderedGroups.lastIndex,
+                                onMove = { i, delta ->
+                                    moved(orderedGroups, i, delta)?.let { orderedGroups = it }
+                                },
+                            )
+                        }
+                    }
+                }
+            } else if (realGroups.isEmpty()) {
                 item {
                     EmptyState(
                         title = stringResource(Res.string.groups_empty_title),
@@ -227,15 +284,18 @@ fun GroupsScreen(
                     }
                 }
             }
-            item {
-                // 「新建分组」是一个入口行，必须包在 group 里：裸行没有容器背景与圆角，
-                // 和上面那些分组卡片（都是 AppCard）摆在一起不像同一种东西。
-                AppPreferenceGroup(inset = true) {
-                    AppActionRow(
-                        text = stringResource(Res.string.groups_add),
-                        onClick = { editing = newGroup },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+            if (!sorting) {
+                item {
+                    // 「新建分组」是一个入口行，必须包在 group 里：裸行没有容器背景与圆角，
+                    // 和上面那些分组卡片（都是 AppCard）摆在一起不像同一种东西。
+                    // 排序模式下整条隐藏：中途新增会让未保存的排序状态被列表刷新冲掉。
+                    AppPreferenceGroup(inset = true) {
+                        AppActionRow(
+                            text = stringResource(Res.string.groups_add),
+                            onClick = { editing = newGroup },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                 }
             }
 
@@ -271,17 +331,12 @@ fun GroupsScreen(
                                 maxLines = 1,
                                 modifier = Modifier.weight(1f),
                             )
-                            AppIconButton(
-                                icon = AppIcon.Back,
-                                contentDescription = stringResource(Res.string.key_sort_up),
-                                onClick = { move(index, -1) },
-                                enabled = index > 0,
-                            )
-                            AppIconButton(
-                                icon = AppIcon.Forward,
-                                contentDescription = stringResource(Res.string.key_sort_down),
-                                onClick = { move(index, 1) },
-                                enabled = index < ordered.lastIndex,
+                            SortMoveButtons(
+                                index = index,
+                                lastIndex = ordered.lastIndex,
+                                onMove = { i, delta ->
+                                    moved(ordered, i, delta)?.let { ordered = it }
+                                },
                             )
                         }
                     }
@@ -372,4 +427,33 @@ private fun NameDialog(
     ) {
         AppTextField(state = name, label = stringResource(Res.string.groups_name_label))
     }
+}
+
+/**
+ * 排序模式的一对上下移按钮。
+ *
+ * 图标统一用 Back（左箭头）旋转得到：MIUIX 图标库里没有现成的上/下箭头，
+ * 而 Forward 是右向雪佛龙，读起来像「下一页」不是「下移」。左箭头顺时针转
+ * 90° 指上、逆时针转 90° 指下，两个方向同源同形，一眼就是一对。
+ */
+@Composable
+private fun SortMoveButtons(
+    index: Int,
+    lastIndex: Int,
+    onMove: (Int, Int) -> Unit,
+) {
+    AppIconButton(
+        icon = AppIcon.Back,
+        modifier = Modifier.rotate(90f),
+        contentDescription = stringResource(Res.string.key_sort_up),
+        onClick = { onMove(index, -1) },
+        enabled = index > 0,
+    )
+    AppIconButton(
+        icon = AppIcon.Back,
+        modifier = Modifier.rotate(-90f),
+        contentDescription = stringResource(Res.string.key_sort_down),
+        onClick = { onMove(index, 1) },
+        enabled = index < lastIndex,
+    )
 }

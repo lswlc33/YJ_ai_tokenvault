@@ -26,7 +26,12 @@ import tokenvault.shared.generated.resources.probe_run_retry
 import tokenvault.shared.generated.resources.probe_run_skipped
 import tokenvault.shared.generated.resources.probe_run_succeeded
 import tokenvault.shared.generated.resources.probe_run_title
+import tokenvault.shared.generated.resources.probe_level_reachability
+import tokenvault.shared.generated.resources.probe_level_key_validity
+import tokenvault.shared.generated.resources.probe_level_model
+import tokenvault.shared.generated.resources.probe_level_balance
 import tokenvault.shared.generated.resources.time_duration_seconds
+import com.lc33.tokenvault.domain.ProbeLevel
 import com.lc33.tokenvault.screens.model.ProbeRunSummary
 import com.lc33.tokenvault.screens.model.UiHealth
 import com.lc33.tokenvault.ui.common.StatusDot
@@ -55,6 +60,10 @@ data class ProbeItemRow(
     /** 供应商名。明细页每一项要能看出"是哪一家"（§13.4）。 */
     val providerName: String,
     val providerId: Long,
+    /** 密钥名称。L1 可达性探测没有对应密钥时为 null。 */
+    val keyLabel: String?,
+    /** 探测级别：L1 端点可达性 / L2 密钥有效性。 */
+    val level: ProbeLevel,
     val health: UiHealth,
     val detail: String?,
     val latencyMs: Long?,
@@ -211,6 +220,27 @@ private fun ItemCard(row: ProbeItemRow, onOpenProvider: (Long) -> Unit) {
                 )
             }
         }
+        // 密钥名称 + 探测级别：让用户看出"探的是哪把 Key、哪种探测"。
+        val subtitle = buildString {
+            if (row.keyLabel != null) {
+                append(row.keyLabel)
+                append(" · ")
+            }
+            append(
+                when (row.level) {
+                    ProbeLevel.L1_REACHABILITY -> stringResource(Res.string.probe_level_reachability)
+                    ProbeLevel.L2_KEY_VALIDITY -> stringResource(Res.string.probe_level_key_validity)
+                    ProbeLevel.L3_MODEL -> stringResource(Res.string.probe_level_model)
+                    ProbeLevel.L4_BALANCE -> stringResource(Res.string.probe_level_balance)
+                }
+            )
+        }
+        AppText(
+            text = subtitle,
+            style = AppTextStyle.Footnote,
+            color = appSecondaryTextColor,
+            modifier = Modifier.padding(top = 2.dp),
+        )
         Column(modifier = Modifier.padding(top = 4.dp)) {
             // 状态点：颜色由 health 决定，标签用四档通用文案（labelOf）。与列表页同一条
             // 约定——这里不造一套"密钥无效/余额不足"的专属文案（红线 17：同一状态全应用一套文案）。

@@ -542,8 +542,8 @@
     </plurals>
     <string name="groups_section_manage">Group settings</string>
     <string name="groups_section_providers">Provider groups</string>
-    <string name="groups_sort_providers">Sort providers</string>
-    <string name="groups_sort_hint">Use the up and down arrows to reorder providers; leaving this mode does not save.</string>
+    <string name="groups_sort_providers">Reorder groups and providers</string>
+    <string name="groups_sort_hint">Use the up and down arrows to reorder groups and providers; leaving this mode does not save.</string>
     <string name="groups_empty_title">No groups yet</string>
     <string name="groups_empty_desc">Groups are the filter chips on the manage page. Create some once you have more than a handful of providers.</string>
     <string name="groups_delete_note">Deleting a group does not delete its providers; they fall back to All.</string>
@@ -558,6 +558,8 @@
     <string name="import_result_api_key">API key</string>
     <string name="import_result_models">Models</string>
     <string name="import_models_none">No models found</string>
+    <string name="import_probe_models">Auto-sync models</string>
+    <string name="import_probe_models_summary">Automatically fetch the model list after import</string>
     <string name="import_duplicate_title">This key already exists</string>
     <string name="import_duplicate_body">A key with the same value already exists under this provider. Import it anyway?</string>
     <string name="import_duplicate_continue">Import anyway</string>
@@ -598,6 +600,11 @@
     <string name="probe_run_succeeded">Succeeded</string>
     <string name="probe_run_retry">Retry the failed and unprobed items</string>
     <string name="probe_run_empty_desc">Nothing has been probed yet, so there are no results to show.</string>
+    <!-- Probe levels -->
+    <string name="probe_level_reachability">Endpoint reachability</string>
+    <string name="probe_level_key_validity">Key validity</string>
+    <string name="probe_level_model">Model reachability</string>
+    <string name="probe_level_balance">Balance query</string>
 
     <!-- Balance breakdown -->
     <string name="balance_failed_section">Query failed</string>

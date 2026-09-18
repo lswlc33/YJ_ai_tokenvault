@@ -3,11 +3,15 @@ package com.lc33.tokenvault.probe
 import com.lc33.tokenvault.endpoint.ProbeRequest
 import com.lc33.tokenvault.endpoint.ProbeResponse
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * 发一次请求的抽象（§8.5）。
@@ -34,7 +38,9 @@ data class ProbeBudget(
  * 探测编排（§8.5）的核心，**纯逻辑、可测**。
  *
  * 职责只有"任务生成之外的部分"：按 host 分组统计预算、429 熔断、总预算超时、逐项推流。
- * 并发限制交给 OkHttp `Dispatcher`（8 / 每 host 3），编排层不造信号量——§8.5 的原话。
+ *
+ * **并发模型**：不同 host 的任务并行发出，同 host 的任务保持顺序（per-host Mutex）。
+ * HTTP 层的并发上限仍由 OkHttp `Dispatcher`（8 / 每 host 3）兜底。
  *
  * 关键语义（测试 14 逐条覆盖）：
  * - 逐项推流 [ProbeItemResult]，UI 不等整轮结束。
@@ -62,96 +68,97 @@ class ProbeOrchestrator(
     /**
      * 跑一轮。逐项 emit 结果。
      *
-     * @param tasks 已生成的任务（顺序即执行顺序）。
+     * 不同 host 的任务并行执行，同 host 的任务按顺序串行（保证间隔与 429 熔断语义）。
+     *
+     * @param tasks 已生成的任务。
      * @param perHostKeyAndModelCount 每个 host 的"密钥数 + 启用模型数"，用于算 host 预算。
      */
     fun run(
         tasks: List<ProbeTask>,
         perHostKeyAndModelCount: Map<String, Int> = emptyMap(),
-    ): Flow<ProbeItemResult> = flow {
+    ): Flow<ProbeItemResult> = channelFlow {
         val startedAt = nowMillis()
+
+        // 并发下的共享状态——所有读写都在 stateLock 内。
         val hostBudget = mutableMapOf<String, Int>()
         val hostRateLimited = mutableSetOf<String>()
         val hostLastRequest = mutableMapOf<String, Long>()
+        val stateLock = Mutex()
+        // 同 host 串行：保证间隔与 429 熔断按序判定。
+        val perHostMutexes = mutableMapOf<String, Mutex>()
 
-        for (task in tasks) {
-            // 取消：协程被取消时立刻停。
-            if (!currentCoroutineContext().isActive) {
-                throw CancellationException("probe cancelled")
+        coroutineScope {
+            for (task in tasks) {
+                // 预算超时快速跳过：避免所有任务都排队 stateLock。
+                if (nowMillis() - startedAt >= budget.totalBudgetMs) continue
+
+                val hostMutex = perHostMutexes.getOrPut(task.host) { Mutex() }
+                launch {
+                    if (!currentCoroutineContext().isActive) return@launch
+                    hostMutex.withLock {
+                        // 取消 / 预算在排队期间过期：跳过。
+                        if (!currentCoroutineContext().isActive) return@launch
+                        if (nowMillis() - startedAt >= budget.totalBudgetMs) return@launch
+
+                        stateLock.withLock {
+                            if (task.host in hostRateLimited) return@launch
+                            val limit = budget.perHostBase + (perHostKeyAndModelCount[task.host] ?: 0)
+                            if ((hostBudget[task.host] ?: 0) >= limit) return@launch
+
+                            // host 间隔：等这个 host 轮到。
+                            val interval = hostIntervalMs(task.host)
+                            val last = hostLastRequest[task.host]
+                            val now = nowMillis()
+                            val nextAllowed = if (last == null) now else last + interval
+                            if (nextAllowed > now) delay(nextAllowed - now)
+                        }
+
+                        val response = transport.execute(
+                            ProbeRequest(
+                                method = if (task.body == null) "GET" else "POST",
+                                url = task.url,
+                                headers = task.headers,
+                                body = task.body,
+                                protocol = task.protocol,
+                            ),
+                            allowInsecure = task.allowInsecure,
+                        )
+
+                        val classification = stateLock.withLock {
+                            hostLastRequest[task.host] = nowMillis()
+                            hostBudget[task.host] = (hostBudget[task.host] ?: 0) + 1
+                            if (response.status == 429) {
+                                hostRateLimited += task.host
+                                onRateLimited(task.host)
+                            }
+                            ProbeClassifier.classify(
+                                status = response.status.takeIf { response.error == null },
+                                body = response.body,
+                                error = response.error,
+                                level = task.level,
+                                clientKeywords = clientKeywords,
+                            )
+                        }
+
+                        send(
+                            ProbeItemResult(
+                                taskId = task.id,
+                                providerId = task.providerId,
+                                providerName = task.providerName,
+                                keyId = task.keyId,
+                                keyLabel = task.keyLabel,
+                                level = task.level,
+                                outcome = classification.outcome,
+                                health = classification.health,
+                                detail = classification.detail,
+                                httpStatus = classification.httpStatus,
+                                latencyMs = response.latencyMs,
+                                body = response.body,
+                            ),
+                        )
+                    }
+                }
             }
-
-            // 总预算：超时则剩余全标 SKIPPED（直接结束流，剩余项由调用方补 SKIPPED）。
-            val elapsed = nowMillis() - startedAt
-            if (elapsed >= budget.totalBudgetMs) {
-                return@flow
-            }
-
-            val host = task.host
-            // host 预算：`12 + 密钥数 + 启用模型数`（§8.5）。
-            val limit = budget.perHostBase + (perHostKeyAndModelCount[host] ?: 0)
-            val used = hostBudget[host] ?: 0
-
-            // 该 host 已 429：可选请求（基线、嗅探、L3）停发。L2 是"必须结论"的请求，
-            // 但红线 29 说"只保留已经排上的 L2"——即 429 之后不再排新的，已排的照发。
-            // 这里简化：429 之后，该 host 的**新任务**一律 SKIPPED。
-            if (host in hostRateLimited) {
-                continue
-            }
-
-            if (used >= limit) {
-                continue
-            }
-
-            // host 间隔：等这个 host 轮到。
-            val interval = hostIntervalMs(host)
-            val last = hostLastRequest[host]
-            val now = nowMillis()
-            val nextAllowed = if (last == null) now else last + interval
-            if (nextAllowed > now) delay(nextAllowed - now)
-
-            val response = transport.execute(
-                ProbeRequest(
-                    method = if (task.body == null) "GET" else "POST",
-                    url = task.url,
-                    headers = task.headers,
-                    body = task.body,
-                    protocol = task.protocol,
-                ),
-                allowInsecure = task.allowInsecure,
-            )
-
-            hostLastRequest[host] = nowMillis()
-            hostBudget[host] = used + 1
-
-            // 429 熔断：通知 host，标记后续任务 SKIPPED。
-            if (response.status == 429) {
-                hostRateLimited += host
-                onRateLimited(host)
-            }
-
-            val classification = ProbeClassifier.classify(
-                status = response.status.takeIf { response.error == null },
-                body = response.body,
-                error = response.error,
-                level = task.level,
-                clientKeywords = clientKeywords,
-            )
-
-            emit(
-                ProbeItemResult(
-                    taskId = task.id,
-                    providerId = task.providerId,
-                    providerName = task.providerName,
-                    keyId = task.keyId,
-                    level = task.level,
-                    outcome = classification.outcome,
-                    health = classification.health,
-                    detail = classification.detail,
-                    httpStatus = classification.httpStatus,
-                    latencyMs = response.latencyMs,
-                    body = response.body,
-                ),
-            )
         }
     }
 }

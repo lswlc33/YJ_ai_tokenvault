@@ -541,8 +541,8 @@
     </plurals>
     <string name="groups_section_manage">分组设置</string>
     <string name="groups_section_providers">供应商分组</string>
-    <string name="groups_sort_providers">排序供应商</string>
-    <string name="groups_sort_hint">使用上下箭头调整供应商顺序；退出排序模式不会保存。</string>
+    <string name="groups_sort_providers">排序分组与供应商</string>
+    <string name="groups_sort_hint">使用上下箭头调整分组与供应商顺序；退出排序模式不会保存。</string>
     <string name="groups_empty_title">还没有分组</string>
     <string name="groups_empty_desc">分组用于管理页的筛选，供应商较多时可创建分组。</string>
     <string name="groups_delete_note">删除分组不会删除其中的供应商，它们会回到「全部」。</string>
@@ -557,6 +557,8 @@
     <string name="import_result_api_key">API Key</string>
     <string name="import_result_models">模型</string>
     <string name="import_models_none">未识别到模型</string>
+    <string name="import_probe_models">自动同步模型</string>
+    <string name="import_probe_models_summary">导入后自动获取模型列表</string>
     <string name="import_duplicate_title">这个密钥已经存在</string>
     <string name="import_duplicate_body">当前供应商下已有相同密钥，仍然继续导入吗？</string>
     <string name="import_duplicate_continue">继续导入</string>
@@ -595,6 +597,11 @@
     <string name="probe_run_succeeded">成功</string>
     <string name="probe_run_retry">仅重试失败项与未探测项</string>
     <string name="probe_run_empty_desc">尚未进行探测，暂无结果。</string>
+    <!-- 探测级别 -->
+    <string name="probe_level_reachability">端点可达性</string>
+    <string name="probe_level_key_validity">密钥有效性</string>
+    <string name="probe_level_model">模型可达性</string>
+    <string name="probe_level_balance">余额查询</string>
 
     <!-- Balance breakdown -->
     <string name="balance_failed_section">查询失败</string>

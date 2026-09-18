@@ -847,6 +847,7 @@ fun VaultNavHost(
             val error by vm.error.collectAsStateWithLifecycle()
             val importing by vm.importing.collectAsStateWithLifecycle()
             val duplicatePrompt by vm.duplicatePrompt.collectAsStateWithLifecycle()
+            val probeModels by vm.probeModels.collectAsStateWithLifecycle()
             val feedback = LocalAppFeedback.current
             val imported = stringResource(Res.string.feedback_imported)
             val clipboardFilled = stringResource(Res.string.feedback_clipboard_filled)
@@ -856,6 +857,7 @@ fun VaultNavHost(
                 error = error,
                 importing = importing,
                 duplicatePrompt = duplicatePrompt,
+                probeModels = probeModels,
                 onBack = back,
                 onParse = vm::parse,
                 // 导入成功后先提示再退回：提示挂在 Shell 上，不受这一页退出组合影响。
@@ -872,6 +874,7 @@ fun VaultNavHost(
                     }
                 },
                 onDismissDuplicate = vm::dismissDuplicate,
+                onProbeModelsChange = vm::setProbeModels,
                 readClipboard = {
                     // 剪贴板为空时以前是静默无反应，用户会以为按钮坏了。
                     val text = vm.readClipboard()
@@ -898,6 +901,7 @@ fun VaultNavHost(
                 onRename = vm::onRenameGroup,
                 onDelete = vm::onDeleteGroup,
                 onSetProviderGroup = vm::setProviderGroup,
+                onReorderGroups = vm::reorderGroups,
                 onReorderProviders = vm::reorderProviders,
             )
         }

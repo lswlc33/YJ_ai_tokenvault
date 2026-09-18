@@ -30,6 +30,8 @@ import tokenvault.shared.generated.resources.import_models_none
 import tokenvault.shared.generated.resources.import_parse
 import tokenvault.shared.generated.resources.import_paste_hint
 import tokenvault.shared.generated.resources.import_paste_label
+import tokenvault.shared.generated.resources.import_probe_models
+import tokenvault.shared.generated.resources.import_probe_models_summary
 import tokenvault.shared.generated.resources.import_result_api_key
 import tokenvault.shared.generated.resources.import_result_base_url
 import tokenvault.shared.generated.resources.import_result_models
@@ -44,7 +46,9 @@ import com.lc33.tokenvault.ui.miuix.AppChip
 import com.lc33.tokenvault.ui.miuix.AppDialog
 import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppIconButton
+import com.lc33.tokenvault.ui.miuix.AppPreferenceGroup
 import com.lc33.tokenvault.ui.miuix.AppScaffold
+import com.lc33.tokenvault.ui.miuix.AppSwitchRow
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppTextField
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
@@ -77,11 +81,13 @@ fun ImportScreen(
     error: CurlImportError?,
     importing: Boolean,
     duplicatePrompt: Boolean,
+    probeModels: Boolean,
     onBack: () -> Unit,
     onParse: (String) -> Unit,
     onConfirm: () -> Unit,
     onConfirmDuplicate: () -> Unit,
     onDismissDuplicate: () -> Unit,
+    onProbeModelsChange: (Boolean) -> Unit,
     readClipboard: () -> String?,
 ) {
     val scrollState = rememberAppTopBarScrollState()
@@ -200,6 +206,27 @@ fun ImportScreen(
                                 result.models.take(4).forEach { AppChip(text = it) }
                             }
                         }
+                    }
+                }
+            }
+
+            // 模型自动同步开关：导入后是否让这把 Key 自动拉取模型列表。
+            // 放在预览区下方——用户刚看到解析出了哪些模型，紧接着决定要不要自动同步，
+            // 认知连贯；放在预览卡片里面会打破卡片的只读语义。
+            preview?.let {
+                item {
+                    AppPreferenceGroup(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = tokens.screenPadding),
+                        inset = false,
+                    ) {
+                        AppSwitchRow(
+                            title = stringResource(Res.string.import_probe_models),
+                            summary = stringResource(Res.string.import_probe_models_summary),
+                            checked = probeModels,
+                            onCheckedChange = onProbeModelsChange,
+                        )
                     }
                 }
             }

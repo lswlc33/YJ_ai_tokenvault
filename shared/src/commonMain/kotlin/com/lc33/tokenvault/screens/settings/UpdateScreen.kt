@@ -73,6 +73,11 @@ fun UpdateScreen(
             VersionCard(updateState = updateState)
         }
         item {
+            // 检查与下载同组：以前「前往下载」单独成组、只隔 8dp，两张一样的圆角卡
+            // 既不像同一节也读不出层级，看着就是排版事故。合进一个组后下载行按状态出现。
+            val downloadUrl = updateState.latest
+                ?.takeIf { updateState.phase == UpdateViewModel.Phase.UPDATE_AVAILABLE }
+                ?.htmlUrl
             AppPreferenceGroup {
                 AppActionRow(
                     text = stringResource(Res.string.update_check_now),
@@ -81,15 +86,7 @@ fun UpdateScreen(
                     enabled = updateState.phase != UpdateViewModel.Phase.CHECKING,
                     modifier = Modifier.fillMaxWidth(),
                 )
-            }
-        }
-        // 有可下载的版本时，下载入口单独成组，不塞进上面的版本卡。
-        val downloadUrl = updateState.latest
-            ?.takeIf { updateState.phase == UpdateViewModel.Phase.UPDATE_AVAILABLE }
-            ?.htmlUrl
-        if (downloadUrl != null) {
-            item {
-                AppPreferenceGroup {
+                if (downloadUrl != null) {
                     AppActionRow(
                         text = stringResource(Res.string.update_open_download),
                         onClick = { onOpenDownload(downloadUrl) },

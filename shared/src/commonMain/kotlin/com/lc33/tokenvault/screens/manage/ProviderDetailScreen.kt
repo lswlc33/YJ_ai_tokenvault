@@ -90,7 +90,6 @@ import com.lc33.tokenvault.screens.model.UiKeyRow
 import com.lc33.tokenvault.screens.model.UiModelRow
 import com.lc33.tokenvault.screens.model.UiProviderRow
 import com.lc33.tokenvault.ui.common.relativeLabel
-import com.lc33.tokenvault.ui.miuix.AppWideDialog
 import com.lc33.tokenvault.ui.miuix.AppBottomSheet
 import com.lc33.tokenvault.ui.miuix.AppActionRow
 import com.lc33.tokenvault.ui.miuix.AppCard
@@ -435,8 +434,8 @@ private fun HintText(text: String) {
 /**
  * 新增密钥：先选导入方式，再进入对应流程。
  *
- * 用**宽版**弹层 + 并排两个标准按钮：这是"二选一"的动作，两条并排一眼能比；
- * 以前是两个带箭头的行入口，读起来像"点进去还有下一页"，而其实点了就直接开流程。
+ * 用**底部弹层** + 并排两个标准按钮：居中宽版对话框悬在屏幕中部，两个选项离拇指
+ * 远、也不像系统里的其它弹层；同一页的账号编辑层已经在底部了，二选一跟着走。
  */
 @Composable
 private fun AddKeyDialog(
@@ -447,7 +446,7 @@ private fun AddKeyDialog(
 ) {
     val tokens = LocalAppTokens.current
 
-    AppWideDialog(
+    AppBottomSheet(
         show = show,
         onDismissRequest = onDismiss,
         title = stringResource(Res.string.detail_add_key),
@@ -566,8 +565,9 @@ private fun AccountEditorSheet(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
         ) {
-            // 名称与备注各自成块：两条都是"填字"，但说的是两件事（这条账号叫什么 /
-            // 它是干嘛的），并成一张卡会让两块文字挤成一段。
+            // 名称与备注同卡两条输入框：以前各包一张 AppCard，两张 16dp 内边距 +
+            // 卡间距叠出 40dp 的空隙，看着像断成了两节。它们都是「给这条账号填字」，
+            // 归一块；两件事靠各自的 label 区分，不需要容器再表达。
             AppCard(modifier = Modifier.fillMaxWidth()) {
                 AppTextField(
                     state = label,
@@ -579,11 +579,10 @@ private fun AccountEditorSheet(
                         null
                     },
                 )
-            }
-            AppCard(modifier = Modifier.fillMaxWidth()) {
                 AppTextField(
                     state = note,
                     label = stringResource(Res.string.editor_note),
+                    modifier = Modifier.padding(top = tokens.itemSpacing),
                 )
             }
             // 三种登录方式都是「开 / 关」，用开关而不是 chip：chip 让"选中"看起来像筛选，

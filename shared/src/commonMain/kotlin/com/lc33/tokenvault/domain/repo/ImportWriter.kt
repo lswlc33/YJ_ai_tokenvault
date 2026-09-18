@@ -19,10 +19,15 @@ class ImportWriter constructor(
     private val transactions: TransactionRunner,
 ) {
     /** 把一条 cURL 解析结果写入已有供应商；只取第一把 Key 与解析出的模型。 */
-    suspend fun writeKeyToProvider(providerId: Long, record: ParsedRecord): Long? {
+    suspend fun writeKeyToProvider(
+        providerId: Long,
+        record: ParsedRecord,
+        probeModels: Boolean = false,
+    ): Long? {
         val parsedKey = record.keys.firstOrNull() ?: return null
         return transactions.inTransaction {
-            val settings = record.toKeySettings()
+            val base = record.toKeySettings()
+            val settings = base.copy(probe = base.probe.copy(models = probeModels))
             val keyId = keys.add(
                 providerId = providerId,
                 label = parsedKey.label,

@@ -972,6 +972,7 @@ class ProbeEngine constructor(
             host = host,
             protocol = protocol,
             keyId = keyId,
+            keyLabel = keyLabel,
             url = url,
             headers = assembled.headers,
             clientProfileId = clientProfileId,

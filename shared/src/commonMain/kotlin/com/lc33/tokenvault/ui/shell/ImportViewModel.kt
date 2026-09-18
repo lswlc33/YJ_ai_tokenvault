@@ -40,6 +40,14 @@ class ImportViewModel constructor(
     private val _duplicatePrompt = MutableStateFlow(false)
     val duplicatePrompt: StateFlow<Boolean> = _duplicatePrompt.asStateFlow()
 
+    /** 导入时是否开启自动同步模型。默认开——导入后用户大概率想立刻看到模型列表。 */
+    private val _probeModels = MutableStateFlow(true)
+    val probeModels: StateFlow<Boolean> = _probeModels.asStateFlow()
+
+    fun setProbeModels(value: Boolean) {
+        _probeModels.value = value
+    }
+
     private var pendingRecord: ParsedRecord? = null
     private var pendingFingerprint: String? = null
 
@@ -102,7 +110,7 @@ class ImportViewModel constructor(
         if (_importing.value) return
         _importing.value = true
         try {
-            writer.writeKeyToProvider(providerId, record)
+            writer.writeKeyToProvider(providerId, record, probeModels = _probeModels.value)
             clearPending()
             _preview.value = null
             onDone()

@@ -24,6 +24,9 @@ data class ProbeTask(
     /** L2 时才非空。 */
     val keyId: Long? = null,
 
+    /** 密钥名称。明细页用来看出"探的是哪把 Key"。 */
+    val keyLabel: String? = null,
+
     /** 请求 URL。 */
     val url: String,
 
@@ -51,6 +54,9 @@ data class ProbeItemResult(
     /** 供应商名。明细页每一项要能显示"是哪一家"，光有 id 画不出来（§13.4）。 */
     val providerName: String,
     val keyId: Long?,
+
+    /** 密钥名称。明细页用来看出"探的是哪把 Key"。 */
+    val keyLabel: String? = null,
     val level: ProbeLevel,
     val outcome: ProbeOutcome,
 

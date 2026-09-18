@@ -281,6 +281,11 @@ class ManageViewModel constructor(
         batchSetGroup(setOf(id), groupId)
     }
 
+    /** 编辑供应商列表页：保存分组的排序结果。与供应商排序同为一次「保存」提交。 */
+    fun reorderGroups(idsInOrder: List<Long>) {
+        viewModelScope.launch { runCatching { groups.reorder(idsInOrder) } }
+    }
+
     /** 编辑供应商列表页：保存手动拖动后的顺序。 */
     fun reorderProviders(idsInOrder: List<Long>) {
         viewModelScope.launch { runCatching { providers.reorder(idsInOrder) } }
