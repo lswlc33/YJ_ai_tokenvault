@@ -25,6 +25,13 @@ enum class BalanceKind(val wireName: String, val usesOwnToken: Boolean) {
     SILICONFLOW("siliconflow", usesOwnToken = false),
     MOONSHOT("moonshot", usesOwnToken = false),
 
+    /**
+     * 火山引擎（QueryBalanceAcct，billing 服务 V4 签名）。凭据复用现有两列：
+     * `balanceUserId` 存 AccessKey ID，`balanceTokenEnc` 存 SecretAccessKey 密文
+     * （[usesOwnToken] 为真，走独立令牌列而不是默认 API Key）。
+     */
+    VOLCENGINE("volcengine", usesOwnToken = true),
+
     /** 任意站：配置 method / path / headers / valuePath / usedPath / currency。**不支持表达式**。 */
     CUSTOM_JSON("customJson", usesOwnToken = false),
     ;

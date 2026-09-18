@@ -19,6 +19,7 @@ object BalanceRegistry {
     private val openRouter = OpenRouterAdapter()
     private val siliconFlow = BuiltinBalanceAdapters.siliconflow()
     private val moonshot = BuiltinBalanceAdapters.moonshot()
+    private val volcengine = VolcengineAdapter()
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -29,6 +30,7 @@ object BalanceRegistry {
         BalanceKind.OPENROUTER -> openRouter
         BalanceKind.SILICONFLOW -> siliconFlow
         BalanceKind.MOONSHOT -> moonshot
+        BalanceKind.VOLCENGINE -> volcengine
         BalanceKind.CUSTOM_JSON -> CustomJsonAdapter(
             runCatching { json.parseToJsonElement(settings.balanceConfig).jsonObject }
                 .getOrElse { kotlinx.serialization.json.JsonObject(emptyMap()) },

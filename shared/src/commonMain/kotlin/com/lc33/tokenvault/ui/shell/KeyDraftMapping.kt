@@ -31,6 +31,7 @@ val KEY_BALANCE_KINDS: List<BalanceKind> = listOf(
     BalanceKind.OPENROUTER,
     BalanceKind.SILICONFLOW,
     BalanceKind.MOONSHOT,
+    BalanceKind.VOLCENGINE,
     BalanceKind.CUSTOM_JSON,
 )
 

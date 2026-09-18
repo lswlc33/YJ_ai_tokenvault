@@ -544,6 +544,22 @@ fun KeyEditorScreen(
                                 label = stringResource(Res.string.editor_balance_user_id),
                             )
                         }
+                        BalanceKind.VOLCENGINE -> {
+                            // 火山引擎走 V4 签名而不是 Bearer：AK 是身份标识、明文可核，
+                            // SK 才是秘密，所以只有后者用带眼睛的密文框。
+                            AppTextField(
+                                state = balanceUserId,
+                                label = stringResource(Res.string.editor_balance_access_key_id),
+                            )
+                            AppSecretTextField(
+                                state = balanceToken,
+                                label = stringResource(Res.string.editor_balance_secret_access_key),
+                                supportingText = stringResource(Res.string.editor_balance_secret_access_key_hint),
+                                concealed = tokenConcealed,
+                                toggleConcealDescription = if (tokenConcealed) revealCd else concealCd,
+                                onToggleConceal = { tokenConcealed = !tokenConcealed },
+                            )
+                        }
                         BalanceKind.CUSTOM_JSON -> {
                             AppTextField(state = balanceMethod, label = stringResource(Res.string.editor_balance_custom_method))
                             AppTextField(state = balancePath, label = stringResource(Res.string.editor_balance_custom_path))

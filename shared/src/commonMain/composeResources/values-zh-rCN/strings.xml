@@ -485,6 +485,9 @@
     <string name="editor_balance_token_hint">在中转站个人安全设置中获取的独立令牌，不是 API 密钥</string>
     <string name="editor_key_keep_secret">清空则保留原密钥，不会把它删掉。</string>
     <string name="editor_balance_user_id">用户 ID</string>
+    <string name="editor_balance_access_key_id">AccessKey ID</string>
+    <string name="editor_balance_secret_access_key">SecretAccessKey</string>
+    <string name="editor_balance_secret_access_key_hint">在火山引擎控制台「API 访问密钥」中创建，仅用于给余额查询请求签名</string>
     <string name="editor_balance_none_hint">该供应商不查询余额。</string>
     <string name="editor_balance_default_key_hint">使用该供应商的默认密钥查询，无需填写额外字段。</string>
     <string name="editor_section_client">客户端预设</string>
@@ -506,6 +509,7 @@
         <item>OpenRouter</item>
         <item>硅基流动</item>
         <item>Moonshot</item>
+        <item>火山引擎</item>
         <item>自定义 JSON</item>
     </string-array>
     <string-array name="auth_styles">
