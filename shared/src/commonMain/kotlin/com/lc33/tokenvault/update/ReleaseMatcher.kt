@@ -7,8 +7,9 @@ package com.lc33.tokenvault.update
  */
 object ReleaseMatcher {
 
-    /** nightly 的固定 tag（ci.yml 里 `--prerelease` 的那条）。 */
-    const val NIGHTLY_TAG = "nightly-build"
+    /** nightly tag 前缀。CI 实际打的是秒级时间戳 tag（每次构建唯一，见 ci.yml），
+     *  旧约定的固定 `nightly-build` 也以同一前缀命中。 */
+    const val NIGHTLY_TAG_PREFIX = "nightly"
 
     /**
      * 挑出「该渠道下应展示的那一条」，并给出与当前版本的比较结论。
@@ -17,9 +18,12 @@ object ReleaseMatcher {
      *   versionName（release.yml 约定 tag 与 vaultVersionName 一致），做语义化版本比较。
      *   `currentVersionName` 形如 `0.1.0`，tag 形如 `v0.1.0`。
      *
-     * nightly 渠道：tag 固定为 [NIGHTLY_TAG]，不随版本变化，没有「比当前新」的语义。
-     *   所以 nightly 的检查结论就是「有没有可下载的 nightly」——有就展示其发布时间，
-     *   让用户自行判断要不要下（nightly 本身就不是 release-tested）。
+     * nightly 渠道：tag 以 [NIGHTLY_TAG_PREFIX] 开头且 `prerelease == true`，取最新一条
+     *   （Releases API 按创建时间倒序返回，firstOrNull 即最新）。不随版本变化，没有
+     *   「比当前新」的语义。所以 nightly 的检查结论就是「有没有可下载的 nightly」——
+     *   有就展示其发布时间，让用户自行判断要不要下（nightly 本身就不是 release-tested）。
+     *   仍要求 prerelease 是为排除 `v0.2.0-alpha` 这类版本化预发布：它不是 nightly，
+     *   被当成 nightly 展示会把用户引向一条没有时效性的旧版。
      *
      * @param releases 已解析的 release 列表（保持 API 顺序，最新在前）。
      * @param currentVersionName 本地版本名（`BuildConfig.VERSION_NAME`）。
@@ -32,8 +36,10 @@ object ReleaseMatcher {
         channel: Int,
     ): UpdateMatch? {
         if (channel == NIGHTLY_CHANNEL) {
-            val nightly = releases.firstOrNull { it.tagName == NIGHTLY_TAG } ?: return null
-            // nightly 固定 tag，无版本可比，恒视为「有可下载的构建」，交由 UI 展示时间。
+            val nightly = releases.firstOrNull {
+                it.prerelease && it.tagName.startsWith(NIGHTLY_TAG_PREFIX)
+            } ?: return null
+            // nightly 无版本可比，恒视为「有可下载的构建」，交由 UI 展示时间。
             return UpdateMatch(latest = nightly, newer = true)
         }
 

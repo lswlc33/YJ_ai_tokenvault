@@ -416,6 +416,8 @@ jobs:
           # 预发布 tag 用带秒级时间戳的 `nightly-YYYYMMDD-HHMMSS`，每次构建唯一。
           # 原因：固定名会被仓库 ref 保护规则锁死；以前只用日期，同一天多次构建
           # 会因 tag 已存在而报错（GH release 不允许重复 tag）。秒级时间戳彻底避免。
+          # 应用内 nightly 渠道按 `nightly` 前缀 + prerelease 匹配（ReleaseMatcher），
+          # 改 tag 命名格式必须同步改那里，否则"检查更新"的 nightly 渠道会失灵。
           tag="nightly-$(date -u '+%Y%m%d-%H%M%S')"
           gh release create "$tag" "${files[@]}" \
             --prerelease --title "$tag" \

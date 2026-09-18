@@ -1,0 +1,143 @@
+name: Release Test
+
+# release.yml 的 Android 链路验证：同一套 verify 闸（放宽版本号核对）+ 同一套签名
+# assembleRelease + 同一条 gh release create（改 --prerelease --latest=false）。
+# 用 `test-vX.Y.Z` tag 触发——与 release.yml 的 `v*.*.*` 触发模式天然互斥。
+# 刻意不构建 iOS：那是 release.yml 唯一的长尾（K/N 链接约 1 小时），且与发布机制无关。
+# 产物 Release 标为预发布且不吃 latest 标签，不会污染应用内两个渠道的匹配
+# （正式版渠道只认 prerelease=false；nightly 渠道只认 `nightly` 前缀）。
+on:
+  push:
+    tags:
+      - 'test-v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '要重跑的 test tag（如 test-v0.1.0）'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-test-${{ github.event_name == 'push' && github.ref_name || inputs.tag || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: 解析 tag
+        id: resolve
+        run: |
+          echo "tag=${{ github.event_name == 'push' && github.ref_name || inputs.tag }}" >> "$GITHUB_OUTPUT"
+
+      - name: 校验 test tag
+        run: |
+          set -eu
+          tag='${{ steps.resolve.outputs.tag }}'
+          if ! echo "$tag" | grep -qE '^test-v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::必须形如 test-vX.Y.Z：$tag"; exit 1
+          fi
+          # 与 release.yml 唯一放宽：版本号允许带 test- 前缀（test-v0.1.0 ↔ 0.1.0-test）。
+          # 其余三道闸保持一致，验证的才是真链路。
+          name=$(grep -E '^vaultVersionName=' gradle.properties | cut -d= -f2 | tr -d '[:space:]')
+          if [ "test-v$name" != "$tag" ] && [ "test-v${name%%-test}" != "$tag" ]; then
+            echo "::error::tag $tag 与 gradle.properties 的 vaultVersionName=$name 不一致"; exit 1
+          fi
+          git fetch --no-tags origin master
+          if ! git merge-base --is-ancestor "$tag" FETCH_HEAD; then
+            echo "::error::tag $tag 不在 master 历史里"; exit 1
+          fi
+
+  android:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.verify.outputs.tag }}
+
+      - name: 凭据泄漏终查
+        run: |
+          set -eu
+          if grep -rnE 'sk-[A-Za-z0-9]{20,}' app gradle shared/src --include='*.kt' --include='*.kts' \
+              --include='*.xml' --include='*.toml' \
+              --exclude-dir=test --exclude-dir=androidTest | grep .; then
+            echo "::error::代码里出现疑似真实 API 密钥字面量"; exit 1
+          fi
+          if git ls-files --error-unmatch '示例数据.md' > /dev/null 2>&1; then
+            echo "::error::示例数据.md 被提交进了仓库"; exit 1
+          fi
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-37.0 build-tools;37.0.0'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: 单测 + 构建签名 release
+        env:
+          VAULT_RELEASE_KEYSTORE_BASE64: ${{ secrets.VAULT_RELEASE_KEYSTORE_BASE64 }}
+          VAULT_RELEASE_STORE_PASSWORD: ${{ secrets.VAULT_RELEASE_STORE_PASSWORD }}
+          VAULT_RELEASE_KEY_ALIAS: ${{ secrets.VAULT_RELEASE_KEY_ALIAS }}
+          VAULT_RELEASE_KEY_PASSWORD: ${{ secrets.VAULT_RELEASE_KEY_PASSWORD }}
+        run: |
+          set -eu
+          if [ -z "${VAULT_RELEASE_KEYSTORE_BASE64:-}" ]; then
+            echo "::error::缺少 VAULT_RELEASE_KEYSTORE_BASE64，拒绝产出未签名包"; exit 1
+          fi
+          printf '%s' "$VAULT_RELEASE_KEYSTORE_BASE64" | base64 -d > release.keystore
+          export VAULT_RELEASE_STORE_FILE=release.keystore
+          ./gradlew :app:testDebugUnitTest :app:assembleRelease --console=plain
+          apk=$(ls -t app/build/outputs/apk/release/*-release.apk 2>/dev/null | head -n 1)
+          if [ -z "$apk" ]; then
+            echo "::error::找不到 release APK 产物"; exit 1
+          fi
+          unzip -l "$apk" | grep -qE 'META-INF/.*\.(RSA|EC)' || {
+            echo "::error::APK 未签名，检查 VAULT_RELEASE_* 四项 secret"; exit 1
+          }
+          rm -f release.keystore
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: test-apk-${{ github.run_id }}
+          path: app/build/outputs/apk/release/*-release.apk
+          if-no-files-found: error
+
+  release:
+    needs: [verify, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: 创建测试预发布 Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.verify.outputs.tag }}
+        run: |
+          set -eu
+          apk=$(find artifacts/test-apk-$GITHUB_RUN_ID -name '*.apk' | head -n 1)
+          if [ -z "$apk" ]; then
+            echo "::error::本次 run 的 APK 产物缺失"; exit 1
+          fi
+          # --verify-tag：tag 必须已存在，防 gh 静默在默认分支补建 tag。
+          # --latest=false：别把测试预发布顶成"最新版本"。
+          gh release create "$TAG" "$apk" \
+            --verify-tag \
+            --prerelease \
+            --latest=false \
+            --title "$TAG（发布链路验证，非正式版）" \
+            --notes "验证 release.yml 的 Android 链路与签名（$GITHUB_SHA）。不构成任何渠道的更新目标。"

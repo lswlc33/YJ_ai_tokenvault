@@ -1,0 +1,247 @@
+name: Release
+
+# 正式版发布：推 `vX.Y.Z` tag 即自动构建签名 APK + 未签名 IPA，并创建非预发布 Release。
+# 应用内"检查更新"的正式版渠道（ReleaseMatcher）只认 prerelease=false 且带 `v` 前缀的
+# tag，所以这里刻意不加 --prerelease，tag 格式也在 verify 步骤里硬校验。
+on:
+  push:
+    tags:
+      # 三段数字，允许 -alpha/-beta 之类预发布后缀（ReleaseMatcher 比较时只看前三段）。
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '要重发的既有 tag（如 v0.2.0；Release 被误删时用于重建）'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  # 同一 tag 只跑一条；发布中途取消比慢更危险（可能留下半截 Release），所以不 cancel-in-progress。
+  group: release-${{ github.event_name == 'push' && github.ref_name || inputs.tag || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: 解析 tag
+        id: resolve
+        run: |
+          echo "tag=${{ github.event_name == 'push' && github.ref_name || inputs.tag }}" >> "$GITHUB_OUTPUT"
+
+      - name: 校验 tag 与版本号、与 master 的关系
+        run: |
+          set -eu
+          tag='${{ steps.resolve.outputs.tag }}'
+          # 1. tag 必须带 v 前缀：ReleaseMatcher.versionNameFromTag 对无前缀 tag 返回 null，
+          #    这样的 release 发出去，应用内正式版渠道永远查不到更新。
+          if ! echo "$tag" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::tag 格式不合规：$tag（要求 vX.Y.Z 或 vX.Y.Z-suffix）"; exit 1
+          fi
+          # 2. tag 必须与 gradle.properties 的 vaultVersionName 一致（版本号唯一声明处）。
+          #    CI 不代替人改版本，只负责拦住不一致。
+          name=$(grep -E '^vaultVersionName=' gradle.properties | cut -d= -f2 | tr -d '[:space:]')
+          if [ "v$name" != "$tag" ]; then
+            echo "::error::tag $tag 与 gradle.properties 的 vaultVersionName=$name 不一致"; exit 1
+          fi
+          # 3. tag 必须打在 master 历史上：意味着这个 commit 已完整跑过 CI
+          #    （单测 / lint / 架构 grep / iOS 模拟器冒烟），release.yml 不重复这些闸门。
+          git fetch --no-tags origin master
+          if ! git merge-base --is-ancestor "$tag" FETCH_HEAD; then
+            echo "::error::tag $tag 不在 master 历史里，发布未过 CI 的代码是禁止的"; exit 1
+          fi
+
+  android:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.verify.outputs.tag }}
+
+      - name: 凭据泄漏终查
+        # 最后一道闸：签名产物一旦推上公开 Release，密钥就永久泄露。
+        # 正则与 pre-commit / ci.yml 的架构 grep 保持同源。
+        run: |
+          set -eu
+          if grep -rnE 'sk-[A-Za-z0-9]{20,}' app gradle shared/src --include='*.kt' --include='*.kts' \
+              --include='*.xml' --include='*.toml' \
+              --exclude-dir=test --exclude-dir=androidTest | grep .; then
+            echo "::error::代码里出现疑似真实 API 密钥字面量"; exit 1
+          fi
+          if git ls-files --error-unmatch '示例数据.md' > /dev/null 2>&1; then
+            echo "::error::示例数据.md 被提交进了仓库"; exit 1
+          fi
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-37.0 build-tools;37.0.0'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: 单测 + Lint + 构建签名 release
+        env:
+          VAULT_RELEASE_KEYSTORE_BASE64: ${{ secrets.VAULT_RELEASE_KEYSTORE_BASE64 }}
+          VAULT_RELEASE_STORE_PASSWORD: ${{ secrets.VAULT_RELEASE_STORE_PASSWORD }}
+          VAULT_RELEASE_KEY_ALIAS: ${{ secrets.VAULT_RELEASE_KEY_ALIAS }}
+          VAULT_RELEASE_KEY_PASSWORD: ${{ secrets.VAULT_RELEASE_KEY_PASSWORD }}
+        run: |
+          set -eu
+          # 与 nightly 相反：正式版绝不允许未签名产物。未签名的 release APK 对已装用户的
+          # 表现是覆盖安装失败，静默发出去比构建失败糟得多。
+          if [ -z "${VAULT_RELEASE_KEYSTORE_BASE64:-}" ]; then
+            echo "::error::缺少 VAULT_RELEASE_KEYSTORE_BASE64，正式版拒绝发布未签名包"; exit 1
+          fi
+          printf '%s' "$VAULT_RELEASE_KEYSTORE_BASE64" | base64 -d > release.keystore
+          export VAULT_RELEASE_STORE_FILE=release.keystore
+          # testDebugUnitTest 含 ArchitectureRulesTest；:shared:jvmTest 含 DiGraphSmokeTest。
+          # assembleDebugAndroidTest 只保证迁移测试仍编得过（跑它需要设备，发布前手工验一次）。
+          ./gradlew :app:testDebugUnitTest :app:lint :app:assembleDebugAndroidTest \
+            :app:assembleRelease :shared:jvmTest --console=plain
+          # R8 只在 release 生效。只认 -release.apk（排除 baseline profile 等中间产物），
+          # 并对选中的 APK 做签名硬校验：v1 签名方案下 META-INF 里必有 *.RSA/*.EC，
+          # 未签名包没有——宁可构建失败，也不发覆盖安装不了的包。
+          apk=$(ls -t app/build/outputs/apk/release/*-release.apk 2>/dev/null | head -n 1)
+          if [ -z "$apk" ]; then
+            echo "::error::找不到 release APK 产物"; exit 1
+          fi
+          unzip -l "$apk" | grep -qE 'META-INF/.*\.(RSA|EC)' || {
+            echo "::error::APK 未签名，检查 VAULT_RELEASE_* 四项 secret 是否与 v0.1.0-alpha 同一把 key"
+            exit 1
+          }
+          rm -f release.keystore
+
+      - uses: actions/upload-artifact@v4
+        with:
+          # 名字带 run_id：同一 tag 重跑（dispatch 重建）时新旧 artifact 不撞名，
+          # download-artifact 也不会把旧一次构建的包混进来。
+          name: release-apk-${{ github.run_id }}
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+
+  ios:
+    needs: verify
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.verify.outputs.tag }}
+
+      # 与 ci.yml 的 iOS job 同源：锁 Xcode 16.4（更新的 CoreSimulator 在 GH 镜像上
+      # boot iOS 18 runtime 不可靠，详见 ci.yml 的 job 注释）。
+      - name: 锁定 Xcode 16.x
+        run: |
+          set -eu
+          XCODE=$(ls -d /Applications/Xcode_16*.app | sort -V | tail -1 || true)
+          if [ -z "${XCODE:-}" ]; then
+            echo "::error::镜像上没有 Xcode 16.x 了（macos-15 镜像变了？请核对 runner-images）"
+            ls -d /Applications/Xcode*.app || true
+            exit 1
+          fi
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.konan
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ios-${{ runner.os }}-${{ hashFiles('gradle/libs.versions.toml', 'shared/build.gradle.kts') }}
+          restore-keys: |
+            ios-${{ runner.os }}-
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: 拾高 Gradle 堆（iOS 链接需要）
+        run: |
+          mkdir -p ~/.gradle
+          printf 'org.gradle.jvmargs=-Xmx6g -Dfile.encoding=UTF-8\n' > ~/.gradle/gradle.properties
+
+      - name: xcodebuild 无签名 archive
+        # 与 nightly 一致：只出未签名 IPA（用户按 README 自行签名安装）。
+        # 模拟器冒烟不在这里重复——verify 已确认 tag 在 master 历史上，
+        # 那个 commit 的 Debug 冒烟在 CI 里跑过了。
+        run: |
+          set -eu
+          cd iosApp
+          xcodebuild \
+            -project iosApp.xcodeproj \
+            -scheme iosApp \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            -archivePath build/iosApp.xcarchive \
+            archive
+
+      - name: 打包未签名 .ipa
+        run: |
+          set -eu
+          APP=iosApp/build/iosApp.xcarchive/Products/Applications/iosApp.app
+          mkdir -p iosApp/build/ipa/Payload
+          cp -R "$APP" iosApp/build/ipa/Payload/
+          cd iosApp/build/ipa
+          zip -r -y ../TokenVault-unsigned.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-ipa-${{ github.run_id }}
+          path: iosApp/build/TokenVault-unsigned.ipa
+          if-no-files-found: error
+
+  release:
+    needs: [verify, android, ios]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: 创建正式版 Release（APK + 未签名 IPA）
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.verify.outputs.tag }}
+        run: |
+          set -eu
+          apk=$(find artifacts/release-apk-$GITHUB_RUN_ID -name '*.apk' | head -n 1)
+          ipa=$(find artifacts/release-ipa-$GITHUB_RUN_ID -name '*.ipa' | head -n 1)
+          if [ -z "$apk" ] || [ -z "$ipa" ]; then
+            echo "::error::本次 run 的产物缺失（apk=$apk ipa=$ipa）"; exit 1
+          fi
+          files=("$apk" "$ipa")
+          # --latest：nightly 是 --prerelease，不把正式版标成 latest，
+          # 应用内正式版渠道与 Releases 页面默认展示的都是这一条。
+          # 手动重发（Release 被删但 tag 还在）时 tag 已存在，create 只挂 Release 不重建 tag。
+          # --verify-tag：tag 必须已存在——gh 默认行为是"tag 不存在就在默认分支最新
+          # 状态补建 tag"，dispatch 传错名字时会静默建错 tag，绝不能发生在正式版上。
+          gh release create "$TAG" "${files[@]}" \
+            --verify-tag \
+            --latest \
+            --title "$TAG" \
+            --generate-notes

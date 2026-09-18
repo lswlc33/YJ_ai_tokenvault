@@ -10,7 +10,7 @@ import kotlinx.serialization.Serializable
  * （assets、author、reactions……）一律 `ignoreUnknownKeys` 丢掉，不落进内存。
  *
  * @param tagName 发布标签。正式版是 `v{versionName}`（如 `v0.1.0`，release.yml 约定
- *   tag 与 vaultVersionName 一致），nightly 是固定的 `nightly-build`。
+ *   tag 与 vaultVersionName 一致），nightly 是 `nightly-` 前缀的秒级时间戳 tag（ci.yml）。
  * @param prerelease 是否预发布。nightly 走 `--prerelease`，正式版是 false。
  */
 @Serializable

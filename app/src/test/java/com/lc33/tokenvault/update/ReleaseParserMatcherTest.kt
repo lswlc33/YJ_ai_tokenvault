@@ -10,7 +10,8 @@ import org.junit.Test
  * 更新检查的纯函数测试（计划.md §13.4「更新」）。
  *
  * 覆盖：GitHub Releases 响应解析（含未知字段忽略、坏 JSON 容错）、按渠道匹配
- * （正式版剥 `v` 前缀比语义化版本、nightly 固定 tag 恒有构建）、版本号比较边界。
+ * （正式版剥 `v` 前缀比语义化版本、nightly 按 `nightly` 前缀 + prerelease 取最新一条）、
+ * 版本号比较边界。
  */
 class ReleaseParserMatcherTest {
 
@@ -21,7 +22,7 @@ class ReleaseParserMatcherTest {
         val body = """
             [
               {"tag_name":"v0.2.0","name":"0.2.0","body":"changelog","published_at":"2026-09-01T00:00:00Z","prerelease":false,"html_url":"https://github.com/lswlc33/YJ_ai_tokenvault/releases/tag/v0.2.0"},
-              {"tag_name":"nightly-build","prerelease":true,"html_url":"https://github.com/lswlc33/YJ_ai_tokenvault/releases/tag/nightly-build"}
+              {"tag_name":"nightly-20260918-030705","prerelease":true,"published_at":"2026-09-18T03:07:05Z","html_url":"https://github.com/lswlc33/YJ_ai_tokenvault/releases/tag/nightly-20260918-030705"}
             ]
         """.trimIndent()
 
@@ -34,7 +35,8 @@ class ReleaseParserMatcherTest {
         assertEquals("changelog", releases[0].body)
         assertEquals("2026-09-01T00:00:00Z", releases[0].publishedAt)
         assertTrue(releases[1].prerelease)
-        assertEquals("nightly-build", releases[1].tagName)
+        assertEquals("nightly-20260918-030705", releases[1].tagName)
+        assertEquals("2026-09-18T03:07:05Z", releases[1].publishedAt)
     }
 
     @Test
@@ -87,20 +89,44 @@ class ReleaseParserMatcherTest {
     }
 
     @Test
-    fun `nightly 渠道匹配固定 tag 且恒视为有构建`() {
+    fun `nightly 渠道匹配时间戳 tag 且恒视为有构建`() {
         val releases = listOf(
-            ReleaseInfo(tagName = "nightly-build", prerelease = true),
+            ReleaseInfo(tagName = "nightly-20260918-030705", prerelease = true),
             ReleaseInfo(tagName = "v0.2.0", prerelease = false),
         )
         val match = ReleaseMatcher.match(releases, "0.1.0", channel = 1)!!
+        assertEquals("nightly-20260918-030705", match.latest.tagName)
+        assertTrue(match.newer)  // nightly 无版本可比，恒视为有可下载构建
+    }
+
+    @Test
+    fun `nightly 渠道兼容旧的固定 tag`() {
+        val releases = listOf(
+            ReleaseInfo(tagName = "nightly-build", prerelease = true),
+        )
+        val match = ReleaseMatcher.match(releases, "0.1.0", channel = 1)!!
         assertEquals("nightly-build", match.latest.tagName)
-        assertTrue(match.newer)  // nightly 固定 tag，无版本可比，恒视为有可下载构建
+    }
+
+    @Test
+    fun `nightly 渠道取列表里最新一条而非最后一条`() {
+        // Releases API 按创建时间倒序返回，firstOrNull 命中即最新。
+        val releases = listOf(
+            ReleaseInfo(tagName = "nightly-20260918-030705", prerelease = true),
+            ReleaseInfo(tagName = "nightly-20260917-010203", prerelease = true),
+        )
+        val match = ReleaseMatcher.match(releases, "0.1.0", channel = 1)!!
+        assertEquals("nightly-20260918-030705", match.latest.tagName)
     }
 
     @Test
     fun `nightly 渠道无 nightly 返回 null`() {
         val releases = listOf(
             ReleaseInfo(tagName = "v0.2.0", prerelease = false),
+            // 版本化预发布不是 nightly：只按 tag 前缀排除，prerelease 挡不住拼写巧合。
+            ReleaseInfo(tagName = "v0.2.0-alpha", prerelease = true),
+            // nightly 前缀但非预发布：不属于 CI 产物形态，不认。
+            ReleaseInfo(tagName = "nightly-20260918-030705", prerelease = false),
         )
         assertNull(ReleaseMatcher.match(releases, "0.1.0", channel = 1))
     }
