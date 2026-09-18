@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -17,6 +19,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.Dp
 import org.jetbrains.compose.resources.stringResource
 import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.add_cd
@@ -179,10 +183,18 @@ fun ManageScreen(
             LoadingState(modifier = Modifier.padding(padding))
             return@AppScaffold
         }
+        val layoutDirection = LocalLayoutDirection.current
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
+                // 只避让顶部与横向 inset：MIUIX Scaffold 的 content 本来就铺满整窗，
+                // 这里若吃下 bottom padding，列表会被裁断在药丸上沿，玻璃底栏采样不到
+                // 内容而发黑。底部避让交给 ProviderList 的 contentPadding。
+                .padding(
+                    top = padding.calculateTopPadding(),
+                    start = padding.calculateStartPadding(layoutDirection),
+                    end = padding.calculateEndPadding(layoutDirection),
+                ),
         ) {
             // 搜索与分组固定在顶部，只有 topBar 随滚动收起：把筛选条也滚走
             // 会让"我刚才筛的是哪个分组"消失。
@@ -206,6 +218,7 @@ fun ManageScreen(
                 state = state,
                 scrollState = scrollState,
                 selecting = selecting,
+                bottomInset = padding.calculateBottomPadding(),
                 onOpenProvider = onOpenProvider,
                 onEnterSelection = onEnterSelection,
                 onToggleSelect = onToggleSelect,
@@ -301,6 +314,7 @@ private fun ProviderList(
     state: ManageUiState,
     scrollState: com.lc33.tokenvault.ui.miuix.AppTopBarScrollState,
     selecting: Boolean,
+    bottomInset: Dp,
     onOpenProvider: (Long) -> Unit,
     onEnterSelection: (Long) -> Unit,
     onToggleSelect: (Long) -> Unit,
@@ -338,6 +352,9 @@ private fun ProviderList(
         modifier = Modifier
             .fillMaxSize()
             .appTopBarScroll(scrollState),
+        // 底部避让走 contentPadding 而不是外层 padding：列表要能滚进药丸底下，
+        // 玻璃才采样得到内容；滚到底时末项恰好停在底栏上沿。
+        contentPadding = PaddingValues(bottom = bottomInset),
         verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
     ) {
         items(rows.size) { index ->

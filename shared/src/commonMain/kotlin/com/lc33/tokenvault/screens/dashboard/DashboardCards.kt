@@ -68,6 +68,7 @@ import com.lc33.tokenvault.ui.miuix.AppDivider
 import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppIconButton
 import com.lc33.tokenvault.ui.miuix.AppLinearProgress
+import com.lc33.tokenvault.ui.miuix.AppPreferenceGroup
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppActionRow
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
@@ -377,12 +378,13 @@ internal fun ProbeCard(
         // 「查看明细」放探测区最下面：它是回看上一轮结果，摆在进度卡之前会把
         // "看进度"和"看结果"两件事的先后顺序颠倒。从未探测过时没有明细分页可看。
         if (lastRun != null && progress == null) {
-            AppCard(modifier = cardModifier()) {
+            // 用 AppPreferenceGroup 而不是 AppCard：卡片默认还叠一层 16dp 内边距，
+            // 56dp 的行会被撑到 88dp，明显比其它块胖（见 AppPreferenceGroup 注释）。
+            AppPreferenceGroup(modifier = cardModifier(), inset = false) {
                 AppActionRow(
                     text = stringResource(Res.string.dashboard_probe_detail),
                     onClick = onOpenDetail,
                     modifier = Modifier.fillMaxWidth(),
-                    inset = false,
                 )
             }
         }
@@ -452,12 +454,11 @@ internal fun BackupCard(backup: BackupStatus, onOpenSync: () -> Unit) {
             )
         }
     }
-    AppCard(modifier = cardModifier()) {
+    AppPreferenceGroup(modifier = cardModifier(), inset = false) {
         AppActionRow(
             text = stringResource(Res.string.dashboard_backup_now),
             onClick = onOpenSync,
             modifier = Modifier.fillMaxWidth(),
-            inset = false,
         )
     }
 }

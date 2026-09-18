@@ -654,12 +654,12 @@ private fun AccountEditorSheet(
                 val canCopy = revealed?.accountId == row.id &&
                     (revealed.username != null || revealed.password != null)
                 if (canCopy) {
-                    AppCard(modifier = Modifier.fillMaxWidth()) {
+                    // 与上面登录方式的组同构：AppCard 会再叠 16dp 内边距，把 56dp 的行撑成 88dp。
+                    AppPreferenceGroup(modifier = Modifier.fillMaxWidth(), inset = false) {
                         AppActionRow(
                             text = stringResource(Res.string.secret_copy_cd),
                             onClick = { onCopy(row.id) },
                             modifier = Modifier.fillMaxWidth(),
-                            inset = false,
                         )
                     }
                 }
