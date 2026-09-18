@@ -100,12 +100,15 @@ jobs:
           printf '%s' "$VAULT_RELEASE_KEYSTORE_BASE64" | base64 -d > release.keystore
           export VAULT_RELEASE_STORE_FILE=release.keystore
           ./gradlew :app:testDebugUnitTest :app:assembleRelease --console=plain
-          apk=$(ls -t app/build/outputs/apk/release/*-release.apk 2>/dev/null | head -n 1)
+          # 与 release.yml 同源：`-name` 精确匹配避开 unsigned 中间产物，
+          # 校验走 apksigner（AGP 默认 v2/v3，grep META-INF 会假阴性）。
+          apk=$(find app/build/outputs/apk/release -maxdepth 1 -type f -name '*-release.apk' | head -n 1)
           if [ -z "$apk" ]; then
-            echo "::error::找不到 release APK 产物"; exit 1
+            echo "::error::找不到已签名的 release APK 产物"; exit 1
           fi
-          unzip -l "$apk" | grep -qE 'META-INF/.*\.(RSA|EC)' || {
-            echo "::error::APK 未签名，检查 VAULT_RELEASE_* 四项 secret"; exit 1
+          BT=$(ls -d "$ANDROID_HOME/build-tools"/* | sort -V | tail -1)
+          "$BT/apksigner" verify --print-certs "$apk" || {
+            echo "::error::APK 未签名或验签失败，检查 VAULT_RELEASE_* 四项 secret"; exit 1
           }
           rm -f release.keystore
 

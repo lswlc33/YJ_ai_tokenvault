@@ -112,15 +112,17 @@ jobs:
           # assembleDebugAndroidTest 只保证迁移测试仍编得过（跑它需要设备，发布前手工验一次）。
           ./gradlew :app:testDebugUnitTest :app:lint :app:assembleDebugAndroidTest \
             :app:assembleRelease :shared:jvmTest --console=plain
-          # R8 只在 release 生效。只认 -release.apk（排除 baseline profile 等中间产物），
-          # 并对选中的 APK 做签名硬校验：v1 签名方案下 META-INF 里必有 *.RSA/*.EC，
-          # 未签名包没有——宁可构建失败，也不发覆盖安装不了的包。
-          apk=$(ls -t app/build/outputs/apk/release/*-release.apk 2>/dev/null | head -n 1)
+          # R8 只在 release 生效。产物精确匹配 `*-release.apk`（`-name` 是全词匹配，
+          # 既避开 baselineProfiles，也不会被子串误伤成 AGP 的 app-release-unsigned.apk——
+          # 本地实测无签名时目录里只有那个），再用 apksigner 硬校验：AGP 默认 v2/v3
+          # 方案（没有 v1 的 META-INF/*.RSA，grep zip 条目会假阴性），必须走官方校验器。
+          apk=$(find app/build/outputs/apk/release -maxdepth 1 -type f -name '*-release.apk' | head -n 1)
           if [ -z "$apk" ]; then
-            echo "::error::找不到 release APK 产物"; exit 1
+            echo "::error::找不到已签名的 release APK 产物"; exit 1
           fi
-          unzip -l "$apk" | grep -qE 'META-INF/.*\.(RSA|EC)' || {
-            echo "::error::APK 未签名，检查 VAULT_RELEASE_* 四项 secret 是否与 v0.1.0-alpha 同一把 key"
+          BT=$(ls -d "$ANDROID_HOME/build-tools"/* | sort -V | tail -1)
+          "$BT/apksigner" verify --print-certs "$apk" || {
+            echo "::error::APK 未签名或验签失败，检查 VAULT_RELEASE_* 四项 secret 是否与 v0.1.0-alpha 同一把 key"
             exit 1
           }
           rm -f release.keystore
