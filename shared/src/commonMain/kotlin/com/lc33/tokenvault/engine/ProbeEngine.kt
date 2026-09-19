@@ -366,34 +366,32 @@ class ProbeEngine constructor(
     }
 
     /**
-     * 这一轮"每把 Key 的模型列表由哪条响应提供"：任务 id → Key id，**每把 Key 至多一条**。
+     * 每把 Key 的"模型列表候选任务"：taskId → keyId。
      *
      * 计划里同一把 Key 可能同时挂着 L1（每个协议一条）和 L2，而它们的 url 都是同一个
      * `modelsUrl`——模型列表端点不分协议。逐条解析等于把同一份响应按协议各归一桶、各写
      * 一套行（`ModelMerger` 的"消失即删"按 `discoveredVia` 分协议，两套行互不清理），
-     * 界面上就是每个模型出现两遍。
+     * 界面上就是每个模型出现两遍。所以一把 Key 本轮**只折一次**。
      *
-     * 取哪一条：优先 L2，与 [ProbePlanBuilder.buildModelListTasks] 同口径，这样手动刷新
-     * 与自动轮写出的 `discoveredVia` 是同一个协议；没有 L2（`keyValidity` 关着）时取首选
-     * 协议的那条 L1——那份列表既然已经发出去了，就不该被白白丢掉。
+     * 这里是"候选"而不是从前那条"首选"：曾经只把一把 Key 绑到唯一一个任务上（L2 优先），
+     * 于是当 L2 被 host 门闸或 429 跳过（跳过的结果 `body = null`）而同一份 url 的 L1
+     * 其实成功带回列表时，那份列表被整个丢掉——用户按了刷新、日志里只有一句
+     * 「model list skipped」，模型数原地不动。既然两条任务打的是同一个端点、拿的是同一份
+     * 响应，谁先带回可用内容就用谁才是对的顺序。
+     *
+     * 剩下的口径差别只有上游没给 `supported_endpoint_types` 时解析器用什么协议兜底，
+     * 而那已经被 [ModelMerger.oneProtocolPerModel] 收敛到这把 Key 声明的首选取。
      */
-    private fun modelsSourceByKeyId(
+    private fun modelSourceCandidatesByKeyId(
         tasks: List<ProbeTask>,
         keyById: Map<Long, ApiKey>,
     ): Map<String, Long> {
-        val tasksPerKey = mutableMapOf<Long, MutableList<ProbeTask>>()
-        for (task in tasks) {
-            task.keyId?.let { tasksPerKey.getOrPut(it) { mutableListOf() } += task }
-        }
         val sources = mutableMapOf<String, Long>()
-        for ((keyId, keyTasks) in tasksPerKey) {
+        for (task in tasks) {
+            val keyId = task.keyId ?: continue
             val key = keyById[keyId] ?: continue
             if (!key.settings.probe.models) continue
-            val primary = key.settings.supportedProtocols.firstOrNull()
-            val source = keyTasks.firstOrNull { it.level == ProbeLevel.L2_KEY_VALIDITY }
-                ?: keyTasks.firstOrNull { it.protocol == primary }
-                ?: keyTasks.first()
-            sources[source.id] = keyId
+            sources[task.id] = keyId
         }
         return sources
     }
@@ -415,6 +413,11 @@ class ProbeEngine constructor(
      * `supported_endpoint_types: ["openai"]` 摊成 chat + responses，那是解析层的事实；
      * 照原样落库就是同一个模型两行，而"消失即删"按协议各管一套、谁也清不掉谁，
      * 于是每刷新一次重复就重新长出来一次。
+     *
+     * @return 这次真的折进了列表（`Confirmed`）才算 true。`SuspiciousEmpty` / `Unparseable`
+     *   返回 false，好让调用方把"这把 Key 本轮还没吃到列表"这件事留着——同一把 Key 的
+     *   另一条候选任务（同 url、同响应）还有可能带回复用。少了这个返回值，一次响应头不对的
+     *   任务就会把这把 Key 永久占住，模型数原地不动。
      */
     private suspend fun applyParsedModels(
         body: String?,
@@ -423,37 +426,46 @@ class ProbeEngine constructor(
         providerId: Long,
         keyId: Long,
         accumulator: MutableMap<Long, MutableMap<Protocol, MutableSet<String>>>,
-    ) {
+    ): Boolean {
         val allowedProtocols = key?.settings?.supportedProtocols ?: emptySet()
-        when (val parsed = ModelListParser.parse(body, protocol)) {
-            is ModelListParse.Confirmed -> ModelMerger.oneProtocolPerModel(
-                discovered = parsed.models,
-                allowed = allowedProtocols,
-                preferred = allowedProtocols.firstOrNull(),
-            ).forEach { model ->
-                accumulator
-                    .getOrPut(keyId) { mutableMapOf() }
-                    .getOrPut(model.protocol) { mutableSetOf() }
-                    .add(model.modelId)
+        return when (val parsed = ModelListParser.parse(body, protocol)) {
+            is ModelListParse.Confirmed -> {
+                ModelMerger.oneProtocolPerModel(
+                    discovered = parsed.models,
+                    allowed = allowedProtocols,
+                    preferred = allowedProtocols.firstOrNull(),
+                ).forEach { model ->
+                    accumulator
+                        .getOrPut(keyId) { mutableMapOf() }
+                        .getOrPut(model.protocol) { mutableSetOf() }
+                        .add(model.modelId)
+                }
+                true
             }
 
-            ModelListParse.SuspiciousEmpty -> audit.record(
-                level = LogLevel.WARN,
-                category = LogCategory.PROBE,
-                message = "model list skipped: no usable entries",
-                detail = "provider=$providerId key=$keyId protocol=${protocol.wireName}",
-                providerId = providerId,
-                keyId = keyId,
-            )
+            ModelListParse.SuspiciousEmpty -> {
+                audit.record(
+                    level = LogLevel.WARN,
+                    category = LogCategory.PROBE,
+                    message = "model list skipped: no usable entries",
+                    detail = "provider=$providerId key=$keyId protocol=${protocol.wireName}",
+                    providerId = providerId,
+                    keyId = keyId,
+                )
+                false
+            }
 
-            ModelListParse.Unparseable -> audit.record(
-                level = LogLevel.WARN,
-                category = LogCategory.PROBE,
-                message = "model list skipped: not a model list",
-                detail = "provider=$providerId key=$keyId protocol=${protocol.wireName}",
-                providerId = providerId,
-                keyId = keyId,
-            )
+            ModelListParse.Unparseable -> {
+                audit.record(
+                    level = LogLevel.WARN,
+                    category = LogCategory.PROBE,
+                    message = "model list skipped: not a model list",
+                    detail = "provider=$providerId key=$keyId protocol=${protocol.wireName}",
+                    providerId = providerId,
+                    keyId = keyId,
+                )
+                false
+            }
         }
     }
 
@@ -873,7 +885,9 @@ class ProbeEngine constructor(
             task.keyId?.let { it to task.providerId }
         }.toMap()
         val fetchedModels = mutableMapOf<Long, MutableMap<Protocol, MutableSet<String>>>()
-        val modelsSource = modelsSourceByKeyId(tasks, keyById)
+        val modelCandidates = modelSourceCandidatesByKeyId(tasks, keyById)
+        // 本轮已经把模型列表折进去的 Key：一把 Key 只折一次，谁先带回可用内容算谁的。
+        val modelsFolded = mutableSetOf<Long>()
 
         try {
             orchestrator.run(tasks, plan.perHostKeyAndModelCount).collect { result ->
@@ -936,21 +950,24 @@ class ProbeEngine constructor(
                 } else {
                     final
                 }
-                // 模型列表检测开启时，这把 Key 的那一条 models 响应就是它的模型列表，
-                // 不再额外发一遍 GET。每把 Key 只认一条来源（见 [modelsSourceByKeyId]）：
-                // L1 与 L2 打的是同一个 modelsUrl，两条都解析就会按协议各归一桶、各写一套
-                // 行，界面上每个模型出现两遍。这里只累积，三路合并等本轮流结束后统一做。
+                // 模型列表检测开启时，这把 Key 的 models 响应就是它的模型列表，不再额外
+                // 发一遍 GET。一把 Key 只折一次（见 [modelSourceCandidatesByKeyId]）：L1 与
+                // L2 打的是同一个 modelsUrl，两条都解析就会按协议各归一桶、各写一套行，
+                // 界面上每个模型出现两遍。这里只累积，三路合并等本轮流结束后统一做。
                 val sourceTask = taskById[result.taskId]
-                val modelsKeyId = modelsSource[result.taskId]
-                if (sourceTask != null && modelsKeyId != null) {
-                    applyParsedModels(
-                        body = result.body,
-                        protocol = sourceTask.protocol,
-                        key = keyById[modelsKeyId],
-                        providerId = sourceTask.providerId,
-                        keyId = modelsKeyId,
-                        accumulator = fetchedModels,
-                    )
+                val modelsKeyId = modelCandidates[result.taskId]
+                if (sourceTask != null && modelsKeyId != null && modelsKeyId !in modelsFolded) {
+                    if (applyParsedModels(
+                            body = result.body,
+                            protocol = sourceTask.protocol,
+                            key = keyById[modelsKeyId],
+                            providerId = sourceTask.providerId,
+                            keyId = modelsKeyId,
+                            accumulator = fetchedModels,
+                        )
+                    ) {
+                        modelsFolded += modelsKeyId
+                    }
                 }
 
                 // SKIPPED 不落库（红线 11 + §8.4：跳过的连 checkedAt 都不写）。

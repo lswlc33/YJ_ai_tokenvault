@@ -75,6 +75,35 @@ class AuditLogRepositoryTest {
         assertTrue(!entry.detail!!.contains("sk-secret-in-json"))
     }
 
+    /**
+     * 失败路径的 `responseBody`。`HttpEngine` 在 catch 里写的是裸 `t.message`，而 Ktor 把
+     * 出错的 `Url` 原样拼进了那句话（实测文案 `Socket timeout has expired [url=https://…, …]`）。
+     * 地址里带 `user:pass@` 是合法输入，于是口令会从这一个字段进库。
+     *
+     * 为什么单独盯这个字段：日志**列表**那一道查询（`AuditLogSummary`）压根不取报文，
+     * 所以"日志页看不到"并不代表它不在——`audit_log` 整张表会进备份包，口令就是这么被
+     * 上传到 WebDAV 的。收口点在仓库这一层（红线 32），所以钉在这里而不是 HttpEngine。
+     */
+    @Test
+    fun `异常文案里的地址口令进不了库`() = runTest {
+        repo.record(
+            LogLevel.ERROR,
+            LogCategory.HTTP,
+            message = "http GET https://127.0.0.1:8080/v1/models failed",
+            detail = "ConnectTimeoutException",
+            requestUrl = "https://127.0.0.1:8080/v1/models",
+            responseBody = "Socket timeout has expired [url=https://admin:Sup3rPassw0rd@127.0.0.1:8080" +
+                "/v1/models, socket_timeout=20000] ms",
+        )
+        val id = repo.observeRecent(10).first().single().id
+        val full = repo.findById(id)
+        assertTrue("没读到那条完整日志（列表查询不取报文，必须按 id 回读）", full != null)
+        val stored = "${full!!.message}${full.detail}${full.requestUrl}${full.responseBody}"
+        assertTrue("口令进了日志表：$stored", !stored.contains("Sup3rPassw0rd"))
+        // host 与路径要留着：不然"哪一家超时了"这条信息就没了。
+        assertTrue("擦过头了，地址整段没了：$stored", full.responseBody!!.contains("127.0.0.1:8080/v1/models"))
+    }
+
     @Test
     fun `按最低等级筛选`() = runTest {
         repo.record(LogLevel.DEBUG, LogCategory.VAULT, message = "debug")

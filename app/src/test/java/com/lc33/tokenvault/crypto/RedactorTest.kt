@@ -90,6 +90,37 @@ class RedactorTest {
         assertFalse(scrubbed.contains("someone@example.com"))
     }
 
+    /**
+     * 地址里的 userinfo。`https://user:pass@host` 是合法输入（自建 new-api 有人这么填），
+     * 而 Ktor 的三类网络异常把出错的 `Url` 原样拼进了 message（实测文案：
+     * `Socket timeout has expired [url=https://…, socket_timeout=20000] ms`），
+     * 调用点又普遍 `detail = t.message` 记一笔失败——口令就是这么进日志表的。
+     * 邮箱那条规则救不了它：自建网关的 `@127.0.0.1:8080`、`@localhost` 不匹配 `@host.tld`。
+     */
+    @Test
+    fun `异常文案里的地址口令被擦掉，但留下是哪一家`() {
+        val message = "Socket timeout has expired [url=https://admin:Sup3rPassw0rd@127.0.0.1:8080/v1/models, " +
+            "socket_timeout=20000] ms"
+        val scrubbed = redactor.scrub(message)
+        assertFalse("口令漏进日志：$scrubbed", scrubbed.contains("Sup3rPassw0rd"))
+        assertFalse("用户名也不该留着：$scrubbed", scrubbed.contains("admin:"))
+        // host 与 path 要留着，否则"哪一家超时了"就查不出来了。
+        assertTrue("擦过头了，地址整段没了：$scrubbed", scrubbed.contains("127.0.0.1:8080/v1/models"))
+    }
+
+    @Test
+    fun `没有凭据的地址不许被顺手擦掉`() {
+        // 只有 host:port、或口令样式出现在查询串里，都不是 userinfo。擦错会让日志失去意义。
+        for (url in listOf(
+            "https://api.example.com:8443/v1/models",
+            "http://127.0.0.1:8080/v1/chat?callback=a@b",
+            "https://example.com/p?token=abc@def",
+        )) {
+            val scrubbed = redactor.scrub("connect failed for $url")
+            assertTrue("正常地址被擦了：$scrubbed", scrubbed.contains(url))
+        }
+    }
+
     @Test
     fun `低熵后缀不误伤`() {
         val lowEntropy = Redactor({ listOf("password0000000000") })

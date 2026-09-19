@@ -54,6 +54,17 @@ class Redactor(
                 }
             }
         }
+
+        // URL 里的 userinfo。这一条挡的不是我们自己写的地址（那条走 `HttpEngine.safeTarget`，
+        // 早就把 userinfo 剥了），挡的是**别人**拼进文案的地址：Ktor 的三类网络异常
+        // （connect / socket / request timeout）都把出错的 `Url` 原样写进了 message，
+        // 而调用点普遍用 `detail = t.message` / `responseBody = t.message` 记一笔失败。
+        // `https://user:pass@host` 是合法输入（自建 new-api 有人这么填），于是口令整串
+        // 进日志表——而这张表用户会在日志页复制、截图、分享。上面的邮箱那条规则救不了它：
+        // 那条要求 `@host.tld`，而自建网关最常见的 `@127.0.0.1:8080`、`@localhost` 不匹配。
+        // 只擦 `://` 到最后一个 `@` 之间的一段，**host 留着**：排查要看是哪一家出的错。
+        out = URL_USERINFO.replace(out) { match -> "${match.groupValues[1]}://$placeholder@" }
+
         return out
     }
 
@@ -92,5 +103,12 @@ class Redactor(
             // 邮箱：平台账号常常就是邮箱，而它同时也是最容易被顺手分享出去的一类
             Regex("""[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}"""),
         )
+
+        /**
+         * `scheme://user:pass@` 那一段。两侧都排除 `/`：不带这个限定的话，
+         * `https://host:8080/p?u=a@b` 里"端口到查询串"会被当成口令一起擦掉，
+         * 而那种地址里根本没有凭据。
+         */
+        private val URL_USERINFO = Regex("""(?i)\b(https?)://[^\s/@]+:[^\s/@]+@""")
     }
 }

@@ -52,13 +52,26 @@ object HttpConcurrencyPolicy {
         OPTIONS.indexOf(count).takeIf { it >= 0 } ?: OPTIONS.indexOf(DEFAULT)
 
     /**
-     * 存储形态 → 并发数。
+     * 存储形态 → 并发数，**返回值一定落在 [OPTIONS] 上**。
      *
-     * null（没写过）、解析不出来、0 或负数一律回默认档。**0 尤其要挡**：那意味着
-     * "一个请求都别想出去"，坏数据不能把整个应用的网络掐死。
+     * 两道都要有：
+     * - 挡 0、负数、非数字。0 尤其致命——那意味着"一个请求都别想出去"，坏数据不能把
+     *   整个应用的网络掐死。
+     * - 钳到档位表。库里的值不一定是这一版写进去的：`BackupEngine` 把备份包里的设置
+     *   原样 `putSetting`，于是"恢复一个来自未来版本（有 1 档、有 64 档）的包"会送进来
+     *   一个档位表外的数。而 [indexOf] 遇到表外的数会落回默认下标——页面显示「8（默认）」、
+     *   闸却在一个没人选过的数上跑，这个界面与事实的分歧正是 [indexOf] 那段注释说不该发生的。
+     *
+     * 方向选**向下取档**：向上等于替用户做了一个他没选过的、更凶的决定，而这一档的
+     * 风险偏向是"别一次打给上游太多"（红线 29）。低于最低档时取最低档——刻意不给 1，
+     * 理由见 [OPTIONS]。
      */
-    fun decode(stored: String?): Int =
-        stored?.trim()?.toIntOrNull()?.takeIf { it > 0 } ?: DEFAULT
+    fun decode(stored: String?): Int {
+        val raw = stored?.trim()?.toIntOrNull() ?: return DEFAULT
+        if (raw <= 0) return DEFAULT
+        // OPTIONS 本身就是升序，所以"最后一个不超过它的档"就是向下取档。
+        return OPTIONS.lastOrNull { it <= raw } ?: OPTIONS.first()
+    }
 
     /** 并发数 → 存储形态。不做钳制：钳集会让人以为 0 是可达状态，而读方向根本不认它。 */
     fun encode(count: Int): String = count.toString()

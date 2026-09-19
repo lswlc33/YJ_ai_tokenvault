@@ -1,6 +1,7 @@
 package com.lc33.tokenvault.domain
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -42,6 +43,34 @@ class HttpConcurrencyPolicyTest {
         assertEquals(HttpConcurrencyPolicy.DEFAULT, HttpConcurrencyPolicy.decode("garbage"))
         assertEquals(HttpConcurrencyPolicy.DEFAULT, HttpConcurrencyPolicy.decode("0"))
         assertEquals(HttpConcurrencyPolicy.DEFAULT, HttpConcurrencyPolicy.decode("-5"))
+    }
+
+    @Test
+    fun `档位表外的数向下取档，界面与闸不许各说各话`() {
+        // 库里的值不一定是这一版写进去的：恢复备份时 BackupEngine 把包里的设置原样落库。
+        // 若读方向照单全收，"1"（刻意不给的那一档）会把整个应用串行化，"5000" 会让
+        // 应用内 HTTP 实际不设限；而 indexOf 对表外的数一律落回默认下标，于是页面写着
+        // 「8（默认）」而闸在跑另一个数——这个分歧是用户看得见、却无从发现的。
+        fun decoded(raw: String) = HttpConcurrencyPolicy.decode(raw)
+
+        // 一律落在档位表上：decode 的结果必须能被下拉原样表示。
+        for (raw in listOf("1", "3", "6", "12", "64", "5000", "999999")) {
+            assertTrue(
+                "${raw} 解码后不在档位表上：" + decoded(raw),
+                decoded(raw) in HttpConcurrencyPolicy.OPTIONS,
+            )
+        }
+        // 方向是"向下"：不替用户做一个他没选过的、更凶的决定（红线 29）。
+        assertEquals(2, decoded("1"))
+        assertEquals(2, decoded("3"))
+        assertEquals(8, decoded("12"))
+        // 超过最高档钳到最高档，而不是绕回默认档。
+        assertEquals(HttpConcurrencyPolicy.MAX, decoded("64"))
+        assertEquals(HttpConcurrencyPolicy.MAX, decoded("5000"))
+        // 表内的数必须原样，别把用户真选过的档位读歪。
+        for (option in HttpConcurrencyPolicy.OPTIONS) {
+            assertEquals(option, decoded(option.toString()))
+        }
     }
 
     @Test
