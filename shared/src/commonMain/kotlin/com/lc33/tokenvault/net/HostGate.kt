@@ -80,6 +80,12 @@ class HostGate(
      */
     private val rateLimited = mutableSetOf<String>()
 
+    /**
+     * 每个 host 上一个请求**真的发出去**的时刻。与 [HostState.lastRelease]（取号放行时刻）
+     * 分开记，理由见 [awaitWireSpacing]。
+     */
+    private val lastDeparture = mutableMapOf<String, Long>()
+
     /** 当前 host 的串行间隔。 */
     suspend fun currentIntervalMs(host: String): Long = stateLock.withLock {
         states[host]?.intervalMs ?: defaultMinIntervalMs
@@ -90,6 +96,10 @@ class HostGate(
      *
      * 排队语义：同一个 host 连续 acquire 时，后一个的放行时间在前一个之后再叠一个间隔，
      * 所以哪怕前面的请求还在睡，后来的也不会插队。不同 host 之间互不相干。
+     *
+     * **这一道只保证"放行顺序"，不保证"实发间隔"**：拿到号之后还要在并发闸外排队，
+     * 低档位下同 host 两张号可能被同一个瞬间一起放出去。所以发请求前还要再走一次
+     * [awaitWireSpacing]，两道各司其职，不是重复。
      */
     suspend fun acquire(host: String) {
         val waitMs = stateLock.withLock {
@@ -98,6 +108,28 @@ class HostGate(
             val last = state.lastRelease
             val nextAllowed = if (last == null) now else (last + state.intervalMs).coerceAtLeast(now)
             states[host] = state.copy(lastRelease = nextAllowed)
+            (nextAllowed - now).coerceAtLeast(0L)
+        }
+        if (waitMs > 0L) delay(waitMs)
+    }
+
+    /**
+     * 拿到并发名额、真的发请求之前，再按"上一次实发时刻"守一次间隔。
+     *
+     * 为什么需要这一道：[acquire] 记的是放行时刻。上限设成 2 时，同 host 相隔 800ms 的两张号
+     * 可能都卡在并发闸外，等名额空出来被同一瞬间一起放行——实发间隔≈0，正是红线 29 要挡的
+     * 那一幕（M0.5 实测 Cloudflare 同 host 2.4 秒内第 3 个请求就 `error code: 1015`）。
+     *
+     * 只在"同 host 挤在少数几个名额上"时才会真睡着：绝大多数时候残余是 0，就是锁内一次读写。
+     * 睡在锁外，与 [acquire] 同一条纪律。它只会把出发推后，不会提前，所以不可能因此变快。
+     */
+    suspend fun awaitWireSpacing(host: String) {
+        val waitMs = stateLock.withLock {
+            val interval = states[host]?.intervalMs ?: defaultMinIntervalMs
+            val now = nowMillis()
+            val previous = lastDeparture[host]
+            val nextAllowed = if (previous == null) now else (previous + interval).coerceAtLeast(now)
+            lastDeparture[host] = nextAllowed
             (nextAllowed - now).coerceAtLeast(0L)
         }
         if (waitMs > 0L) delay(waitMs)

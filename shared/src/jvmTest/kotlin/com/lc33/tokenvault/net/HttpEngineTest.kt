@@ -157,6 +157,47 @@ class HttpEngineTest {
         assertEquals(200L, gate.currentIntervalMs("a.example.com"))
     }
 
+    /**
+     * 实发间隔（[HostGate.awaitWireSpacing]）。
+     *
+     * [HostGate.acquire] 那道记的是"放行时刻"，而放行之后还要在并发闸外等名额：上限 2 时
+     * 同 host 两张号会被同一个瞬间一起放出去，实发间隔塌成 0——正是红线 29 要挡的形状
+     * （M0.5 实测 Cloudflare 同 host 2.4 秒内第 3 个请求就 1015）。这三条钉的是补上的那一档。
+     */
+    @Test
+    fun `名额把同 host 两张号一起放行时，实发仍按间隔出发`() = runTest {
+        val gate = HostGate(defaultMinIntervalMs = 100, nowMillis = { testScheduler.currentTime })
+        val departures = mutableListOf<Long>()
+        val waiters = (1..3).map {
+            launch {
+                gate.awaitWireSpacing("a.example.com")
+                departures += testScheduler.currentTime
+            }
+        }
+        waiters.joinAll()
+        assertEquals(listOf(0L, 100L, 200L), departures.sorted())
+    }
+
+    @Test
+    fun `实发间隔不挡别的 host`() = runTest {
+        val gate = HostGate(defaultMinIntervalMs = 100, nowMillis = { testScheduler.currentTime })
+        gate.awaitWireSpacing("a.example.com")
+        gate.awaitWireSpacing("a.example.com") // a 的第二次出发睡到 100
+        assertEquals(100L, testScheduler.currentTime)
+        // b 从没出过发的话就该立刻走：这一道是每 host 一份账，不是全局串行。
+        gate.awaitWireSpacing("b.example.com")
+        assertEquals(100L, testScheduler.currentTime)
+    }
+
+    @Test
+    fun `429 加倍后的间隔同样管住实发`() = runTest {
+        val gate = HostGate(defaultMinIntervalMs = 100, maxIntervalMs = 8_000, nowMillis = { testScheduler.currentTime })
+        gate.awaitWireSpacing("a.example.com")
+        gate.onRateLimited("a.example.com") // 100 → 200
+        gate.awaitWireSpacing("a.example.com")
+        assertEquals(200L, testScheduler.currentTime)
+    }
+
     // ------------------------------------------------------------------ execute
 
     private fun engineWith(status: HttpStatusCode, body: String, gate: HostGate): HttpEngine {

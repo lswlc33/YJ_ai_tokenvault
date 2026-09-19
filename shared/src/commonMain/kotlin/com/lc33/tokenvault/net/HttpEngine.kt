@@ -96,6 +96,9 @@ class HttpEngine(
             // 的时候占着一个名额什么都不干，等于让被限流的供应商拖慢整个应用的网络。
             // 记账（record）也在闸外：最小那一档（2）下，一次 Room 写入停顿不该变成网络停顿。
             val onWire = concurrency.withPermit {
+                // 拿到名额之后再守一次同 host 间隔。上面那次 `hostGate.acquire` 记的是放行
+                // 时刻，而名额可能让两张号一起等到——实发间隔就塌成 0 了（红线 29）。
+                hostGate.awaitWireSpacing(hostOf(request.url))
                 val started = clockMillis()
                 val response = client.request(request.url) {
                     method = HttpMethod.parse(request.method)

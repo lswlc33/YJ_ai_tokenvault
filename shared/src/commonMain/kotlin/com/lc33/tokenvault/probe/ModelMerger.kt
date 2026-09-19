@@ -35,11 +35,13 @@ data class NewDiscoveredModel(
  * `discoveredVia == 本轮协议` 的行。少了这个限定，只拉了 CHAT 列表就会把所有 ANTHROPIC
  * 发现项一起删掉（红线 30）。
  *
- * 四条规则：
+ * 五条规则：
  * - 列表里有、库里没有 → 插入，`source = 'discovered'`、`discoveredVia = 本协议`。
- * - 两边都有 → `touchLastSeen`。
+ * - 两边都有（同协议）→ `touchLastSeen`。
  * - 库里有、列表里没有，且 `source = 'discovered'` 且 `discoveredVia = 本协议` → 删除。
- * - `source = 'manual'` 的行、以及 `discoveredVia` 是别的协议的行 → **完全不动**（红线 13）。
+ * - 列表里有这个模型、但它躺在**另一协议**的发现行上 → 删除那一行，由插入在本协议下重建
+ *   （一把 Key 的一个模型只留一行；少了这条，跨协议的孪生行谁都清不掉，见下方实现处的注释）。
+ * - `source = 'manual'` 的行 → **完全不动**（红线 13）。
  *
  * @param existing 库里该供应商已有的模型（不限协议）。
  * @param fetched 本轮拉到的模型 id 列表（已经解析出协议，或由调用方先归到本协议）。
@@ -70,20 +72,29 @@ object ModelMerger {
         val seen = mutableSetOf<String>()
 
         for (existingModel in existing) {
-            val fetchedModel = fetchedByProtocol[existingModel.modelId]
-                ?.takeIf { existingModel.protocol == thisProtocol }
-            if (fetchedModel != null) {
+            val inThisRound = fetchedByProtocol.containsKey(existingModel.modelId)
+            if (inThisRound && existingModel.protocol == thisProtocol) {
                 // 两边都有 → touch lastSeenAt。
                 toTouch += existingModel.id
                 seen += existingModel.modelId
-            } else {
-                // 库里没有对应条目。只有 discovered + 本协议 的行才删除。
-                if (existingModel.source == ModelSource.DISCOVERED &&
-                    existingModel.discoveredVia == thisProtocol
-                ) {
-                    toDelete += existingModel.id
-                }
-                // manual 或别的协议 → 完全不动。
+                continue
+            }
+            // manual 行永远不动（红线 13）：它旁边那条发现行是另一件事。
+            if (existingModel.source != ModelSource.DISCOVERED) continue
+            if (inThisRound) {
+                // 本轮列表里有这个模型，但它躺在**另一协议**的那一行上 → 把那一行收掉，
+                // 让下面的插入在本协议下重建。一把 Key 的一个模型只留一行，这是这张表的
+                // 语义（红线 18：`protocol` 答的是"这个模型发到哪条路径"）。
+                //
+                // 为什么不收就是死循环：这一行的 `discoveredVia` 不是本轮协议，"消失即删"
+                // 永远管不到它；而插入守卫只看同协议的行，于是旧的 responses 行留着、新的
+                // chat 行又插进来，**每刷新一次就整套孪生长回来一次**。触发条件也不偏：
+                // v8 迁移按"id 最小"保留幸存行而不校正协议，所以任何"恢复过旧备份、且这把
+                // Key 的首选协议不是那条"的库都会撞上。
+                toDelete += existingModel.id
+            } else if (existingModel.discoveredVia == thisProtocol) {
+                // 库里有、列表里没有，且是本轮协议发现的 → 消失即删（红线 30 的限定就在这）。
+                toDelete += existingModel.id
             }
         }
 

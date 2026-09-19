@@ -278,6 +278,24 @@ class ProbeEngine constructor(
 
         val tasks = plannedTasks.mapNotNull { it.toTask(profileOf(it.clientProfileId)) }
 
+        // "按了刷新、模型数一点没变"必须留一句为什么。钥匙在这里掉队有两种，都不报错：
+        // 计划层不给这把 Key 排任务（没声明协议、或 baseUrl 坏，见 `ProbePlanBuilder.targetOf`），
+        // 执行层丢掉排好的任务（密钥解不开：保险箱锁着，或密文与 AAD 对不上）。
+        // 不写这一句的话，日志里那句 `keys=N tasks=M` 只是让人盯着两个数字猜。
+        val unplannedKeys = selectedKeys.mapNotNull { it.id }.toSet() -
+            plannedTasks.mapNotNull { it.keyId }.toSet()
+        val droppedTasks = plannedTasks.size - tasks.size
+        if (unplannedKeys.isNotEmpty() || droppedTasks > 0) {
+            audit.record(
+                level = LogLevel.WARN,
+                category = LogCategory.PROBE,
+                message = "model list refresh had nothing to send",
+                detail = "provider=$providerId unplannedKeys=${unplannedKeys.size} " +
+                    "droppedTasks=$droppedTasks",
+                providerId = providerId,
+            )
+        }
+
         var ok = 0
         var fail = 0
         val fetchedByKey = mutableMapOf<Long, MutableMap<Protocol, MutableSet<String>>>()

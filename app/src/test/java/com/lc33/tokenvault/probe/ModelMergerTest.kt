@@ -125,6 +125,69 @@ class ModelMergerTest {
     // 解析层把 `["openai"]` 摊成 chat + responses 是事实，但照原样往下传就是同一个模型
     // 两行、界面上一份重复列表，而"消失即删"按协议各管一套，重复每刷新一次长回来一次。
 
+    // -------------------------------------------------- 跨协议孪生行的收口
+    //
+    // v8 迁移按"id 最小"保留幸存行，而**不校正它的协议**。于是幸存行若不是这把 Key 的首选
+    // 协议，旧语义下它永远删不掉（"消失即删"只认同协议的 `discoveredVia`），而插入守卫又只看
+    // 同协议的行、照样插一条——每刷新一次就整套孪生长回来一次，迁移等于白跑。
+
+    @Test
+    fun `本轮列表里的模型若躺在另一协议的发现行上则收掉并由本协议重建`() {
+        val twin = model(
+            7, "claude-opus-4-8",
+            protocol = Protocol.RESPONSES,
+            source = ModelSource.DISCOVERED,
+            discoveredVia = Protocol.RESPONSES,
+        )
+        val plan = ModelMerger.merge(
+            existing = listOf(twin),
+            fetched = listOf(fetched("claude-opus-4-8", Protocol.CHAT)),
+            thisProtocol = Protocol.CHAT,
+        )
+        assertEquals(listOf(7L), plan.toDelete)
+        assertEquals(listOf(NewDiscoveredModel("claude-opus-4-8", Protocol.CHAT)), plan.toInsert)
+        assertTrue(plan.toTouch.isEmpty())
+    }
+
+    @Test
+    fun `同模型已有本协议行时只 touch，不会既删又插`() {
+        val keep = model(3, "gpt-6-astra", source = ModelSource.DISCOVERED, discoveredVia = Protocol.CHAT)
+        val twin = model(
+            9, "gpt-6-astra",
+            protocol = Protocol.RESPONSES,
+            source = ModelSource.DISCOVERED,
+            discoveredVia = Protocol.RESPONSES,
+        )
+        val plan = ModelMerger.merge(
+            existing = listOf(keep, twin),
+            fetched = listOf(fetched("gpt-6-astra", Protocol.CHAT)),
+            thisProtocol = Protocol.CHAT,
+        )
+        assertEquals(listOf(3L), plan.toTouch)
+        assertEquals(listOf(9L), plan.toDelete)
+        assertTrue("只剩一行，不该再插", plan.toInsert.isEmpty())
+    }
+
+    @Test
+    fun `本轮没查到的模型不许跨协议连带删掉`() {
+        // 红线 30 的另一半：收孪生只在"本轮列表确实有这个模型"时才动手。
+        // 只拉了 CHAT 列表就把 ANTHROPIC 独占的模型删掉，等于替上游决定它没有这个模型。
+        val anthropicOnly = model(
+            5, "claude-opus-5",
+            protocol = Protocol.ANTHROPIC,
+            source = ModelSource.DISCOVERED,
+            discoveredVia = Protocol.ANTHROPIC,
+        )
+        val plan = ModelMerger.merge(
+            existing = listOf(anthropicOnly),
+            fetched = listOf(fetched("gpt-4o", Protocol.CHAT)),
+            thisProtocol = Protocol.CHAT,
+        )
+        assertTrue(plan.toDelete.isEmpty())
+        assertTrue(plan.toTouch.isEmpty())
+        assertEquals(listOf(NewDiscoveredModel("gpt-4o", Protocol.CHAT)), plan.toInsert)
+    }
+
     @Test
     fun `摊成多个协议的模型只留首选协议那一行`() {
         val folded = ModelMerger.oneProtocolPerModel(
