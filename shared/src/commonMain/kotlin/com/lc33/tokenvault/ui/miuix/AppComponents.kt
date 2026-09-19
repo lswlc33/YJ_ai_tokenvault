@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -962,6 +963,38 @@ class AppTextFieldState internal constructor(internal val state: TextFieldState)
     fun setText(text: String) {
         state.setTextAndPlaceCursorAtEnd(text)
     }
+
+    /**
+     * 用 [CharArray] 覆盖文本，**不先拼出一个擦不掉的 `String`**（红线 1）。
+     *
+     * 回填已存的 WebDAV 凭据用它：把值放进输入框是必要的（用户要看得见自己存的是什么、
+     * 忘了密码要能想起来），但中间产物不该再落一个进常量池的 String。输入框内部仍持有
+     * 这段文本——那是文本框不可避免的代价，所以用完照旧要 [clear]。
+     */
+    @OptIn(ExperimentalFoundationApi::class)
+    fun setText(chars: CharArray) {
+        clear()
+        if (chars.isEmpty()) return
+        state.edit {
+            replace(0, length, CharArraySequence(chars))
+            selection = TextRange(chars.size)
+        }
+    }
+}
+
+/**
+ * [CharArray] 的只读视图。
+ *
+ * 存在的唯一理由：输入框的写入口收 `CharSequence`，而 `CharArray` 不是——直接
+ * `String(chars)` 就能过，但那一份是进常量池、擦不掉的，正是要避免的那一步。
+ */
+private class CharArraySequence(private val source: CharArray) : CharSequence {
+    override val length: Int get() = source.size
+
+    override fun get(index: Int): Char = source[index]
+
+    override fun subSequence(startIndex: Int, endIndex: Int): CharSequence =
+        CharArraySequence(source.copyOfRange(startIndex, endIndex))
 }
 
 @Composable

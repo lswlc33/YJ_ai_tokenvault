@@ -14,7 +14,10 @@ interface WebDavSettingsRepository {
 
     /**
      * 保存非秘密配置。凭据传 null 表示保留原值；传非空 CharArray 才会覆盖。
-     * 这样改远程目录不需要重新输一遍密码，但也不会把已存密码解出来回填到 UI。
+     * 这样改远程目录不需要重新输一遍密码。
+     *
+     * 设置弹层会把已存的凭据**回填**给你看（[credentials]），所以"这一格留空"现在的意思
+     * 是"这一格不改"，不是"把它清空"——想真的删掉凭据得走清库/恢复，别指望留空。
      */
     suspend fun saveConfig(config: WebDavConfig, username: CharArray?, password: CharArray?)
 

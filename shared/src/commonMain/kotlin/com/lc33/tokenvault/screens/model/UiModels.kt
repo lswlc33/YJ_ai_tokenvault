@@ -22,6 +22,15 @@ enum class UiHealth {
 data class UiMoney(val currency: String, val amount: String)
 
 /**
+ * 远端 WebDAV 备份列表里的一行（§12.2）。
+ *
+ * [label] 由 shell 侧从文件名里那个 epoch 算成本地日期，页面不参与解析与格式化——
+ * 它拿不到平台时区，也不该知道 `yuanji-backup-<秒>.yjv` 这套命名。
+ * [fileName] 是恢复时要原样发回去的那个键。
+ */
+data class UiRemoteBackup(val fileName: String, val label: String)
+
+/**
  * 用户自定义的分组。管理页的筛选条就是它们。
  *
  * [id] 为 null 表示「全部」那一枚伪分组——它不入库，只是筛选条上的第一项。

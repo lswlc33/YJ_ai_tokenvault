@@ -6,6 +6,7 @@ import com.lc33.tokenvault.crypto.zeroize
 import com.lc33.tokenvault.domain.model.BackupTarget
 import com.lc33.tokenvault.domain.model.LastBackup
 import com.lc33.tokenvault.domain.model.WebDavConfig
+import com.lc33.tokenvault.domain.model.WebDavCredentials
 import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.domain.repo.WebDavSettingsRepository
 import com.lc33.tokenvault.engine.BackupEngine
@@ -183,6 +184,37 @@ class SyncViewModel constructor(
             }
         }
     }
+
+    /**
+     * 从 WebDAV 恢复**列表里被选中的那一份**。
+     *
+     * 与 [restoreLatestFromWebDav] 分两条路是刻意的：走列表时用户已经看到了文件名与日期，
+     * 恢复的就该是他点的那一条，而不是"再列一次取最大"——两次 PROPFIND 之间别人传了新备份，
+     * 后一种写法就会给他恢复成另一份。
+     */
+    fun restoreFromWebDav(fileName: String, password: CharArray, mode: RestoreMode) {
+        val owned = password.copyOf()
+        viewModelScope.launch {
+            _webDavBusy.value = true
+            try {
+                val result = webDavEngine.restore(fileName, owned, mode)
+                _events.send(SyncEvent.RestoreSucceeded(result.importedProviders))
+            } catch (t: Throwable) {
+                _events.send(SyncEvent.RestoreFailed)
+            } finally {
+                owned.zeroize()
+                _webDavBusy.value = false
+            }
+        }
+    }
+
+    /**
+     * 解出已存的 WebDAV 凭据，给设置弹层回填（2026-09 反馈：改一次配置要重输一遍，
+     * 忘了密码在应用里根本看不到）。**调用方负责用完 zeroize**——这里不擦是因为
+     * 拷进输入框之前擦掉就没有意义了。
+     */
+    suspend fun storedCredentials(): WebDavCredentials? =
+        runCatching { webDavSettings.credentials() }.getOrNull()
 
     /**
      * 记一次成功备份（时间 + 落点）到 `app_settings`。

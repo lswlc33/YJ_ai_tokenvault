@@ -56,10 +56,28 @@ class WebDavEngine constructor(
         withConnection { config, credentials ->
             val latest = client.listBackups(config, credentials).maxOrNull()
                 ?: throw com.lc33.tokenvault.net.WebDavNotFoundException("GET")
-            val bytes = client.get(config, credentials, latest)
-            backup.restore(bytes, password, mode)
+            restoreAt(config, credentials, latest, password, mode)
         }
     }
+
+    /**
+     * 恢复**列表里被选中的那一份**。
+     *
+     * 与 [restoreLatest] 分开是有意的：一次 PROPFIND 只用来列，选中哪一条由界面决定，
+     * 这里不再"取最大者"——用户点的是 9 月 3 日那份，就不该悄悄给他恢复昨天的。
+     */
+    suspend fun restore(fileName: String, password: CharArray, mode: RestoreMode): RestoreResult =
+        withAudit("restore") {
+            withConnection { config, credentials -> restoreAt(config, credentials, fileName, password, mode) }
+        }
+
+    private suspend fun restoreAt(
+        config: WebDavConfig,
+        credentials: WebDavCredentials,
+        fileName: String,
+        password: CharArray,
+        mode: RestoreMode,
+    ): RestoreResult = backup.restore(client.get(config, credentials, fileName), password, mode)
 
     private suspend fun <T> withConnection(
         block: suspend (WebDavConfig, WebDavCredentials) -> T,
@@ -102,6 +120,21 @@ class WebDavEngine constructor(
         const val DEFAULT_KEEP_COUNT = 10
 
         private const val BACKUP_PREFIX = "yuanji-backup-"
+
+        /**
+         * 文件名里那份备份的落盘时刻（epoch 毫秒）；不是本应用命名的返回 null。
+         *
+         * 上限取 2100 年的秒数：再往上的话 `* 1000` 就溢出成负数，界面会画出一个
+         * 1970 年前的日期。远端目录里被人塞进来的怪文件宁可退回显示文件名。
+         */
+        fun backupEpochMillis(fileName: String): Long? =
+            fileName.removePrefix(BACKUP_PREFIX)
+                .removeSuffix(WebDavClient.BACKUP_EXTENSION)
+                .toLongOrNull()
+                ?.takeIf { it in 1..MAX_EPOCH_SECONDS }
+                ?.times(1000)
+
+        private const val MAX_EPOCH_SECONDS = 4_102_444_800L
 
         fun backupFileName(epochMillis: Long): String =
             BACKUP_PREFIX + "${epochMillis / 1000}.yjv"

@@ -15,6 +15,7 @@ import com.lc33.tokenvault.domain.model.PredictiveBackExitDirection
 import com.lc33.tokenvault.endpoint.EndpointError
 import com.lc33.tokenvault.domain.model.PredictiveBackStyle
 import com.lc33.tokenvault.engine.RestoreMode
+import com.lc33.tokenvault.engine.WebDavEngine
 import com.lc33.tokenvault.platform.BiometricPromptText
 import com.lc33.tokenvault.platform.nowMillis
 import com.lc33.tokenvault.platform.openAppLocaleSettings
@@ -22,6 +23,7 @@ import com.lc33.tokenvault.platform.openExternalUrl
 import com.lc33.tokenvault.platform.rememberBackupFilePicker
 import com.lc33.tokenvault.screens.dashboard.BalanceBreakdownScreen
 import com.lc33.tokenvault.ui.common.LoadingState
+import com.lc33.tokenvault.ui.common.relativeLabel
 import com.lc33.tokenvault.screens.dashboard.DashboardScreen
 import com.lc33.tokenvault.screens.lock.ChangePinScreen
 import com.lc33.tokenvault.screens.manage.GroupsScreen
@@ -32,6 +34,7 @@ import com.lc33.tokenvault.screens.manage.ManageScreen
 import com.lc33.tokenvault.screens.manage.ProviderDetailScreen
 import com.lc33.tokenvault.screens.manage.ProviderEditorScreen
 import com.lc33.tokenvault.screens.model.BackupStatus
+import com.lc33.tokenvault.screens.model.UiRemoteBackup
 import com.lc33.tokenvault.screens.probe.ProbeRunScreen
 import com.lc33.tokenvault.screens.settings.AboutScreen
 import com.lc33.tokenvault.screens.settings.AppearanceScreen
@@ -1137,10 +1140,45 @@ private fun SyncRouteContent(
     var webDavPasswordRevealed by remember { mutableStateOf(false) }
     var allowInsecure by remember { mutableStateOf(false) }
     var remoteBackups by remember { mutableStateOf<List<String>?>(null) }
+    // 只有用户自己点「刷新远端列表」才配那一条"远端备份：N 份"的 toast；
+    // 进页面的自动拉取只更新列表。失败**仍然**照旧提示——那时它是唯一的信号。
+    var remoteListRequested by remember { mutableStateOf(false) }
+    // 走列表点进来的那一份。null = 走的是「从 WebDAV 恢复」那条老路（恢复最新）。
+    var pendingWebDavRestoreFile by remember { mutableStateOf<String?>(null) }
     val webDavUrlState = rememberAppTextFieldState()
     val webDavDirectoryState = rememberAppTextFieldState()
     val webDavUsernameState = rememberSecretTextFieldState()
     val webDavPasswordState = rememberSecretTextFieldState()
+
+    // 拉到的列表按"最近的在最前"排（引擎按文件名升序返回，时间戳就在文件名里）。
+    // 不 remember：几行字符串的排序成本，比让时间标签停在第一次拉取那一刻更划算。
+    val remoteRows = remoteBackups?.sortedDescending()?.map { name ->
+        UiRemoteBackup(
+            fileName = name,
+            label = WebDavEngine.backupEpochMillis(name)?.let { relativeLabel(nowMillis(), it) } ?: name,
+        )
+    }
+
+    // 配置就绪就拉一次：以前"远端到底有哪些包"得先点刷新才看得到，
+    // 而这一页要回答的正是这个问题。失败仍走既有的那条例外提示，不另发明文案。
+    LaunchedEffect(webDavConfig.isReady) {
+        if (webDavConfig.isReady) vm.listWebDavBackups()
+    }
+
+    // 打开凭据弹层时才解密文回填（2026-09 反馈：改一次配置要重输一遍，忘了密码也看不到）。
+    // 刻意等到打开之后再做：解一次字段级密文是挂起调用，不该为可能根本不看的弹层花。
+    LaunchedEffect(showWebDavSettings) {
+        if (!showWebDavSettings || !webDavConfig.hasCredentials) return@LaunchedEffect
+        val stored = vm.storedCredentials() ?: return@LaunchedEffect
+        try {
+            webDavUsernameState.setText(stored.username)
+            webDavPasswordState.setText(stored.password)
+        } finally {
+            stored.zeroize()
+        }
+        // 回填进来仍然是遮着的：看得见是"点一下眼睛"的结果，不是打开弹层的结果。
+        webDavPasswordRevealed = false
+    }
 
     LaunchedEffect(vm) {
         vm.events.collect { event ->
@@ -1161,7 +1199,10 @@ private fun SyncRouteContent(
                 }
                 is SyncEvent.WebDavListSucceeded -> {
                     remoteBackups = event.names
-                    feedback?.post(AppFeedback(getString(Res.string.sync_remote_count, event.names.size)))
+                    if (remoteListRequested) {
+                        remoteListRequested = false
+                        feedback?.post(AppFeedback(getString(Res.string.sync_remote_count, event.names.size)))
+                    }
                 }
                 is SyncEvent.WebDavUploadSucceeded ->
                     feedback?.post(
@@ -1207,7 +1248,7 @@ private fun SyncRouteContent(
         backup = backup,
         webDavConfig = webDavConfig,
         webDavBusy = webDavBusy,
-        remoteBackups = remoteBackups,
+        remoteBackups = remoteRows,
         onBack = onBack,
         onExport = { pendingAction = PendingSyncAction.Export },
         onImport = { pendingAction = PendingSyncAction.Import },
@@ -1222,8 +1263,19 @@ private fun SyncRouteContent(
             showWebDavSettings = true
         },
         onUploadWebDav = { pendingAction = PendingSyncAction.WebDavUpload },
-        onRestoreWebDav = { pendingAction = PendingSyncAction.WebDavRestore },
-        onRefreshWebDav = vm::listWebDavBackups,
+        onRestoreWebDav = {
+            // 老入口 = 恢复最新那一份，清掉上一次的选中值，别让它替这一次做主。
+            pendingWebDavRestoreFile = null
+            pendingAction = PendingSyncAction.WebDavRestore
+        },
+        onRestoreRemote = { fileName ->
+            pendingWebDavRestoreFile = fileName
+            pendingAction = PendingSyncAction.WebDavRestore
+        },
+        onRefreshWebDav = {
+            remoteListRequested = true
+            vm.listWebDavBackups()
+        },
     )
 
     AppDialog(
@@ -1371,14 +1423,23 @@ private fun SyncRouteContent(
         onDismiss = {
             pendingWebDavPassword?.zeroize()
             pendingWebDavPassword = null
+            pendingWebDavRestoreFile = null
             webDavRestoreModePicker = false
         },
         onChosen = { mode ->
             pendingWebDavPassword?.let {
-                vm.restoreLatestFromWebDav(it, mode)
+                // 从列表点进来的就恢复那一份，别再"列一次取最大"——两次 PROPFIND 之间
+                // 别人传了新备份的话，那样会把用户刚选的那一份换掉。
+                val fileName = pendingWebDavRestoreFile
+                if (fileName == null) {
+                    vm.restoreLatestFromWebDav(it, mode)
+                } else {
+                    vm.restoreFromWebDav(fileName, it, mode)
+                }
                 it.zeroize()
             }
             pendingWebDavPassword = null
+            pendingWebDavRestoreFile = null
             webDavRestoreModePicker = false
         },
     )

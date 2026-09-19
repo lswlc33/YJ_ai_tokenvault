@@ -18,6 +18,8 @@ import tokenvault.shared.generated.resources.sync_import
 import tokenvault.shared.generated.resources.sync_import_summary
 import tokenvault.shared.generated.resources.sync_passphrase_summary
 import tokenvault.shared.generated.resources.sync_remote_count
+import tokenvault.shared.generated.resources.sync_remote_empty
+import tokenvault.shared.generated.resources.sync_remote_section
 import tokenvault.shared.generated.resources.sync_section_local
 import tokenvault.shared.generated.resources.sync_section_webdav
 import tokenvault.shared.generated.resources.sync_title
@@ -34,6 +36,7 @@ import com.lc33.tokenvault.domain.model.WebDavConfig
 import com.lc33.tokenvault.platform.nowMillis
 import com.lc33.tokenvault.screens.model.BackupStatus
 import com.lc33.tokenvault.screens.model.UiBackupTarget
+import com.lc33.tokenvault.screens.model.UiRemoteBackup
 import com.lc33.tokenvault.ui.common.relativeLabel
 import com.lc33.tokenvault.ui.miuix.AppActionRow
 import com.lc33.tokenvault.ui.miuix.AppArrowRow
@@ -61,13 +64,14 @@ fun SyncScreen(
     backup: BackupStatus,
     webDavConfig: WebDavConfig,
     webDavBusy: Boolean,
-    remoteBackups: List<String>?,
+    remoteBackups: List<UiRemoteBackup>?,
     onBack: () -> Unit,
     onExport: () -> Unit,
     onImport: () -> Unit,
     onOpenWebDavSettings: () -> Unit,
     onUploadWebDav: () -> Unit,
     onRestoreWebDav: () -> Unit,
+    onRestoreRemote: (String) -> Unit,
     onRefreshWebDav: () -> Unit,
 ) {
     val tokens = LocalAppTokens.current
@@ -119,6 +123,35 @@ fun SyncScreen(
                     onClick = onRefreshWebDav,
                     enabled = webDavConfig.isReady && !webDavBusy,
                 )
+            }
+        }
+        // 拉到的备份逐条列在这里（2026-09 反馈：只有"恢复最新"一个入口，等于只能回到昨天）。
+        // null = 还没拉取，这一段不画；空列表照画——"远端确实没有包"和"还没点刷新"
+        // 是两件事，都缩成不画就分不出来了。
+        if (webDavConfig.isReady && remoteBackups != null) {
+            item { SectionTitle(text = stringResource(Res.string.sync_remote_section)) }
+            if (remoteBackups.isEmpty()) {
+                item {
+                    AppText(
+                        text = stringResource(Res.string.sync_remote_empty),
+                        style = AppTextStyle.Footnote,
+                        color = appSecondaryTextColor,
+                        modifier = Modifier.padding(horizontal = tokens.screenPadding),
+                    )
+                }
+            } else {
+                item {
+                    AppPreferenceGroup {
+                        remoteBackups.forEach { row ->
+                            AppArrowRow(
+                                title = row.label,
+                                summary = row.fileName,
+                                enabled = !webDavBusy,
+                                onClick = { onRestoreRemote(row.fileName) },
+                            )
+                        }
+                    }
+                }
             }
         }
         item {

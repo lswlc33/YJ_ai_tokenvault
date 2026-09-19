@@ -350,7 +350,7 @@
     <string name="sync_webdav_password_label">Password</string>
     <string name="sync_webdav_password_reveal">Show password</string>
     <string name="sync_webdav_password_hide">Hide password</string>
-    <string name="sync_webdav_credentials_keep">Saved credentials are kept; only a new value overwrites them</string>
+    <string name="sync_webdav_credentials_keep">Prefilled with the saved credentials. Leave a field blank to keep that one unchanged.</string>
     <string name="sync_webdav_credentials_required">Initial setup needs both username and password</string>
     <string name="sync_webdav_insecure_required">Allow insecure HTTP</string>
     <string name="sync_insecure_http_warning">Basic credentials and the backup file would be sent in the clear. Enable only on a trusted self-hosted network.</string>
@@ -361,6 +361,8 @@
     <string name="sync_webdav_refresh">Refresh remote list</string>
     <string name="sync_webdav_refresh_summary">Read-only; nothing is uploaded or modified</string>
     <string name="sync_remote_count">Remote backups: %1$d</string>
+    <string name="sync_remote_section">Remote backups</string>
+    <string name="sync_remote_empty">No backup package in that remote directory yet.</string>
     <string name="sync_result_webdav_configured">WebDAV settings saved</string>
     <string name="sync_result_webdav_uploaded">Uploaded %1$s and pruned %2$d old backups</string>
     <string name="sync_export">Export an encrypted backup</string>

@@ -345,7 +345,7 @@
     <string name="sync_webdav_password_label">密码</string>
     <string name="sync_webdav_password_reveal">显示密码</string>
     <string name="sync_webdav_password_hide">隐藏密码</string>
-    <string name="sync_webdav_credentials_keep">已保存的凭据会保留，输入新值才会覆盖</string>
+    <string name="sync_webdav_credentials_keep">已回填当前保存的凭据。哪一格留空，就表示这一格不改。</string>
     <string name="sync_webdav_credentials_required">首次配置需要同时填用户名和密码</string>
     <string name="sync_webdav_insecure_required">允许明文 HTTP</string>
     <string name="sync_insecure_http_warning">Basic 凭据与备份文件将以明文传输，仅在可信的自建网络中启用</string>
@@ -356,6 +356,8 @@
     <string name="sync_webdav_refresh">刷新远端列表</string>
     <string name="sync_webdav_refresh_summary">只读操作，不会上传或修改数据</string>
     <string name="sync_remote_count">远端备份：%1$d 份</string>
+    <string name="sync_remote_section">远端备份</string>
+    <string name="sync_remote_empty">那个远端目录里还没有备份包。</string>
     <string name="sync_result_webdav_configured">WebDAV 设置已保存</string>
     <string name="sync_result_webdav_uploaded">已上传 %1$s，清理 %2$d 份旧备份</string>
     <string name="sync_export">导出加密备份</string>
