@@ -14,7 +14,10 @@ import platform.Foundation.timeIntervalSince1970
  *
  * §8.1 的超时语义在 iOS 上要显式配：NSURLSession 没有 connect / read 分开的概念，
  * 只有"这个请求多久没进展算超时"（`timeoutIntervalForRequest`）与"整个资源最多给多久"
- * （`timeoutIntervalForResource`），对应 Android/JVM 那侧的 read 20s / call 35s。
+ * （`timeoutIntervalForResource`），对应 Android/JVM 那侧的 read / call 两个入参。
+ * 探测传的是 §8.1 那张表的 20s / 35s，WebDAV 传的是更宽的一档（见
+ * `WEBDAV_SOCKET_TIMEOUT_MS`）——`timeoutIntervalForResource` 是会话级的，
+ * 所以这个数只能由引擎拿到，per-request 的 `timeout {}` 盖不住它。
  * 不配的话用系统默认（60s / 7 天），一轮探测的总预算会被单个慢请求吃掉。
  *
  * Key 上自己的 `timeoutSeconds` 走 `buildClient()` 装的 HttpTimeout 插件：Darwin 引擎把
@@ -25,10 +28,10 @@ import platform.Foundation.timeIntervalSince1970
  * `willPerformHTTPRedirection` 直接回 `null`（3xx 原样交回），与 `buildClient()` 里
  * `followRedirects = false` 一致——三端都拿到 3xx，分类结论才不会两端分叉。
  */
-actual fun platformEngine(): HttpClientEngine = Darwin.create {
+actual fun platformEngine(readTimeoutMs: Long, callTimeoutMs: Long): HttpClientEngine = Darwin.create {
     configureSession {
-        timeoutIntervalForRequest = ENGINE_SOCKET_TIMEOUT_MS / 1000.0
-        timeoutIntervalForResource = ENGINE_CALL_TIMEOUT_MS / 1000.0
+        timeoutIntervalForRequest = readTimeoutMs / 1000.0
+        timeoutIntervalForResource = callTimeoutMs / 1000.0
     }
 }
 

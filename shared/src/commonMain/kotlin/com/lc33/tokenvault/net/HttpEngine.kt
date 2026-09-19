@@ -263,8 +263,14 @@ class InsecureEndpointException(message: String) : Exception(message)
  *
  * Android/JVM → OkHttp 引擎；iOS → Darwin 引擎。并发上限、TLS 配置都在各 actual
  * 里按 §8.1 那张表配好，`HttpEngine` 不关心底层是谁。
+ *
+ * 两个超时做成参数而不是常量：备份那条路要走的预算和探测不是一回事（见
+ * [WEBDAV_SOCKET_TIMEOUT_MS]），而探测那一档是 §8.1 定下来的，不能为了备份去改它。
  */
-expect fun platformEngine(): HttpClientEngine
+expect fun platformEngine(
+    readTimeoutMs: Long = ENGINE_SOCKET_TIMEOUT_MS,
+    callTimeoutMs: Long = ENGINE_CALL_TIMEOUT_MS,
+): HttpClientEngine
 
 /**
  * 建默认 client。DI 里单例，供 [HttpEngine] 与 [WebDavClient] 共用。
@@ -282,11 +288,17 @@ expect fun platformEngine(): HttpClientEngine
  *    Darwin 引擎把 `socketTimeoutMillis` 当成 NSURLRequest 的超时用（iOS 没有
  *    connect/read 分开的概念），OkHttp 侧引擎工厂已经配好 8/20/35s，值一样、不冲突。
  */
-fun buildClient(): HttpClient = HttpClient(platformEngine()) {
+fun buildClient(
+    readTimeoutMs: Long = ENGINE_SOCKET_TIMEOUT_MS,
+    callTimeoutMs: Long = ENGINE_CALL_TIMEOUT_MS,
+): HttpClient = HttpClient(platformEngine(readTimeoutMs, callTimeoutMs)) {
     followRedirects = false
     install(HttpTimeout) {
         connectTimeoutMillis = ENGINE_CONNECT_TIMEOUT_MS
-        socketTimeoutMillis = ENGINE_SOCKET_TIMEOUT_MS
+        socketTimeoutMillis = readTimeoutMs
+        // requestTimeoutMillis 也要写：iOS 上 Darwin 只认 socket 那一个（见上面第 2 条），
+        // 但整体上限得由插件也管一份，三端才是同一个预算。
+        requestTimeoutMillis = callTimeoutMs
     }
 }
 
@@ -298,6 +310,21 @@ const val ENGINE_SOCKET_TIMEOUT_MS = 20_000L
 
 /** §8.1：call 35s。iOS 侧对应 `timeoutIntervalForResource`（整个资源给多久，含重连）。 */
 const val ENGINE_CALL_TIMEOUT_MS = 35_000L
+
+/**
+ * WebDAV 的读超时：90s。
+ *
+ * 探测那档 20s 是给"这家 API 到底活没活"用的，备份不是同一件事：中转站类
+ * （Alist / CloudDrive 挂在 OneDrive、阿里云盘之类之后）在 token 冷的时候，
+ * 光是换回那一个 302 就要十几到几十秒。实测某 Alist + OneDrive 端点：热 token 下
+ * 首字节 2.9–6.3s、整包 6.8–9.6s，冷的时候同一条 GET 直接超过 20s——
+ * 于是日志里只有 `Socket timeout has expired [..., socket_timeout=20000]`，
+ * 用户在界面上看到的是一句"恢复失败"。给到 90s 覆盖冷启动，仍然远小于"卡死"。
+ */
+const val WEBDAV_SOCKET_TIMEOUT_MS = 90_000L
+
+/** WebDAV 的整次调用上限：5 分钟。备份包是几 MB 级，蜂窝网上行慢也要留够。 */
+const val WEBDAV_CALL_TIMEOUT_MS = 300_000L
 
 /** 单调时钟。commonMain 拿不到 `System`，注入（红线 20）。 */
 internal expect fun clockMillis(): Long

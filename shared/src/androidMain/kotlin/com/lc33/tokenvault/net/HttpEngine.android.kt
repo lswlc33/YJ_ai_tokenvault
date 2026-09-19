@@ -7,7 +7,7 @@ import java.util.concurrent.TimeUnit
 /**
  * Android 端引擎：OkHttp 引擎（§8.1 那张表）。
  *
- * - connect 8s / read 20s / call 35s；
+ * - connect 8s；read / call 由调用方给（探测走 §8.1 的 20s / 35s，备份走更宽的档）。
  * - dispatcher maxRequests 8、maxRequestsPerHost 3（中转站普遍限流）。
  *
  * **显式关掉重定向跟随**：OkHttp 默认会把 301/302 悄悄跟完再回一个 200，而 iOS 那侧的
@@ -15,11 +15,11 @@ import java.util.concurrent.TimeUnit
  * 所以这里跟着 `buildClient()` 的 `followRedirects = false` 一起关（Ktor 的 client 层
  * 插件与 OkHttp 引擎层各管一头，两处都要关才真的不跟）。
  */
-actual fun platformEngine(): HttpClientEngine = OkHttp.create {
+actual fun platformEngine(readTimeoutMs: Long, callTimeoutMs: Long): HttpClientEngine = OkHttp.create {
     preconfigured = okhttp3.OkHttpClient.Builder()
         .connectTimeout(ENGINE_CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-        .readTimeout(ENGINE_SOCKET_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-        .callTimeout(ENGINE_CALL_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        .readTimeout(readTimeoutMs, TimeUnit.MILLISECONDS)
+        .callTimeout(callTimeoutMs, TimeUnit.MILLISECONDS)
         .followRedirects(false)
         .followSslRedirects(false)
         .retryOnConnectionFailure(true)

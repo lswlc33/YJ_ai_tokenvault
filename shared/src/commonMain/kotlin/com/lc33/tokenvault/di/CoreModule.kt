@@ -232,7 +232,20 @@ val coreModule = module {
             scope = get(named(Qualifiers.APP_SCOPE)),
         )
     }
-    single { WebDavClient(get(), audit = get()) }
+    // 备份单独一个 client，不复用上面那个探测用的：中转站类（Alist / CloudDrive 挂在
+    // OneDrive、阿里云盘之类之后）在 token 冷的时候，光换一个下载用的 302 就能超过
+    // §8.1 那档 20s 读超时，表现是"恢复失败"而日志里只有一句 socket_timeout=20000。
+    // iOS 侧更紧：`timeoutIntervalForResource` 是会话级的，只能由引擎拿到，所以预算
+    // 必须在建 client 时给，per-request 盖不住。
+    single {
+        WebDavClient(
+            com.lc33.tokenvault.net.buildClient(
+                readTimeoutMs = com.lc33.tokenvault.net.WEBDAV_SOCKET_TIMEOUT_MS,
+                callTimeoutMs = com.lc33.tokenvault.net.WEBDAV_CALL_TIMEOUT_MS,
+            ),
+            audit = get(),
+        )
+    }
     single {
         WebDavEngine(
             settings = get(), backup = get(), client = get(), audit = get(),
