@@ -18,6 +18,7 @@ import com.lc33.tokenvault.screens.lock.LockUiState
 import com.lc33.tokenvault.screens.lock.OnboardingStep
 import com.lc33.tokenvault.screens.lock.PinError
 import com.lc33.tokenvault.screens.lock.UnlockUiState
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -163,15 +164,23 @@ class LockViewModel constructor(
         val pin = takePin()
         setBusy(true)
         viewModelScope.launch {
-            val result = withContext(Dispatchers.Default) {
-                try {
-                    session.unlockWithPin(pin)
-                } finally {
-                    // 无论成败都擦：成功时 DEK 已经在会话里，这份 PIN 再无用处
-                    pin.zeroize()
+            // busy 一定要在 finally 里摘：`unlockWithPin` 理论上不抛（结构性问题都收进了
+            // `UnlockResult.Unavailable`），可它一旦抛了就再也不会有人来执行下面那句
+            // `setBusy(false)`，而 `onPinDigit` 第一行就是 `if (busy()) return`——锁屏会永远
+            // 按不动，比崩一次更没出路。不把异常顺手接成 `Unavailable`：那一档会把阶段钉到
+            // BootCorrupt（"清空重来"页），拿一次偶发异常去劝用户清库是不可接受的。
+            val result = try {
+                withContext(Dispatchers.Default) {
+                    try {
+                        session.unlockWithPin(pin)
+                    } finally {
+                        // 无论成败都擦：成功时 DEK 已经在会话里，这份 PIN 再无用处
+                        pin.zeroize()
+                    }
                 }
+            } finally {
+                setBusy(false)
             }
-            setBusy(false)
             applyUnlockResult(result)
         }
     }
@@ -224,8 +233,20 @@ class LockViewModel constructor(
         if (busy()) return
         viewModelScope.launch {
             setBusy(true)
-            val outcome = vault.unlock(currentBiometricBlob(), prompt)
-            setBusy(false)
+            // **这一句必须包起来。** 平台侧 `unlock` 里那发 `BiometricPrompt.authenticate` 没包
+            // 异常（Activity 刚重建、不是 resumed 状态时系统会抛），而锁屏是所有输入的必经口子：
+            // 冒出协程就是崩进程，而 `setBusy(false)` 写在下一行的话即使被人接住也永不执行——
+            // `onPinDigit`/`onPinBackspace` 第一行都是 `if (busy()) return`，于是锁屏彻底按不动。
+            // 抛出来这一次就按"这一步没成、请用 PIN"处理，摘 busy 放进 finally。
+            val outcome = try {
+                vault.unlock(currentBiometricBlob(), prompt)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Throwable) {
+                BiometricUnlockOutcome.Error("biometric call failed")
+            } finally {
+                setBusy(false)
+            }
             when (outcome) {
                 BiometricUnlockOutcome.Success -> {
                     clearError()

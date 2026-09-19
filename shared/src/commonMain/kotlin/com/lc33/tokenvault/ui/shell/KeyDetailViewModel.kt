@@ -61,6 +61,12 @@ class KeyDetailViewModel constructor(
 
         /** 删除 / 移位这类本地写入失败了。不说一句"失败了"，用户只会以为按钮坏了。 */
         data object WriteFailed : Event
+
+        /**
+         * 「查看密钥」解不开。不提示的话点一下什么也不发生，而从别的设备恢复来的库
+         * 必然走到这一支（密文在、DEK 不是那一把）。
+         */
+        data object RevealFailed : Event
     }
 
     private val _events = Channel<Event>(Channel.BUFFERED)
@@ -131,7 +137,11 @@ class KeyDetailViewModel constructor(
         viewModelScope.launch {
             val plain = withContext(Dispatchers.Default) {
                 runCatching { keys.reveal(keyId) }.getOrNull()
-            } ?: return@launch
+            }
+            if (plain == null) {
+                _events.trySend(Event.RevealFailed)
+                return@launch
+            }
             revealedPlain?.zeroize()
             revealedPlain = plain
             knownSecrets.add(plain)

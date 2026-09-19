@@ -218,6 +218,12 @@ abstract class VaultDatabase : RoomDatabase() {
                 // 外键在迁移期间是不是真的关着，取决于运行时（见 `reconcileForeignKeys`），
                 // 所以先留一份 seed，末尾把被连带删掉的行原样补回来——配置不能靠赌。
                 connection.execSQL("CREATE TEMP TABLE key_settings_seed AS SELECT * FROM key_settings")
+                // 同一份"不靠赌"必须覆盖到这两张子表：它们同样是 `ON DELETE CASCADE` 的下游
+                // （`models.keyId` → api_keys，`provider_accounts.providerId` → providers），
+                // 而本跳不重建它们，所以 `SELECT *` 就够。只 seed `key_settings` 的话，级联真
+                // 发生时补回来的只有配置——模型列表与账号会静默消失（4→5 那份就是两张都留）。
+                connection.execSQL("CREATE TEMP TABLE models_seed AS SELECT * FROM models")
+                connection.execSQL("CREATE TEMP TABLE provider_accounts_seed AS SELECT * FROM provider_accounts")
 
                 // 2) api_keys：去掉 isDefault，补 note，保留原 id / 外键 / 探测结果。
                 connection.execSQL(
@@ -329,6 +335,23 @@ abstract class VaultDatabase : RoomDatabase() {
                     """.trimIndent(),
                 )
                 connection.execSQL("DROP TABLE key_settings_seed")
+                // 同上：按主键判缺，两边都在的行不会被这一句重复插。
+                connection.execSQL(
+                    """
+                    INSERT INTO models
+                    SELECT * FROM models_seed s
+                    WHERE s.id NOT IN (SELECT id FROM models)
+                    """.trimIndent(),
+                )
+                connection.execSQL("DROP TABLE models_seed")
+                connection.execSQL(
+                    """
+                    INSERT INTO provider_accounts
+                    SELECT * FROM provider_accounts_seed s
+                    WHERE s.id NOT IN (SELECT id FROM provider_accounts)
+                    """.trimIndent(),
+                )
+                connection.execSQL("DROP TABLE provider_accounts_seed")
 
                 connection.reconcileForeignKeys("2->3")
             }

@@ -59,6 +59,10 @@ class RoomModelRepository constructor(
                 sortOrder = dao.findByProviderAndKey(providerId, keyId).size,
             ),
         ).also { id ->
+            // `IGNORE` 撞上唯一索引时返回 -1：什么都没插进去，就别再记一条
+            // "model added id=-1"。调用方拿这个 -1 判断"是不是重复了"（编辑页要为此
+            // 单独说一句），导入链路则按"跳过"处理，所以这里不把 -1 变成异常。
+            if (id <= 0L) return@also
             audit.recordSafe(LogLevel.INFO, LogCategory.VAULT, "model added", "id=$id modelId=${modelId.trim()}", providerId = providerId, keyId = keyId)
         }
     }

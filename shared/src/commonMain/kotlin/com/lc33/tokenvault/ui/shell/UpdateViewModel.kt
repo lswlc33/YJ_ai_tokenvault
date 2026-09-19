@@ -26,6 +26,8 @@ import kotlinx.coroutines.launch
 class UpdateViewModel constructor(
     private val updateEngine: UpdateEngine,
     private val settings: SettingsRepository,
+    // 与外观页/探测设置页同一套：写不进去要报一句，而不是让 `dao.put` 的异常冒出协程。
+    private val failures: SettingsFailures,
 ) : ViewModel() {
 
     /** 更新检查的状态。初始为 [Phase.IDLE]，用户点「立即检查」前不主动联网。 */
@@ -56,7 +58,7 @@ class UpdateViewModel constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
 
     fun onUpdateChannelChange(channel: Int) {
-        viewModelScope.launch { settings.setUpdateChannel(channel) }
+        viewModelScope.launch { failures.guard { settings.setUpdateChannel(channel) } }
     }
 
     /**

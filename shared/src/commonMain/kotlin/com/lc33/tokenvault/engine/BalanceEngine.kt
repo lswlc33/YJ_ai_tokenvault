@@ -108,10 +108,27 @@ class BalanceEngine constructor(
                 revealKey(key.id)?.also { knownSecrets.add(it) }
             }
             try {
-                val request = withClientProfile(
-                    adapter.buildRequest(effectiveSettings, keySecret, token),
-                    profile,
-                )
+                // `buildRequest` 也会抛 `BalanceParseException`（`CustomJsonAdapter` 在 headers
+                // 被配成对象/数组时抛 bad_headers_config / bad_header_value_*）。它以前落在
+                // 下面那个只管 `parse` 的 catch 之外：异常一路冲出 `refreshAll` 的 for 循环，
+                // **后面每一把 Key 都不再刷余额**，而四个调用点全是 `runCatching` —— 用户看到的
+                // 就是"余额永远不动、零提示"。这里把它收成这一把 Key 的失败快照。
+                val request = try {
+                    withClientProfile(
+                        adapter.buildRequest(effectiveSettings, keySecret, token),
+                        profile,
+                    )
+                } catch (error: BalanceParseException) {
+                    val failed = BalanceSnapshot(
+                        amount = null,
+                        currency = BalanceSnapshot.UNKNOWN_CURRENCY,
+                        checkedAt = now(),
+                        error = error.reason,
+                    )
+                    keys.updateBalance(key.id, failed)
+                    auditBalance(key.providerId, key.id, failed)
+                    return failed
+                }
                 val response = engine.execute(request, allowInsecure = effectiveSettings.allowInsecure)
                 val snapshot = response.error?.let { error ->
                     BalanceSnapshot(

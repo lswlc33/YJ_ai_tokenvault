@@ -96,7 +96,12 @@ class AndroidSecureClipboard(
         val ours = String(value)
         clearJob = scope.launch {
             delay(effectiveSeconds * 1000L)
-            if (currentText() == ours) clearNow()
+            val now = currentText()
+            // 读不回来时也清。Android 12 起，非聚焦应用读 `primaryClip` 只能拿到遮蔽过的
+            // 空值，于是 `now == ours` 在**主场景**（复制完切去别处粘贴，那一刻我们必然在后台）
+            // 永远不成立——这份明文密钥就永远留在剪贴板上，而这个类存在的理由就是不让它留着。
+            // 两边代价不对等：误吞的只是用户这 60 秒里新复制的东西，漏清的是密钥。
+            if (now == null || now.isEmpty() || now == ours) clearNow()
         }
     }
 
@@ -119,12 +124,18 @@ class AndroidSecureClipboard(
             clearJob?.cancel()
             clearJob = scope.launch {
                 delay(remainingMs)
-                if (currentLabel() == label) clearNow()
+                // 判据与上面那条一致：读不出标签（后台限制）时也清，理由见 `recoverOverdueClear`
+                // 末尾那段注释。
+                val seen = currentLabel()
+                if (label == null || seen == null || seen == label) clearNow()
             }
             return
         }
-        if (label != null && currentLabel() != label) {
-            // 已经不是我们那份了：这条记录的历史使命结束。
+        val seen = currentLabel()
+        if (label != null && seen != null && seen != label) {
+            // 只有**读得出来、且确实不是我们那份**才放弃这条记录。Android 12 起后台读剪贴板
+            // 拿到的是遮蔽过的空值（`currentLabel()` 于是为 null），按旧写法就是"永远认不出、
+            // 于是永远不清"——而那份明文正躺在剪贴板上等着被清。
             prefs.edit().remove(KEY_CLEAR_AT).remove(KEY_LABEL).apply()
             return
         }

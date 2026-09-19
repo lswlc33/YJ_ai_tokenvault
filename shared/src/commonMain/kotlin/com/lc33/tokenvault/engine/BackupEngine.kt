@@ -18,6 +18,8 @@ import com.lc33.tokenvault.domain.model.LogCategory
 import com.lc33.tokenvault.domain.model.LogLevel
 import com.lc33.tokenvault.domain.repo.AuditLogRepository
 import kotlinx.serialization.json.Json
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * 备份与恢复的编排（§12.1）。
@@ -61,7 +63,11 @@ class BackupEngine constructor(
         // 导出也挂起前台空闲锁定（§7.4）：导出大库要 reveal 全部密钥，中途被锁会丢进度。
         autoLocker.pauseIdleLock()
         try {
-            return exportInner(password)
+            // **切走主线程。** 这条链上是 PBKDF2（默认 21 万轮、封顶 60 万）+ 整库 gzip + AES，
+            // 而 `BackupCodec` 用的是 `deriveSecretToByteArrayBlocking`——不是 suspend，自己不会
+            // 挑线程。调用方（SyncViewModel）又跑在 `viewModelScope`（Main.immediate）上，
+            // 于是每按一次"导出备份"主线程就连续算几百毫秒到一秒级。
+            return withContext(Dispatchers.Default) { exportInner(password) }
         } finally {
             autoLocker.resumeIdleLock()
         }
@@ -142,7 +148,8 @@ class BackupEngine constructor(
         // 恢复同样挂起前台空闲锁定（§7.4），finally 保证任何退出路径（含重抛）都恢复。
         autoLocker.pauseIdleLock()
         try {
-            return restoreInner(bytes, password, mode)
+            // 与 [export] 同理：解包那一下是同一发阻塞式 PBKDF2，之后还要逐表写库。
+            return withContext(Dispatchers.Default) { restoreInner(bytes, password, mode) }
         } finally {
             autoLocker.resumeIdleLock()
         }

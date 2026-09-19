@@ -45,6 +45,7 @@ import com.lc33.tokenvault.engine.RefreshRound
 import com.lc33.tokenvault.engine.UpdateEngine
 import com.lc33.tokenvault.engine.VaultRefreshRound
 import com.lc33.tokenvault.engine.WebDavEngine
+import com.lc33.tokenvault.engine.scopeCrashGuard
 import com.lc33.tokenvault.net.HostGate
 import com.lc33.tokenvault.net.HttpEngine
 import com.lc33.tokenvault.net.WebDavClient
@@ -106,8 +107,10 @@ val coreModule = module {
 
     // ------------------------------------------------------------------ 基础能力
 
+    // 挂 [scopeCrashGuard]：活在这个作用域上的协程（TokenVaultApp 里的建库 seed 与三条进程级
+    // 订阅）没有父协程接异常，默认处理器直接杀进程，而它们偏偏最容易崩在"库打不开"上。
     single(named(Qualifiers.APP_SCOPE)) {
-        CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        CoroutineScope(SupervisorJob() + Dispatchers.Default + scopeCrashGuard)
     }
 
     single<RandomBytes> { SecureRandomBytes }

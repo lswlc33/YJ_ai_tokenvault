@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
@@ -135,7 +136,10 @@ fun ProviderEditorScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .appTopBarScroll(scrollState),
+                .appTopBarScroll(scrollState)
+                // 这一页以前漏了它：edge-to-edge 之后 manifest 的 adjustResize 不再生效，
+                // 没有 imePadding 就是键盘直接盖住正在输入的那一行（Key/Profile/导入三页都有）。
+                .imePadding(),
             contentPadding = padding,
         ) {
             // 读不到那一行要挂在页面上，不能只飘一条 toast：这一页的长相与"新建一家"

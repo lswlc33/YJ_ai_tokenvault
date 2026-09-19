@@ -12,8 +12,7 @@ import io.ktor.client.request.header
 import io.ktor.client.request.request
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
-import io.ktor.client.statement.bodyAsBytes
-import io.ktor.client.statement.bodyAsText
+import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
@@ -21,6 +20,7 @@ import io.ktor.http.URLBuilder
 import io.ktor.http.contentType
 import io.ktor.http.decodeURLPart
 import io.ktor.http.takeFrom
+import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.CancellationException
 import com.lc33.tokenvault.crypto.zeroize
 import kotlin.io.encoding.Base64
@@ -45,7 +45,7 @@ class WebDavClient constructor(
                 setBody(PROP_REQUEST_BODY)
             }
             ensureSuccess(response.status.value, "PROPFIND")
-            response.status.value to parseBackupNames(response.bodyAsText())
+            response.status.value to parseBackupNames(response.readBytesCapped().decodeToString())
         }
 
     suspend fun put(config: WebDavConfig, credentials: WebDavCredentials, fileName: String, bytes: ByteArray) {
@@ -62,7 +62,7 @@ class WebDavClient constructor(
         logged("GET", remoteFileUrl(config, fileName)) {
             val response = requestDav("GET", remoteFileUrl(config, fileName), credentials)
             ensureSuccess(response.status.value, "GET")
-            response.status.value to response.bodyAsBytes()
+            response.status.value to response.readBytesCapped()
         }
 
     suspend fun delete(config: WebDavConfig, credentials: WebDavCredentials, fileName: String) {
@@ -71,6 +71,38 @@ class WebDavClient constructor(
             ensureSuccess(response.status.value, "DELETE")
             response.status.value to Unit
         }
+    }
+
+    /**
+     * 按块读响应体并封顶。与 [HttpEngine] 里那份 `readBodyCapped` 同一个道理，只是上限换成
+     * 备份包的量级（那边 512KB 是给模型列表用的，套到这里会把正常备份判成非法）。
+     *
+     * `bodyAsBytes()` 会把上游给的全部读进内存，而上游给多少完全不看我们的脸色：
+     * `remoteDirectory` 填错指到一个视频、或网盘目录里有一个同名的大文件，几百 MB 先进内存、
+     * 再整份 gunzip（[com.lc33.tokenvault.engine.BackupEngine]）——低端机直接 OOM 闪退。
+     * 整库导出是"明文 JSON + gzip + AES"，几百把 Key 也就几 MB，32MB 封顶不误伤正常包。
+     */
+    private suspend fun HttpResponse.readBytesCapped(): ByteArray {
+        val channel = bodyAsChannel()
+        val buffer = ByteArray(MAX_DOWNLOAD_BYTES)
+        var total = 0
+        while (total < buffer.size) {
+            val read = channel.readAvailable(buffer, total, buffer.size - total)
+            if (read < 0) break
+            total += read
+        }
+        // 下一字节要用独立的单字节数组探：读进 buffer[0] 会把已经拿到的头一个字节覆盖掉。
+        val probe = ByteArray(1)
+        if (total == buffer.size && channel.readAvailable(probe, 0, 1) > 0) {
+            channel.cancel(null)
+            // 抛异常而不是截断：截断会让下面那道 gzip/AES 拿到半份文件，报出来的就是
+            // "口令错或包损坏"，把真原因（文件大得离谱）盖掉了。恢复失败这条路由
+            // `SyncEvent.RestoreFailed` 说成资源文案，所以这里只写给日志与诊断看。
+            throw IllegalStateException(
+                "remote file is larger than ${MAX_DOWNLOAD_BYTES / (1024 * 1024)}MB, download refused",
+            )
+        }
+        return buffer.copyOf(total)
     }
 
     private suspend fun recordHttp(
@@ -161,6 +193,9 @@ class WebDavClient constructor(
 
     companion object {
         private const val USER_AGENT = "YuanJi-WebDAV/1.0"
+
+        /** [readBytesCapped] 的上限：32 MB。备份包量级见那里的说明。 */
+        const val MAX_DOWNLOAD_BYTES = 32 * 1024 * 1024
         private const val PROP_REQUEST_BODY =
             """<?xml version="1.0" encoding="utf-8"?><D:propfind xmlns:D="DAV:"><D:prop><D:resourcetype/></D:prop></D:propfind>"""
 

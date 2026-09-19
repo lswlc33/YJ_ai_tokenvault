@@ -293,7 +293,10 @@ object CurlParser {
      */
     private fun unescapeShell(raw: String): String {
         var s = raw.trim()
-        if (s.startsWith("$'") && s.endsWith("'")) {
+        // `length >= 3` 不是洁癖：`-H "$'"` 这种被截断的粘贴内容会同时满足 `startsWith("$'")`
+        // 与 `endsWith("'")`，少了这一句就是 `substring(2, 1)` —— 实测抛
+        // StringIndexOutOfBoundsException，而它一路冒到页面上的"应用 cURL"按钮。
+        if (s.length >= 3 && s.startsWith("$'") && s.endsWith("'")) {
             s = s.substring(2, s.length - 1)
             return s
                 .replace("\\n", "\n")

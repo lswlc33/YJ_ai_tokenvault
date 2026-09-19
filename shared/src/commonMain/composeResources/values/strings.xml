@@ -892,4 +892,6 @@
     <string name="key_settings_title">Key settings</string>    <string name="licenses_title">Open-source licenses</string>
     <string name="licenses_intro">Libraries included in this app and their licenses.</string>
     <string name="licenses_copyright_label">Copyright</string>
-    <string name="licenses_license_label">License</string></resources>
+    <string name="licenses_license_label">License</string>
+    <string name="detail_key_reveal_failed">This key\'s cipher text can\'t be decrypted — it may come from a backup made on another device. Re-enter the key to use it.</string>
+    <string name="feedback_model_duplicate">That model is already listed under this key.</string></resources>

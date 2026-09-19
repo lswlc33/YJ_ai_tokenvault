@@ -85,6 +85,8 @@ import tokenvault.shared.generated.resources.feedback_group_deleted
 import tokenvault.shared.generated.resources.feedback_group_renamed
 import tokenvault.shared.generated.resources.feedback_key_deleted
 import tokenvault.shared.generated.resources.feedback_model_deleted
+import tokenvault.shared.generated.resources.detail_key_reveal_failed
+import tokenvault.shared.generated.resources.feedback_model_duplicate
 import tokenvault.shared.generated.resources.feedback_model_saved
 import tokenvault.shared.generated.resources.feedback_providers_deleted
 import tokenvault.shared.generated.resources.feedback_providers_deleted_partial
@@ -460,6 +462,7 @@ fun VaultNavHost(
                 val modelsRefreshing = stringResource(Res.string.feedback_models_refreshing)
                 val modelProbed = stringResource(Res.string.feedback_model_probed)
                 val writeFailed = stringResource(Res.string.manage_write_failed)
+                val revealFailed = stringResource(Res.string.detail_key_reveal_failed)
                 LaunchedEffect(vm) {
                     vm.events.collect { event ->
                         when (event) {
@@ -487,6 +490,8 @@ fun VaultNavHost(
                                 feedback?.post(AppFeedback(keyProbed))
                             KeyDetailViewModel.Event.WriteFailed ->
                                 feedback?.post(AppFeedback(writeFailed))
+                            KeyDetailViewModel.Event.RevealFailed ->
+                                feedback?.post(AppFeedback(revealFailed))
                         }
                     }
                 }
@@ -553,6 +558,7 @@ fun VaultNavHost(
                 val undoFailed = stringResource(Res.string.feedback_undo_failed)
                 val modelDeleted = stringResource(Res.string.feedback_model_deleted)
                 val modelSaved = stringResource(Res.string.feedback_model_saved)
+                val modelDuplicate = stringResource(Res.string.feedback_model_duplicate)
                 LaunchedEffect(vm) {
                     vm.events.collect { event ->
                         when (event) {
@@ -571,6 +577,8 @@ fun VaultNavHost(
                             )
                             KeyEditorViewModel.Event.ModelSaved ->
                                 feedback?.post(AppFeedback(modelSaved))
+                            KeyEditorViewModel.Event.ModelDuplicate ->
+                                feedback?.post(AppFeedback(modelDuplicate))
                         }
                     }
                 }

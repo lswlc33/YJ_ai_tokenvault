@@ -59,6 +59,9 @@ class RoomProviderRepository constructor(
     }
 
     override suspend fun setGroup(ids: List<Long>, groupId: Long?) {
+        // 空集合会让 Room 生成 `WHERE id IN ()` —— 那是语法错误，抛出来被上层兜成一句
+        // "写入失败"，而实际什么都没做。没得改就直接返回。
+        if (ids.isEmpty()) return
         dao.setGroup(ids, groupId, now())
         audit.recordSafe(LogLevel.INFO, LogCategory.VAULT, "providers regrouped", "count=${ids.size} groupId=${groupId ?: -1}")
     }

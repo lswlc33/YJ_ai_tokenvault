@@ -109,6 +109,9 @@ class KeyEditorViewModel constructor(
 
         /** 模型已添加或编辑落库。 */
         data object ModelSaved : Event
+
+        /** 这一行本来就有（撞唯一索引，什么都没插）：不能说"已保存"，那是一句假话。 */
+        data object ModelDuplicate : Event
     }
 
     private val _events = Channel<Event>(Channel.BUFFERED)
@@ -309,7 +312,11 @@ class KeyEditorViewModel constructor(
                     protocol = protocol,
                     needsReview = modelId.any { it.isWhitespace() || it.isUpperCase() },
                 )
-            }.onSuccess { _events.trySend(Event.ModelSaved) }
+            }.onSuccess { id ->
+                // 撞上唯一索引时仓库返回 -1，那一行根本没进库。以前一律发 ModelSaved，
+                // 于是"已保存"的提示弹出来、列表里却没有那一条——用户只能反复点。
+                _events.trySend(if (id <= 0L) Event.ModelDuplicate else Event.ModelSaved)
+            }
         }
     }
 

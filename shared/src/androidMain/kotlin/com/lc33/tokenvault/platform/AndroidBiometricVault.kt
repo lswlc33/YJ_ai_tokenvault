@@ -52,7 +52,15 @@ class AndroidBiometricVault(
     private val session: VaultSession,
 ) : BiometricVault {
 
-    private val keyStore: KeyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
+    /**
+     * **不在构造期取 Keystore。** 这个类是 `LockViewModel` 的构造参数，锁屏页一进来就要建它，
+     * 而开机早期与部分 ROM 上 `getInstance`/`load` 会抛——裸着就是"崩在锁屏之前，连 PIN 都输不了"，
+     * 那是整条路上最没有出路的一种崩。拿不到就退化成 null：两个用点本来就都在 `runCatching` 里，
+     * 结果顺着"这台设备用不了生物识别"那条已有的路走（`isAvailable()` 另有一道 BiometricManager 判定）。
+     */
+    private val keyStore: KeyStore? by lazy {
+        runCatching { KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) } }.getOrNull()
+    }
 
     private val mainExecutor: Executor =
         Executor { command -> Handler(Looper.getMainLooper()).post(command) }
@@ -188,7 +196,7 @@ class AndroidBiometricVault(
     }
 
     private fun deleteKey() {
-        runCatching { keyStore.deleteEntry(ALIAS) }
+        runCatching { keyStore?.deleteEntry(ALIAS) }
     }
 
     private fun specBuilder(strongBox: Boolean) =
@@ -206,7 +214,7 @@ class AndroidBiometricVault(
             .setIsStrongBoxBacked(strongBox)
 
     private fun secretKey(): SecretKey? =
-        runCatching { keyStore.getKey(ALIAS, null) as? SecretKey }.getOrNull()
+        runCatching { keyStore?.getKey(ALIAS, null) as? SecretKey }.getOrNull()
 
     private fun encryptCipherOrNull(): Cipher? {
         val key = secretKey() ?: return null

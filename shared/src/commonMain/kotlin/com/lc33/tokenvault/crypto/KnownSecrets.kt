@@ -1,6 +1,7 @@
 package com.lc33.tokenvault.crypto
 
-import kotlin.concurrent.Volatile
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 
 /**
  * 会话级「已知明文秘密」追踪器（红线 32 的第一道）。
@@ -26,31 +27,41 @@ import kotlin.concurrent.Volatile
  */
 class KnownSecrets {
 
-    /** 副本一份份持有，`add` 后调用方擦自己那份不影响这里。 */
-    @Volatile
-    private var secrets: List<CharArray> = emptyList()
+    /**
+     * 副本一份份持有，`add` 后调用方擦自己那份不影响这里。
+     *
+     * 用 `MutableStateFlow` 而不是 `@Volatile var` + 快照替换：后者看着像无锁安全，其实
+     * `secrets = secrets + copy` 本身就是一次**读-改-写**——探测线程与界面线程同时 add 时，
+     * 后写的那一份会覆盖掉前一条，**丢的那把密钥从此不再被脱敏**，可能原样进 `audit_log`。
+     * `update` 是原子的比较并交换（冲突就重试），跨端可用且不需要 `synchronized`。
+     */
+    private val secrets = MutableStateFlow<List<CharArray>>(emptyList())
 
     /**
      * 登记一份已知明文。
      *
      * 存的是**副本**：调用方（ViewModel）随后会 zeroize 自己那一份，这里得留得住。
-     *
-     * 并发策略：不用 `synchronized`（JVM 专属，会挡住 iOS 编译），而是每次修改都
-     * 用不可变列表快照替换 [secrets]，配合 `@Volatile` 保证跨线程可见性。
-     * 这里只有「append」和「整表清空」两种操作，没有读-改-写竞争，快照替换足够。
+     * 去重也在 CAS 里做：同一把密钥可能被反复展开，重复登记只会让脱敏多做几轮无用替换。
      */
     fun add(secret: CharArray) {
         if (secret.isEmpty()) return
-        // 去重：同一把密钥可能被反复展开，重复登记只会让脱敏多做几轮无用替换。
-        if (secrets.any { it.contentEquals(secret) }) return
-        secrets = secrets + secret.copyOf()
+        val copy = secret.copyOf()
+        secrets.update { current ->
+            if (current.any { it.contentEquals(copy) }) current else current + copy
+        }
     }
 
     /** 清空并逐一置零。锁定（[VaultSession.lock]）时调用。 */
     fun clear() {
-        val old = secrets
-        secrets = emptyList()
-        old.forEach { it.zeroize() }
+        // 交换而不是 `getAndSet`（那是 `AtomicReference` 的 API，`StateFlow` 没有）：
+        // `update` 内部是 CAS，重试时 `previous` 会被写成"最终真的被换掉的那一份"，
+        // 于是擦的一定是已经离开清单的那些副本。
+        var previous: List<CharArray> = emptyList()
+        secrets.update { current ->
+            previous = current
+            emptyList()
+        }
+        previous.forEach { it.zeroize() }
     }
 
     /**
@@ -58,5 +69,5 @@ class KnownSecrets {
      * [Redactor.knownSecrets] 参数"做成 lambda 而非集合"的意图一致：
      * 清单会随用户继续展开而增长，脱敏器不该持有一份过期副本。
      */
-    fun snapshot(): List<String> = secrets.map { it.concatToString() }
+    fun snapshot(): List<String> = secrets.value.map { it.concatToString() }
 }

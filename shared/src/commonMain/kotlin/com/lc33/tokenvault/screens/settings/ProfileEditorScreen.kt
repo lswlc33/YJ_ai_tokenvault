@@ -134,19 +134,22 @@ fun ProfileEditorScreen(
     }
 
     fun applyCurl() {
-        val result = CurlParser.parse(curlText.text)
-        val hasContent = result.userAgent != null || result.headers.isNotEmpty() ||
-            result.bodyPatch != "{}"
-        if (!hasContent) {
+        // 粘贴进来的是什么完全不受我们控制（`CurlParser` 里就有过越界的例子），解析炸了就
+        // 当"这一段没认出内容"处理，走下面那条已有的失败提示。导入页是包着的（ImportViewModel），
+        // 这一页以前裸调 —— 一次畸形粘贴直接崩整个应用。
+        val parsed = runCatching { CurlParser.parse(curlText.text) }.getOrNull()
+        val hasContent = parsed != null &&
+            (parsed.userAgent != null || parsed.headers.isNotEmpty() || parsed.bodyPatch != "{}")
+        if (parsed == null || !hasContent) {
             curlFailed = true
             droppedHeaders = emptyList()
             return
         }
         curlFailed = false
-        result.userAgent?.let { userAgent.setText(it) }
-        if (result.headers.isNotEmpty()) headersText.setText(result.headers.toHeaderLines())
-        if (result.bodyPatch != "{}") bodyPatch.setText(result.bodyPatch)
-        droppedHeaders = result.droppedHeaders
+        parsed.userAgent?.let { userAgent.setText(it) }
+        if (parsed.headers.isNotEmpty()) headersText.setText(parsed.headers.toHeaderLines())
+        if (parsed.bodyPatch != "{}") bodyPatch.setText(parsed.bodyPatch)
+        droppedHeaders = parsed.droppedHeaders
     }
 
     AppScaffold(

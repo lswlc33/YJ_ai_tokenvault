@@ -873,4 +873,6 @@
     <string name="key_settings_title">密钥设置</string>    <string name="licenses_title">开放源代码许可</string>
     <string name="licenses_intro">本应用包含的开源组件及其许可证。</string>
     <string name="licenses_copyright_label">版权</string>
-    <string name="licenses_license_label">许可证</string></resources>
+    <string name="licenses_license_label">许可证</string>
+    <string name="detail_key_reveal_failed">这把密钥的密文解不开，可能来自另一台设备的备份。要使用它，请重新填入明文密钥。</string>
+    <string name="feedback_model_duplicate">这个模型已经在这把密钥下面了。</string></resources>

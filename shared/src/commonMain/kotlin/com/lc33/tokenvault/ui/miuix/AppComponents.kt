@@ -42,6 +42,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -93,6 +94,12 @@ fun AppText(
     color: Color = Color.Unspecified,
     textAlign: TextAlign? = null,
     maxLines: Int = Int.MAX_VALUE,
+    /**
+     * 超长时的处理。**默认省略号而不是截断**：`Text` 的默认值是 `Clip`，全应用 20 处
+     * `maxLines = 1` 于是都把长值齐边切掉——密钥遮蔽串、模型 id、URL、余额恰好都是
+     * 一眼看不出"后面还有"的那一类，用户会以为值就这么长。
+     */
+    overflow: TextOverflow = TextOverflow.Ellipsis,
     /** 等宽字族。密钥遮蔽串、模型 id、URL 用它，值只能来自 `AppTokens.monoFontFamily`。 */
     fontFamily: FontFamily? = null,
 ) {
@@ -109,6 +116,7 @@ fun AppText(
         color = color,
         textAlign = textAlign,
         maxLines = maxLines,
+        overflow = overflow,
         style = if (fontFamily == null) base else base.copy(fontFamily = fontFamily),
     )
 }

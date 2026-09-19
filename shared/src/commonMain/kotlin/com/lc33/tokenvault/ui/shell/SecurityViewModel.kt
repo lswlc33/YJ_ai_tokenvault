@@ -19,6 +19,7 @@ import com.lc33.tokenvault.platform.VaultSession
 import com.lc33.tokenvault.screens.lock.ChangePinStep
 import com.lc33.tokenvault.screens.lock.ChangePinUiState
 import com.lc33.tokenvault.screens.lock.PinError
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -52,6 +53,10 @@ class SecurityViewModel constructor(
     private val settings: SettingsRepository,
     private val vault: BiometricVault,
     private val bootStore: BootStore,
+    // 这一页的四项设置写入（自动锁定时限 / 前台空闲 / 息屏锁定 / 剪贴板清除）本来裸跑在
+    // `viewModelScope.launch` 里：Room `dao.put` 抛一次（磁盘满、探测并发撞 SQLITE_BUSY）就是
+    // 杀进程，而同类页面全都走 [SettingsFailures.guard]。补上，别再留第三种写法。
+    private val failures: SettingsFailures,
 ) : ViewModel() {
 
     private val _changePin = MutableStateFlow(ChangePinUiState())
@@ -259,9 +264,23 @@ class SecurityViewModel constructor(
         viewModelScope.launch {
             if (enabled) {
                 _biometricBusy.value = true
-                val outcome = vault.enable(prompt)
-                _biometricBusy.value = false
+                // `vault.enable` 里那把硬件密钥是现建的，`KeyGenerator.getInstance/init/generateKey`
+                // 在部分 ROM 上会抛（Keystore 服务不可用、算法参数被拒），而**同一个函数里的
+                // `vault.disable()` 两条都是包着调的**——这里裸调等于既崩进程又把开关永久按住
+                // （`_biometricBusy` 停在 true，后面再也翻不动）。取消要照旧往外抛，不能当成一次失败。
+                val outcome = try {
+                    vault.enable(prompt)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Throwable) {
+                    _biometricError.value = error.message
+                    null
+                } finally {
+                    _biometricBusy.value = false
+                }
                 when (outcome) {
+                    null -> Unit
+
                     is BiometricEnableOutcome.Success ->
                         if (!writeBoot { it.copy(biometricEnabled = true, dekWrappedByBiometric = outcome.blob) }) {
                             // 平台侧已经存好了一份，而 boot 里没记 —— 把它一起撤掉，
@@ -328,7 +347,7 @@ class SecurityViewModel constructor(
         )
 
     fun onAutoLockIndexChange(index: Int) {
-        viewModelScope.launch { settings.setAutoLockTimeout(AutoLockPolicy.at(index)) }
+        viewModelScope.launch { failures.guard { settings.setAutoLockTimeout(AutoLockPolicy.at(index)) } }
     }
 
     // ------------------------------------------------------------------ 前台空闲 / 屏幕关闭锁定
@@ -341,7 +360,7 @@ class SecurityViewModel constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     fun onIdleLockChange(enabled: Boolean) {
-        viewModelScope.launch { settings.setIdleLock(enabled) }
+        viewModelScope.launch { failures.guard { settings.setIdleLock(enabled) } }
     }
 
     /** 屏幕关闭即锁定开关。权威是 `app_settings.lockOnScreenOff`。默认关。 */
@@ -349,7 +368,7 @@ class SecurityViewModel constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     fun onLockOnScreenOffChange(enabled: Boolean) {
-        viewModelScope.launch { settings.setLockOnScreenOff(enabled) }
+        viewModelScope.launch { failures.guard { settings.setLockOnScreenOff(enabled) } }
     }
 
     // ------------------------------------------------------------------ 剪贴板自动清除
@@ -367,7 +386,7 @@ class SecurityViewModel constructor(
         )
 
     fun onClipboardClearIndexChange(index: Int) {
-        viewModelScope.launch { settings.setClipboardClearSeconds(ClipboardClearPolicy.at(index)) }
+        viewModelScope.launch { failures.guard { settings.setClipboardClearSeconds(ClipboardClearPolicy.at(index)) } }
     }
 
     override fun onCleared() {

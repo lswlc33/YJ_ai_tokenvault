@@ -66,6 +66,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.concurrent.Volatile
 
 /**
  * 探测引擎宿主（计划.md §8.5）。**不是 ViewModel**——探测要能跨页面存活，
@@ -73,7 +74,7 @@ import kotlinx.coroutines.withContext
  *
  * 四条设计决定：
  *
- * 1. **自己的作用域**。内部 `CoroutineScope(SupervisorJob() + Dispatchers.IO)`，
+ * 1. **自己的作用域**。内部 `CoroutineScope(SupervisorJob() + Dispatchers.Default + scopeCrashGuard)`，
  *    不借 `@AppScope`：后者是应用级、永不取消，而探测要在锁定 / 手动取消时真的停。
  * 2. **逐项落库、逐项推流**。编排器 [ProbeOrchestrator] 是纯逻辑，这里把它的每一项结果
  *    写回 `api_keys` 并更新 `probe_runs`，所以中途被锁定 / 取消也不丢已完成的结果。
@@ -99,11 +100,23 @@ class ProbeEngine constructor(
     private val placeholders: Map<String, String>,
 ) {
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    // 挂 [scopeCrashGuard]：轮次里的异常本来由 runRound 的 catch 收口，这一道是给"收口本身
+    // 又抛了"（收尾写库失败）留的最后一层——没有它，一次写库失败就是杀进程。
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + scopeCrashGuard)
 
+    /**
+     * 这四个 Job 跨线程读写，必须 `@Volatile`：主线程在 [startScoped]/[cancel]/[quickProbe]
+     * 里写，而 [onLock] 是被 `AutoLocker` 的后台协程调的（它跑在 `idleJob` 那条协程上）。
+     * 少了这层可见性，自动锁定那一刻可能读到旧值或 null——**金库已经锁上、网络请求继续发**，
+     * 或者反过来点"开始探测"没反应。`kotlin.jvm.Volatile` 在 iOS 不存在，用 kotlin.concurrent 那份。
+     */
+    @Volatile
     private var currentJob: Job? = null
+    @Volatile
     private var modelJob: Job? = null
+    @Volatile
     private var statusJob: Job? = null
+    @Volatile
     private var quickModelJob: Job? = null
 
     /**
@@ -906,6 +919,9 @@ class ProbeEngine constructor(
                     // "真正跑过请求的项"，摘要卡上的"未探测 N"继续由 `total - done` 算。
                     done = done + skipped,
                     total = tasks.size,
+                    // 刚结算这一项探的是哪家。仪表板上那句"正在请求 N/M · host"第三段一直空着，
+                    // 就是因为以前没人给它：尾部会悬一个孤零零的「·」。
+                    currentHost = taskById[result.taskId]?.host,
                     providerDone = providerDone + providerSkipped,
                     providerTotal = providerTotal,
                     providerOk = providerOk,
@@ -943,6 +959,44 @@ class ProbeEngine constructor(
                     keyFail = keyFail,
                     cancelled = true,
                 )
+            }
+            return
+        } catch (failure: Throwable) {
+            // 不是"被取消"，是探测途中真的出了错：收尾写库撞 SQLITE_BUSY、磁盘满、库被系统回收。
+            // 以前这一支没人接，后果是双重的——`finishRun` 整个被跳过，进度永久停在
+            // "正在请求 N/M"、明细页永久显示"停止探测"并把重试藏掉；同一条异常同时冒到
+            // `scope.launch` 杀进程。这里两件事一起收口：本轮按"跑到哪算哪"结案，
+            // 并记一条 ERROR 说清为什么中断（写不进日志也不能再抛出去，那等于没兜）。
+            withContext(NonCancellable) {
+                runCatching {
+                    finishRun(
+                        runId = runId,
+                        scope = scope,
+                        startedAt = startedAt,
+                        total = tasks.size,
+                        done = done,
+                        ok = ok,
+                        fail = fail,
+                        providerTotal = providerTotal,
+                        providerDone = providerDone,
+                        providerOk = providerOk,
+                        providerFail = providerFail,
+                        keyTotal = keyTotal,
+                        keyDone = keyDone,
+                        keyOk = keyOk,
+                        keyFail = keyFail,
+                        cancelled = false,
+                    )
+                }
+                runCatching {
+                    audit.record(
+                        level = LogLevel.ERROR,
+                        category = LogCategory.PROBE,
+                        message = "probe round aborted",
+                        detail = "${failure::class.simpleName}: ${failure.message}",
+                        runId = runId,
+                    )
+                }
             }
             return
         }
@@ -1001,45 +1055,52 @@ class ProbeEngine constructor(
         keyFail: Int,
         cancelled: Boolean,
     ) {
-        runRepository.update(
-            ProbeRun(
-                id = runId,
-                scope = scope,
-                startedAt = startedAt,
-                finishedAt = now(),
-                total = total,
-                done = done,
-                okCount = ok,
-                failCount = fail,
-                providerTotal = providerTotal,
-                providerDone = providerDone,
-                providerOk = providerOk,
-                providerFail = providerFail,
-                keyTotal = keyTotal,
-                keyDone = keyDone,
-                keyOk = keyOk,
-                keyFail = keyFail,
-                cancelled = cancelled,
-            ),
-        )
+        // **先把"进行中"摘掉，再动库。** 下面三句写库任何一句抛了，界面都不该继续画
+        // "正在请求 N/M"、明细页也不该继续把"停止探测"顶在重试按钮上——那是个没有出路的态。
+        // 摘早点没有代价：`running` 的判据是 `currentJob.isActive`，不是这条进度流。
+        _progress.value = null
+        runCatching {
+            runRepository.update(
+                ProbeRun(
+                    id = runId,
+                    scope = scope,
+                    startedAt = startedAt,
+                    finishedAt = now(),
+                    total = total,
+                    done = done,
+                    okCount = ok,
+                    failCount = fail,
+                    providerTotal = providerTotal,
+                    providerDone = providerDone,
+                    providerOk = providerOk,
+                    providerFail = providerFail,
+                    keyTotal = keyTotal,
+                    keyDone = keyDone,
+                    keyOk = keyOk,
+                    keyFail = keyFail,
+                    cancelled = cancelled,
+                ),
+            )
+        }
         // 一轮结束：记汇总日志。级别看有没有失败；取消不记 ERROR（它不是故障，§13.4）。
         val level = when {
             cancelled -> LogLevel.INFO
             fail > 0 -> LogLevel.WARN
             else -> LogLevel.INFO
         }
-        audit.record(
-            level = level,
-            category = LogCategory.PROBE,
-            message = if (cancelled) "probe cancelled" else "probe finished",
-            detail = "total=$total ok=$ok fail=$fail cancelled=$cancelled",
-            // 带上轮次：日志页/明细页要能回答"这一轮到底发生了什么"，`runId` 是唯一的线索。
-            runId = runId,
-        )
+        runCatching {
+            audit.record(
+                level = level,
+                category = LogCategory.PROBE,
+                message = if (cancelled) "probe cancelled" else "probe finished",
+                detail = "total=$total ok=$ok fail=$fail cancelled=$cancelled",
+                // 带上轮次：日志页/明细页要能回答"这一轮到底发生了什么"，`runId` 是唯一的线索。
+                runId = runId,
+            )
+        }
         // 轮次收尾即裁一次条数：这张表每轮长一行，而明细页只看最近一轮。上限口径与
         // `LogMaintenance`（启动时那次）共用 `ProbeRunRepository.MAX_RUNS_KEPT`。
-        runRepository.trimToCount(ProbeRunRepository.MAX_RUNS_KEPT)
-        _progress.value = null
+        runCatching { runRepository.trimToCount(ProbeRunRepository.MAX_RUNS_KEPT) }
         _roundResults.tryEmit(RoundResult(total = total, ok = ok, fail = fail, cancelled = cancelled))
     }
 

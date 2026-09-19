@@ -68,7 +68,16 @@ actual fun rememberBackupFilePicker(
                             // 安全作用域；普通本地路径这里只会返回 false，无副作用。
                             val scoped = targetUrl.startAccessingSecurityScopedResource()
                             try {
-                                bytes.toNSData().writeToURL(targetUrl, atomically = true)
+                                // `writeToURL` 是返回布尔的旧 API，以前这个返回值没人看：写失败
+                                // （沙盒外被拒、只读位置、磁盘满）时 `SyncViewModel.export` 那句
+                                // `runCatching { sink(bytes) }` 判成功，于是弹"已导出"、写下
+                                // lastBackup，而文件根本没生成——用户以为手上有一份备份。
+                                val written = bytes.toNSData().writeToURL(targetUrl, atomically = true)
+                                if (!written) {
+                                    // 消息只给日志看：调用方（SyncViewModel.export）失败那条路投的是
+                                    // 固定事件 + 资源文案，不会把这句原样念给用户。
+                                    throw IllegalStateException("document write failed: ${targetUrl.path}")
+                                }
                             } finally {
                                 if (scoped) targetUrl.stopAccessingSecurityScopedResource()
                             }
