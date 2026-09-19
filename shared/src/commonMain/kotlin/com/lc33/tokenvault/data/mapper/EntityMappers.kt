@@ -1,5 +1,6 @@
 package com.lc33.tokenvault.data.mapper
 
+import com.lc33.tokenvault.catalog.ModelCatalogMatcher
 import com.lc33.tokenvault.data.dao.ApiKeyWithSettingsRow
 import com.lc33.tokenvault.data.dao.ProviderSummaryRow
 import com.lc33.tokenvault.data.entity.ApiKeyEntity
@@ -8,7 +9,9 @@ import com.lc33.tokenvault.data.entity.AuditLogEntity
 import com.lc33.tokenvault.data.entity.ClientProfileEntity
 import com.lc33.tokenvault.data.entity.GroupEntity
 import com.lc33.tokenvault.data.entity.KeySettingsEntity
+import com.lc33.tokenvault.data.entity.ModelCatalogEntity
 import com.lc33.tokenvault.data.entity.ModelEntity
+import com.lc33.tokenvault.data.entity.ModelVendorEntity
 import com.lc33.tokenvault.data.entity.ProviderAccountEntity
 import com.lc33.tokenvault.data.entity.ProviderEntity
 import com.lc33.tokenvault.domain.AuthStyle
@@ -23,6 +26,8 @@ import com.lc33.tokenvault.domain.model.AiModel
 import com.lc33.tokenvault.domain.model.ApiKey
 import com.lc33.tokenvault.domain.model.AuditEntry
 import com.lc33.tokenvault.domain.model.BalanceSnapshot
+import com.lc33.tokenvault.domain.model.CatalogModel
+import com.lc33.tokenvault.domain.model.CatalogVendor
 import com.lc33.tokenvault.domain.model.ClientProfile
 import com.lc33.tokenvault.domain.model.Group
 import com.lc33.tokenvault.domain.model.KeyProbeSettings
@@ -296,6 +301,103 @@ fun AiModel.toEntity(): ModelEntity = ModelEntity(
     firstSeenAt = firstSeenAt,
     lastSeenAt = lastSeenAt,
     sortOrder = sortOrder,
+)
+
+// ------------------------------------------------------------------ model_catalog / model_vendors
+
+/**
+ * 目录行的两个方向。
+ *
+ * 纯类型 ↔ 实体这一层之所以必须存在：`catalog/` 是纯 Kotlin 包，`ArchitectureRulesTest`
+ * 禁止它引入任何 AndroidX 类型，所以解析器只能吐 [CatalogModel]，Room 实体在这里才出现。
+ * 模态那份 CSV 编码复用 [toCsv] / [csvToList]（那两个函数的注释本来就写着给这张表用）。
+ */
+fun CatalogModel.toEntity(): ModelCatalogEntity = ModelCatalogEntity(
+    key = key,
+    providerSlug = providerSlug,
+    vendor = vendor,
+    vendorName = vendorName,
+    modelId = modelId,
+    qualifiedId = qualifiedId,
+    normId = normId,
+    canonical = canonical,
+    name = name,
+    description = description,
+    family = family,
+    contextLimit = contextLimit,
+    outputLimit = outputLimit,
+    costInput = costInput,
+    costOutput = costOutput,
+    costCacheRead = costCacheRead,
+    costCacheWrite = costCacheWrite,
+    inputModalities = inputModalities.toCsv(),
+    outputModalities = outputModalities.toCsv(),
+    reasoning = reasoning,
+    toolCall = toolCall,
+    attachment = attachment,
+    structuredOutput = structuredOutput,
+    openWeights = openWeights,
+    releaseDate = releaseDate,
+    lastUpdated = lastUpdated,
+    status = status,
+    knowledgeCutoff = knowledgeCutoff,
+)
+
+fun ModelCatalogEntity.toDomain(): CatalogModel = CatalogModel(
+    key = key,
+    providerSlug = providerSlug,
+    vendor = vendor,
+    vendorName = vendorName,
+    modelId = modelId,
+    qualifiedId = qualifiedId,
+    normId = normId,
+    canonical = canonical,
+    name = name,
+    description = description,
+    family = family,
+    contextLimit = contextLimit,
+    outputLimit = outputLimit,
+    costInput = costInput,
+    costOutput = costOutput,
+    costCacheRead = costCacheRead,
+    costCacheWrite = costCacheWrite,
+    inputModalities = inputModalities.csvToList(),
+    outputModalities = outputModalities.csvToList(),
+    reasoning = reasoning,
+    toolCall = toolCall,
+    attachment = attachment,
+    structuredOutput = structuredOutput,
+    openWeights = openWeights,
+    releaseDate = releaseDate,
+    lastUpdated = lastUpdated,
+    status = status,
+    knowledgeCutoff = knowledgeCutoff,
+)
+
+/** 匹配器要的纯投影。DAO 行 → [ModelCatalogMatcher.CatalogEntry] 就这一个转换点。 */
+fun ModelCatalogEntity.toMatcherEntry(): ModelCatalogMatcher.CatalogEntry =
+    ModelCatalogMatcher.CatalogEntry(
+        key = key,
+        vendor = vendor,
+        modelId = modelId,
+        normId = normId,
+        qualifiedId = qualifiedId,
+        canonical = canonical,
+        lastUpdated = lastUpdated,
+    )
+
+fun CatalogVendor.toEntity(): ModelVendorEntity = ModelVendorEntity(
+    slug = slug,
+    name = name,
+    apiUrl = apiUrl,
+    docUrl = docUrl,
+)
+
+fun ModelVendorEntity.toDomain(): CatalogVendor = CatalogVendor(
+    slug = slug,
+    name = name,
+    apiUrl = apiUrl,
+    docUrl = docUrl,
 )
 
 // ------------------------------------------------------------------ client_profiles

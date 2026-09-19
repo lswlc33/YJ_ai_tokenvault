@@ -8,8 +8,8 @@ import org.junit.Test
 /**
  * 模型元数据匹配（§10）纯函数测试（测试 13）。
  *
- * 覆盖：归一化规则、三级匹配（含 `/` 主键、精确 modelId、normId）、vendorHint 消歧、
- * lastUpdated 最新兜底。
+ * 覆盖：归一化规则、三级匹配（qualifiedId、精确 modelId、normId）、
+ * vendorHint 消歧、canonical（原创条目优先于聚合站转售）与 lastUpdated 兜底。
  */
 class ModelCatalogMatcherTest {
 
@@ -18,8 +18,18 @@ class ModelCatalogMatcherTest {
         vendor: String = "anthropic",
         modelId: String = "claude-opus-4",
         normId: String = "claude-opus-4",
+        qualifiedId: String = "anthropic/claude-opus-4",
+        canonical: Boolean = vendor == key.substringBefore('/'),
         lastUpdated: String? = "2026-01-01",
-    ) = CatalogEntry(key, vendor, modelId, normId, lastUpdated)
+    ) = CatalogEntry(
+        key = key,
+        vendor = vendor,
+        modelId = modelId,
+        normId = normId,
+        qualifiedId = qualifiedId,
+        canonical = canonical,
+        lastUpdated = lastUpdated,
+    )
 
     // ------------------------------------------------------------------ 归一化
 
@@ -60,15 +70,87 @@ class ModelCatalogMatcherTest {
     // ------------------------------------------------------------------ 三级匹配
 
     @Test
-    fun `含斜杠的主键直接命中`() {
+    fun `含斜杠的输入按 qualifiedId 命中`() {
         val hit = ModelCatalogMatcher.match(
             modelId = "anthropic/claude-opus-4",
             vendorHint = null,
-            byKey = entry(),
-            byModelId = emptyList(),
-            byNormId = emptyList(),
+            byQualifiedId = listOf(entry()),
         )
         assertEquals("anthropic/claude-opus-4", hit?.key)
+    }
+
+    @Test
+    fun `含斜杠的输入在主键对不上时仍能从精确 modelId 命中`() {
+        // 聚合站条目的主键是 `tokengo/deepseek/deepseek-chat`，用户手里的
+        // `deepseek/deepseek-chat` 比不上主键；老实现在这一步直接 return null，
+        // 于是所有带厂商前缀的模型 id 一级匹配整段失效。
+        val resale = entry(
+            key = "tokengo/deepseek/deepseek-chat",
+            vendor = "deepseek",
+            modelId = "deepseek/deepseek-chat",
+            normId = "deepseek-chat",
+            qualifiedId = "deepseek/deepseek-chat",
+            canonical = false,
+        )
+        val hit = ModelCatalogMatcher.match(
+            modelId = "deepseek/deepseek-chat",
+            vendorHint = null,
+            byQualifiedId = listOf(resale),
+        )
+        assertEquals("tokengo/deepseek/deepseek-chat", hit?.key)
+    }
+
+    @Test
+    fun `同一条模型有原创和转售两条时取原创那条`() {
+        // 转售那条 last_updated 更新。没有 canonical 这一档时它会赢，
+        // 于是详情页显示的是聚合站的转售价，不是厂方价。
+        val official = entry(
+            key = "deepseek/deepseek-chat",
+            vendor = "deepseek",
+            modelId = "deepseek-chat",
+            normId = "deepseek-chat",
+            qualifiedId = "deepseek/deepseek-chat",
+            canonical = true,
+            lastUpdated = "2026-01-01",
+        )
+        val resale = entry(
+            key = "tokengo/deepseek/deepseek-chat",
+            vendor = "deepseek",
+            modelId = "deepseek/deepseek-chat",
+            normId = "deepseek-chat",
+            qualifiedId = "deepseek/deepseek-chat",
+            canonical = false,
+            lastUpdated = "2026-06-01",
+        )
+        val hit = ModelCatalogMatcher.match(
+            modelId = "deepseek-chat",
+            vendorHint = null,
+            byModelId = listOf(resale, official),
+        )
+        assertEquals("deepseek/deepseek-chat", hit?.key)
+    }
+
+    @Test
+    fun `两条都原创时退回新旧而不是列表顺序`() {
+        // 两个厂商各有一个同名不同实体的模型，没有哪条"更原创"。这时取第一条
+        // 等于让 SQLite 的返回顺序决定显示谁的价格，所以退回 lastUpdated。
+        val older = entry(key = "a/x", vendor = "a", modelId = "x", normId = "x", lastUpdated = "2026-01-01")
+        val newer = entry(key = "b/x", vendor = "b", modelId = "x", normId = "x", lastUpdated = "2026-06-01")
+        val hit = ModelCatalogMatcher.match(
+            modelId = "x",
+            vendorHint = null,
+            byModelId = listOf(older, newer),
+        )
+        assertEquals("b/x", hit?.key)
+        // 反过来传也不该改变结果——这一条守的就是"不依赖顺序"。
+        assertEquals(
+            "b/x",
+            ModelCatalogMatcher.match(
+                modelId = "x",
+                vendorHint = null,
+                byModelId = listOf(newer, older),
+            )?.key,
+        )
     }
 
     @Test
@@ -76,9 +158,7 @@ class ModelCatalogMatcherTest {
         val hit = ModelCatalogMatcher.match(
             modelId = "claude-opus-4",
             vendorHint = null,
-            byKey = null,
             byModelId = listOf(entry()),
-            byNormId = emptyList(),
         )
         assertEquals("claude-opus-4", hit?.modelId)
     }
@@ -90,23 +170,39 @@ class ModelCatalogMatcherTest {
         val hit = ModelCatalogMatcher.match(
             modelId = "claude-opus-4",
             vendorHint = "anthropic",
-            byKey = null,
             byModelId = listOf(openai, anthropic),
-            byNormId = emptyList(),
         )
         assertEquals("anthropic/claude-opus-4", hit?.key)
     }
 
     @Test
+    fun `vendorHint 优先于原创条目`() {
+        // 用户明说这把 Key 是某家给的，就按他说的那家显示，即使另一家才是原创。
+        val openai = entry(key = "openai/x", vendor = "openai", modelId = "x", normId = "x")
+        val anthropic = entry(
+            key = "thirdparty/claude-x",
+            vendor = "thirdparty",
+            modelId = "x",
+            normId = "x",
+            qualifiedId = "thirdparty/x",
+            canonical = true,
+        )
+        val hit = ModelCatalogMatcher.match(
+            modelId = "x",
+            vendorHint = "openai",
+            byModelId = listOf(anthropic, openai),
+        )
+        assertEquals("openai/x", hit?.key)
+    }
+
+    @Test
     fun `多厂商同名无 hint 取 lastUpdated 最新`() {
-        val older = entry(key = "a/x", vendor = "a", lastUpdated = "2026-01-01")
-        val newer = entry(key = "b/x", vendor = "b", lastUpdated = "2026-06-01")
+        val older = entry(key = "a/x", vendor = "a", modelId = "x", normId = "x", canonical = false, lastUpdated = "2026-01-01")
+        val newer = entry(key = "b/x", vendor = "b", modelId = "x", normId = "x", canonical = false, lastUpdated = "2026-06-01")
         val hit = ModelCatalogMatcher.match(
             modelId = "x",
             vendorHint = null,
-            byKey = null,
             byModelId = listOf(older, newer),
-            byNormId = emptyList(),
         )
         assertEquals("b/x", hit?.key)
     }
@@ -116,11 +212,23 @@ class ModelCatalogMatcherTest {
         val hit = ModelCatalogMatcher.match(
             modelId = "claude-opus-4-latest",
             vendorHint = null,
-            byKey = null,
-            byModelId = emptyList(),
             byNormId = listOf(entry(normId = "claude-opus-4")),
         )
         assertEquals("claude-opus-4", hit?.modelId)
+    }
+
+    @Test
+    fun `第一级命中时不再回退`() {
+        // 三级依次回退，但如果第一级已经有唯一候选，就不该被第三级里那条"更晚更新"的顶掉。
+        val qualified = entry(key = "anthropic/claude-opus-4", qualifiedId = "anthropic/claude-opus-4")
+        val other = entry(key = "zzz/claude-opus-4", vendor = "zzz", qualifiedId = "zzz/claude-opus-4", lastUpdated = "2099-01-01")
+        val hit = ModelCatalogMatcher.match(
+            modelId = "anthropic/claude-opus-4",
+            vendorHint = null,
+            byQualifiedId = listOf(qualified),
+            byNormId = listOf(other),
+        )
+        assertEquals("anthropic/claude-opus-4", hit?.key)
     }
 
     @Test
@@ -128,9 +236,6 @@ class ModelCatalogMatcherTest {
         val hit = ModelCatalogMatcher.match(
             modelId = "unknown-model",
             vendorHint = null,
-            byKey = null,
-            byModelId = emptyList(),
-            byNormId = emptyList(),
         )
         assertNull(hit)
     }
