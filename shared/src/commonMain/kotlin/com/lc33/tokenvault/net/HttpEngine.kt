@@ -42,6 +42,15 @@ class HttpEngine(
     private val client: HttpClient,
     private val hostGate: HostGate,
     private val audit: AuditLogRepository? = null,
+    /**
+     * 应用内并发闸。**放在这一层而不是引擎里**：iOS 的 URLSession 没有"全局并发"这个概念
+     * （只有每主机上限），引擎级配置写不出一个三端一致的「最大并发数」——那样设置会在
+     * 安卓是真限制、在 iOS 是假数字。
+     *
+     * 默认值是**不限制**，所以老调用点（测试里按位置构造的那些）行为不变；生产由 DI 注入
+     * 那个跟着设置走档的单例。
+     */
+    val concurrency: ConcurrencyGate = ConcurrencyGate(UNLIMITED_CONCURRENCY),
 ) {
 
     /**
@@ -82,29 +91,41 @@ class HttpEngine(
         hostGate.acquire(hostOf(request.url))
 
         return try {
-            val started = clockMillis()
-            val response = client.request(request.url) {
-                method = HttpMethod.parse(request.method)
-                applyHeaders(request.headers)
-                // §8.1：per-request 超时。`timeoutSeconds` 是用户在 Key 编辑页填的，
-                // 只在这里生效——引擎级超时是三端共用的兜底，挡不住"这家就是慢"。
-                // socket 值要一起写：Darwin 引擎只认 socket 超时（它把 NSURLRequest 的
-                // timeoutInterval 当这个用），只写 requestTimeoutMillis 的话 iOS 端仍然
-                // 在 20s 就断，用户填 60 秒等于没填。
-                request.timeoutMs?.let { timeoutMillis ->
-                    timeout {
-                        requestTimeoutMillis = timeoutMillis
-                        socketTimeoutMillis = timeoutMillis
+            // 名额只包住"真的在网线上"的那一段：读响应体也算，它还在占这条连接。
+            // 上面那行 `hostGate.acquire` 故意留在闸外——一家在等自己那 800ms（撞过 429 是 8s）
+            // 的时候占着一个名额什么都不干，等于让被限流的供应商拖慢整个应用的网络。
+            // 记账（record）也在闸外：最小那一档（2）下，一次 Room 写入停顿不该变成网络停顿。
+            val onWire = concurrency.withPermit {
+                val started = clockMillis()
+                val response = client.request(request.url) {
+                    method = HttpMethod.parse(request.method)
+                    applyHeaders(request.headers)
+                    // §8.1：per-request 超时。`timeoutSeconds` 是用户在 Key 编辑页填的，
+                    // 只在这里生效——引擎级超时是三端共用的兜底，挡不住"这家就是慢"。
+                    // socket 值要一起写：Darwin 引擎只认 socket 超时（它把 NSURLRequest 的
+                    // timeoutInterval 当这个用），只写 requestTimeoutMillis 的话 iOS 端仍然
+                    // 在 20s 就断，用户填 60 秒等于没填。
+                    request.timeoutMs?.let { timeoutMillis ->
+                        timeout {
+                            requestTimeoutMillis = timeoutMillis
+                            socketTimeoutMillis = timeoutMillis
+                        }
+                    }
+                    request.body?.let { body ->
+                        setBody(body)
+                        contentType(ContentType.Application.Json)
                     }
                 }
-                request.body?.let { body ->
-                    setBody(body)
-                    contentType(ContentType.Application.Json)
-                }
+                val latencyMs = clockMillis() - started
+                OnWire(
+                    status = response.status.value,
+                    headers = response.headers.entries()
+                        .associate { it.key to it.value.joinToString(", ") },
+                    body = response.readBodyCapped(),
+                    latencyMs = latencyMs,
+                )
             }
-            val latencyMs = clockMillis() - started
-            val responseBody = response.readBodyCapped()
-            val status = response.status.value
+            val status = onWire.status
             val rateLimited = status == 429
             // 间隔复位靠这里：只有 429 之外的响应才算"上游没嫌我们吵"（见 HostGate.onSuccess）。
             // 放在记账之前，保证即便日志写入失败也照样衰减。
@@ -113,16 +134,16 @@ class HttpEngine(
                 level = if (status in 200..299) LogLevel.INFO else LogLevel.WARN,
                 category = LogCategory.HTTP,
                 message = "http ${request.method} ${safeTarget(request.url)} -> $status",
-                detail = "latency=${latencyMs}ms",
+                detail = "latency=${onWire.latencyMs}ms",
                 requestUrl = safeTarget(request.url),
                 requestBody = request.body,
-                responseBody = responseBody,
+                responseBody = onWire.body,
             )
             ProbeResponse(
                 status = status,
-                headers = response.headers.entries().associate { it.key to it.value.joinToString(", ") },
-                body = responseBody,
-                latencyMs = latencyMs,
+                headers = onWire.headers,
+                body = onWire.body,
+                latencyMs = onWire.latencyMs,
             )
         } catch (cancelled: CancellationException) {
             // 取消不是一次失败响应：必须原样上抛，否则调用方的 Job.cancel 会一直等网络超时。
@@ -234,9 +255,28 @@ class HttpEngine(
         if (!hasAccept) header(HttpHeaders.Accept, "application/json")
     }
 
+    /**
+     * 一次请求"在网线上"那一段的产物。
+     *
+     * 单独抽出来是为了把并发名额的作用域切准：名额只包到拿到这四样为止，之后的
+     * `hostGate.onSuccess`、审计写入与 `ProbeResponse` 组装都在闸外。
+     */
+    private data class OnWire(
+        val status: Int,
+        val headers: Map<String, String>,
+        val body: String,
+        val latencyMs: Long,
+    )
+
     companion object {
         /** M5 阶段的默认 UA；M6 起由客户端预设（HeaderAssembler）提供。 */
         const val DEFAULT_USER_AGENT = "YuanJi/0.1.0 (Android)"
+
+        /**
+         * 构造 [HttpEngine] 时不传闸就用它：一个数字这么大的闸等价于没有闸。
+         * 测试里按位置构造的老调用点因此行为不变。
+         */
+        const val UNLIMITED_CONCURRENCY = Int.MAX_VALUE
 
         /**
          * 单段报文的落库上限。模型列表能到几十 KB，整段进库会把日志表撑爆。

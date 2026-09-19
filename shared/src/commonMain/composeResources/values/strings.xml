@@ -284,6 +284,21 @@
         <item>Every hour</item>
         <item>Every 6 hours</item>
     </string-array>
+    <!-- 并发这一档是全局的（探测/模型列表/余额/检查更新都算），WebDAV 备份走另一个
+         client，所以文案必须点名它不算。
+         刻意**不**在这里写"每家最多 3 个"：那个 3 是 OkHttp 的 maxRequestsPerHost，只在
+         Android/JVM 成立，iOS 用的是 URLSession 自己的默认（6 个）。文案是三端共用的，
+         写上那个数字就等于在 iOS 上撒谎；能说的是 commonMain 的 HostGate 那条 0.8 秒间隔。 -->
+    <string name="probe_section_concurrency">Concurrency</string>
+    <string name="probe_max_concurrency">Max concurrent requests</string>
+    <string name="probe_max_concurrency_summary">How many of this app\'s own requests may be on the wire at once (probes, balance, model lists, update checks; WebDAV backups are not counted). One provider is still waited out at 0.8s between requests. Lower is gentler on rate limits but makes a round slower, and one hung site holds a slot while it waits.</string>
+    <string-array name="probe_max_concurrency_options">
+        <item>2 (most conservative)</item>
+        <item>4</item>
+        <item>8 (default)</item>
+        <item>16</item>
+        <item>32 (most parallel)</item>
+    </string-array>
     <string name="probe_section_client">Client disguise</string>
     <string name="probe_sniff">Match a client profile automatically</string>
     <string name="probe_sniff_summary">Manual probes only. Stops immediately when the host rate-limits.</string>

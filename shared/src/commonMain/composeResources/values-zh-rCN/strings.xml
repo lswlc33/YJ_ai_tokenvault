@@ -280,6 +280,16 @@
         <item>每 1 小时</item>
         <item>每 6 小时</item>
     </string-array>
+    <string name="probe_section_concurrency">并发</string>
+    <string name="probe_max_concurrency">最大并发数</string>
+    <string name="probe_max_concurrency_summary">同时有几个请求真的在网线上（探测、余额、模型列表、检查更新都算，WebDAV 备份不算）。同一家供应商仍至少隔 0.8 秒才发第二个请求。调小更不容易撞限流，但一轮更慢，而且一家卡住的站会占着一个名额。</string>
+    <string-array name="probe_max_concurrency_options">
+        <item>2（最保守）</item>
+        <item>4</item>
+        <item>8（默认）</item>
+        <item>16</item>
+        <item>32（最多并行）</item>
+    </string-array>
     <string name="probe_section_client">客户端伪装</string>
     <string name="probe_sniff">自动匹配客户端预设</string>
     <string name="probe_sniff_summary">仅在手动探测时执行，遇到限流立即停止。</string>

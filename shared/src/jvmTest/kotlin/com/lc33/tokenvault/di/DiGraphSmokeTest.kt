@@ -18,10 +18,12 @@ import com.lc33.tokenvault.domain.repo.TransactionRunner
 import com.lc33.tokenvault.engine.AutoRefresher
 import com.lc33.tokenvault.engine.BackupEngine
 import com.lc33.tokenvault.engine.BalanceEngine
+import com.lc33.tokenvault.engine.HttpConcurrencyApplier
 import com.lc33.tokenvault.engine.ProbeEngine
 import com.lc33.tokenvault.engine.ProbeSession
 import com.lc33.tokenvault.engine.RefreshRound
 import com.lc33.tokenvault.engine.UpdateEngine
+import com.lc33.tokenvault.net.ConcurrencyGate
 import com.lc33.tokenvault.net.HttpEngine
 import com.lc33.tokenvault.platform.AutoLocker
 import com.lc33.tokenvault.platform.BootStore
@@ -122,6 +124,11 @@ class DiGraphSmokeTest {
 
         // 网络与引擎
         assertNotNull(koin.get<HttpEngine>())
+        // 并发闸与它的订阅者：闸是 HttpEngine 的第 4 个依赖（少注册会让 HttpEngine 解析失败），
+        // applier 只在启动入口里 get()，测试从不碰它——不在这条上点一次，注册写歪了要等到
+        // 真机上"设置改了但并发数永远不变"才发现。
+        assertNotNull(koin.get<ConcurrencyGate>())
+        assertNotNull(koin.get<HttpConcurrencyApplier>())
         assertNotNull(koin.get<BackupStore>())
         assertNotNull(koin.get<BackupEngine>())
         assertNotNull(koin.get<BalanceEngine>())

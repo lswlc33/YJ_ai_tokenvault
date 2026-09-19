@@ -194,9 +194,25 @@ val coreModule = module {
     // ------------------------------------------------------------------ 网络与引擎
 
     single { HostGate(nowMillis = ::nowMillis) }
+    // 应用内 HTTP 的并发闸。档位由设置页那一枚下拉决定，进程活着期间随流改（见
+    // HttpConcurrencyApplier）。它必须是单例：闸要是每次注入都新建一个，"最大并发数"
+    // 就变成"每个调用点各自 8 个"，那比没有闸更误导人。
+    single { com.lc33.tokenvault.net.ConcurrencyGate() }
     // 应用内不提供代理（移动端难以可靠实现，走系统全局代理）：client 是稳定单例。
     single { com.lc33.tokenvault.net.buildClient() }
-    single { HttpEngine(client = get(), hostGate = get(), audit = get()) }
+    single {
+        HttpEngine(
+            client = get(), hostGate = get(), audit = get(),
+            concurrency = get(),
+        )
+    }
+    single {
+        com.lc33.tokenvault.engine.HttpConcurrencyApplier(
+            settings = get(),
+            gate = get(),
+            scope = get(named(Qualifiers.APP_SCOPE)),
+        )
+    }
     single { com.lc33.tokenvault.backup.BackupCodec(get()) }
     single<BackupStore> {
         RoomBackupStore(

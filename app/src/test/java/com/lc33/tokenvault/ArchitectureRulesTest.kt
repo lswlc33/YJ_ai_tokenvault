@@ -3,6 +3,7 @@ package com.lc33.tokenvault
 import com.lc33.tokenvault.domain.AutoLockPolicy
 import com.lc33.tokenvault.domain.AutoRefreshPolicy
 import com.lc33.tokenvault.domain.ClipboardClearPolicy
+import com.lc33.tokenvault.domain.HttpConcurrencyPolicy
 import com.lc33.tokenvault.domain.model.LogRetention
 import com.lc33.tokenvault.domain.model.PredictiveBackExitDirection
 import com.lc33.tokenvault.domain.model.PredictiveBackStyle
@@ -263,6 +264,73 @@ class ArchitectureRulesTest {
             ),
         )
     }
+
+    /**
+     * 最大并发数那一枚下拉（§13.4 探测设置页）。
+     *
+     * 与「自动锁定」「自动刷新间隔」同一条风险，但后果更直白：按下标取值，错位一格就是
+     * 「选 8 得到 32」，等于一次把四倍请求打给上游——红线 29 挡的正是这件事。
+     */
+    @Test
+    fun `最大并发数下拉的选项数与策略表一致`() {
+        fail(
+            "最大并发数下拉按下标取值，两边数量必须一致（§13.4）：",
+            arrayItemCountMismatches(
+                "probe_max_concurrency_options",
+                HttpConcurrencyPolicy.OPTIONS.size,
+                "HttpConcurrencyPolicy.OPTIONS",
+            ),
+        )
+    }
+
+    /**
+     * 三端 HTTP 引擎的并发配置必须与设置档位对得上。
+     *
+     * 为什么这条要进机器检查而不是留在 code review：设置里能选的最大值是 32，而引擎的
+     * `maxRequests` 是构造时定死的。谁把它"顺手改回 8"，16/32 两档就悄悄变成假数——
+     * 界面写着 32，实际 8，而且没有任何报错。这条断言就是让这种改动直接红。
+     *
+     * iOS 只断"引擎里不该出现全局 maxRequests"：Darwin 没有全局并发的概念（全局那一档由
+     * commonMain 的 `net/ConcurrencyGate` 负责），在引擎里再写一个是第二套真相。
+     */
+    @Test
+    fun `三端引擎的并发配置与设置档位对齐`() {
+        val violations = mutableListOf<String>()
+        // 文件名带上平台短后缀（`.android.kt` / `.jvm.kt`），所以下面这两对不能只按目录拼出来。
+        val okHttpEngines = listOf(
+            "androidMain" to "HttpEngine.android.kt",
+            "jvmMain" to "HttpEngine.jvm.kt",
+        )
+        for ((sourceSet, fileName) in okHttpEngines) {
+            val file = platformSourceRoot(sourceSet).resolve("net/$fileName")
+            if (!file.isFile) {
+                violations += "找不到 $file"
+                continue
+            }
+            val text = file.readText()
+            if (!text.contains("maxRequests = HttpConcurrencyPolicy.MAX")) {
+                violations += "${file.name} 的 maxRequests 必须等于 HttpConcurrencyPolicy.MAX，" +
+                    "否则最高两档只是把请求挪进 OkHttp 队列里排队"
+            }
+            if (!text.contains("maxRequestsPerHost = HttpConcurrencyPolicy.PER_HOST_MAX_REQUESTS")) {
+                violations += "${file.name} 的 maxRequestsPerHost 必须走常量（红线 29 的每主机限流）"
+            }
+        }
+        val ios = platformSourceRoot("iosMain").resolve("net/HttpEngine.ios.kt")
+        if (!ios.isFile) {
+            violations += "找不到 $ios"
+        } else if (Regex("""maxRequests\s*=""").containsMatchIn(ios.readText())) {
+            violations += "iosMain 不该出现 maxRequests：全局那一档归 commonMain 的 ConcurrencyGate，" +
+                "引擎里再写一套就是两个真相互相不认识"
+        }
+        fail("HTTP 引擎的并发上限必须与「最大并发数」档位一致：", violations)
+    }
+
+    /** 平台源码根：与 [sharedSourceRoot] 同一套两种 cwd 兜底（IDE 跑与命令行跑工作目录不同）。 */
+    private fun platformSourceRoot(sourceSet: String): File = sequenceOf(
+        File("shared/src/$sourceSet/kotlin/com/lc33/tokenvault"),
+        File("../shared/src/$sourceSet/kotlin/com/lc33/tokenvault"),
+    ).firstOrNull { it.isDirectory } ?: error("找不到 shared/$sourceSet 主源码目录")
 
     /**
      * 密钥设置页那两个下拉。

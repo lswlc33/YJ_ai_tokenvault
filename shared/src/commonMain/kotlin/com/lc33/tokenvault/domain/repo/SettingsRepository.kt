@@ -152,6 +152,24 @@ interface SettingsRepository {
     suspend fun setAutoRefreshIntervalMinutes(minutes: Int)
 
     /**
+     * 应用内 HTTP 的最大并发数（§13.4 探测设置页）。档位与兜底见
+     * [com.lc33.tokenvault.domain.HttpConcurrencyPolicy]；**没写过时发
+     * [com.lc33.tokenvault.domain.HttpConcurrencyPolicy.DEFAULT]**。
+     *
+     * 存并发数而不是下拉下标，理由与间隔一样：以后中间插一档，用户已选的含义不能变。
+     *
+     * 消费方是 [com.lc33.tokenvault.engine.HttpConcurrencyApplier]（应用单例），它把值推给
+     * [com.lc33.tokenvault.net.ConcurrencyGate]。放在应用单例而不是设置页 ViewModel 上：
+     * 否则用户从没进过那一页，整个进程就跑在硬默认上，而页面上写着另一档。
+     *
+     * 这一档管的是所有走 `HttpEngine` 的请求（探测、模型列表、官网可达性、余额、检查更新），
+     * **不含 WebDAV**——备份用的是另一个 client，不该被探测挤住。
+     */
+    fun observeMaxConcurrency(): Flow<Int>
+
+    suspend fun setMaxConcurrency(count: Int)
+
+    /**
      * 底栏模糊（§13.4 外观页）。开 = 底栏对下方内容做背景模糊（`miuix-blur`，要 GPU）；
      * 关 = 底栏用实色背景。
      *

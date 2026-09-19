@@ -2,6 +2,7 @@ package com.lc33.tokenvault.net
 
 import com.lc33.tokenvault.domain.model.LogCategory
 import com.lc33.tokenvault.domain.model.LogLevel
+import com.lc33.tokenvault.domain.repo.AuditLogRepository
 import com.lc33.tokenvault.endpoint.ProbeRequest
 import com.lc33.tokenvault.endpoint.ProbeResponse
 import io.ktor.client.HttpClient
@@ -13,12 +14,16 @@ import io.ktor.http.headersOf
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -311,5 +316,152 @@ class HttpEngineTest {
         )
 
         assertEquals("""{"data":[]}""", response.body)
+    }
+
+    /**
+     * 并发闸真的接在 [HttpEngine.execute] 上（§13.4「最大并发数」）。
+     *
+     * `ConcurrencyGateTest` 证的是闸本身；这三条证的是**接线**——闸没注入、注入的是
+     * 另一个实例、或者 `withPermit` 只包住了 `client.request` 而把读体漏在外面，
+     * 上面那些用例全都还是绿的。六个不同 host 是为了绕开 host 门闸的串行，
+     * 让"同时几个在飞"只由并发闸决定。
+     *
+     * 三条都用 `runBlocking` 而不是 `runTest`：`MockEngine` 把处理块跑到它自己的
+     * `Dispatchers.IO` 上，虚拟时间的 `runCurrent()` 推不动它——那样写出来的断言会
+     * 稳定读到 0，看着像"闸把请求卡死了"，其实是测试自己没推进。计数用原子类，
+     * 因为写它的是引擎线程、读它的是测试线程。
+     */
+    @Test
+    fun `并发闸生效时 execute 同时最多放行设定数个请求`() = runBlocking {
+        val concurrency = ConcurrencyGate(2)
+        val hold = CompletableDeferred<Unit>()
+        val live = AtomicInteger()
+        val peak = AtomicInteger()
+        val mock = MockEngine {
+            live.incrementAndGet()
+            peak.accumulateAndGet(live.get()) { a, b -> maxOf(a, b) }
+            hold.await()
+            live.decrementAndGet()
+            respond("{}", HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+        }
+        val engine = HttpEngine(
+            HttpClient(mock),
+            HostGate(defaultMinIntervalMs = 0, nowMillis = { 0L }),
+            concurrency = concurrency,
+        )
+
+        val jobs = (1..6).map { i ->
+            launch {
+                engine.execute(url("https://h$i.example.com/v1/models"))
+            }
+        }
+        awaitWithin("六个不同 host 也该有两个同时上网线") { live.get() >= 2 }
+        hold.complete(Unit)
+        jobs.joinAll()
+
+        assertTrue(peak.get() <= 2, "全程峰值 ${peak.get()} 越过了上限 2")
+        assertEquals(0, concurrency.inFlightCount())
+    }
+
+    /** 取消一个在飞的请求，名额必须立刻回到排队的那个手上（漏一次就是永久少一格）。 */
+    @Test
+    fun `取消在飞的请求后名额立刻让给排队的下一个`() = runBlocking {
+        val concurrency = ConcurrencyGate(1)
+        val served = AtomicInteger()
+        val slowOnWire = CompletableDeferred<Unit>()
+        val mock = MockEngine { request ->
+            if (request.url.toString().contains("slow")) {
+                slowOnWire.complete(Unit)
+                awaitCancellation()
+            }
+            served.incrementAndGet()
+            respond("{}", HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+        }
+        val engine = HttpEngine(
+            HttpClient(mock),
+            HostGate(defaultMinIntervalMs = 0, nowMillis = { 0L }),
+            concurrency = concurrency,
+        )
+
+        val slow = launch { engine.execute(url("https://slow.example.com/v1/models")) }
+        // 慢的那个**真的**上了网线，唯一的名额才算被它占住；不等这步就取消，可能压根没排队。
+        awaitWithin("慢请求没进引擎，这条用例没在测名额转移") { slowOnWire.isCompleted }
+        val next = launch { engine.execute(url("https://next.example.com/v1/models")) }
+        delay(200)
+        assertEquals(0, served.get(), "名额还被慢的那个占着")
+
+        slow.cancelAndJoin()
+        // 没交回来就在这里超时：永久少一格等于"探测越跑越慢，最后整轮卡住"。
+        awaitWithin("取消之后排队的那个要立刻上网线") { served.get() >= 1 }
+        next.join()
+        assertEquals(0, concurrency.inFlightCount())
+    }
+
+    /**
+     * 名额**不**包住审计写入：一次 Room 写停顿不该变成网络停顿。
+     *
+     * 最小那一档（2）下这最要命——日志写慢一点，整个应用就只剩一条网络通道。
+     * 断法是：让审计写入卡在挂起函数里，第二个请求仍然能拿到名额上网线。
+     */
+    @Test
+    fun `审计写入不占并发名额`() = runBlocking {
+        val concurrency = ConcurrencyGate(1)
+        val auditStall = CompletableDeferred<Unit>()
+        val served = AtomicInteger()
+        val mock = MockEngine {
+            served.incrementAndGet()
+            respond("{}", HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+        }
+        val slowAudit = object : AuditLogRepository by RecordingAuditLog() {
+            override suspend fun record(
+                level: LogLevel,
+                category: LogCategory,
+                message: String,
+                detail: String?,
+                providerId: Long?,
+                keyId: Long?,
+                runId: Long?,
+                requestUrl: String?,
+                requestBody: String?,
+                responseBody: String?,
+            ) {
+                auditStall.await()
+            }
+        }
+        val engine = HttpEngine(
+            HttpClient(mock),
+            HostGate(defaultMinIntervalMs = 0, nowMillis = { 0L }),
+            audit = slowAudit,
+            concurrency = concurrency,
+        )
+
+        val first = launch { engine.execute(url("https://a.example.com/v1/models")) }
+        // 第一个跑完网线那一段、停在写审计日志上：名额在这一步之前就该还掉了。
+        awaitWithin("第一个请求没上网线") { served.get() >= 1 }
+
+        val second = launch { engine.execute(url("https://b.example.com/v1/models")) }
+        awaitWithin("日志写得慢不该把网络也拖住") { served.get() >= 2 }
+
+        auditStall.complete(Unit)
+        first.join()
+        second.join()
+        assertEquals(0, concurrency.inFlightCount())
+    }
+
+    private fun url(target: String) =
+        ProbeRequest(method = "GET", url = target, headers = emptyList())
+
+    /**
+     * 等一个由引擎线程写出的条件成立，等不到就红。
+     *
+     * 不用 `yield` 或固定次数：这里要等的可能是别的线程上真的在跑的磁盘/网络代码，
+     * "让一次调度"不稳定；超时兜底才让"永远等不到"这种失败有个能读的消息。
+     */
+    private suspend fun awaitWithin(what: String, deadlineMs: Long = 5_000, predicate: () -> Boolean) {
+        val reached = withTimeoutOrNull(deadlineMs) {
+            while (!predicate()) delay(20)
+            true
+        } ?: false
+        assertTrue(reached, "$what（${deadlineMs}ms 内没等到）")
     }
 }

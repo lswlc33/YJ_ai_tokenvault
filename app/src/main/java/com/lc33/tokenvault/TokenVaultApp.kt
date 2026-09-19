@@ -11,6 +11,7 @@ import com.lc33.tokenvault.di.platformModule
 import com.lc33.tokenvault.di.viewModelModule
 import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.engine.AutoRefresher
+import com.lc33.tokenvault.engine.HttpConcurrencyApplier
 import com.lc33.tokenvault.platform.AutoLocker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -34,6 +35,7 @@ class TokenVaultApp : Application() {
 
     private val autoLocker: AutoLocker by inject()
     private val autoRefresher: AutoRefresher by inject()
+    private val concurrencyApplier: HttpConcurrencyApplier by inject()
     private val settings: SettingsRepository by inject()
     private val profileSeeder: ProfileSeeder by inject()
     private val appScope: CoroutineScope by inject(named(Qualifiers.APP_SCOPE))
@@ -72,5 +74,8 @@ class TokenVaultApp : Application() {
         // 自动刷新（§13.4 探测设置页）：进程级起一次，开关与间隔由它自己订阅，
         // 所以用户改设置不需要回到这一页重开。解锁后那一刷在 AppRoot 里接。
         autoRefresher.start()
+        // 并发档位同理（§13.4）：不接在探测设置页的 ViewModel 上，否则用户没进过那一页
+        // 就没人把库里的值推给闸，页面上写 32、实际跑 8。
+        concurrencyApplier.start()
     }
 }

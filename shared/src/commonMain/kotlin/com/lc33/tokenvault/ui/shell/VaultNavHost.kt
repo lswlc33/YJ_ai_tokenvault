@@ -715,10 +715,12 @@ fun VaultNavHost(
             val defaultProbeModelReachability by vm.defaultProbeModelReachability.collectAsStateWithLifecycle()
             val autoRefresh by vm.autoRefresh.collectAsStateWithLifecycle()
             val autoRefreshIntervalIndex by vm.autoRefreshIntervalIndex.collectAsStateWithLifecycle()
+            val maxConcurrencyIndex by vm.maxConcurrencyIndex.collectAsStateWithLifecycle()
             ProbeSettingsScreen(
                 sniffClientProfile = sniffClientProfile,
                 autoRefresh = autoRefresh,
                 autoRefreshIntervalIndex = autoRefreshIntervalIndex,
+                maxConcurrencyIndex = maxConcurrencyIndex,
                 defaultProbeReachability = defaultProbeReachability,
                 defaultProbeKeys = defaultProbeKeys,
                 defaultProbeBalance = defaultProbeBalance,
@@ -727,6 +729,7 @@ fun VaultNavHost(
                 onSniffClientProfileChange = vm::onSniffClientProfileChange,
                 onAutoRefreshChange = vm::onAutoRefreshChange,
                 onAutoRefreshIntervalIndexChange = vm::onAutoRefreshIntervalIndexChange,
+                onMaxConcurrencyIndexChange = vm::onMaxConcurrencyIndexChange,
                 onDefaultProbeReachabilityChange = vm::onDefaultProbeReachabilityChange,
                 onDefaultProbeKeysChange = vm::onDefaultProbeKeysChange,
                 onDefaultProbeBalanceChange = vm::onDefaultProbeBalanceChange,

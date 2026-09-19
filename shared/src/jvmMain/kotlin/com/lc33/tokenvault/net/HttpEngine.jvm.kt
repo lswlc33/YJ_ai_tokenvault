@@ -1,6 +1,7 @@
 package com.lc33.tokenvault.net
 
 import io.ktor.client.engine.HttpClientEngine
+import com.lc33.tokenvault.domain.HttpConcurrencyPolicy
 import io.ktor.client.engine.okhttp.OkHttp
 import java.util.concurrent.TimeUnit
 
@@ -20,8 +21,8 @@ actual fun platformEngine(readTimeoutMs: Long, callTimeoutMs: Long): HttpClientE
         .retryOnConnectionFailure(true)
         .dispatcher(
             okhttp3.Dispatcher().apply {
-                maxRequests = 8
-                maxRequestsPerHost = 3
+                maxRequests = HttpConcurrencyPolicy.MAX
+                maxRequestsPerHost = HttpConcurrencyPolicy.PER_HOST_MAX_REQUESTS
             },
         )
         .build()

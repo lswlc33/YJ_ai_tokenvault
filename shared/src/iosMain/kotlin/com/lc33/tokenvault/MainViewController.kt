@@ -8,6 +8,7 @@ import com.lc33.tokenvault.di.platformModule
 import com.lc33.tokenvault.di.viewModelModule
 import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.engine.AutoRefresher
+import com.lc33.tokenvault.engine.HttpConcurrencyApplier
 import com.lc33.tokenvault.platform.AutoLocker
 import com.lc33.tokenvault.platform.SecureClipboard
 import com.lc33.tokenvault.platform.VaultSession
@@ -87,4 +88,7 @@ private fun initIosApp() {
     // 自动刷新（§13.4 探测设置页）：等价 Android 端 TokenVaultApp 那一句。间隔靠应用内
     // 协程计时，所以 iOS 挂后台被冻结时不会偷偷发请求；回前台解锁后由 AppRoot 补一轮。
     koin.get<AutoRefresher>().start()
+    // 并发档位：等价 Android 端 TokenVaultApp 那一句。不接在设置页 ViewModel 上，
+    // 否则没进过那一页的进程会一直跑在硬默认档上。
+    koin.get<HttpConcurrencyApplier>().start()
 }

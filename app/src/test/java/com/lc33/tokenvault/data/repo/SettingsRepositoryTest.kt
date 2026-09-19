@@ -4,6 +4,7 @@ import app.cash.turbine.test
 import com.lc33.tokenvault.domain.AutoLockPolicy
 import com.lc33.tokenvault.domain.AutoLockTimeout
 import com.lc33.tokenvault.domain.DefaultProbeSettings
+import com.lc33.tokenvault.domain.HttpConcurrencyPolicy
 import com.lc33.tokenvault.domain.model.BalanceSnapshot
 import com.lc33.tokenvault.domain.model.LogLevel
 import com.lc33.tokenvault.domain.model.LogRetention
@@ -417,6 +418,55 @@ class SettingsRepositoryTest {
             repo.setClipboardClearSeconds(30)
             repo.setAutoRefreshIntervalMinutes(5)
             expectNoEvents()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    // -------------------------------------------------------------- 最大并发数（§13.4）
+
+    @Test
+    fun `最大并发数没写过时默认 8`() = runTest {
+        repo.observeMaxConcurrency().test {
+            assertEquals(HttpConcurrencyPolicy.DEFAULT, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `最大并发数存的是个数而不是下拉下标`() = runTest {
+        // 与自动刷新间隔同一条理由，但这里的后果是打给上游的请求数：存下标的话，
+        // 以后中间插一档，所有人已选的档位含义集体往后挪一格，而且没人看得出来。
+        repo.setMaxConcurrency(16)
+        assertEquals("16", dao.rows.first { it.key == "maxConcurrency" }.value)
+        repo.observeMaxConcurrency().test {
+            assertEquals(16, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `最大并发数坏值落回默认而不是零`() = runTest {
+        // 0 个并发等于整个应用从此不再发一个请求，比"档位偏一格"严重得多。
+        dao.put(
+            com.lc33.tokenvault.data.entity.AppSettingEntity(key = "maxConcurrency", value = "0"),
+        )
+        repo.observeMaxConcurrency().test {
+            assertEquals(HttpConcurrencyPolicy.DEFAULT, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `最大并发数只在自己的流上出声`() = runTest {
+        // 换档靠 HttpConcurrencyApplier 订阅这条流；写别的设置项把它吵醒一次，
+        // 就是每次改任何设置都重建一次闸——正在排队的请求会被莫名其妙放一遍。
+        repo.setMaxConcurrency(8)
+        repo.observeMaxConcurrency().test {
+            assertEquals(8, awaitItem())
+            repo.setAutoRefreshIntervalMinutes(15)
+            expectNoEvents()
+            repo.setMaxConcurrency(32)
+            assertEquals(32, awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
     }

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lc33.tokenvault.domain.AutoRefreshPolicy
 import com.lc33.tokenvault.domain.DefaultProbeSettings
+import com.lc33.tokenvault.domain.HttpConcurrencyPolicy
 import com.lc33.tokenvault.domain.repo.SettingsRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -78,6 +79,25 @@ class ProbeSettingsViewModel constructor(
     fun onAutoRefreshIntervalIndexChange(index: Int) {
         viewModelScope.launch {
             failures.guard { settings.setAutoRefreshIntervalMinutes(AutoRefreshPolicy.at(index)) }
+        }
+    }
+
+    /**
+     * 最大并发数在下拉里的下标。同样**从仓库派生**：真正生效的那个数在
+     * `ConcurrencyGate` 里，由 `HttpConcurrencyApplier` 从同一条流推过去，这里再记一份
+     * 就会出现"页面显示 8、闸是 32"。
+     */
+    val maxConcurrencyIndex: StateFlow<Int> = settings.observeMaxConcurrency()
+        .map { HttpConcurrencyPolicy.indexOf(it) }
+        .stateIn(
+            viewModelScope,
+            SharingStarted.Eagerly,
+            HttpConcurrencyPolicy.indexOf(HttpConcurrencyPolicy.DEFAULT),
+        )
+
+    fun onMaxConcurrencyIndexChange(index: Int) {
+        viewModelScope.launch {
+            failures.guard { settings.setMaxConcurrency(HttpConcurrencyPolicy.at(index)) }
         }
     }
 

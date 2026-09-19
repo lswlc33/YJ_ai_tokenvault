@@ -7,6 +7,7 @@ import com.lc33.tokenvault.domain.AutoLockTimeout
 import com.lc33.tokenvault.domain.AutoRefreshPolicy
 import com.lc33.tokenvault.domain.ClipboardClearPolicy
 import com.lc33.tokenvault.domain.DefaultProbeSettings
+import com.lc33.tokenvault.domain.HttpConcurrencyPolicy
 import com.lc33.tokenvault.domain.model.BalanceSnapshot
 import com.lc33.tokenvault.domain.model.BackupTarget
 import com.lc33.tokenvault.domain.model.LastBackup
@@ -225,6 +226,22 @@ class RoomSettingsRepository constructor(
         auditChange(KEY_AUTO_REFRESH_INTERVAL)
     }
 
+    override fun observeMaxConcurrency(): Flow<Int> = dao.observeAll()
+        .map { rows ->
+            HttpConcurrencyPolicy.decode(rows.firstOrNull { it.key == KEY_MAX_CONCURRENCY }?.value)
+        }
+        .distinctUntilChanged()
+
+    override suspend fun setMaxConcurrency(count: Int) {
+        dao.put(
+            AppSettingEntity(
+                key = KEY_MAX_CONCURRENCY,
+                value = HttpConcurrencyPolicy.encode(count),
+            ),
+        )
+        auditChange(KEY_MAX_CONCURRENCY)
+    }
+
     private suspend fun auditChange(key: String) {
         audit.recordSafe(LogLevel.INFO, LogCategory.VAULT, "setting changed", "key=$key")
     }
@@ -297,6 +314,14 @@ class RoomSettingsRepository constructor(
         const val KEY_AUTO_REFRESH = "autoRefresh"
 
         const val KEY_AUTO_REFRESH_INTERVAL = "autoRefreshIntervalMinutes"
+
+        /**
+         * 应用内 HTTP 最大并发数（存次数，见 [HttpConcurrencyPolicy]）。
+         *
+         * 与 `maxRequestsPerHost` 那个"每家最多 3"不是一回事：这一条是全局在飞上限，
+         * 后者是三端引擎里写死的每主机上限，不进设置。
+         */
+        const val KEY_MAX_CONCURRENCY = "maxConcurrency"
 
         const val KEY_LOG_LEVEL_FILTER = "logLevelFilter"
 

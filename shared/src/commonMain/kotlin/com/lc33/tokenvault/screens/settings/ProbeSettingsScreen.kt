@@ -24,6 +24,10 @@ import tokenvault.shared.generated.resources.probe_defaults_goto_manage
 import tokenvault.shared.generated.resources.probe_defaults_notice
 import tokenvault.shared.generated.resources.probe_keywords
 import tokenvault.shared.generated.resources.probe_keywords_summary
+import tokenvault.shared.generated.resources.probe_max_concurrency
+import tokenvault.shared.generated.resources.probe_max_concurrency_options
+import tokenvault.shared.generated.resources.probe_max_concurrency_summary
+import tokenvault.shared.generated.resources.probe_section_concurrency
 import tokenvault.shared.generated.resources.probe_section_auto_refresh
 import tokenvault.shared.generated.resources.probe_section_client
 import tokenvault.shared.generated.resources.probe_section_cost
@@ -67,6 +71,7 @@ fun ProbeSettingsScreen(
     sniffClientProfile: Boolean,
     autoRefresh: Boolean,
     autoRefreshIntervalIndex: Int,
+    maxConcurrencyIndex: Int,
     defaultProbeReachability: Boolean,
     defaultProbeKeys: Boolean,
     defaultProbeBalance: Boolean,
@@ -75,6 +80,7 @@ fun ProbeSettingsScreen(
     onSniffClientProfileChange: (Boolean) -> Unit,
     onAutoRefreshChange: (Boolean) -> Unit,
     onAutoRefreshIntervalIndexChange: (Int) -> Unit,
+    onMaxConcurrencyIndexChange: (Int) -> Unit,
     onDefaultProbeReachabilityChange: (Boolean) -> Unit,
     onDefaultProbeKeysChange: (Boolean) -> Unit,
     onDefaultProbeBalanceChange: (Boolean) -> Unit,
@@ -144,6 +150,22 @@ fun ProbeSettingsScreen(
                         onSelect = onAutoRefreshIntervalIndexChange,
                     )
                 }
+            }
+        }
+
+        // 并发这一档与上面那节的性质不同：「自动刷新」管的是"什么时候刷"，而它管的是
+        // **整个应用同时发几个请求**（模型列表、余额、检查更新都算），手动探测也受它管。
+        // 所以单独成节，不混进"自动刷新"里，免得读成一个只管定时器的开关。
+        item { SectionTitle(text = stringResource(Res.string.probe_section_concurrency)) }
+        item {
+            AppPreferenceGroup {
+                AppDropdownRow(
+                    title = stringResource(Res.string.probe_max_concurrency),
+                    summary = stringResource(Res.string.probe_max_concurrency_summary),
+                    items = stringArrayResource(Res.array.probe_max_concurrency_options).toList(),
+                    selectedIndex = maxConcurrencyIndex,
+                    onSelect = onMaxConcurrencyIndexChange,
+                )
             }
         }
 

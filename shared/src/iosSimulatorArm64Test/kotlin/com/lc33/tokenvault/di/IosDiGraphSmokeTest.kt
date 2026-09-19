@@ -19,10 +19,12 @@ import com.lc33.tokenvault.domain.repo.TransactionRunner
 import com.lc33.tokenvault.engine.AutoRefresher
 import com.lc33.tokenvault.engine.BackupEngine
 import com.lc33.tokenvault.engine.BalanceEngine
+import com.lc33.tokenvault.engine.HttpConcurrencyApplier
 import com.lc33.tokenvault.engine.ProbeEngine
 import com.lc33.tokenvault.engine.ProbeSession
 import com.lc33.tokenvault.engine.RefreshRound
 import com.lc33.tokenvault.engine.UpdateEngine
+import com.lc33.tokenvault.net.ConcurrencyGate
 import com.lc33.tokenvault.net.HttpEngine
 import com.lc33.tokenvault.platform.AutoLocker
 import com.lc33.tokenvault.platform.BootStore
@@ -88,6 +90,8 @@ class IosDiGraphSmokeTest {
             "AuditLogRepository" to { koin.get<AuditLogRepository>() },
             "ProbeRunRepository" to { koin.get<ProbeRunRepository>() },
             "HttpEngine" to { koin.get<HttpEngine>() },
+            "ConcurrencyGate" to { koin.get<ConcurrencyGate>() },
+            "HttpConcurrencyApplier" to { koin.get<HttpConcurrencyApplier>() },
             "BackupStore" to { koin.get<BackupStore>() },
             "BackupEngine" to { koin.get<BackupEngine>() },
             "BalanceEngine" to { koin.get<BalanceEngine>() },
