@@ -37,6 +37,7 @@ import com.lc33.tokenvault.probe.PlannedTask
 import com.lc33.tokenvault.probe.MODEL_PROBE_PROTOCOL_ORDER
 import com.lc33.tokenvault.probe.ModelListParse
 import com.lc33.tokenvault.probe.ModelListParser
+import com.lc33.tokenvault.probe.ModelMerger
 import com.lc33.tokenvault.probe.modelProbeStateOf
 import com.lc33.tokenvault.probe.ProbeBudget
 import com.lc33.tokenvault.probe.Classification
@@ -409,6 +410,11 @@ class ProbeEngine constructor(
      *
      * 判定本身在解析层（`probe/ModelListParse`），这里只是"不落地"的那一半——
      * 仓库层（`data/RoomModelRepository`）不动，它照旧认为"空列表 = 确实没有"。
+     *
+     * **一个模型只折进一个协议**（[ModelMerger.oneProtocolPerModel]）。解析器会把
+     * `supported_endpoint_types: ["openai"]` 摊成 chat + responses，那是解析层的事实；
+     * 照原样落库就是同一个模型两行，而"消失即删"按协议各管一套、谁也清不掉谁，
+     * 于是每刷新一次重复就重新长出来一次。
      */
     private suspend fun applyParsedModels(
         body: String?,
@@ -420,14 +426,16 @@ class ProbeEngine constructor(
     ) {
         val allowedProtocols = key?.settings?.supportedProtocols ?: emptySet()
         when (val parsed = ModelListParser.parse(body, protocol)) {
-            is ModelListParse.Confirmed -> parsed.models
-                .filter { it.protocol in allowedProtocols }
-                .forEach { model ->
-                    accumulator
-                        .getOrPut(keyId) { mutableMapOf() }
-                        .getOrPut(model.protocol) { mutableSetOf() }
-                        .add(model.modelId)
-                }
+            is ModelListParse.Confirmed -> ModelMerger.oneProtocolPerModel(
+                discovered = parsed.models,
+                allowed = allowedProtocols,
+                preferred = allowedProtocols.firstOrNull(),
+            ).forEach { model ->
+                accumulator
+                    .getOrPut(keyId) { mutableMapOf() }
+                    .getOrPut(model.protocol) { mutableSetOf() }
+                    .add(model.modelId)
+            }
 
             ModelListParse.SuspiciousEmpty -> audit.record(
                 level = LogLevel.WARN,

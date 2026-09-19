@@ -118,4 +118,70 @@ class ModelMergerTest {
         )
         assertEquals(listOf(NewDiscoveredModel("shared-model", Protocol.ANTHROPIC)), plan.toInsert)
     }
+
+    // -------------------------------------------------- 一个模型只留一个协议
+    //
+    // 上面那条是合并层的既有语义（"给了两个协议就落两行"），这一组是**在它之前**收一次口：
+    // 解析层把 `["openai"]` 摊成 chat + responses 是事实，但照原样往下传就是同一个模型
+    // 两行、界面上一份重复列表，而"消失即删"按协议各管一套，重复每刷新一次长回来一次。
+
+    @Test
+    fun `摊成多个协议的模型只留首选协议那一行`() {
+        val folded = ModelMerger.oneProtocolPerModel(
+            discovered = listOf(
+                fetched("gpt-5.6-sol", Protocol.CHAT),
+                fetched("gpt-5.6-sol", Protocol.RESPONSES),
+                fetched("gpt-4o", Protocol.CHAT),
+            ),
+            allowed = setOf(Protocol.CHAT, Protocol.RESPONSES),
+            preferred = Protocol.CHAT,
+        )
+
+        assertEquals(
+            listOf(NewDiscoveredModel("gpt-5.6-sol", Protocol.CHAT), NewDiscoveredModel("gpt-4o", Protocol.CHAT)),
+            folded,
+        )
+    }
+
+    @Test
+    fun `首选协议不在候选里就用候选自己的第一个`() {
+        // 只标了 anthropic 的模型不该被强行记成 chat——那样它会发到 /chat/completions
+        // 而上游只有 /messages，表现是 404，且很难反推回这里。
+        val folded = ModelMerger.oneProtocolPerModel(
+            discovered = listOf(
+                fetched("claude-opus-5", Protocol.CHAT),
+                fetched("claude-opus-5", Protocol.ANTHROPIC),
+            ),
+            allowed = setOf(Protocol.CHAT, Protocol.ANTHROPIC),
+            preferred = Protocol.ANTHROPIC,
+        )
+
+        assertEquals(listOf(NewDiscoveredModel("claude-opus-5", Protocol.ANTHROPIC)), folded)
+    }
+
+    @Test
+    fun `Key 没声明的协议不落库`() {
+        val folded = ModelMerger.oneProtocolPerModel(
+            discovered = listOf(
+                fetched("kimi-k3", Protocol.CHAT),
+                fetched("kimi-k3", Protocol.RESPONSES),
+            ),
+            allowed = setOf(Protocol.CHAT),
+            preferred = Protocol.CHAT,
+        )
+
+        assertEquals(listOf(NewDiscoveredModel("kimi-k3", Protocol.CHAT)), folded)
+    }
+
+    @Test
+    fun `一个协议都没声明时什么都不留`() {
+        // 兜住 `key == null` / 设置读空：宁可什么都不写，也别拿一个猜出来的协议落库。
+        val folded = ModelMerger.oneProtocolPerModel(
+            discovered = listOf(fetched("gpt-4o", Protocol.CHAT)),
+            allowed = emptySet(),
+            preferred = null,
+        )
+
+        assertTrue(folded.isEmpty())
+    }
 }
