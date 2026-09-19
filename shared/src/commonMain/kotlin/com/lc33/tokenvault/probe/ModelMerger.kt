@@ -103,4 +103,36 @@ object ModelMerger {
             toDelete = toDelete.distinct(),
         )
     }
+
+    /**
+     * 一次解析的产物折成"每个模型只留一个协议"，并且只留这把 Key 声明过的协议。
+     *
+     * 为什么需要：[ModelListParser] 会把一条上游条目摊成多个协议——new-api 的
+     * `supported_endpoint_types: ["openai"]` 同时覆盖 chat 与 responses（M0.5 实测，见
+     * `Protocol.protocolsForEndpointType` 的注释）。摊开本身没错，错在往下走：
+     * `models` 表按协议分行，而 [merge] 的"消失即删"又限定 `discoveredVia == 本轮协议`，
+     * 两套行互不清理。于是同一个模型在库里躺两行，界面上就是一份重复的模型列表，
+     * 而且**每刷新一次就重新长出来一次**。
+     *
+     * 这张表的语义是"这个模型发到哪条路径"（红线 18），一行只能答一个协议；真要留
+     * "它还支持别的协议"得另开一列，不在这里塞。取哪个：优先这把 Key 声明序的第一个
+     * （与 `ProbePlanBuilder.buildModelListTasks` 请求所用的协议一致，手动刷新与自动轮
+     * 写出的 `discoveredVia` 才会是同一个），它不在候选里才退到候选的第一个——
+     * 只标了 `["anthropic"]` 的模型不该被强行记成 chat。
+     */
+    fun oneProtocolPerModel(
+        discovered: List<NewDiscoveredModel>,
+        allowed: Set<Protocol>,
+        preferred: Protocol?,
+    ): List<NewDiscoveredModel> =
+        discovered
+            .filter { it.protocol in allowed }
+            .groupBy { it.modelId }
+            .map { (modelId, entries) ->
+                NewDiscoveredModel(
+                    modelId = modelId,
+                    protocol = entries.firstOrNull { it.protocol == preferred }?.protocol
+                        ?: entries.first().protocol,
+                )
+            }
 }

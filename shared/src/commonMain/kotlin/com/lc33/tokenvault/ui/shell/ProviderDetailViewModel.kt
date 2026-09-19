@@ -171,7 +171,12 @@ class ProviderDetailViewModel constructor(
             val keyRows = data.keys.map { key ->
                 key.toRow(maskMap[key.id]?.text ?: SecretMask.ELLIPSIS)
             }
-            val modelRows = data.models.map { it.toRow() }
+            // 按 (Key, 模型 id) 收一次：库里同一个 modelId 可以按协议各存一行（红线 18 说
+            // 协议属于模型，一个模型在 chat 与 responses 上都可用就是两行），而这一页
+            // **不显示协议尾巴**——两份都画出来就是"每个模型出现两遍"，那句"N 个模型"
+            // 也跟着列表数、与供应商卡上的去重计数各说各话。DAO 按 sortOrder 排过，
+            // 留下的是最先发现的那一行。Key 详情页保留两行，那里协议 chip 看得见。
+            val modelRows = data.models.distinctBy { it.keyId to it.modelId }.map { it.toRow() }
             val accountRows = data.accounts.map { account ->
                 account.toRow(accountMaskMap[account.id]?.text ?: SecretMask.ELLIPSIS)
             }

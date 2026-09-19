@@ -63,7 +63,7 @@ abstract class VaultDatabase : RoomDatabase() {
     abstract fun appSettingDao(): AppSettingDao
 
     companion object {
-        const val VERSION = 7
+        const val VERSION = 8
         const val FILE_NAME = "vault.db"
 
         val MIGRATION_1_2: Migration = object : Migration(1, 2) {
@@ -571,6 +571,44 @@ abstract class VaultDatabase : RoomDatabase() {
             override fun migrate(connection: SQLiteConnection) {
                 connection.execSQL(
                     "ALTER TABLE providers ADD COLUMN checkWebsite INTEGER NOT NULL DEFAULT 0",
+                )
+            }
+        }
+
+        /**
+         * v8：清掉历史刷新写出的重复模型行。**纯数据，schema 一字未动**。
+         *
+         * 来由：`refreshModelsInner` 以前复用探测计划铺任务，而计划里同一把 Key 有
+         * "每个协议一条 L1 + 一条 L2"，它们的 url 都是同一个 `modelsUrl`（模型列表端点
+         * 不分协议）。同一份响应于是被按协议各归一桶、各写一套行；`ModelMerger` 的
+         * "消失即删"限定 `discoveredVia == 本轮协议`，两套行互不清理，重复永久留在库里，
+         * 界面上每个模型出现两遍。请求侧已经在 `ProbePlanBuilder.buildModelListTasks`
+         * 收口成每把 Key 一次，这里补上存量。
+         *
+         * 只动 `source = 'discovered'` 的行（手动录入的永不被自动同步改动，红线 13），
+         * 同组保留 id 最小的那条——即第一次发现它的那一行，协议归属也就是它。
+         * 与手动行并存的发现行**不删**：这条迁移要解决的是"刷新写出来的重复"，那才是它的
+         * 责任范围；手动行旁边那条发现行属于另一件事，删错了直接毁掉用户手敲的数据，
+         * 而它在界面上本来就靠协议尾巴区分得开。
+         *
+         * `keyId IS models.keyId`：SQLite 的 `IS` 是 NULL 安全的等值比较。`keyId` 可空
+         * （备份恢复链路会留空值），用 `=` 的话两侧都是 NULL 时匹配不上，那些重复组会漏掉。
+         */
+        val MIGRATION_7_8: Migration = object : Migration(7, 8) {
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL(
+                    """
+                    DELETE FROM models
+                    WHERE source = 'discovered'
+                      AND EXISTS (
+                          SELECT 1 FROM models AS keep
+                          WHERE keep.source = 'discovered'
+                            AND keep.providerId = models.providerId
+                            AND keep.keyId IS models.keyId
+                            AND keep.modelId = models.modelId
+                            AND keep.id < models.id
+                      )
+                    """.trimIndent(),
                 )
             }
         }

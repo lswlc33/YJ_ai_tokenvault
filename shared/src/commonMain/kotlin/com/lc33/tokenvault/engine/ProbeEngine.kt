@@ -37,6 +37,7 @@ import com.lc33.tokenvault.probe.PlannedTask
 import com.lc33.tokenvault.probe.MODEL_PROBE_PROTOCOL_ORDER
 import com.lc33.tokenvault.probe.ModelListParse
 import com.lc33.tokenvault.probe.ModelListParser
+import com.lc33.tokenvault.probe.ModelMerger
 import com.lc33.tokenvault.probe.modelProbeStateOf
 import com.lc33.tokenvault.probe.ProbeBudget
 import com.lc33.tokenvault.probe.Classification
@@ -224,6 +225,9 @@ class ProbeEngine constructor(
      *
      * 与普通探测分开跑：模型列表是 GET、零成本，但结果要进三路合并，不适合塞进
      * `probe_runs` 的进度语义。仍然尊重探测总闸与 Key 探测开关，锁定态不发。
+     *
+     * **每把 Key 恰好一次 GET**，且只看这把 Key 的 `probe.models`：既不看可达性也不看
+     * 密钥有效性开关（那两个各铺一份任务，同一份列表会被发两三次、按协议各写一套行）。
      */
     fun refreshModels(providerId: Long, keyId: Long? = null): Boolean {
         if (modelJob?.isActive == true) return false
@@ -261,19 +265,18 @@ class ProbeEngine constructor(
         val profileList = clientProfiles.observeAll().first()
         val defaultProfile = profileList.firstOrNull { it.builtinKey == "default" }
         val clientKeywords = this.settings.observeClientKeywords().first()
-        val plan = ProbePlanBuilder.build(listOf(provider)) { pid ->
+        // 每把 Key 恰好一条 GET，不复用探测计划：那份按"每个协议一条 L1 + 一条 L2"铺开，
+        // 而它们打的是同一个 modelsUrl（`EndpointNormalizer` 里模型列表不分协议）。
+        // 复用的后果不只是白发请求——每条任务各带一个 protocol，同一份响应会被按协议
+        // 各归一桶、各写一套行，界面上每个模型就出现两遍。见 `ProbePlanBuilder` 的说明。
+        val plannedTasks = ProbePlanBuilder.buildModelListTasks(listOf(provider)) { pid ->
             selectedKeys.filter { it.providerId == pid }
         }
 
         fun profileOf(id: Long?): ClientProfile? =
             profileList.firstOrNull { it.id == id } ?: defaultProfile
 
-        val tasks = mutableListOf<ProbeTask>()
-        for (planned in plan.tasks) {
-            if (planned.keyId == null) continue
-            if (keyId != null && planned.keyId != keyId) continue
-            planned.toTask(profileOf(planned.clientProfileId))?.let { tasks += it }
-        }
+        val tasks = plannedTasks.mapNotNull { it.toTask(profileOf(it.clientProfileId)) }
 
         var ok = 0
         var fail = 0
@@ -354,9 +357,45 @@ class ProbeEngine constructor(
             level = if (fail == 0) LogLevel.INFO else LogLevel.WARN,
             category = LogCategory.PROBE,
             message = "models refreshed",
-            detail = "provider=$providerId tasks=${tasks.size} ok=$ok fail=$fail models=$discovered",
+            // `tasks` 与 `keys` 应当相等：每把 Key 恰好一次 GET。日志里两者差开就是
+            // 有人又把探测计划拿来做模型列表刷新了（同一个 modelsUrl 会被发两三次）。
+            detail = "provider=$providerId keys=${selectedKeys.size} tasks=${tasks.size} " +
+                "ok=$ok fail=$fail models=$discovered",
         )
         return ModelRefreshResult(discovered = discovered, failed = fail > 0 && ok == 0)
+    }
+
+    /**
+     * 这一轮"每把 Key 的模型列表由哪条响应提供"：任务 id → Key id，**每把 Key 至多一条**。
+     *
+     * 计划里同一把 Key 可能同时挂着 L1（每个协议一条）和 L2，而它们的 url 都是同一个
+     * `modelsUrl`——模型列表端点不分协议。逐条解析等于把同一份响应按协议各归一桶、各写
+     * 一套行（`ModelMerger` 的"消失即删"按 `discoveredVia` 分协议，两套行互不清理），
+     * 界面上就是每个模型出现两遍。
+     *
+     * 取哪一条：优先 L2，与 [ProbePlanBuilder.buildModelListTasks] 同口径，这样手动刷新
+     * 与自动轮写出的 `discoveredVia` 是同一个协议；没有 L2（`keyValidity` 关着）时取首选
+     * 协议的那条 L1——那份列表既然已经发出去了，就不该被白白丢掉。
+     */
+    private fun modelsSourceByKeyId(
+        tasks: List<ProbeTask>,
+        keyById: Map<Long, ApiKey>,
+    ): Map<String, Long> {
+        val tasksPerKey = mutableMapOf<Long, MutableList<ProbeTask>>()
+        for (task in tasks) {
+            task.keyId?.let { tasksPerKey.getOrPut(it) { mutableListOf() } += task }
+        }
+        val sources = mutableMapOf<String, Long>()
+        for ((keyId, keyTasks) in tasksPerKey) {
+            val key = keyById[keyId] ?: continue
+            if (!key.settings.probe.models) continue
+            val primary = key.settings.supportedProtocols.firstOrNull()
+            val source = keyTasks.firstOrNull { it.level == ProbeLevel.L2_KEY_VALIDITY }
+                ?: keyTasks.firstOrNull { it.protocol == primary }
+                ?: keyTasks.first()
+            sources[source.id] = keyId
+        }
+        return sources
     }
 
     /**
@@ -371,6 +410,11 @@ class ProbeEngine constructor(
      *
      * 判定本身在解析层（`probe/ModelListParse`），这里只是"不落地"的那一半——
      * 仓库层（`data/RoomModelRepository`）不动，它照旧认为"空列表 = 确实没有"。
+     *
+     * **一个模型只折进一个协议**（[ModelMerger.oneProtocolPerModel]）。解析器会把
+     * `supported_endpoint_types: ["openai"]` 摊成 chat + responses，那是解析层的事实；
+     * 照原样落库就是同一个模型两行，而"消失即删"按协议各管一套、谁也清不掉谁，
+     * 于是每刷新一次重复就重新长出来一次。
      */
     private suspend fun applyParsedModels(
         body: String?,
@@ -382,14 +426,16 @@ class ProbeEngine constructor(
     ) {
         val allowedProtocols = key?.settings?.supportedProtocols ?: emptySet()
         when (val parsed = ModelListParser.parse(body, protocol)) {
-            is ModelListParse.Confirmed -> parsed.models
-                .filter { it.protocol in allowedProtocols }
-                .forEach { model ->
-                    accumulator
-                        .getOrPut(keyId) { mutableMapOf() }
-                        .getOrPut(model.protocol) { mutableSetOf() }
-                        .add(model.modelId)
-                }
+            is ModelListParse.Confirmed -> ModelMerger.oneProtocolPerModel(
+                discovered = parsed.models,
+                allowed = allowedProtocols,
+                preferred = allowedProtocols.firstOrNull(),
+            ).forEach { model ->
+                accumulator
+                    .getOrPut(keyId) { mutableMapOf() }
+                    .getOrPut(model.protocol) { mutableSetOf() }
+                    .add(model.modelId)
+            }
 
             ModelListParse.SuspiciousEmpty -> audit.record(
                 level = LogLevel.WARN,
@@ -827,6 +873,7 @@ class ProbeEngine constructor(
             task.keyId?.let { it to task.providerId }
         }.toMap()
         val fetchedModels = mutableMapOf<Long, MutableMap<Protocol, MutableSet<String>>>()
+        val modelsSource = modelsSourceByKeyId(tasks, keyById)
 
         try {
             orchestrator.run(tasks, plan.perHostKeyAndModelCount).collect { result ->
@@ -889,19 +936,19 @@ class ProbeEngine constructor(
                 } else {
                     final
                 }
-                // 模型列表检测开启时，L2 的 models 响应就是这把 Key 的模型列表，
-                // 不再额外发一遍 GET。这里只累积，真正的三路合并等本轮流结束后统一做。
-                val resultTask = taskById[result.taskId]
-                if (resultTask?.keyId != null &&
-                    resultTask.level == ProbeLevel.L2_KEY_VALIDITY &&
-                    keyById[resultTask.keyId]?.settings?.probe?.models == true
-                ) {
+                // 模型列表检测开启时，这把 Key 的那一条 models 响应就是它的模型列表，
+                // 不再额外发一遍 GET。每把 Key 只认一条来源（见 [modelsSourceByKeyId]）：
+                // L1 与 L2 打的是同一个 modelsUrl，两条都解析就会按协议各归一桶、各写一套
+                // 行，界面上每个模型出现两遍。这里只累积，三路合并等本轮流结束后统一做。
+                val sourceTask = taskById[result.taskId]
+                val modelsKeyId = modelsSource[result.taskId]
+                if (sourceTask != null && modelsKeyId != null) {
                     applyParsedModels(
                         body = result.body,
-                        protocol = resultTask.protocol,
-                        key = keyById[resultTask.keyId],
-                        providerId = resultTask.providerId,
-                        keyId = resultTask.keyId,
+                        protocol = sourceTask.protocol,
+                        key = keyById[modelsKeyId],
+                        providerId = sourceTask.providerId,
+                        keyId = modelsKeyId,
                         accumulator = fetchedModels,
                     )
                 }
@@ -1008,8 +1055,9 @@ class ProbeEngine constructor(
             }
         }
 
-        // keyValidity 关掉时没有 L2 响应可复用；模型列表检测若单独开着，就补一次
-        // 独立的 GET。这条路径只在必要時触发，避免常见场景双倍请求。
+        // 本轮一条任务都没摊上的 Key（可达性与密钥有效性都关着）在这里补一次独立 GET。
+        // 少了这一趟，"只开模型列表自动更新"的 Key 永远拉不到列表——计划本身只按前两个
+        // 开关铺任务。`buildModelListTasks` 只看 `probe.models`，所以这里确实发得出请求。
         allKeys
             .filter { key ->
                 key.settings.probe.enabled && key.settings.probe.models &&

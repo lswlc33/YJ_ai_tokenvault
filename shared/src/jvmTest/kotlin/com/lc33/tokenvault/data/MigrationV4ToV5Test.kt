@@ -25,6 +25,10 @@ import kotlinx.serialization.json.jsonPrimitive
  *
  * 为什么不只留 androidTest 的那条：`VaultDatabaseMigrationTest` 是 instrumented 测试，
  * 没有设备时根本跑不到；这条让同一个迁移在每次 `:shared:jvmTest` 都被验一遍。
+ *
+ * **每加一条迁移，下面每个 `addMigrations(...)` 都要补到最新版本**：Room 打开时必须走得
+ * 通"库当前版本 → `VERSION`"，少一环就是 `A migration from N to M was required but not
+ * found`，红的还是这些老测试——看着像老迁移坏了，其实是链断了。
  */
 class MigrationV4ToV5Test {
 
@@ -43,6 +47,7 @@ class MigrationV4ToV5Test {
                     VaultDatabase.MIGRATION_4_5,
                     VaultDatabase.MIGRATION_5_6,
                     VaultDatabase.MIGRATION_6_7,
+                    VaultDatabase.MIGRATION_7_8,
                 )
                 .build()
 
@@ -75,7 +80,11 @@ class MigrationV4ToV5Test {
             createDatabase(dbFile, version = 5)
             val database = Room.databaseBuilder<VaultDatabase>(name = dbFile.absolutePath)
                 .setDriver(BundledSQLiteDriver())
-                .addMigrations(VaultDatabase.MIGRATION_5_6, VaultDatabase.MIGRATION_6_7)
+                .addMigrations(
+                    VaultDatabase.MIGRATION_5_6,
+                    VaultDatabase.MIGRATION_6_7,
+                    VaultDatabase.MIGRATION_7_8,
+                )
                 .build()
 
             // 老日志（迁移前就写好的）三列是 null，不该被迁移搞坏。
@@ -112,7 +121,10 @@ class MigrationV4ToV5Test {
             createDatabase(dbFile, version = 6)
             val database = Room.databaseBuilder<VaultDatabase>(name = dbFile.absolutePath)
                 .setDriver(BundledSQLiteDriver())
-                .addMigrations(VaultDatabase.MIGRATION_6_7)
+                .addMigrations(
+                    VaultDatabase.MIGRATION_6_7,
+                    VaultDatabase.MIGRATION_7_8,
+                )
                 .build()
 
             // 老数据原样保留，新列按"默认关"落库——升级不该让老供应商突然开始被 ping。
@@ -123,6 +135,113 @@ class MigrationV4ToV5Test {
             database.close()
         } finally {
             dir.deleteRecursively()
+        }
+    }
+
+    /**
+     * v8 那次存量清理：同一个模型按协议重复落库的行只留一条。
+     *
+     * 这一跳没有任何 DDL，Room 的 schema 校验帮不上忙——它只保证"表结构对得上"，
+     * 不保证"该删的删了、不该删的没删"。所以断言全部落在**留下哪些 id** 上：
+     * 三组都必须在（否则就是误删用户数据），三组都必须没（否则这条迁移白写）。
+     */
+    @Test
+    fun `v7 库迁到 v8 后重复的发现行只留一条，手动行与它的发现行都不动`() = runBlocking {
+        val dir = createTempDirectory(prefix = "vault-migration-v8-").toFile()
+        try {
+            val dbFile = File(dir, "vault.db")
+            createDatabase(dbFile, version = 7)
+            // 第二把 Key：给"同一个模型挂在不同 Key 上"那一组当父行，别留悬空外键。
+            insertExtraKey(dbFile, id = 2)
+            // 重复组一：纯 discovered，两个协议。留 id 1，删 id 2。
+            insertModel(dbFile, id = 1, keyId = 1, modelId = "gpt-5.6-sol", protocol = "chat", source = "discovered")
+            insertModel(dbFile, id = 2, keyId = 1, modelId = "gpt-5.6-sol", protocol = "responses", source = "discovered")
+            // 重复组二：keyId 为空（备份恢复链路会留这种行）。`=` 匹配不上 NULL，
+            // 这一组就是专门钉 `IS` 的：留 id 5，删 id 6。
+            insertModel(dbFile, id = 5, keyId = null, modelId = "deepseek-v4", protocol = "chat", source = "discovered")
+            insertModel(dbFile, id = 6, keyId = null, modelId = "deepseek-v4", protocol = "responses", source = "discovered")
+            // 重复组三：keyId 不同的两把 Key 各一行——这不是重复，两行都要留。
+            insertModel(dbFile, id = 7, keyId = 1, modelId = "kimi-k3", protocol = "chat", source = "discovered")
+            insertModel(dbFile, id = 8, keyId = 2, modelId = "kimi-k3", protocol = "chat", source = "discovered")
+            // 手动行 + 与它同 id 的发现行：都不许动（红线 13，且这条迁移只管发现行之间的重复）。
+            insertModel(dbFile, id = 3, keyId = 1, modelId = "claude-opus-5", protocol = "chat", source = "manual")
+            insertModel(dbFile, id = 4, keyId = 1, modelId = "claude-opus-5", protocol = "anthropic", source = "discovered")
+
+            val database = Room.databaseBuilder<VaultDatabase>(name = dbFile.absolutePath)
+                .setDriver(BundledSQLiteDriver())
+                .addMigrations(VaultDatabase.MIGRATION_7_8)
+                .build()
+
+            val left = database.modelDao().findAll().map { it.id }.sorted()
+            assertEquals(
+                listOf(1L, 3L, 4L, 5L, 7L, 8L),
+                left,
+                "只该收掉同 Key 同 modelId 的发现行；手动行、跨 Key 的行、NULL keyId 的首行都不许动",
+            )
+            // 留下的是"第一次发现它"的那一行，协议归属照旧。
+            assertEquals(
+                "chat",
+                database.modelDao().findAll().first { it.id == 1L }.protocol,
+            )
+
+            database.close()
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    /**
+     * 用裸连接再插一把 `api_keys`。
+     *
+     * [createDatabase] 只给一行 Key，而"同一个模型挂在不同 Key 上不算重复"那一组需要
+     * 第二个父行——悬空外键虽然在这条不跑 `reconcileForeignKeys` 的迁移上不会立刻出事，
+     * 但把坑留给"以后有人给这一跳补上 reconcile"的那一刻，测试会以看不明白的方式红。
+     */
+    private fun insertExtraKey(file: File, id: Long) {
+        val connection = BundledSQLiteDriver().open(file.absolutePath)
+        try {
+            connection.execSQL(
+                """
+                INSERT INTO api_keys (id, providerId, label, note, secretEnc, fingerprint, health,
+                    lastOutcome, healthDetail, httpStatus, latencyMs, checkedAt, okAt,
+                    balanceAmount, balanceUsed, balanceCurrency, balanceRaw, balanceCheckedAt,
+                    balanceError, sortOrder, createdAt, updatedAt)
+                VALUES ($id, 1, 'k$id', 'n', X'00', 'fp$id', 'ok', 'success', NULL, 200, 12, 3, 3,
+                    NULL, NULL, NULL, NULL, NULL, NULL, $id, 1, 1)
+                """.trimIndent(),
+            )
+        } finally {
+            connection.close()
+        }
+    }
+
+    /**
+     * 用裸连接插一行 `models`。
+     *
+     * 与 [insertKeySettings] 同一个理由：这一行要在迁移**之前**存在，必须按 v7 那份列定义写，
+     * 走 DAO 就变成"用 v8 的口径造旧数据"了。
+     */
+    private fun insertModel(
+        file: File,
+        id: Long,
+        keyId: Long?,
+        modelId: String,
+        protocol: String,
+        source: String,
+    ) {
+        val connection = BundledSQLiteDriver().open(file.absolutePath)
+        try {
+            connection.execSQL(
+                """
+                INSERT INTO models (id, providerId, keyId, modelId, protocol, displayName, source,
+                    discoveredVia, favorite, needsReview, catalogKey, probeState, lastOutcome,
+                    probeDetail, latencyMs, probedAt, firstSeenAt, lastSeenAt, sortOrder)
+                VALUES ($id, 1, ${keyId ?: "NULL"}, '$modelId', '$protocol', NULL, '$source',
+                    '$protocol', 0, 0, NULL, 'unknown', 'skipped', NULL, NULL, NULL, 1, 1, $id)
+                """.trimIndent(),
+            )
+        } finally {
+            connection.close()
         }
     }
 
@@ -151,6 +270,7 @@ class MigrationV4ToV5Test {
                     VaultDatabase.MIGRATION_4_5,
                     VaultDatabase.MIGRATION_5_6,
                     VaultDatabase.MIGRATION_6_7,
+                    VaultDatabase.MIGRATION_7_8,
                 )
                 .build()
 
