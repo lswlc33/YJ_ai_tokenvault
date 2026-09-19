@@ -36,6 +36,21 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<!--
+		与 Android 侧 app/src/main/AndroidManifest.xml 里那句 usesCleartextTraffic="true"
+		是同一件事的另一半，缺了它「允许不安全的 HTTP」这个开关在 iOS 上是空的：
+		应用层 remoteUrl() 的 require() 放行 http:// 之后，NSURLSession 仍会按 ATS 默认
+		策略直接把连接掐掉（NSURLErrorDomain Code=-1022），于是同一个 WebDAV 地址在
+		安卓能用、在 iOS 一句"失败"就没了下文。地址是用户自己填的，无法写成
+		NSExceptionDomains 那种建包时就知道的域名，只能整体放开。
+		代价写清楚：这一条同时让全应用可以走明文，App Store 审核可能要求说明理由；
+		自签证书的 https 不在这条的覆盖范围内（那是证书校验，不是 ATS 策略）。
+	-->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Unlock your vault with Face ID</string>
 	<key>UIApplicationSceneManifest</key>
