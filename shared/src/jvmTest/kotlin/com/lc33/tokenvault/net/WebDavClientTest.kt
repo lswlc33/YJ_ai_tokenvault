@@ -209,4 +209,113 @@ class WebDavClientTest {
         assertEquals(2, hits)
         credentials.zeroize()
     }
+
+    /**
+     * `Location` 由服务器给。不加这道闸，服务器（或任何能改响应的位置）就能把我们的 Basic
+     * 凭据从 https 带进 http——而 Android 侧 `usesCleartextTraffic="true"`，系统不会拦。
+     */
+    @Test
+    fun `跳到 http 而未开不安全开关时不跟`() {
+        val config = WebDavConfig(url = "https://dav.example.com/dav", remoteDirectory = "/YuanJi")
+        val credentials = WebDavCredentials("user".toCharArray(), "pass".toCharArray())
+        val seen = mutableListOf<String>()
+        val engine = MockEngine { request ->
+            seen += request.url.toString()
+            respond(
+                ByteArray(0),
+                HttpStatusCode.MovedPermanently,
+                headersOf(HttpHeaders.Location, "http://dav.example.com/dav/YuanJi/a.yjv"),
+            )
+        }
+        val client = WebDavClient(HttpClient(engine) { followRedirects = false })
+
+        val e = assertFailsWith<WebDavHttpException> {
+            runBlocking { client.get(config, credentials, "a.yjv") }
+        }
+
+        // 只发了一次：那一下 301 交给 ensureSuccess 定性，凭据没跟着去明文地址。
+        assertEquals(301, e.status)
+        assertEquals(listOf("https://dav.example.com/dav/YuanJi/a.yjv"), seen)
+        credentials.zeroize()
+    }
+
+    /** 内网 NAS 走 http 是用户自己开的开关，这种跳转该照常跟。 */
+    @Test
+    fun `开了不安全开关时允许跟到 http`() {
+        val config = WebDavConfig(
+            url = "http://192.168.1.20/dav",
+            remoteDirectory = "/YuanJi",
+            allowInsecure = true,
+        )
+        val credentials = WebDavCredentials("user".toCharArray(), "pass".toCharArray())
+        val seen = mutableListOf<String>()
+        val engine = MockEngine { request ->
+            seen += request.url.toString()
+            if (request.url.encodedPath.endsWith("a.yjv") && seen.size == 1) {
+                respond(
+                    ByteArray(0),
+                    HttpStatusCode.Found,
+                    headersOf(HttpHeaders.Location, "http://192.168.1.20:9080/dav/YuanJi/a.yjv"),
+                )
+            } else {
+                respond(byteArrayOf(9), HttpStatusCode.OK)
+            }
+        }
+        val client = WebDavClient(HttpClient(engine) { followRedirects = false })
+
+        val bytes = runBlocking { client.get(config, credentials, "a.yjv") }
+
+        assertContentEquals(byteArrayOf(9), bytes)
+        assertEquals(
+            listOf(
+                "http://192.168.1.20/dav/YuanJi/a.yjv",
+                "http://192.168.1.20:9080/dav/YuanJi/a.yjv",
+            ),
+            seen,
+        )
+        credentials.zeroize()
+    }
+
+    /**
+     * 预签名 / CDN 那类跳转的目标不认这套账号密码，带上等于把凭据交给第三台机器。
+     * 不带最多换回 401，那是看得见的失败。同主机换端口仍算同一家，凭据照常带。
+     */
+    @Test
+    fun `跨主机跳转不带凭据而同主机换端口照带`() {
+        val credentials = WebDavCredentials("user".toCharArray(), "pass".toCharArray())
+
+        /** 跟一次 `location`，返回每一跳收到的 Authorization 头。 */
+        fun follow(location: String): List<String?> {
+            val seen = mutableListOf<String?>()
+            val engine = MockEngine { request ->
+                seen += request.headers[HttpHeaders.Authorization]
+                if (seen.size == 1) {
+                    respond(
+                        ByteArray(0),
+                        HttpStatusCode.Found,
+                        headersOf(HttpHeaders.Location, location),
+                    )
+                } else {
+                    respond(byteArrayOf(9), HttpStatusCode.OK)
+                }
+            }
+            val client = WebDavClient(HttpClient(engine) { followRedirects = false })
+            runBlocking {
+                client.get(
+                    WebDavConfig(url = "https://dav.example.com/dav", remoteDirectory = "/YuanJi"),
+                    credentials,
+                    "a.yjv",
+                )
+            }
+            return seen
+        }
+
+        // 第一跳一定带；跳到别家主机就不带。
+        val cdn = follow("https://cdn.example.net/a.yjv?sig=s")
+        assertTrue(cdn.first() != null)
+        assertTrue(cdn.last() == null)
+        // 同一台机器换端口还是同一家，凭据照带。
+        assertTrue(follow("https://dav.example.com:8443/dav/YuanJi/a.yjv").last() != null)
+        credentials.zeroize()
+    }
 }

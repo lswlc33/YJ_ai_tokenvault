@@ -17,6 +17,8 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.URLBuilder
+import io.ktor.http.URLProtocol
+import io.ktor.http.Url
 import io.ktor.http.contentType
 import io.ktor.http.decodeURLPart
 import io.ktor.http.takeFrom
@@ -39,7 +41,7 @@ class WebDavClient constructor(
 
     suspend fun listBackups(config: WebDavConfig, credentials: WebDavCredentials): List<String> =
         logged("PROPFIND", remoteDirectoryUrl(config)) {
-            val response = requestDav("PROPFIND", remoteDirectoryUrl(config), credentials) {
+            val response = requestDav("PROPFIND", config, remoteDirectoryUrl(config), credentials) {
                 header(HttpHeaders.Depth, "1")
                 contentType(ContentType.Application.Xml)
                 setBody(PROP_REQUEST_BODY)
@@ -50,7 +52,7 @@ class WebDavClient constructor(
 
     suspend fun put(config: WebDavConfig, credentials: WebDavCredentials, fileName: String, bytes: ByteArray) {
         logged("PUT", remoteFileUrl(config, fileName)) {
-            val response = requestDav("PUT", remoteFileUrl(config, fileName), credentials) {
+            val response = requestDav("PUT", config, remoteFileUrl(config, fileName), credentials) {
                 setBody(bytes)
             }
             ensureSuccess(response.status.value, "PUT")
@@ -60,14 +62,14 @@ class WebDavClient constructor(
 
     suspend fun get(config: WebDavConfig, credentials: WebDavCredentials, fileName: String): ByteArray =
         logged("GET", remoteFileUrl(config, fileName)) {
-            val response = requestDav("GET", remoteFileUrl(config, fileName), credentials)
+            val response = requestDav("GET", config, remoteFileUrl(config, fileName), credentials)
             ensureSuccess(response.status.value, "GET")
             response.status.value to response.readBytesCapped()
         }
 
     suspend fun delete(config: WebDavConfig, credentials: WebDavCredentials, fileName: String) {
         logged("DELETE", remoteFileUrl(config, fileName)) {
-            val response = requestDav("DELETE", remoteFileUrl(config, fileName), credentials)
+            val response = requestDav("DELETE", config, remoteFileUrl(config, fileName), credentials)
             ensureSuccess(response.status.value, "DELETE")
             response.status.value to Unit
         }
@@ -119,7 +121,8 @@ class WebDavClient constructor(
      * 为什么要在这里自己跟：探测那一侧刻意关掉了重定向（见 `HttpEngine.buildClient`——3xx 对
      * 探活没有意义，跟过去只会把"上游在跳转"这件事藏起来），但 WebDAV 的 3xx 是真实的配置差异：
      * 尾斜杠、http→https、目录被反代挪走。不处理的表现是"某天备份同步全红"，而用户在自己
-     * 那一侧改不动上游那个斜杠。
+     * 那一侧改不动上游那个斜杠。文件级跳转同样常见：Alist / Nextcloud / 对象存储网关会把
+     * `.yjv` 的 GET 直接 302 到真正的落点，表现就是"列表拉得到、包下不来"。
      *
      * 为什么不用 Ktor 的 `HttpRedirect` 插件：它按 RFC 把 301/302/303 上的非 GET 降级成 GET，
      * 于是 PUT 的备份字节压根没发出去、我们却报"已上传"——静默丢数据比报错糟得多。
@@ -127,6 +130,7 @@ class WebDavClient constructor(
      */
     private suspend fun requestDav(
         verb: String,
+        config: WebDavConfig,
         url: String,
         credentials: WebDavCredentials,
         configure: HttpRequestBuilder.() -> Unit = {},
@@ -139,11 +143,54 @@ class WebDavClient constructor(
         if (first.status.value !in 300..399) return first
         // 没有 Location 的 3xx 无处可跟，原样交出去让 ensureSuccess 定性。
         val location = first.headers[HttpHeaders.Location]?.let { resolve(url, it) } ?: return first
+        val dropCredentials = when (val guard = redirectGuard(config, url, location)) {
+            is RedirectGuard.Refuse -> {
+                // 只进日志：原因里带目标协议/主机（诊断要它），凭据永远不出去。
+                // 界面照旧拿那条 3xx 由 ensureSuccess 定性，不为它再发明一句文案。
+                recordHttp(LogLevel.WARN, "webdav $verb redirect refused", detail = guard.reason)
+                return first
+            }
+
+            RedirectGuard.DropCredentials -> true
+            null -> false
+        }
         return client.request(location) {
             method = HttpMethod(verb)
-            applyAuth(credentials)
+            if (!dropCredentials) applyAuth(credentials)
             configure()
         }
+    }
+
+    /** [requestDav] 跟随前要过的两道闸（见 [redirectGuard]）。 */
+    private sealed interface RedirectGuard {
+        /** 换了主机：可以跟，但不再出示凭据。 */
+        data object DropCredentials : RedirectGuard
+
+        /** 压根不跟。[reason] 只写进日志。 */
+        data class Refuse(val reason: String) : RedirectGuard
+    }
+
+    /**
+     * 跳转目标能不能跟。`null` = 原样跟（带凭据）。
+     *
+     * 1. **不许把凭据从 https 带进 http**。`Location` 由服务器给，等于服务器能决定我们的
+     *    Basic 凭据走不走明文；而 Android 侧 `usesCleartextTraffic="true"`，系统不会拦。
+     *    只有用户自己开了「允许不安全的 HTTP」（[WebDavConfig.allowInsecure]）才允许落到
+     *    http——与 [remoteUrl] 那几条 require 同一个立场：放行的是用户的显式选择，不是服务器的。
+     * 2. **换主机就不再带凭据**。预签名/CDN 那类跳转的目标本来就不认这套账号密码，带上
+     *    等于把凭据交给第三台机器；不带最多换回一个 401，那是看得见的失败，比静默交出去好。
+     *    只比主机不比端口：同一台机器换端口还是同一家。
+     */
+    private fun redirectGuard(config: WebDavConfig, from: String, to: String): RedirectGuard? {
+        val fromUrl = runCatching { Url(from) }.getOrNull()
+            ?: return RedirectGuard.Refuse("unparsable request URL")
+        val toUrl = runCatching { Url(to) }.getOrNull()
+            ?: return RedirectGuard.Refuse("unparsable Location")
+        val httpAllowed = toUrl.protocol == URLProtocol.HTTP && config.allowInsecure
+        if (toUrl.protocol != URLProtocol.HTTPS && !httpAllowed) {
+            return RedirectGuard.Refuse("target ${toUrl.protocol.name} would carry Basic credentials in the clear")
+        }
+        return if (toUrl.host != fromUrl.host) RedirectGuard.DropCredentials else null
     }
 
     /** `Location` 允许是绝对地址，也可能是相对当前 URL 的一段（尾斜杠那类跳转常见）。 */
