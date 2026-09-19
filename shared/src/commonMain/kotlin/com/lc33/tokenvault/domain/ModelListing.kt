@@ -105,7 +105,7 @@ fun listModels(
             .let { byFamily ->
                 byFamily.entries.sortedWith(
                     compareByDescending<Map.Entry<String, List<ListedModel>>> { it.value.size }
-                        .thenBy { ModelFamily.displayOf(it.key, vendorNames[it.key]) },
+                        .thenBy { ModelFamily.displayOfKey(it.key, vendorNames[it.key]) },
                 )
             }
             .map { entry ->

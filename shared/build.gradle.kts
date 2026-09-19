@@ -211,6 +211,17 @@ room {
     schemaDirectory("$projectDir/schemas")
 }
 
+// 会真联网的本地探针（`catalog/ModelsDevSpikeTest`）默认跳过，靠 `-DvaultSpike=true` 显式打开，
+// 与 `app/build.gradle.kts` 里那份是同一个约定——不转发的话命令行上的 `-D` 到不了测试 JVM，
+// 探针会安静地自己让开，看起来像"跑过了"。
+tasks.withType<Test>().configureEach {
+    systemProperty("vaultSpike", providers.systemProperty("vaultSpike").getOrElse(""))
+    systemProperty("vaultDump", providers.systemProperty("vaultDump").getOrElse(""))
+    testLogging {
+        showStandardStreams = true
+    }
+}
+
 // 模拟器测试：stdout 与异常全量进控制台。Release 二进制的异常栈没有行号，
 // 靠 IosDiGraphSmokeTest 里的 println 定位（iOS 启动闪退排查用）。
 tasks.withType<org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest>().configureEach {

@@ -35,9 +35,14 @@ class ModelFamilyTest {
     }
 
     @Test
-    fun `斜杠前缀优先于横杠`() {
+    fun `斜杠前缀整段保留，不削成首字母`() {
         assertEquals("moonshot", ModelFamily.keyOf("moonshot/kimi-k2"))
         assertEquals("deepseek", ModelFamily.keyOf("deepseek/deepseek-v3.2"))
+        // 带横杠的厂商名不能被"取字母段"削成一个字母：真机实测里 `z-ai/...` 曾凑出
+        // 一个 21 个模型的 "z" 组，把智谱和别的单字母前缀混在一起。
+        assertEquals("z-ai", ModelFamily.keyOf("z-ai/glm-5.3-flash"))
+        assertEquals("x-ai", ModelFamily.keyOf("x-ai/grok-4"))
+        assertEquals("moonshot", ModelFamily.keyOf("moonshot/kimi-k2:free"))
     }
 
     @Test
@@ -69,5 +74,16 @@ class ModelFamilyTest {
         // 这正是目录同步的价值所在：同步过一次，分组标题就从"看着像"变成"是那个名字"。
         assertEquals("Deepseek", ModelFamily.displayOf("deepseek-chat", null))
         assertEquals("Gpt", ModelFamily.displayOf("gpt-4o", "  "))
+    }
+
+    @Test
+    fun `族键已经是归好的那一个时不再归第二次`() {
+        // 分组循环里手上拿的就是 keyOf 的结果，再过 displayOf 会被归两次：
+        // z-ai 第二遍只剩字母 "z"，21 个智谱模型会挂在写着「Z」的组下面。
+        assertEquals("Z-ai", ModelFamily.displayOfKey("z-ai", null))
+        assertEquals("Z.ai", ModelFamily.displayOfKey("z-ai", "Z.ai"))
+        assertEquals("DeepSeek", ModelFamily.displayOfKey("deepseek", "DeepSeek"))
+        // displayOf 收的是原始模型 id，两个入口不能混用。
+        assertEquals("Z-ai", ModelFamily.displayOf("z-ai/glm-5.3-flash", null))
     }
 }

@@ -24,7 +24,15 @@ object ModelFamily {
 
     /** 归一化后的族键（小写）。用于分组、排序、搜索。 */
     fun keyOf(modelId: String): String {
-        val head = modelId.trim().substringBefore('/').substringBefore(':')
+        val trimmed = modelId.trim()
+        // **带斜杠的 id 直接拿斜杠前面那一整段当族**。这是 OpenRouter 那类目录的命名法：
+        // `z-ai/glm-5.3-flash`、`moonshot/kimi-k2` 里斜杠前本来就是厂商名，
+        // 而"取开头字母段"这条规则会把 `z-ai` 削成一个孤零零的 "z"——真机实测里
+        // 这样凑出了一个 21 个模型的 "z" 组，把智谱和别的东西混在了一起。
+        if (trimmed.contains('/')) {
+            return trimmed.substringBefore('/').lowercase().ifEmpty { OTHERS_KEY }
+        }
+        val head = trimmed.substringBefore(':')
         if (head.isEmpty()) return OTHERS_KEY
         val letters = head.takeWhile { it.isLetter() }.lowercase()
         if (letters.length >= 2) return letters
@@ -39,7 +47,17 @@ object ModelFamily {
      * 但目录没有的时候也不能空着不显示。
      */
     fun displayOf(modelId: String, catalogVendorName: String?): String =
-        catalogVendorName?.takeIf { it.isNotBlank() } ?: capitalize(keyOf(modelId))
+        displayOfKey(keyOf(modelId), catalogVendorName)
+
+    /**
+     * 已经是族键时走这一条。
+     *
+     * 分组那一层的循环里手上拿着的就是 [keyOf] 的结果，如果再进 [displayOf] 会被**归两次**：
+     * `z-ai` 第二遍取字母段只剩一个 `z`，退回后连横杠都丢了，界面上那 21 个智谱的模型
+     * 会挂在一个写着「Z」的组下面。2026-09-20 拿真机数据实测时撞到的就是这个。
+     */
+    fun displayOfKey(familyKey: String, catalogVendorName: String?): String =
+        catalogVendorName?.takeIf { it.isNotBlank() } ?: capitalize(familyKey)
 
     private fun capitalize(value: String): String =
         value.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }

@@ -67,6 +67,17 @@ class ModelCatalogMatcherTest {
         assertEquals("o3", CatalogNormalize.normalize("o3"))
     }
 
+    @Test
+    fun `归一化去掉六位上线日与批处理后缀`() {
+        // 真机实测补的两条：火山的 doubao 全是 6 位 YYMMDD 后缀（133 个只认得出 28 个），
+        // openrouter 有几十个 `:batch` 档位。
+        assertEquals("doubao-lite-128k", CatalogNormalize.normalize("doubao-lite-128k-240428"))
+        assertEquals("doubao-pro-4k", CatalogNormalize.normalize("doubao-pro-4k-240515"))
+        assertEquals("gpt-6-astra", CatalogNormalize.normalize("gpt-6-astra:batch"))
+        // 8 位在前：`20250101` 不能被 6 位分支先咬掉一半。
+        assertEquals("claude-opus-4", CatalogNormalize.normalize("claude-opus-4-20250101"))
+    }
+
     // ------------------------------------------------------------------ 三级匹配
 
     @Test
