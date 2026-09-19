@@ -2,6 +2,7 @@ package com.lc33.tokenvault.engine
 
 import com.lc33.tokenvault.domain.AutoRefreshPolicy
 import com.lc33.tokenvault.domain.repo.SettingsRepository
+import kotlin.concurrent.Volatile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
