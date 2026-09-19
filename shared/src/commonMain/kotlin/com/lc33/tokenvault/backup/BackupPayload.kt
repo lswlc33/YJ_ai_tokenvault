@@ -1,6 +1,7 @@
 package com.lc33.tokenvault.backup
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import okio.Buffer
 import okio.GzipSink
 import okio.GzipSource
@@ -85,6 +86,18 @@ data class BackupProvider(
     val probeBalance: Boolean = true,
     val probeModels: Boolean = false,
     val probeModelReachability: Boolean = false,
+
+    /**
+     * **包内**的供应商归属令牌（红线 1 的补充）。
+     *
+     * `name + apiRoot` 是跨设备的去重自然键，但它是从"这家第一把 Key 的 apiRoot"借来的：
+     * 同名同 apiRoot 的两家在包里指的是同一个 ref，于是它们的 Key / 账号 / 模型会互相镜像
+     * （覆盖恢复后各拿到对方的全部 Key，条数翻倍）。所以导出的每一家再带一个包内唯一的 ref，
+     * 子条目按它归位。
+     *
+     * 旧包没有这一项（null），恢复端退回 `name + apiRoot` 配对——两种包都能恢复。
+     */
+    val ref: String? = null,
 )
 
 /** v3 的 Key 行为配置。旧备份里没有这段，恢复时从 BackupProvider 的旧字段推导。 */
@@ -121,6 +134,9 @@ data class BackupApiKey(
     /** 所属供应商，按 name + apiRoot 定位（与合并恢复的去重键一致）。 */
     val providerName: String,
     val providerApiRoot: String,
+
+    /** 所属供应商的包内 ref，见 [BackupProvider.ref]。null = 旧包，按 name + apiRoot 配对。 */
+    val providerRef: String? = null,
     val label: String = "",
     val note: String = "",
     val secret: String,
@@ -134,6 +150,9 @@ data class BackupApiKey(
 data class BackupAccount(
     val providerName: String,
     val providerApiRoot: String,
+
+    /** 所属供应商的包内 ref，见 [BackupProvider.ref]。 */
+    val providerRef: String? = null,
     val label: String = "",
     val username: String? = null,
     val password: String? = null,
@@ -148,6 +167,9 @@ data class BackupAccount(
 data class BackupModel(
     val providerName: String,
     val providerApiRoot: String,
+
+    /** 所属供应商的包内 ref，见 [BackupProvider.ref]。 */
+    val providerRef: String? = null,
 
     /** 绑定到哪张 Key。用密钥明文做自然键；null 表示旧备份，恢复时挂默认 Key。 */
     val keySecret: String? = null,
@@ -177,12 +199,52 @@ data class BackupProfile(
     val sortOrder: Int = 0,
 )
 
-/** 设置白名单（§12.1：themeMode / localeTag 显式包含，权威在 boot）。 */
+/**
+ * 设置白名单（§12.1：themeMode / localeTag 显式包含，权威在 boot）。
+ *
+ * 库里 `app_settings` 有两条值列：`value`（TEXT）与 `valueBlob`（字段级加密，
+ * WebDAV 用户名/密码就走这条，见 `RoomWebDavSettingsRepository`）。旧版本只搬 `value`，
+ * 而恢复是整行 `@Upsert`——于是**每一次恢复都把加密设置清成空行**（用户在备份回来的
+ * 库里发现自己掉出了 WebDAV）。
+ *
+ * [encryptedValue] 补上这一段，并且**遵守红线 2**：包里放的是解开的明文（整包已加密），
+ * 恢复端用自己的 DEK 重新密封。直接把 blob 字节搬过去看着更省事，但那是"设备本地"的密文
+ * （AAD 绑的是设置键 + 本机 DEK），换设备后照样解不开——等于白存。
+ */
 @Serializable
 data class BackupSetting(
     val key: String,
     val value: String? = null,
-)
+
+    /** `valueBlob` 那一条的明文。null 表示这一项不是加密设置。 */
+    val encryptedValue: String? = null,
+
+    /**
+     * 本机这一行**占着** `valueBlob`，不管解不解得开。只在读取本机时置位，不进备份包
+     * （[Transient]：包里没有这一列，旧包按 false 反序列化，语义就是"包不是本机"）。
+     *
+     * 为什么要单独一列状态：本机的密文解不开时 [encryptedValue] 是 null，只看两列的值
+     * 就把"本机存着坏掉的凭据"读成"这一项还没有"，合并恢复于是拿包里的版本盖掉它——
+     * 与 `RoomBackupStore.findSetting` 那句"本地坏数据不该被悄悄盖掉"正好相反。
+     */
+    @Transient val hasStoredBlob: Boolean = false,
+) {
+    /** 这一条在库里占着 `valueBlob`（恢复时要把明文重新密封回那一列）。 */
+    val isSecret: Boolean get() = encryptedValue != null
+
+    /**
+     * 本机是否已经有值。两列**任一**非空、或者那一列压根占着但读不出（[hasStoredBlob]）
+     * 都算——只看值会把"已经存着密文"误判成"这一项还没有"，合并恢复于是把 WebDAV 凭据
+     * 盖掉（原来的丢法）。
+     */
+    val isSet: Boolean get() = value != null || encryptedValue != null || hasStoredBlob
+
+    /**
+     * 两列是否都一样。合并恢复时本机这一行是空的（两条都 null）、包里这条也是空的，
+     * 那就没什么好盖的——整行 `@Upsert` 只是把同样的值白写一遍。
+     */
+    fun sameValueAs(other: BackupSetting): Boolean = value == other.value && encryptedValue == other.encryptedValue
+}
 
 /** 备份包的完整 payload。 */
 @Serializable

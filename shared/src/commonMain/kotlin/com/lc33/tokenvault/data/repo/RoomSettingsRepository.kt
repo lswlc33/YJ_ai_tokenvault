@@ -7,6 +7,8 @@ import com.lc33.tokenvault.domain.AutoLockTimeout
 import com.lc33.tokenvault.domain.ClipboardClearPolicy
 import com.lc33.tokenvault.domain.DefaultProbeSettings
 import com.lc33.tokenvault.domain.model.BalanceSnapshot
+import com.lc33.tokenvault.domain.model.BackupTarget
+import com.lc33.tokenvault.domain.model.LastBackup
 import com.lc33.tokenvault.domain.model.LogCategory
 import com.lc33.tokenvault.domain.model.LogLevel
 import com.lc33.tokenvault.domain.model.LogRetention
@@ -90,15 +92,6 @@ class RoomSettingsRepository constructor(
     override suspend fun setClientKeywords(keywords: List<String>) {
         dao.put(AppSettingEntity(key = KEY_CLIENT_KEYWORDS, value = encodeKeywords(keywords)))
         auditChange(KEY_CLIENT_KEYWORDS)
-    }
-
-    override fun observeProxy(): Flow<String> = dao.observeAll()
-        .map { rows -> rows.firstOrNull { it.key == KEY_PROXY }?.value.orEmpty() }
-        .distinctUntilChanged()
-
-    override suspend fun setProxy(hostPort: String) {
-        dao.put(AppSettingEntity(key = KEY_PROXY, value = hostPort.trim()))
-        auditChange(KEY_PROXY)
     }
 
     override fun observeSniffClientProfile(): Flow<Boolean> = dao.observeAll()
@@ -225,6 +218,28 @@ class RoomSettingsRepository constructor(
         dao.put(AppSettingEntity(key = KEY_MEMBER, value = enabled.toString()))
     }
 
+    /**
+     * 最近一次成功备份。两个键（时间、落点）拼成一条流：分开两条流会让状态卡出现
+     * "有时间没落点"的中间帧，那一帧画出来的是半句话。
+     */
+    override fun observeLastBackup(): Flow<LastBackup?> = dao.observeAll()
+        .map { rows ->
+            val at = rows.firstOrNull { it.key == KEY_LAST_BACKUP_AT }?.value?.trim()?.toLongOrNull()
+                ?: return@map null
+            LastBackup(
+                atMillis = at,
+                target = BackupTarget.fromWireName(
+                    rows.firstOrNull { it.key == KEY_LAST_BACKUP_TARGET }?.value?.trim(),
+                ),
+            )
+        }
+        .distinctUntilChanged()
+
+    override suspend fun setLastBackup(backup: LastBackup) {
+        dao.put(AppSettingEntity(key = KEY_LAST_BACKUP_AT, value = backup.atMillis.toString()))
+        dao.put(AppSettingEntity(key = KEY_LAST_BACKUP_TARGET, value = backup.target.wireName))
+    }
+
     private companion object {
         /**
          * 键名照 §7.4 里的写法。
@@ -242,7 +257,7 @@ class RoomSettingsRepository constructor(
 
         const val KEY_CLIENT_KEYWORDS = "clientKeywords"
 
-        const val KEY_PROXY = "httpProxy"
+        // 历史键 "httpProxy"（应用内代理）已随代理功能移除；老库里残留的行不再被读写。
 
         const val KEY_SNIFF_CLIENT_PROFILE = "sniffClientProfile"
 
@@ -267,6 +282,11 @@ class RoomSettingsRepository constructor(
 
         /** 会员标记。纯展示，不进审计日志（见 [observeMember]）。 */
         const val KEY_MEMBER = "member"
+
+        /** 最近一次成功备份的时间与落点。两个键合起来才是一句话，见 [observeLastBackup]。 */
+        const val KEY_LAST_BACKUP_AT = "lastBackupAtMillis"
+
+        const val KEY_LAST_BACKUP_TARGET = "lastBackupTarget"
 
         /**
          * 阈值 → JSON 对象（键 = 币种代码，值 = 金额）。

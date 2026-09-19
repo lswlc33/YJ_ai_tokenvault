@@ -5,9 +5,10 @@ import com.lc33.tokenvault.domain.model.BalanceSnapshot
 import com.lc33.tokenvault.domain.model.KeySettings
 import com.lc33.tokenvault.endpoint.ProbeRequest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * OpenRouter 余额适配器（§9.2）。
@@ -40,12 +41,16 @@ class OpenRouterAdapter : BalanceAdapter {
         }
         val root = runCatching { json.parseToJsonElement(body).jsonObject }.getOrNull()
             ?: throw BalanceParseException(kind, "no_json")
-        val data = root["data"]?.jsonObject
+        // `as?` 而不是 `jsonObject`：`data` 被回成数组或字符串时，那个访问器抛
+        // IllegalArgumentException，绕开 BalanceParseException 的"只报字段名"通道。
+        val data = root["data"] as? JsonObject
             ?: throw BalanceParseException(kind, "missing_data")
 
-        val totalCredits = data["total_credits"]?.jsonPrimitive?.doubleOrNull
+        // `doubleOrNull` 对 `12.3` 与 `"12.3"` 两种写法都吃，OpenRouter 的 credits 接口
+        // 历史上就回过字符串形态，不能因为层级/写法差异判成"缺字段"。
+        val totalCredits = (data["total_credits"] as? JsonPrimitive)?.doubleOrNull
             ?: throw BalanceParseException(kind, "missing_total_credits")
-        val totalUsage = data["total_usage"]?.jsonPrimitive?.doubleOrNull ?: 0.0
+        val totalUsage = (data["total_usage"] as? JsonPrimitive)?.doubleOrNull ?: 0.0
 
         return BalanceSnapshot(
             amount = totalCredits - totalUsage,

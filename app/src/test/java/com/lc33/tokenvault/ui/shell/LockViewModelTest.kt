@@ -21,6 +21,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.setMain
 import org.junit.After
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -39,7 +40,8 @@ import org.junit.rules.TemporaryFolder
  * `Dispatchers.setMain` 用 [StandardTestDispatcher]，而 ViewModel 里的 PBKDF2 走
  * `withContext(Dispatchers.Default)` ——那是真的线程池、真的几百毫秒。所以断言前要
  * `awaitIdle()`（先把主调度器排空、再等真实的后台工作落地），不能只 `runCurrent()`。
- * 引导参数被 [slowClock] 压到下限，所以整套仍是秒级。
+ * 引导用的 KDF 参数由 [com.lc33.tokenvault.crypto.Pbkdf2Kdf.benchmark] 现场标定，
+ * 这台机器上一次只有零点几秒，所以整套仍是秒级。
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class LockViewModelTest {
@@ -48,6 +50,7 @@ class LockViewModelTest {
     val temp = TemporaryFolder()
 
     private lateinit var store: FileBootStore
+    private lateinit var bootFile: File
     private lateinit var session: VaultSession
     private lateinit var autoLocker: AutoLocker
     private lateinit var scope: TestScope
@@ -59,8 +62,8 @@ class LockViewModelTest {
     fun setUp() {
         Dispatchers.setMain(dispatcher)
         scope = TestScope(dispatcher)
-        val file = File(temp.newFolder("files"), FileBootStore.FILE_NAME)
-        store = FileBootStore(file) { "test-device" }
+        bootFile = File(temp.newFolder("files"), FileBootStore.FILE_NAME)
+        store = FileBootStore(bootFile) { "test-device" }
         session = VaultSession(
             bootStore = store,
             nowEpochMs = { now },
@@ -73,12 +76,15 @@ class LockViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun newViewModel() = LockViewModel(
+    private fun newViewModel(vault: BiometricVault = unavailableBiometric) = LockViewModel(
         session = session,
         bootStore = store,
         autoLocker = autoLocker,
-        vault = unavailableBiometric,
+        vault = vault,
     )
+
+    /** 验证框的三段文案由 composable 层解析，测试里给什么都行——只要**不是中文**（红线 19）。 */
+    private val prompt = BiometricPromptText(title = "Unlock", subtitle = "Verify", cancel = "Use PIN")
 
     /** 这套用例只测 PIN 那条路，生物识别一律"这台设备用不了"。 */
     private val unavailableBiometric = object : BiometricVault {
@@ -90,6 +96,32 @@ class LockViewModelTest {
             BiometricUnlockOutcome.Invalidated
 
         override fun disable() = Unit
+    }
+
+    /**
+     * 回固定结果的生物识别替身，并记下 `disable()` 被调了几次。
+     *
+     * 为什么非要记次数：这一层最要紧的三条规则里，两条是**否定式**的——
+     * "被系统锁住时什么都不许改"（改了就把等一会儿就能用的凭据关掉）与
+     * "清空重来必须连平台凭据一起删"（不删就留下一份活着的安全材料）。
+     * 只看 boot 里写了什么判不出前者，只看界面判不出后者。
+     */
+    private class FakeBiometric(
+        private val outcome: BiometricUnlockOutcome,
+    ) : BiometricVault {
+        var disableCalls = 0
+
+        override fun isAvailable(): Boolean = true
+
+        override suspend fun enable(prompt: BiometricPromptText): BiometricEnableOutcome =
+            BiometricEnableOutcome.Unavailable
+
+        override suspend fun unlock(blob: ByteArray?, prompt: BiometricPromptText): BiometricUnlockOutcome =
+            outcome
+
+        override fun disable() {
+            disableCalls++
+        }
     }
 
     private fun record() = (store.read() as? BootState.Ok)?.record
@@ -182,11 +214,11 @@ class LockViewModelTest {
     // ------------------------------------------------------------------ 解锁与退避
 
     /** 走完整条引导再锁上，得到一个"冷启动落到锁屏"的起点。 */
-    private fun lockedVaultViewModel(): LockViewModel {
+    private fun lockedVaultViewModel(vault: BiometricVault = unavailableBiometric): LockViewModel {
         val setup = newViewModel()
         setup.onboardFully()
         session.lock()
-        val vm = newViewModel()
+        val vm = newViewModel(vault)
         awaitIdle { vm.phase.value is LockPhase.Locked }
         return vm
     }
@@ -248,5 +280,95 @@ class LockViewModelTest {
         assertNull(vm.uiState.value.unlock.error)
         assertEquals(PinPolicy.DEFAULT_SLOTS, vm.uiState.value.unlock.pinSlots)
         assertFalse(session.isUnlocked)
+    }
+
+    // ------------------------------------------------------------------ 生物识别的三档善后
+
+    @Test
+    fun `生物识别被系统锁住时什么都不许改`() {
+        val vault = FakeBiometric(BiometricUnlockOutcome.LockedOut)
+        val vm = lockedVaultViewModel(vault)
+        store.update { it.copy(biometricEnabled = true, dekWrappedByBiometric = byteArrayOf(1, 2, 3)) }
+
+        vm.unlockWithBiometric(prompt)
+        awaitIdle { vm.uiState.value.unlock.error != null }
+
+        // 锁住是"过一会儿再来"，不是"这条路坏了"：删凭据、关开关都会把一件没坏的事改成要重开一次
+        assertEquals(PinError.BiometryLockedOut, vm.uiState.value.unlock.error)
+        assertEquals("被系统锁住时不许动平台凭据", 0, vault.disableCalls)
+        val after = record()!!
+        assertTrue(after.biometricEnabled)
+        assertArrayEquals(byteArrayOf(1, 2, 3), after.dekWrappedByBiometric)
+        assertTrue(vm.phase.value is LockPhase.Locked)
+    }
+
+    @Test
+    fun `生物识别这一步没成时报改用PIN而不是PIN错误`() {
+        val vault = FakeBiometric(BiometricUnlockOutcome.Error("keychain add failed: -34018"))
+        val vm = lockedVaultViewModel(vault)
+
+        vm.unlockWithBiometric(prompt)
+        awaitIdle { vm.uiState.value.unlock.error != null }
+
+        // 这一次根本没试过 PIN，说"PIN 不对"是假话；但也不能报"暂时锁住"——那是另一种等法
+        assertEquals(PinError.BiometryFailed, vm.uiState.value.unlock.error)
+        assertEquals(0, vault.disableCalls)
+    }
+
+    @Test
+    fun `凭据失效而boot已读不通时落到恢复页而不是崩在锁屏上`() {
+        val vault = FakeBiometric(BiometricUnlockOutcome.Invalidated)
+        val vm = lockedVaultViewModel(vault)
+        store.update { it.copy(biometricEnabled = true, dekWrappedByBiometric = byteArrayOf(7)) }
+        // 善后那一步要写 boot，而这一刻文件已经解析不出来了（撕裂写入 / 被人改过）
+        bootFile.writeText("{ not json at all")
+
+        vm.unlockWithBiometric(prompt)
+        awaitIdle { vm.phase.value is LockPhase.BootCorrupt }
+
+        // 关键在"异常没从锁屏冒出去"：走到了恢复页，而那份损坏文件没被增量写覆盖掉
+        assertEquals(PinError.BootWriteFailed, vm.uiState.value.unlock.error)
+        assertEquals(1, vault.disableCalls)
+        assertTrue(bootFile.readText().startsWith("{ not json"))
+    }
+
+    @Test
+    fun `清空重来连平台凭据一起抹掉`() {
+        val vault = FakeBiometric(BiometricUnlockOutcome.Invalidated)
+        newViewModel().onboardFully()
+        store.update { it.copy(biometricEnabled = true) }
+        val vm = newViewModel(vault)
+        awaitIdle { vm.phase.value == LockPhase.Unlocked }
+
+        vm.onWipeAndStartOver()
+
+        // 下一次引导会生成一把全新的 DEK，留着旧那份就是留着一份还活着、却没人读得到的安全材料
+        assertEquals(1, vault.disableCalls)
+        assertNull("boot 应当已经清掉", store.read() as? BootState.Ok)
+        assertFalse("清空重来后内存里不该还留着 DEK", session.isUnlocked)
+        assertEquals(LockPhase.Onboarding, vm.phase.value)
+    }
+
+    // ------------------------------------------------------------------ 引导写盘失败
+
+    @Test
+    fun `引导写不进盘时退回设PIN那一步而不是卡在进度页`() {
+        val vm = newViewModel()
+        awaitIdle { vm.phase.value == LockPhase.Onboarding }
+        vm.onOnboardingNext()
+        // rename 的失败分支在 CI 上造不出真实条件，用 FileBootStore 的测试钩子钉住它
+        store.renameOverride = { _, _ -> false }
+
+        vm.type(GOOD_PIN)
+        assertEquals(OnboardingStep.ConfirmPin, vm.uiState.value.onboarding.step)
+        vm.type(GOOD_PIN)
+        awaitIdle { vm.uiState.value.onboarding.error != null }
+
+        // Calibrating 那一屏没有键盘也没有取消按钮，停在那里就等于杀掉进程重来
+        assertEquals(PinError.BootWriteFailed, vm.uiState.value.onboarding.error)
+        assertEquals(OnboardingStep.SetPin, vm.uiState.value.onboarding.step)
+        assertFalse(vm.uiState.value.onboarding.busy)
+        assertEquals(LockPhase.Onboarding, vm.phase.value)
+        assertFalse("写盘失败时不该把 DEK 采纳进会话", session.isUnlocked)
     }
 }

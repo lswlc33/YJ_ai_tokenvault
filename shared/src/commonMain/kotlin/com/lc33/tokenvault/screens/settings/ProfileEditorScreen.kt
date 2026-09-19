@@ -2,7 +2,7 @@ package com.lc33.tokenvault.screens.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,9 +21,11 @@ import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.unit.dp
 import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.back_cd
+import tokenvault.shared.generated.resources.dialog_cancel
 import tokenvault.shared.generated.resources.editor_advanced_collapse
 import tokenvault.shared.generated.resources.editor_advanced_expand
 import tokenvault.shared.generated.resources.editor_save
+import tokenvault.shared.generated.resources.editor_row_missing
 import tokenvault.shared.generated.resources.editor_section_basic
 import tokenvault.shared.generated.resources.profile_editor_body_patch
 import tokenvault.shared.generated.resources.profile_editor_body_patch_hint
@@ -49,6 +51,7 @@ import com.lc33.tokenvault.domain.Protocol
 import com.lc33.tokenvault.domain.model.ClientProfile
 import com.lc33.tokenvault.importer.CurlParser
 import com.lc33.tokenvault.screens.model.ProfileEditorDraft
+import com.lc33.tokenvault.ui.common.protocolLabel
 import com.lc33.tokenvault.ui.miuix.AppDialog
 import com.lc33.tokenvault.ui.miuix.AppFilterChip
 import com.lc33.tokenvault.ui.miuix.AppIcon
@@ -84,6 +87,7 @@ import com.lc33.tokenvault.ui.theme.LocalStatusPalette
 @Composable
 fun ProfileEditorScreen(
     initial: ClientProfile?,
+    loadFailed: Boolean = false,
     onBack: () -> Unit,
     onSave: (ProfileEditorDraft) -> Unit,
     onDelete: () -> Unit,
@@ -176,6 +180,22 @@ fun ProfileEditorScreen(
                 .appTopBarScroll(scrollState),
             contentPadding = padding,
         ) {
+            // 读不到那一枚预设：这一页看起来与"新建"一模一样，而保存是被挡住的。
+            // 不写在这页上，用户只会反复按对勾（与 ProviderEditorScreen 同一套说法）。
+            if (loadFailed) {
+                item {
+                    AppText(
+                        text = stringResource(Res.string.editor_row_missing),
+                        style = AppTextStyle.Footnote,
+                        color = LocalStatusPalette.current.error,
+                        modifier = Modifier.padding(
+                            start = tokens.screenPadding,
+                            end = tokens.screenPadding,
+                            top = tokens.itemSpacing,
+                        ),
+                    )
+                }
+            }
             item {
                 CurlImportCard(
                     expanded = showCurl,
@@ -259,6 +279,9 @@ fun ProfileEditorScreen(
         title = stringResource(Res.string.profile_editor_delete_title),
         summary = stringResource(Res.string.profile_editor_delete_summary),
         confirmText = stringResource(Res.string.profile_editor_delete),
+        // 删除类弹层给一个看得见的退路（AppDialog 契约）。内置预设删了还会被 seed 回来，
+        // 自定义的那一份是用户自己抓包攒的，没了就是没了。
+        dismissText = stringResource(Res.string.dialog_cancel),
         onConfirm = {
             showDelete = false
             onDelete()
@@ -326,16 +349,20 @@ private fun CurlImportCard(
 @Composable
 private fun ProtocolChips(selected: Set<Protocol>, onChange: (Set<Protocol>) -> Unit) {
     val tokens = LocalAppTokens.current
-    Row(
+    // 两件事一起改：文案不再用 `protocol.name`（那是枚举名，页面上会跳出 CHAT / ANTHROPIC，
+    // 而密钥设置页同一协议写的是 "Chat" / "Anthropic"——同一个状态两套字），
+    // 容器换成 FlowRow（本地化后 chip 宽度不一，360dp 屏上 Row 会把第三枚挤出屏幕）。
+    FlowRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = tokens.screenPadding, vertical = tokens.itemSpacing),
         horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
+        verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
     ) {
         Protocol.entries.forEach { protocol ->
             val isSelected = protocol in selected
             AppFilterChip(
-                text = protocol.name,
+                text = protocolLabel(protocol),
                 selected = isSelected,
                 onClick = {
                     onChange(if (isSelected) selected - protocol else selected + protocol)

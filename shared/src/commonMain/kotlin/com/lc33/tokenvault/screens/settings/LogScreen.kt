@@ -18,11 +18,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringArrayResource
 import org.jetbrains.compose.resources.stringResource
@@ -45,6 +47,7 @@ import tokenvault.shared.generated.resources.log_clear_confirm_title
 import tokenvault.shared.generated.resources.log_empty
 import tokenvault.shared.generated.resources.log_empty_title
 import tokenvault.shared.generated.resources.log_filter_summary
+import tokenvault.shared.generated.resources.log_recent_limit_note
 import tokenvault.shared.generated.resources.log_level_debug
 import tokenvault.shared.generated.resources.log_level_error
 import tokenvault.shared.generated.resources.log_level_info
@@ -61,6 +64,7 @@ import com.lc33.tokenvault.platform.nowMillis
 import com.lc33.tokenvault.ui.common.EmptyState
 import com.lc33.tokenvault.ui.common.StatusDot
 import com.lc33.tokenvault.ui.common.relativeLabel
+import com.lc33.tokenvault.ui.shell.LogViewModel
 import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppDialog
 import com.lc33.tokenvault.ui.miuix.AppIcon
@@ -122,6 +126,21 @@ fun LogScreen(
         if (autoScroll && entries.isNotEmpty()) {
             listState.animateScrollToItem(0)
         }
+    }
+
+    // 用户自己往上翻就关掉自动滚动：上面那条 effect 是按 `entries` 触发的，新日志一直在写，
+    // 不关掉的话读历史的人每看两行就被拽回顶部一次，等于这一页只能读最新那几条。
+    //
+    // 判据用"列表还停在顶部吗"而不是 `isScrollInProgress`：后者分不出是谁在滚——
+    // `animateScrollToItem` 自己也会把它置为 true，那样自动滚动执行一次就把自己关掉了。
+    // 程序发起的滚动只会**回到**顶部（让下面这个值变成 false），真正"离开顶部"的只有手指，
+    // 所以这条判据天然不会被自己触发，也不需要在两处维护同一个状态。
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            listState.firstVisibleItemIndex != 0 || listState.firstVisibleItemScrollOffset != 0
+        }
+            .distinctUntilChanged()
+            .collect { awayFromTop -> if (awayFromTop) autoScroll = false }
     }
 
     AppScaffold(
@@ -231,6 +250,21 @@ fun LogScreen(
                                 null
                             },
                         )
+                    }
+
+                    // 一次只取最近 RECENT_LIMIT 条，页面也没有"加载更多"：到量了就得说清
+                    // 这里看到的是截断结果，否则用户会把"往下翻没有了"读成"更早什么都没发生"。
+                    if (entries.size >= LogViewModel.RECENT_LIMIT) {
+                        item {
+                            AppText(
+                                text = stringResource(
+                                    Res.string.log_recent_limit_note,
+                                    LogViewModel.RECENT_LIMIT,
+                                ),
+                                style = AppTextStyle.Footnote,
+                                color = appSecondaryTextColor,
+                            )
+                        }
                     }
 
                     // 滑到底的呼吸空间：内容画到窗口底部（透出玻璃底栏），不垫就会贴边。

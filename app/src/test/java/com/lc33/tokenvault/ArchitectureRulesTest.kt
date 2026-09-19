@@ -143,11 +143,16 @@ class ArchitectureRulesTest {
     fun `screens 里不出现 SQL 与 HTTP 构造`() {
         val sqlKeywords = Regex("""\b(SELECT\s|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM|CREATE\s+TABLE)""")
         val violations = mutableListOf<String>()
-        for (file in kotlinFilesUnder(appSourceRoot, "screens")) {
-            val text = file.readText()
-            sqlKeywords.find(text)?.let { violations += "${file.relPathOf(appSourceRoot)} 出现 SQL：${it.value.trim()}" }
-            if (text.contains("Request.Builder")) {
-                violations += "${file.relPathOf(appSourceRoot)} 直接构造 HTTP 请求"
+        // 阶段3 起 screens/ 全在 shared/src/commonMain，app 下那个目录已经不存在了：
+        // 只扫 appSourceRoot 时 kotlinFilesUnder 拿到空列表，这条规则会**静默通过**，
+        // 看起来是绿的、实际是空转。app 那一份保留作兜底，防止有人把页面搬回去。
+        for (root in listOf(appSourceRoot, sharedSourceRoot)) {
+            for (file in kotlinFilesUnder(root, "screens")) {
+                val text = file.readText()
+                sqlKeywords.find(text)?.let { violations += "${file.relPathOf(root)} 出现 SQL：${it.value.trim()}" }
+                if (text.contains("Request.Builder")) {
+                    violations += "${file.relPathOf(root)} 直接构造 HTTP 请求"
+                }
             }
         }
         fail("页面层不碰 SQL，也不构造 HTTP 请求（计划.md §4.3）：", violations)

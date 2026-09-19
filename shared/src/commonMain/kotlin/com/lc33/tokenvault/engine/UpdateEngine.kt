@@ -11,14 +11,21 @@ import com.lc33.tokenvault.update.ReleaseParser
  *
  * 与 [ProbeEngine] / [BalanceEngine] 分开：它是「点一下、发一个匿名 GET、比一下版本」，
  * 没有探测的逐项进度、也没有余额的落库，生命周期最简。复用 [HttpEngine] 发请求——
- * 它的 UA 兜底、手动代理、超时配置都是这里要的，host 门闸对单次 GitHub 请求无感。
+ * 它的 UA 兜底、超时与响应体字节上限都是这里要的；单次匿名请求用不上 host 门闸
+ * （门闸是给"同 host 连打几十发"的探测准备的）。
  *
  * 一条链：匿名 GET `/repos/lswlc33/YJ_ai_tokenvault/releases` → 解析 → 按渠道匹配。
  * 任何一步失败（网络 / 解析 / 匹配不到）都返回 [UpdateResult] 的失败态，**不影响任何
  * 本地功能**（§13.4 诚实声明）。
  *
- * 安全约束：这是匿名请求，不带任何身份、不带设备信息、不带金库内容（红线 32 的
- * 邻居——响应体也不落日志、不进 error 消息）。
+ * 安全约束：这是匿名请求，不带任何身份、不带设备信息、不带金库内容。
+ *
+ * 关于日志，说清楚实际行为而不是许一个做不到的愿：请求经 [HttpEngine]，所以这一发的
+ * **响应体会进 HTTP 审计日志**（`net/HttpEngine.MAX_BODY_CHARS = 8000` 个字符，超出部分
+ * 掐中间留头尾）。GitHub 那个地址回的是公开 release 列表，里面不含任何凭据，落一份截断
+ * 后的副本是用来定位"为什么匹配不到版本"的有用证据。要留意的是另一侧：**error 消息里
+ * 永远不放 body**（下面任何失败分支都只回 [UpdateErrorKind]，不带原文），UI 因此也拿不到
+ * 一整段上游文本，不会被诱导去分享它。
  */
 class UpdateEngine constructor(
     private val engine: HttpEngine,

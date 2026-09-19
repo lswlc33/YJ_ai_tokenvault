@@ -16,6 +16,7 @@ import com.lc33.tokenvault.domain.model.LogLevel
 import com.lc33.tokenvault.domain.model.KeySettings
 import com.lc33.tokenvault.domain.repo.ApiKeyRepository
 import com.lc33.tokenvault.domain.repo.AuditLogRepository
+import com.lc33.tokenvault.domain.repo.DuplicateApiKeyException
 import com.lc33.tokenvault.domain.repo.TransactionRunner
 import com.lc33.tokenvault.domain.repo.UndoableDeletion
 import kotlinx.coroutines.flow.Flow
@@ -61,6 +62,12 @@ class RoomApiKeyRepository constructor(
         val bytes = secret.toUtf8()
         return try {
             val fingerprint = cipher.fingerprint(bytes)
+            // 指纹预检（与导入预览用的是同一个口径）：`api_keys(providerId, fingerprint)` 是
+            // 唯一索引，撞上了 Room 只会抛 `UNIQUE constraint failed`，用户读不懂、
+            // 日志也指不出是哪一家。这里先查一次，把它变成领域错误。
+            dao.findIdByFingerprint(providerId, fingerprint)?.let { clash ->
+                throw DuplicateApiKeyException(providerId, clash)
+            }
             val stamp = now()
             transactions.inTransaction {
                 val keyId = dao.insertRaw(
@@ -70,7 +77,9 @@ class RoomApiKeyRepository constructor(
                         note = note.trim(),
                         secretEnc = ByteArray(0),
                         fingerprint = fingerprint,
-                        sortOrder = dao.findByProvider(providerId).size,
+                        // 排到最后只要一个数：把这家全部 Key（含密文行）读回来数一遍，
+                        // 是在为一件 O(1) 的事付 O(n) 的内存与拷贝。
+                        sortOrder = dao.countByProvider(providerId),
                         createdAt = stamp,
                         updatedAt = stamp,
                     ),
@@ -98,9 +107,14 @@ class RoomApiKeyRepository constructor(
     }
 
     override suspend fun replaceSecret(id: Long, secret: CharArray) {
+        val row = dao.findRaw(id) ?: throw IllegalStateException("api key $id not found")
         val bytes = secret.toUtf8()
         try {
-            dao.setSecret(id, cipher.seal(bytes, aadForSecret(id)), cipher.fingerprint(bytes), now())
+            val fingerprint = cipher.fingerprint(bytes)
+            // 同一家里不能有第二把同样的密钥；换成它自己不算冲突（那是幂等操作）。
+            val clash = dao.findIdByFingerprint(row.providerId, fingerprint)
+            if (clash != null && clash != id) throw DuplicateApiKeyException(row.providerId, clash)
+            dao.setSecret(id, cipher.seal(bytes, aadForSecret(id)), fingerprint, now())
             audit.recordSafe(LogLevel.INFO, LogCategory.VAULT, "api key secret replaced", "id=$id", keyId = id)
         } finally {
             bytes.zeroize()
@@ -204,7 +218,22 @@ class RoomApiKeyRepository constructor(
             error = snapshot.error,
         )
 
-    override suspend fun resetProbeResults() = dao.resetProbeResults()
+    /**
+     * 清掉全部 Key 的探测结果。
+     *
+     * 这是一条**全表 UPDATE**，把用户看到的健康状态一起抹平（数据页的「清空探测结果」）。
+     * 与删除同类，所以留一条 WARN：事后问"我的状态怎么全没了"，日志要答得上来是哪一步、
+     * 谁动的。明细里不含任何密钥内容。
+     */
+    override suspend fun resetProbeResults() {
+        dao.resetProbeResults()
+        audit.recordSafe(
+            LogLevel.WARN,
+            LogCategory.VAULT,
+            "api key probe results reset",
+            "scope=all",
+        )
+    }
 
     private fun sealBalanceToken(keyId: Long, plain: CharArray?): ByteArray? {
         if (plain == null || plain.isEmpty()) return null

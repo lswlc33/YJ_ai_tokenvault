@@ -3,6 +3,7 @@ package com.lc33.tokenvault.backup
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -115,5 +116,21 @@ class BackupPayloadTest {
         val bad = ByteArray(10) { 0x00 }
         val e = runCatching { gunzip(bad) }.exceptionOrNull()
         assertTrue(e is BackupCorruptException)
+    }
+
+    @Test
+    fun `本机解不开的密文仍算已有值`() {
+        // 只看两列的值会把"本机存着一份坏掉的凭据"读成"这一项还没有"，合并恢复于是拿包里的
+        // 版本盖掉它——坏数据不该因为读不出就被悄悄替换（RoomBackupStore.findSetting 的承诺）。
+        assertTrue(BackupSetting(key = "webdavPassword", hasStoredBlob = true).isSet)
+        assertFalse(BackupSetting(key = "webdavPassword").isSet)
+    }
+
+    @Test
+    fun `hasStoredBlob 是本机状态，不进备份包`() {
+        // 包不是本机：这一列跟着包走会让恢复端把"包里那一项"误读成"本机有一份坏数据"。
+        val encoded = json.encodeToString(BackupSetting.serializer(), BackupSetting(key = "k", hasStoredBlob = true))
+        assertFalse(encoded.contains("hasStoredBlob"), "备份包里不该出现本机状态列：$encoded")
+        assertFalse(json.decodeFromString(BackupSetting.serializer(), encoded).hasStoredBlob)
     }
 }

@@ -23,6 +23,7 @@ import tokenvault.shared.generated.resources.import_duplicate_body
 import tokenvault.shared.generated.resources.import_duplicate_continue
 import tokenvault.shared.generated.resources.import_duplicate_title
 import tokenvault.shared.generated.resources.import_error_missing_key
+import tokenvault.shared.generated.resources.import_error_failed
 import tokenvault.shared.generated.resources.import_error_multiple_commands
 import tokenvault.shared.generated.resources.import_error_no_command
 import tokenvault.shared.generated.resources.import_from_clipboard
@@ -39,6 +40,7 @@ import tokenvault.shared.generated.resources.import_result_protocol
 import tokenvault.shared.generated.resources.import_section_paste
 import tokenvault.shared.generated.resources.import_section_preview
 import tokenvault.shared.generated.resources.import_title
+import com.lc33.tokenvault.ui.common.protocolLabel
 import com.lc33.tokenvault.ui.miuix.AppActionButton
 import com.lc33.tokenvault.ui.miuix.AppActionRow
 import com.lc33.tokenvault.ui.miuix.AppCard
@@ -68,11 +70,14 @@ data class CurlImportPreview(
     val models: List<String>,
 )
 
-/** 识别失败的三类原因；文案由页面统一映射。 */
+/** 识别与写入失败的原因；文案由页面统一映射。 */
 enum class CurlImportError {
     NoCommand,
     MultipleCommands,
     MissingKey,
+
+    /** 这一条没能处理完（解析抛了 / 指纹算不出 / 写库失败）。以前这种失败是崩溃。 */
+    Failed,
 }
 
 @Composable
@@ -196,6 +201,9 @@ fun ImportScreen(
                                 color = appSecondaryTextColor,
                             )
                         } else {
+                            // 预览只铺前 4 枚，但必须把没画出来的数量说出来：只看 4 枚 chip
+                            // 会被读成"这条 cURL 里就只有这些模型"，而导入进去的是一条不少。
+                            val shownModels = 4
                             FlowRow(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -203,7 +211,9 @@ fun ImportScreen(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 verticalArrangement = Arrangement.spacedBy(6.dp),
                             ) {
-                                result.models.take(4).forEach { AppChip(text = it) }
+                                result.models.take(shownModels).forEach { AppChip(text = it) }
+                                val hidden = result.models.size - shownModels
+                                if (hidden > 0) AppChip(text = "+$hidden")
                             }
                         }
                     }
@@ -282,4 +292,5 @@ private fun importErrorText(error: CurlImportError): String = when (error) {
     CurlImportError.NoCommand -> stringResource(Res.string.import_error_no_command)
     CurlImportError.MultipleCommands -> stringResource(Res.string.import_error_multiple_commands)
     CurlImportError.MissingKey -> stringResource(Res.string.import_error_missing_key)
+    CurlImportError.Failed -> stringResource(Res.string.import_error_failed)
 }

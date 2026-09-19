@@ -13,6 +13,7 @@ import kotlinx.cinterop.readBytes
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.usePinned
 import kotlinx.cinterop.value
+import platform.CoreFoundation.CFErrorRefVar
 import platform.CoreFoundation.CFDictionaryCreate
 import platform.CoreFoundation.CFDictionaryRef
 import platform.CoreFoundation.CFRelease
@@ -26,14 +27,23 @@ import platform.CoreFoundation.kCFStringEncodingUTF8
 import platform.Foundation.CFBridgingRelease
 import platform.Foundation.CFBridgingRetain
 import platform.Foundation.NSData
+import platform.Foundation.NSError
 import platform.Foundation.create
+import platform.LocalAuthentication.LAErrorAppCancel
+import platform.LocalAuthentication.LAErrorBiometryLockout
+import platform.LocalAuthentication.LAErrorBiometryNotEnrolled
+import platform.LocalAuthentication.LAErrorSystemCancel
+import platform.LocalAuthentication.LAErrorUserCancel
+import platform.LocalAuthentication.LAErrorUserFallback
 import platform.LocalAuthentication.LAContext
 import platform.LocalAuthentication.LAPolicyDeviceOwnerAuthenticationWithBiometrics
 import platform.Security.SecAccessControlCreateWithFlags
+import platform.Security.SecAccessControlRef
 import platform.Security.SecItemAdd
 import platform.Security.SecItemCopyMatching
 import platform.Security.SecItemDelete
 import platform.Security.errSecAuthFailed
+import platform.Security.errSecInteractionNotAllowed
 import platform.Security.errSecItemNotFound
 import platform.Security.errSecSuccess
 import platform.Security.errSecUserCanceled
@@ -71,21 +81,37 @@ import kotlin.coroutines.resume
  *   不在 CoreFoundation 模块，import 必须写 `platform.Foundation.*`；
  * - `CFDictionaryCreate` 的键值数组用 `null` 回调创建，所以**字典不 retain 内容**，
  *   每次调用的值（包裹的密文、访问控制、LAContext）都必须在调用结束前自己持有并释放。
+ *
+ * **所有失败都要带原因出去**：`evaluatePolicy` 的 `NSError`、`SecAccessControlCreateWithFlags`
+ * 的 `CFErrorRef*` 出参、`SecItemAdd` / `SecItemCopyMatching` 的 OSStatus 一律不许丢——
+ * 丢了之后界面只能说"失败"，而这一项失败的常见原因（没设锁屏密码、刚录了新指纹、
+ * 连续按错被系统锁住）各自要做的下一件事完全不同。
  */
 class IosBiometricVault(
     private val session: VaultSession,
 ) : BiometricVault {
 
-    /** 服务名与账号是常驻常量，随本对象活到进程结束，所以这两份 CFString 不释放。 */
+    /** 服务名与账号是常驻常量，随本对象活到进程结束，所以这几份 CFString 不释放。 */
     private val service: CFStringRef? =
         CFStringCreateWithCString(kCFAllocatorDefault, SERVICE, kCFStringEncodingUTF8)
 
     private val account: CFStringRef? =
         CFStringCreateWithCString(kCFAllocatorDefault, ACCOUNT, kCFStringEncodingUTF8)
 
+    /**
+     * 写入时用的第二个账号（staging）。
+     *
+     * Keychain 用 (class, service, account) 认唯一性，同一个账号上没法"先加新的再删旧的"，
+     * 所以换一份 DEK 只能落在另一个账号上、提交成功后再把正式账号换过来。
+     */
+    private val stagingAccount: CFStringRef? =
+        CFStringCreateWithCString(kCFAllocatorDefault, ACCOUNT_STAGING, kCFStringEncodingUTF8)
+
     override fun isAvailable(): Boolean =
         LAContext().canEvaluatePolicy(
             LAPolicyDeviceOwnerAuthenticationWithBiometrics,
+            // 这里传 null 是有意的：这一问只关心"能不能"，而"为什么不能"（没录指纹 /
+            // 没设锁屏密码 / 硬件不可用）在界面上都收敛成同一句"这台设备现在用不了"。
             error = null,
         )
 
@@ -93,79 +119,208 @@ class IosBiometricVault(
         if (!isAvailable()) return BiometricEnableOutcome.Unavailable
         val context = LAContext().apply { localizedCancelTitle = prompt.cancel }
         // 启用前先验证一次：既确认这台设备的生物识别真的可用，也拿到用户当下的明确同意。
-        if (!authenticate(context, prompt.subtitle)) return BiometricEnableOutcome.Cancelled
-        val stored = try {
-            // 借用而不是复制：Keychain 会拷一份进去，借来的引用随 lambda 结束即释放。
-            session.withDek { dek -> store(dek, context) }
-        } catch (_: Exception) {
-            false
+        when (val auth = authenticate(context, prompt)) {
+            IosAuth.Success -> Unit
+            IosAuth.Cancelled -> return BiometricEnableOutcome.Cancelled
+            IosAuth.LockedOut -> return BiometricEnableOutcome.LockedOut
+            // 函数开头 `isAvailable()` 已经挡过一次，走到这里只可能是两步之间用户把指纹删光了。
+            // 报"这台设备现在用不了"，而不是"失败了"：没有哪一步出错，只是没东西可验了。
+            IosAuth.NotEnrolled -> return BiometricEnableOutcome.Unavailable
+            is IosAuth.Failed -> return BiometricEnableOutcome.Error(auth.reason)
         }
-        return if (stored) {
-            BiometricEnableOutcome.Success(null)
-        } else {
-            BiometricEnableOutcome.Error("keychain store failed")
+        // 借用而不是复制：Keychain 会拷一份进去，借来的引用随 lambda 结束即释放。
+        return try {
+            session.withDek { dek ->
+                when (val stored = store(dek, context)) {
+                    StoreOutcome.Stored -> BiometricEnableOutcome.Success(null)
+                    is StoreOutcome.Failed -> BiometricEnableOutcome.Error(stored.reason)
+                }
+            }
+        } catch (_: Exception) {
+            BiometricEnableOutcome.Error("vault is locked")
         }
     }
 
     override suspend fun unlock(blob: ByteArray?, prompt: BiometricPromptText): BiometricUnlockOutcome {
         val context = LAContext().apply { localizedCancelTitle = prompt.cancel }
-        if (!authenticate(context, prompt.subtitle)) return BiometricUnlockOutcome.Cancelled
+        when (val auth = authenticate(context, prompt)) {
+            IosAuth.Success -> Unit
+            IosAuth.Cancelled -> return BiometricUnlockOutcome.Cancelled
+            // 锁住（连续失败太多次）时**不碰 boot**：Keychain 那一份完全正常，
+            // 判成 Invalidated 会把一个没坏的凭据关掉，用户还得用 PIN 重开一次。
+            IosAuth.LockedOut -> return BiometricUnlockOutcome.LockedOut
+            // 一个指纹/人脸都没录了：这一项绑的是 `BiometryCurrentSet`，那份 Keychain
+            // 已经被系统判死，**再也不会读出来**。所以这是真失效，交给调用方关开关清包裹
+            // （留着它只会让开关一直"开着"，而每一次都注定解不开）。
+            IosAuth.NotEnrolled -> return BiometricUnlockOutcome.Invalidated
+            is IosAuth.Failed -> return BiometricUnlockOutcome.Error(auth.reason)
+        }
         val (status, bytes) = read(context)
-        val dek = when {
-            status == errSecItemNotFound || status == errSecAuthFailed ->
-                return BiometricUnlockOutcome.Invalidated
-
-            status == errSecUserCanceled -> return BiometricUnlockOutcome.Cancelled
-            bytes == null -> return BiometricUnlockOutcome.Error("keychain read failed: $status")
-            else -> bytes
+        if (status == errSecItemNotFound || status == errSecAuthFailed) {
+            return BiometricUnlockOutcome.Invalidated
         }
-        return when (session.unlockWithDek(dek)) {
-            is UnlockResult.Success -> BiometricUnlockOutcome.Success
-            // unlockWithDek 在失败时已经擦掉 dek；凭据对不上就当它失效，让用户重新启用。
-            else -> BiometricUnlockOutcome.Invalidated
+        if (status == errSecUserCanceled) return BiometricUnlockOutcome.Cancelled
+        if (status == errSecInteractionNotAllowed) {
+            // 设备正处于锁屏 / 生物识别临时不可用：凭据没坏，只是现在读不出来。
+            return BiometricUnlockOutcome.LockedOut
         }
+        val dek = bytes ?: return BiometricUnlockOutcome.Error("keychain read failed: OSStatus $status")
+        val result = session.unlockWithDek(dek)
+        if (result is UnlockResult.Success) return BiometricUnlockOutcome.Success
+        // 身份校验没过（或长度 / boot 不对）：这条路拿回来的东西不是本库的那把 DEK，
+        // 留着它只会让下一次又"解锁成功但数据解不开"。删掉平台凭据，开关由调用方关掉。
+        disable()
+        return BiometricUnlockOutcome.Error(
+            (result as? UnlockResult.Unavailable)?.reason ?: "platform DEK rejected",
+        )
     }
 
     override fun disable() {
-        withQuery(emptyList()) { query -> SecItemDelete(query) }
+        // 两个账号都要清：`store` 是"先写 staging、再换到正式账号"，中途失败会留下
+        // staging 那一份。留着它 = 一份没人读的 DEK 躺在 Keychain 里。
+        withQuery(accountRef = account) { query -> SecItemDelete(query) }
+        withQuery(accountRef = stagingAccount) { query -> SecItemDelete(query) }
     }
 
-    private suspend fun authenticate(context: LAContext, reason: String): Boolean =
+    /**
+     * 系统验证框的结果。
+     *
+     * **[IosAuth.Failed] 必须存在**：旧实现把 `reply` 里那个 `NSError?` 直接丢掉，
+     * 于是"用户按了取消""Touch ID 被锁住""系统弹不出来"三种情况在调用方看起来一模一样，
+     * 用户按了没反应、也永远不知道下一步该做什么。
+     */
+    private sealed interface IosAuth {
+        data object Success : IosAuth
+        data object Cancelled : IosAuth
+        data object LockedOut : IosAuth
+
+        /** 这台设备现在**没有**任何已录入的生物识别（用户删光了指纹/人脸）。 */
+        data object NotEnrolled : IosAuth
+        data class Failed(val reason: String) : IosAuth
+    }
+
+    /**
+     * 弹系统验证框。
+     *
+     * **`localizedReason` 传 title，不传 subtitle**：iOS 那个框只有**一行**说明文字的位置
+     * （`LAContext` 上除 `localizedReason` 外只有 `localizedCancelTitle` /
+     * `localizedFallbackTitle`，没有 Android `PromptInfo.setSubtitle` 的对应物），
+     * 而 Android 端这一格用的正是 `setTitle(prompt.title)`。之前送出去的是 subtitle，
+     * 于是 iOS 用户看到的是"验证一下是你，才能解开数据密钥"这一串目的描述，
+     * 而框上从来没写过"这是要解锁金库"还是"这是要开启生物识别"——两件事在启用与解锁
+     * 两个场景里恰好是不同的 title，混成一句就分不出来了。
+     *
+     * 底部那个按钮已经由 `localizedCancelTitle` 接走（调用点设好）。
+     * `localizedFallbackTitle` 刻意不设：`...WithBiometrics` 这条策略没有"改用设备密码"的
+     * 退路，设了也不会出现，而设成"改用 PIN"更是假话（系统不会拿它去解本应用的 PIN）。
+     */
+    private suspend fun authenticate(context: LAContext, prompt: BiometricPromptText): IosAuth =
         suspendCancellableCoroutine { continuation ->
             context.evaluatePolicy(
                 LAPolicyDeviceOwnerAuthenticationWithBiometrics,
-                reason,
-            ) { success, _ ->
-                if (continuation.isActive) continuation.resume(success)
+                prompt.title,
+            ) { success, error ->
+                if (!continuation.isActive) return@evaluatePolicy
+                continuation.resume(
+                    when {
+                        success -> IosAuth.Success
+                        // 取消是用户的选择，不是故障：这一档不能进 [IosAuth.Failed]，
+                        // 否则每次按取消都会冒一条系统错误。
+                        error?.code == LAErrorUserCancel || error?.code == LAErrorAppCancel ||
+                            error?.code == LAErrorSystemCancel || error?.code == LAErrorUserFallback ->
+                            IosAuth.Cancelled
+
+                        error?.code == LAErrorBiometryLockout -> IosAuth.LockedOut
+
+                        // 没录入任何生物识别 ≠ 暂时锁住：这一档"等一会儿"不会变好，
+                        // 说"稍后再试"是把人往错的方向推。它归到"这条路本身没有了"，
+                        // 由调用方按失效善后（关掉开关、清掉那份再也读不出来的 Keychain 项）。
+                        error?.code == LAErrorBiometryNotEnrolled -> IosAuth.NotEnrolled
+
+                        else -> IosAuth.Failed(error?.localizedDescription ?: "biometry unavailable")
+                    },
+                )
             }
         }
 
-    /** 写入：先删旧项，再带生物识别访问控制加一条新的。 */
-    private fun store(dek: ByteArray, context: LAContext): Boolean {
-        disable()
-        val access = SecAccessControlCreateWithFlags(
-            kCFAllocatorDefault,
-            kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly,
-            kSecAccessControlBiometryCurrentSet,
-            null,
-        ) ?: return false
+    /** [store] 的结果：要么已经落在正式账号上，要么带着原因失败（此时正式那一份没被动过）。 */
+    private sealed interface StoreOutcome {
+        data object Stored : StoreOutcome
+        data class Failed(val reason: String) : StoreOutcome
+    }
+
+    /** 访问控制的创建结果。失败那一份带的是 `CFError` 里的人话，不是错误码。 */
+    private sealed interface AccessControl {
+        data class Ok(val ref: SecAccessControlRef) : AccessControl
+        data class Failed(val reason: String) : AccessControl
+    }
+
+    /**
+     * 写入：**先 add 到 staging，成功后才删正式项、再把同一份 add 到正式账号**。
+     *
+     * 旧实现是"先 disable() 删掉旧的、再 SecItemAdd 新的"，那个顺序在 add 失败时
+     * （访问控制建不出来、权限、磁盘异常）会把用户**本来能用**的凭据删了个干净：
+     * 开关还开着，但生物识别从此再也解不开，只能回 PIN 重开一次。
+     * 现在 add 失败时正式那一份原地不动；提交那一步万一失败，staging 里还留着新的一份，
+     * 由下一次 [enable] 或 [disable] 收尾，而调用方拿到的是一句具体原因。
+     */
+    private fun store(dek: ByteArray, context: LAContext): StoreOutcome {
+        val access = when (val created = createAccessControl()) {
+            is AccessControl.Ok -> created.ref
+            is AccessControl.Failed -> return StoreOutcome.Failed(created.reason)
+        }
         // CFData 与 NSData 是 toll-free bridged，桥接之后 keychain 就收得了。
         val dataRef = CFBridgingRetain(dek.toNSData())
         val contextRef = CFBridgingRetain(context)
         try {
-            val status = withQuery(
-                listOf(
-                    kSecAttrAccessControl to access,
-                    kSecValueData to dataRef,
-                    // 带上刚验证过的上下文：新建时若也要用户在场，系统不会再弹一次。
-                    kSecUseAuthenticationContext to contextRef,
-                ),
-            ) { query -> SecItemAdd(query, null) }
-            return status == errSecSuccess
+            // 每写一次都要带上刚验证过的上下文：新建时若也要用户在场，系统不会再弹一次。
+            val entries: List<Pair<CFStringRef?, CFTypeRef?>> = listOf(
+                kSecAttrAccessControl to access,
+                kSecValueData to dataRef,
+                kSecUseAuthenticationContext to contextRef,
+            )
+            // 先扫掉上一次可能留下的 staging（中途被杀留下的半成品）。
+            withQuery(accountRef = stagingAccount) { query -> SecItemDelete(query) }
+            val staged = withQuery(entries, accountRef = stagingAccount) { query -> SecItemAdd(query, null) }
+            if (staged != errSecSuccess) {
+                return StoreOutcome.Failed("keychain add failed: OSStatus $staged")
+            }
+            withQuery(accountRef = account) { query -> SecItemDelete(query) }
+            val committed = withQuery(entries, accountRef = account) { query -> SecItemAdd(query, null) }
+            if (committed != errSecSuccess) {
+                return StoreOutcome.Failed("keychain commit failed: OSStatus $committed")
+            }
+            withQuery(accountRef = stagingAccount) { query -> SecItemDelete(query) }
+            return StoreOutcome.Stored
         } finally {
             CFRelease(access)
             dataRef?.let { CFRelease(it) }
             contextRef?.let { CFRelease(it) }
+        }
+    }
+
+    /**
+     * 建生物识别访问控制。**错误出参必须接**：`SecAccessControlCreateWithFlags` 返回 null
+     * 时旧实现只知道"失败了"，而真正的原因（设备没设锁屏密码、生物识别被限制）都在
+     * 那个 `CFErrorRef*` 里——不接就等于把唯一一句能给用户的话扔掉了。
+     *
+     * 返回 null 时那个 out 参数**不由我们负责释放**（Core Foundation 的"Get 规则"：
+     * 没取得所有权），所以这里只做一次 toll-free 桥接读文案，不 CFRelease。
+     */
+    private fun createAccessControl(): AccessControl = memScoped {
+        val error = alloc<CFErrorRefVar>()
+        val ref = SecAccessControlCreateWithFlags(
+            kCFAllocatorDefault,
+            kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly,
+            kSecAccessControlBiometryCurrentSet,
+            error.ptr,
+        )
+        if (ref != null) {
+            AccessControl.Ok(ref)
+        } else {
+            val reason = (error.value?.let { CFBridgingRelease(it) as? NSError }?.localizedDescription
+                ?: "access control unavailable")
+            AccessControl.Failed(reason)
         }
     }
 
@@ -209,13 +364,16 @@ class IosBiometricVault(
      * 这也是为什么值一律在本函数调用期间由调用方持有。
      */
     private inline fun <T> withQuery(
-        extra: List<Pair<CFStringRef?, CFTypeRef?>>,
+        extra: List<Pair<CFStringRef?, CFTypeRef?>> = emptyList(),
+        accountRef: CFStringRef? = account,
         block: (CFDictionaryRef?) -> T,
     ): T = memScoped {
         val pairs = listOf(
             kSecClass to kSecClassGenericPassword,
             kSecAttrService to service,
-            kSecAttrAccount to account,
+            // 账号可换：`store` 那份"先写 staging 再提交到正式账号"的写法要用到第二个账号，
+            // 而两个账号才是这一层"写失败不丢旧凭据"的全部本钱。
+            kSecAttrAccount to accountRef,
         ) + extra
         val keys = allocArrayOf(*pairs.map { it.first }.toTypedArray())
         val values = allocArrayOf(*pairs.map { it.second }.toTypedArray())
@@ -237,6 +395,9 @@ class IosBiometricVault(
     private companion object {
         const val SERVICE = "com.lc33.tokenvault.biometric"
         const val ACCOUNT = "vault_bio"
+
+        /** 写入过程中用的账号，见 [store] 的"先 staging 再提交"。 */
+        const val ACCOUNT_STAGING = "vault_bio.staging"
     }
 }
 

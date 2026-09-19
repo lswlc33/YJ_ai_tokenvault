@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
  */
 class MemberViewModel constructor(
     private val settings: SettingsRepository,
+    private val failures: SettingsFailures,
 ) : ViewModel() {
 
     /** 当前是不是会员。权威在 `app_settings.member`，这里从同一条流派生（红线 31）。 */
@@ -29,11 +30,11 @@ class MemberViewModel constructor(
 
     /** 「限时免费」按钮：翻成会员。 */
     fun onPurchase() {
-        viewModelScope.launch { settings.setMember(true) }
+        viewModelScope.launch { failures.guard { settings.setMember(true) } }
     }
 
     /** 「取消」按钮：退回普通用户。 */
     fun onCancel() {
-        viewModelScope.launch { settings.setMember(false) }
+        viewModelScope.launch { failures.guard { settings.setMember(false) } }
     }
 }

@@ -4,6 +4,7 @@ import com.lc33.tokenvault.balance.BalanceParseException
 import com.lc33.tokenvault.balance.BalanceRegistry
 import com.lc33.tokenvault.balance.NewApiAdapter
 import com.lc33.tokenvault.crypto.KnownSecrets
+import com.lc33.tokenvault.crypto.Redactor
 import com.lc33.tokenvault.crypto.zeroize
 import com.lc33.tokenvault.domain.BalanceKind
 import com.lc33.tokenvault.domain.model.ApiKey
@@ -43,6 +44,8 @@ class BalanceEngine constructor(
     private val now: () -> Long,
     private val placeholders: Map<String, String>,
 ) {
+    /** 见 [rawOf]：跟着 [knownSecrets] 现读，不额外要一个构造参数。 */
+    private val redactor = Redactor(knownSecrets = knownSecrets::snapshot)
     suspend fun refreshAll(): Int {
         val allKeys = keys.observeAll().first()
         var refreshed = 0
@@ -83,8 +86,11 @@ class BalanceEngine constructor(
         }
 
         try {
+            // 校准只做一次：`quotaCalibrated` 是"这台设备上已经从 /api/status 读到过
+            // quota_per_unit"的记号。原来每次刷余额都先打一发 `/api/status` 再看结果，
+            // 于是"查一次余额"实际是两个请求——而第二发拿到的换算比永远和库里那份一样。
             val newApiAdapter = adapter as? NewApiAdapter
-            if (newApiAdapter != null) {
+            if (newApiAdapter != null && !settings.quotaCalibrated) {
                 val calibrated = tryCalibrate(newApiAdapter, settings, profile)
                 if (calibrated != null) {
                     effectiveSettings = settings.copy(quotaPerUnit = calibrated, quotaCalibrated = true)
@@ -120,7 +126,11 @@ class BalanceEngine constructor(
                     BalanceSnapshot(
                         amount = null,
                         currency = BalanceSnapshot.UNKNOWN_CURRENCY,
-                        raw = response.body,
+                        // 整段上游原文要进 `key_settings.balance_raw`、并且显示在余额详情的
+                        // 折叠区里（用户拿它跟上游页面对账）。原文里有什么是不受我们控制的：
+                        // new-api 系的接口出错时会把请求上下文连**访问令牌**一起回显，
+                        // 所以入库前必须过一遍脱敏（红线 32）并截断——原文可能是整页 HTML。
+                        raw = rawOf(response.body),
                         checkedAt = now(),
                         error = error.reason,
                     )
@@ -141,6 +151,26 @@ class BalanceEngine constructor(
         keys.reveal(keyId)
     } catch (_: Exception) {
         null
+    }
+
+    /**
+     * 上游原文进库前的处理：**截断 + 脱敏**。
+     *
+     * 脱敏器在这里现造而不是从 DI 传：`Redactor` 本身无状态，它的"记忆"全在
+     * [knownSecrets] 那份会话清单里（第一道按已知明文替换），而那份清单已经是单例。
+     * 为一个无状态对象再多要一个构造参数，换来的是同一件事有两个可能的来源。
+     *
+     * 顺序不能倒：先截断再脱敏会让被砍掉的尾巴里那半截令牌漏网，
+     * 先脱敏再截断则擦干净了才留下可读的头尾。
+     */
+    private fun rawOf(body: String?): String? {
+        if (body.isNullOrEmpty()) return null
+        val scrubbed = redactor.scrub(body)
+        return if (scrubbed.length <= MAX_RAW_CHARS) {
+            scrubbed
+        } else {
+            scrubbed.take(MAX_RAW_CHARS) + RAW_TRUNCATED_MARK
+        }
     }
     private fun withClientProfile(request: ProbeRequest, profile: ClientProfile?): ProbeRequest =
         request.copy(
@@ -179,6 +209,17 @@ class BalanceEngine constructor(
             "Accept" to "application/json",
             "Content-Type" to "application/json; charset=utf-8",
         )
+
+        /**
+         * `balance_raw` 的字符上限。上游错误页是一整页 HTML（几百 KB 不奇怪），而这一列
+         * 每把 Key 只留最新一份、显示在余额详情的折叠区里——留头 8 KB 足够看出"回的是
+         * HTML 而不是 JSON"，整页塞进库只会把表撑大、把详情页卡住。
+         */
+        const val MAX_RAW_CHARS = 8_000
+
+        /** 截断标记用英文：`balance_raw` 是上游原文那一栏的技术性内容，界面文案才走资源
+         *  （与 `net/HttpEngine` 的报文截断标记同一条约定）。 */
+        const val RAW_TRUNCATED_MARK = "…[truncated]"
     }
 
     private suspend fun auditBalance(

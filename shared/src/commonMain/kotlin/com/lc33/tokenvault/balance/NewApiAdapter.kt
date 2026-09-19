@@ -5,9 +5,11 @@ import com.lc33.tokenvault.domain.model.BalanceSnapshot
 import com.lc33.tokenvault.domain.model.KeySettings
 import com.lc33.tokenvault.endpoint.ProbeRequest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 
 /**
@@ -52,18 +54,25 @@ class NewApiAdapter(
         }
         val root = runCatching { json.parseToJsonElement(body).jsonObject }.getOrNull()
             ?: throw BalanceParseException(kind, "no_json")
-        val data = root["data"]?.jsonObject
+        // `as?` 而不是 `jsonObject` / `jsonPrimitive`：字段被回成字符串或对象时，那两个
+        // 访问器抛 IllegalArgumentException，绕开 BalanceParseException 的"只报字段名"通道。
+        val data = root["data"] as? JsonObject
             ?: throw BalanceParseException(kind, "missing_data")
 
-        val quota = data["quota"]?.jsonPrimitive?.longOrNull
+        // `longOrNull` 同样吃 `"226870"` 与 `226870` 两种写法。
+        val quota = (data["quota"] as? JsonPrimitive)?.longOrNull
             ?: throw BalanceParseException(kind, "missing_quota")
-        val usedQuota = data["used_quota"]?.jsonPrimitive?.longOrNull ?: 0L
+        val usedQuota = (data["used_quota"] as? JsonPrimitive)?.longOrNull ?: 0L
         val quotaPerUnit = providerQuotaPerUnit(data)
 
+        // 换算比是"多少 quota 等于 1 单位货币"，new-api 侧的约定值是 **500000**
+        // （即 1 美元 = 500000 quota，M0.5 在 Agent Router 与 JustDoWork 上都实测到同一个数），
+        // 所以这里是**除以**它而不是乘以某个魔法数。站点改了这个值就走
+        // [calibrateQuotaPerUnit] 校准，别在别处再写一遍 500000。
         val amount = quota.toDouble() / quotaPerUnit
         val used = usedQuota.toDouble() / quotaPerUnit
-        val currency = data["quota_display_type"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
-            ?: "USD"
+        val currency = (data["quota_display_type"] as? JsonPrimitive)?.contentOrNull
+            ?.takeIf { it.isNotBlank() } ?: "USD"
 
         return BalanceSnapshot(
             amount = amount,
@@ -81,12 +90,12 @@ class NewApiAdapter(
     fun calibrateQuotaPerUnit(statusBody: String): Double? {
         val root = runCatching { json.parseToJsonElement(statusBody).jsonObject }.getOrNull()
             ?: return null
-        return root["data"]?.jsonObject?.get("quota_per_unit")?.jsonPrimitive?.doubleOrNull
+        return ((root["data"] as? JsonObject)?.get("quota_per_unit") as? JsonPrimitive)?.doubleOrNull
     }
 
     /** 从 `/api/user/self` 的 data 里读 `quota_per_unit`（部分站会带，没带用默认）。 */
     private fun providerQuotaPerUnit(data: kotlinx.serialization.json.JsonObject): Double =
-        data["quota_per_unit"]?.jsonPrimitive?.doubleOrNull
+        (data["quota_per_unit"] as? JsonPrimitive)?.doubleOrNull
             ?: calibratedQuotaPerUnit?.takeIf { it > 0.0 }
             ?: BalanceKind.NEWAPI_DEFAULT_QUOTA_PER_UNIT
 

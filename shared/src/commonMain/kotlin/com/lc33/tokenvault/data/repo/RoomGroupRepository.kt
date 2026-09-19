@@ -27,7 +27,8 @@ class RoomGroupRepository constructor(
      * 于是"拖动排序"做出来之后老数据的顺序会突然全变。
      */
     override suspend fun add(name: String): Long {
-        val next = dao.findAll().size
+        // 排到最后只要一个数：`findAll()` 是把所有分组整行读回来只为数个数。
+        val next = dao.count()
         return dao.insert(Group(name = name.trim(), sortOrder = next).toEntity()).also { id ->
             audit.recordSafe(LogLevel.INFO, LogCategory.VAULT, "group added", "id=$id")
         }

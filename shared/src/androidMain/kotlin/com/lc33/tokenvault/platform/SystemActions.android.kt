@@ -23,7 +23,12 @@ actual fun openAppLocaleSettings() {
 }
 
 actual fun openExternalUrl(url: String) {
+    // Application Context 起 Activity **必须**带 NEW_TASK，否则系统直接抛
+    // `RuntimeException: ... must include FLAG_ACTIVITY_NEW_TASK`（runCatching 会把它
+    // 静默吞掉，表现就是"点了没反应"）。与上面 [openAppLocaleSettings] 同一条规矩。
     runCatching {
-        appContext.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        appContext.startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
     }
 }

@@ -51,7 +51,6 @@ import com.lc33.tokenvault.ui.shell.ProfileEditorRoute
 import com.lc33.tokenvault.ui.shell.ProfileListRoute
 import com.lc33.tokenvault.ui.shell.ProviderDetailRoute
 import com.lc33.tokenvault.ui.shell.ProviderEditorRoute
-import com.lc33.tokenvault.ui.shell.ProxyRoute
 import com.lc33.tokenvault.ui.shell.ProbeRunRoute
 import com.lc33.tokenvault.ui.shell.ProbeSettingsRoute
 import com.lc33.tokenvault.ui.shell.SecurityRoute
@@ -87,7 +86,6 @@ fun rememberVaultBackStack(): MutableList<VaultRoute> {
                     subclass(ProbeSettingsRoute::class)
                     subclass(BalanceThresholdsRoute::class)
                     subclass(ClientKeywordsRoute::class)
-                    subclass(ProxyRoute::class)
                     subclass(ProfileListRoute::class)
                     subclass(ProfileEditorRoute::class)
                     subclass(DataRoute::class)

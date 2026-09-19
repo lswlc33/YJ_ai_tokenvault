@@ -8,6 +8,8 @@ import com.lc33.tokenvault.di.platformModule
 import com.lc33.tokenvault.di.viewModelModule
 import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.platform.AutoLocker
+import com.lc33.tokenvault.platform.SecureClipboard
+import com.lc33.tokenvault.platform.VaultSession
 import com.lc33.tokenvault.ui.shell.AppRoot
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -27,10 +29,15 @@ import platform.UIKit.UIViewController
  * 首次调用时完成一次初始化（等价 Android 端 TokenVaultApp.onCreate）：
  * 启动 Koin、挂后台/前台通知驱动 [AutoLocker]、接进程级设置订阅、种内置预设。
  *
- * 能力边界（与 Android 端的差异，都记在 迁移计划.md）：
- * - 前台空闲锁定：Android 用 Activity.onUserInteraction 重置计时，iOS 没有
- *   等价的公开钩子（要 swizzle UIApplication.sendEvent），暂不生效；
- * - 屏幕关闭即锁定：iOS 没有对应广播，暂用"进后台"那条路兜底。
+ * 能力边界（与 Android 端的差异，都记在 迁移计划.md）。三条都由 `platform/PlatformCapabilities.kt`
+ * 那三个编译期能力位决定，界面上对应的行在 iOS 直接不画（做不到的不进界面，红线 19）：
+ * - 前台空闲锁定（`supportsIdleLock`）：Android 用 Activity.onUserInteraction 重置计时，iOS 没有
+ *   等价的公开钩子（要 swizzle UIApplication.sendEvent）。**这里因此不订阅 idleLock 设置**——
+ *   订了也没有重置方，表现是"进应用 30 秒必锁"，比不提供这一项更糟；
+ * - 屏幕关闭即锁定（`supportsLockOnScreenOff`）：iOS 没有对应广播，`AutoLocker.onScreenOff`
+ *   在这一端没有调用方；
+ * - 应用内语言入口（`supportsInAppLanguageSwitch`）：走系统「应用语言」设置，
+ *   切换后还要重启应用，所以外观页那一行在 iOS 不画。
  */
 private var appInitialized = false
 
@@ -50,6 +57,12 @@ private fun initIosApp() {
     val settings = koin.get<SettingsRepository>()
     val appScope = koin.get<CoroutineScope>(named(Qualifiers.APP_SCOPE))
 
+    // 剪贴板：锁定那一刻会话要顺手清它（§7.5），所以在这里绑一次；同时补做上次进程被杀
+    // 时没来得及执行的自动清除（Android 端 MainActivity.onCreate 同一件事）。
+    val clipboard = koin.get<SecureClipboard>()
+    koin.get<VaultSession>().bindClipboard(clipboard)
+    clipboard.recoverOverdueClear()
+
     // 切后台/回前台驱动自动锁定（§7.4）。等价 Android 端的 ProcessLifecycleOwner 观察者。
     val center = NSNotificationCenter.defaultCenter
     center.addObserverForName(UIApplicationDidEnterBackgroundNotification, `object` = null, queue = null) { _ ->
@@ -62,8 +75,10 @@ private fun initIosApp() {
     // 自动锁定时限接在进程级订阅上，不接在设置页的 ViewModel 上（同 Android 端的理由：
     // 那个 ViewModel 只在用户站在那一页时活着）。这几条只碰明文列，锁定态也能跑。
     appScope.launch { settings.observeAutoLockTimeout().collect { autoLocker.timeout = it } }
-    appScope.launch { settings.observeIdleLock().collect { autoLocker.idleLock = it } }
-    appScope.launch { settings.observeLockOnScreenOff().collect { autoLocker.lockOnScreenOff = it } }
+    // 「回前台补算一次离开多久」由 AutoLocker 用 sleep-aware 的墙钟差做（§7.4）：
+    // iOS 的 systemUptime 睡眠期间不前进，只认它的话这一档永远不生效。
+    // 「屏幕关闭即锁定」不订阅：iOS 拿不到独立的熄屏事件（见 supportsLockOnScreenOff），
+    // 设置项在该端已隐藏，这里不留一条永远不会生效的死订阅。
 
     // 内置客户端预设（§8.2）：幂等，只碰公开数据，锁定态也能跑。
     appScope.launch { koin.get<ProfileSeeder>().seed() }

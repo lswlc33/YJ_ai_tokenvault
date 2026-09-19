@@ -5,8 +5,8 @@ import com.lc33.tokenvault.domain.Protocol
 /**
  * 一次探测请求的**纯数据**描述（计划.md §8.1）。
  *
- * `endpoint/` 只产出这个，不碰任何 OkHttp 类型——协议构造与解析在 JVM 上用
- * `MockWebServer` 就能做真实测试。真正把它发出去的是 `net/OkHttpEngine`。
+ * `endpoint/` 只产出这个，不碰任何 Ktor/OkHttp 类型——协议构造与解析在 JVM 上用
+ * Mock 引擎就能做真实测试。真正把它发出去的是 `net/HttpEngine`。
  *
  * @param body 请求体。L1 的 `GET` 是 null；L2/L3 的极简推理调用是 JSON 字符串。
  *   **这里不区分秘密与非秘密**——密钥在 [headers] 里，它已经在 `CharArray` 层面被
@@ -17,7 +17,8 @@ data class ProbeRequest(
     val url: String,
 
     /**
-     * 有序头。**必须含 `User-Agent`**——不设时 OkHttp 会自带 `okhttp/4.x`，等于直接
+     * 有序头。**必须含 `User-Agent`**——不设时底层引擎会自带默认 UA（Android/JVM 的
+     * OkHttp 是 `okhttp/4.x`，iOS 的 Darwin 是 CFNetwork 那一串），等于直接
      * 告诉上游"我不是 AI 客户端"（§8.1）。鉴权头（`Authorization` / `x-api-key` /
      * `anthropic-version`）由协议构造代码控制，客户端预设不得覆盖（红线 22）。
      */
@@ -26,6 +27,16 @@ data class ProbeRequest(
 
     /** 这个请求服务于哪个协议。`net/` 层与嗅探靠它决定重试策略。 */
     val protocol: Protocol? = null,
+
+    /**
+     * 这一次请求的超时（毫秒），来自 `key.settings.timeoutSeconds`。
+     *
+     * null = 不特别指定，用引擎级兜底（§8.1 的 connect 8s / read 20s / call 35s）。
+     * 做成 per-request 而不是全局配置：超时是**这一把 Key 指向的那家站点有多慢**的属性，
+     * 同一台设备上一家自建 new-api（冷启动要 30s）与 DeepSeek（200ms）共用一个全局值，
+     * 就只能选"慢的那家能用、快的那家白等"。
+     */
+    val timeoutMs: Long? = null,
 )
 
 /**

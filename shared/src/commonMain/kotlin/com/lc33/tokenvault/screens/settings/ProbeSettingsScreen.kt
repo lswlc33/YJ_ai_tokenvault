@@ -18,12 +18,9 @@ import tokenvault.shared.generated.resources.probe_defaults_goto_manage
 import tokenvault.shared.generated.resources.probe_defaults_notice
 import tokenvault.shared.generated.resources.probe_keywords
 import tokenvault.shared.generated.resources.probe_keywords_summary
-import tokenvault.shared.generated.resources.probe_proxy
-import tokenvault.shared.generated.resources.probe_proxy_summary
 import tokenvault.shared.generated.resources.probe_section_client
 import tokenvault.shared.generated.resources.probe_section_cost
 import tokenvault.shared.generated.resources.probe_section_defaults
-import tokenvault.shared.generated.resources.probe_section_network
 import tokenvault.shared.generated.resources.probe_settings_title
 import tokenvault.shared.generated.resources.probe_sniff
 import tokenvault.shared.generated.resources.probe_sniff_summary
@@ -71,7 +68,6 @@ fun ProbeSettingsScreen(
     onOpenManage: () -> Unit,
     onEditThresholds: () -> Unit,
     onEditKeywords: () -> Unit,
-    onEditProxy: () -> Unit,
 ) {
     SettingsSubPage(titleRes = Res.string.probe_settings_title, onBack = onBack) {
         // 这一页最容易被误解的地方：级别开关不是总开关。所以说明放在最上面，
@@ -136,17 +132,6 @@ fun ProbeSettingsScreen(
                     title = stringResource(Res.string.probe_keywords),
                     summary = stringResource(Res.string.probe_keywords_summary),
                     onClick = onEditKeywords,
-                )
-            }
-        }
-
-        item { SectionTitle(text = stringResource(Res.string.probe_section_network)) }
-        item {
-            AppPreferenceGroup {
-                AppArrowRow(
-                    title = stringResource(Res.string.probe_proxy),
-                    summary = stringResource(Res.string.probe_proxy_summary),
-                    onClick = onEditProxy,
                 )
             }
         }

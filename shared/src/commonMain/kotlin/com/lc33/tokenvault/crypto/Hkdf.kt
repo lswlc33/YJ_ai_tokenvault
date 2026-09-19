@@ -24,6 +24,14 @@ object Hkdf {
     const val INFO_FINGERPRINT = "yuanji/fp/v1"
 
     /**
+     * 平台 DEK 身份校验（`boot.dekCheck`）子密钥的域标签。
+     *
+     * 刻意不复用 [INFO_FIELD]：校验密文与业务密文用同一把子密钥的话，
+     * dekCheck 就成了"能解开字段密文的证据"，多一层可被利用的等式。
+     */
+    const val INFO_DEK_CHECK = "yuanji/dekcheck/v1"
+
+    /**
      * 从 [masterKey] 派生一个 [length] 字节的子密钥。
      *
      * 不擦 [masterKey]：它是会话持有的 DEK，生命周期由 `VaultSession` 管（红线 6）。
@@ -38,4 +46,7 @@ object Hkdf {
     fun fieldKey(dek: ByteArray): ByteArray = derive(dek, INFO_FIELD)
 
     fun fingerprintKey(dek: ByteArray): ByteArray = derive(dek, INFO_FINGERPRINT)
+
+    /** 平台 DEK 路径身份校验用的子密钥，见 [INFO_DEK_CHECK]。 */
+    fun dekCheckKey(dek: ByteArray): ByteArray = derive(dek, INFO_DEK_CHECK)
 }

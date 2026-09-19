@@ -58,6 +58,9 @@ class KeyDetailViewModel constructor(
 
         /** 顶栏「探测这把 Key」已发出（有效性 / 模型列表 / 余额，各自看开关）。 */
         data object Probed : Event
+
+        /** 删除 / 移位这类本地写入失败了。不说一句"失败了"，用户只会以为按钮坏了。 */
+        data object WriteFailed : Event
     }
 
     private val _events = Channel<Event>(Channel.BUFFERED)
@@ -68,6 +71,8 @@ class KeyDetailViewModel constructor(
 
     private var revealedPlain: CharArray? = null
 
+    // Lazily 而不是 WhileSubscribed(5s)：退订会把这条流复位成 null，
+    // 于是"切后台再回来"的第一帧是整页加载，而动作函数读 `state.value` 会读到那个 null。
     val state: StateFlow<KeyDetailUiState?> = combine(
         keys.observeByProvider(providerId),
         models.observeByProvider(providerId),
@@ -89,7 +94,7 @@ class KeyDetailViewModel constructor(
             canMoveUp = position > 0,
             canMoveDown = position >= 0 && position < order.lastIndex,
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    }.stateIn(viewModelScope, SharingStarted.Lazily, null)
 
     init {
         viewModelScope.launch { recomputeMask() }
@@ -109,10 +114,13 @@ class KeyDetailViewModel constructor(
         if (probeEngine.probeKey(keyId)) _events.trySend(Event.Probed)
     }
 
-    /** 只拉模型列表（模型区那个刷新按钮）。结果由 Shell 层统一播报。 */
-    fun refreshModels() {
-        probeEngine.refreshModels(providerId, keyId)
-    }
+    /**
+     * 只拉模型列表（模型区那个刷新按钮）。结果由 Shell 层统一播报。
+     *
+     * 返回值给页面判断"这一句'正在刷新'该不该说"：引擎在跑别的轮 / 锁着的时候这一发
+     * 根本发不出去，无条件提示就成了"说了句没发生的事"。
+     */
+    fun refreshModels(): Boolean = probeEngine.refreshModels(providerId, keyId)
 
     /** 手动触发模型可达性探测。协议由引擎按 Chat → Anthropic 自己试，这里不需要知道。 */
     fun probeModel(modelId: String) {
@@ -186,22 +194,35 @@ class KeyDetailViewModel constructor(
     fun delete() {
         viewModelScope.launch {
             // 拿住撤销句柄再发事件：删除已经落库，提示消失前用户可以按"撤销"把它写回来。
-            val undo = keys.delete(keyId)
-            _events.trySend(Event.Deleted(undo))
+            // 失败（外键被别的表指着、库正忙）必须说：异常从协程里冒出去会直接崩应用。
+            runCatching { keys.delete(keyId) }
+                .onSuccess { undo -> _events.trySend(Event.Deleted(undo)) }
+                .onFailure { _events.trySend(Event.WriteFailed) }
         }
     }
 
+    /**
+     * 上移 / 下移一把 Key。
+     *
+     * **不读 [state]**：那条流在没有订阅者的瞬间是 null（切后台又回来的第一帧就是），
+     * 以前这里读到 null 就 `return@launch`，表现成"点了上移没反应"。而它要的 providerId
+     * 本来就是构造参数，没有理由绕道 UI 状态去取。
+     */
     private fun reorder(delta: Int) {
         viewModelScope.launch {
-            val current = state.value ?: return@launch
-            val providerId = current.key.providerId
-            val allKeys = keys.observeByProvider(providerId).first()
-            val ids = allKeys.sortedBy { it.sortOrder }.map { it.id }.toMutableList()
-            val index = ids.indexOf(keyId)
-            val target = index + delta
-            if (index < 0 || target < 0 || target >= ids.size) return@launch
-            ids[index] = ids[target].also { ids[target] = keyId }
-            keys.reorder(providerId, ids)
+            val result = runCatching {
+                val ids = keys.observeByProvider(providerId).first()
+                    .sortedBy { it.sortOrder }
+                    .map { it.id }
+                    .toMutableList()
+                val index = ids.indexOf(keyId)
+                val target = index + delta
+                if (index < 0 || target !in ids.indices) return@runCatching null
+                ids[index] = ids[target].also { ids[target] = keyId }
+                keys.reorder(providerId, ids)
+            }
+            // 越界（第一把还想上移）由页面用 canMoveUp/canMoveDown 挡住，这里只报写失败。
+            if (result.isFailure) _events.trySend(Event.WriteFailed)
         }
     }
 

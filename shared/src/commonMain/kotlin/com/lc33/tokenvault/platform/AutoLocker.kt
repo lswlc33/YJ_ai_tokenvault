@@ -16,24 +16,37 @@ import kotlinx.coroutines.launch
 /**
  * 自动锁定（§7.4）。
  *
- * 三条设计决定：
+ * 四条设计决定：
  *
  * 1. **切后台就起一个定时器，到点在后台真的锁掉**，而不是等用户回来再补锁。DEK 在内存里
  *    多待一秒就多一秒被 dump 的窗口，而"回来时再检查"对着一个已经被翻过的进程毫无意义。
  *    回到前台仍然再算一次，因为 Doze 与应用待机会把 [delay] 拖过时限。
- * 2. **时间用 `SystemClock.elapsedRealtime` 而不是墙上时间**（由调用方注入，红线 20）：
- *    用户改系统时间、或者跨过时区，都不该影响"离开了多久"。
+ * 2. **"离开了多久"要有两个时钟**（时间一律注入，红线 20）：注入的单调时钟给用户改系统时间、
+ *    跨时区都动不了它，但在 iOS 上它不含设备睡眠；墙钟含睡眠却改得动。两个一起看，
+ *    任一超时即锁（见 [sleepAwareElapsedMillis] 与下面第 4 条）。
  * 3. **锁定这件事要能被界面观察到**。[VaultSession] 刻意不暴露 `StateFlow`，所以这里补一个
  *    只带"锁了"这一个事实的 [locked]；`LockViewModel` 收到就清掉界面上所有明文状态并换树。
  *
- * 还没做的两条（都在 §7.4 里）：前台空闲计时（默认关闭，要在 `dispatchTouchEvent` 里重置，
- * 而且探测或备份进行中必须暂停它）、"屏幕关闭即锁定"。两条都要先有设置项落地。
+ * 4. **前台空闲锁定与"屏幕关闭即锁定"是平台能力，不是通用能力**：Android 有
+ *    `Activity.onUserInteraction` 与 `ACTION_SCREEN_OFF`，iOS 两个都没有（前者要 swizzle
+ *    `UIApplication.sendEvent`）。所以这两项由 [supportsIdleLock] / [supportsLockOnScreenOff]
+ *    决定进不进设置页，而这里再各自挡一道——**挡第二道是为了防"从 Android 备份恢复过来的
+ *    设置值"在 iOS 上真的生效**：那条 30 秒空闲计时在 iOS 没有重置方，表现是"进应用 30 秒
+ *    必锁"，比不实现更糟。
  */
 class AutoLocker(
     private val session: VaultSession,
     private val scope: CoroutineScope,
     /** 锁定发生时顺带通知（探测引擎要停，§7.4 / §8.5）。默认空，测试不传。 */
     private val onLock: () -> Unit = {},
+    /**
+     * 进后台那一次的墙上时刻（epoch 毫秒），给 [sleepAwareElapsedMillis] 用。
+     *
+     * 声明位置在 [elapsedRealtimeMs] **之前**不是随手排的：现有调用点与测试都用
+     * `AutoLocker(session, scope) { … }` 的尾随 lambda 形式，尾随 lambda 绑的是**最后一个**
+     * 参数，插到后面会把它悄悄换成另一个时钟，测试当场失真。
+     */
+    private val epochNowMs: () -> Long = { nowMillis() },
     private val elapsedRealtimeMs: () -> Long,
 ) : IdleLockSuspender {
 
@@ -87,6 +100,16 @@ class AutoLocker(
     val locked: SharedFlow<Unit> = _locked.asSharedFlow()
 
     private var backgroundedAtMs: Long? = null
+
+    /**
+     * 进后台那一次的墙上时刻，和 [backgroundedAtMs] 一起记、一起清。
+     *
+     * 为什么要两份：注入进来的 [elapsedRealtimeMs] 在 Android 上就是 elapsedRealtime（含睡眠），
+     * 而在 iOS 上来自 `systemUptime`（**睡眠不计时**）。同一个"离开多久"的判断，
+     * 一端对、一端错，所以回到前台时两个都问、任一超时即锁（详见 [sleepAwareElapsedMillis]）。
+     */
+    private var backgroundedAtEpochMs: Long? = null
+
     private var pending: Job? = null
 
     /** 前台空闲计时的挂起任务。null = 没起（关着 / 锁着 / 暂停中）。 */
@@ -109,6 +132,7 @@ class AutoLocker(
             if (!session.isUnlocked) return@withLock
             val after = timeout as? AutoLockTimeout.After ?: return@withLock
             backgroundedAtMs = elapsedRealtimeMs()
+            backgroundedAtEpochMs = epochNowMs()
             scheduleBackgroundLockLocked(after, backgroundedAtMs!!)
         }
     }
@@ -119,9 +143,19 @@ class AutoLocker(
             pending?.cancel()
             pending = null
             val since = backgroundedAtMs ?: return@withLock
+            val sinceEpoch = backgroundedAtEpochMs
             backgroundedAtMs = null
+            backgroundedAtEpochMs = null
             val after = timeout as? AutoLockTimeout.After ?: return@withLock
-            if (elapsedRealtimeMs() - since >= after.seconds * MILLIS_PER_SECOND) lockIfUnlocked()
+            val limit = after.seconds * MILLIS_PER_SECOND
+            // 两条时间各管一头：注入的单调时钟在 iOS 上不含睡眠（只认它 = 那条设置永远不生效），
+            // 墙钟在 Android 上会被用户改系统时间带跑（只认它 = 往前调一分钟就多一分钟豁免）。
+            // 任一超时即锁：这是"多锁一次"与"该锁没锁"之间的选择，选前者。
+            if (elapsedRealtimeMs() - since >= limit) {
+                lockIfUnlocked()
+            } else if (sinceEpoch != null && sleepAwareElapsedMillis(sinceEpoch) >= limit) {
+                lockIfUnlocked()
+            }
         }
     }
 
@@ -129,6 +163,7 @@ class AutoLocker(
     fun lockNow() {
         guard.withLock {
             backgroundedAtMs = null
+            backgroundedAtEpochMs = null
             pending?.cancel()
             pending = null
             lockIfUnlocked()
@@ -151,7 +186,9 @@ class AutoLocker(
     /** 屏幕关闭（`ACTION_SCREEN_OFF`）。开开关就当场锁，否则什么都不做。 */
     fun onScreenOff() {
         guard.withLock {
-            if (!lockOnScreenOff) return@withLock
+            // 能力位先挡一道：iOS 上既没有广播也没有设置入口，这一句是给"从 Android 恢复
+            // 过来的设置值"准备的——那台设备上没有重置计时的对手机制，直接照做就是假承诺。
+            if (!supportsLockOnScreenOff || !lockOnScreenOff) return@withLock
             lockIfUnlocked()
         }
     }
@@ -191,10 +228,13 @@ class AutoLocker(
         _locked.tryEmit(Unit)
     }
 
-    /** 重起前台空闲计时。调用方须持有 [guard]。开关关着 / 锁着 / 暂停中都不起。 */
+    /** 重起前台空闲计时。调用方须持有 [guard]。开关关着 / 锁着 / 暂停中 / 平台不支持都不起。 */
     private fun startIdleTimerLocked() {
         cancelIdleLocked()
         if (!idleLock || !session.isUnlocked || idlePausedCount > 0) return
+        // 能力位：见类注释第 4 条。iOS 上没有"用户摸了一下屏幕"的公开钩子，起了计时器
+        // 就是"进应用 30 秒必锁"，所以这一层直接不起计时，而不只是把设置页那一行藏掉。
+        if (!supportsIdleLock) return
         idleJob = scope.launch {
             delay(AutoLockPolicy.IDLE_LOCK_SECONDS * MILLIS_PER_SECOND)
             guard.withLock {

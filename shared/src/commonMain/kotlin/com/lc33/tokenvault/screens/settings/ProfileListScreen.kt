@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +41,9 @@ import com.lc33.tokenvault.ui.theme.LocalAppTokens
  * 能过闸的预设（Agent Router，而且只需要换 UA）。其余预设的头部集合来自社区观察、
  * 没有官方文档、随客户端升级漂移——这句话要能在页面上被看到，不能只写在计划里。
  *
+ * 内置与自定义**分两组各带自己的标题**：ViewModel 回的是全量表（它不该关心界面怎么分组），
+ * 都画在「预设」这一节下面的话，用户自己抓包导入的条目会被读成"官方给的又一条"。
+ *
  * @param defaultName 内置 `default` 那枚的本地化显示名（其余内置是品牌名、自定义是用户起的名字，
  *   都不需要本地化）。由调用方用 `stringResource` 取好传进来——本页读资源没问题，但
  *   把它当参数能让"显示名怎么定"这件事集中在一处（[displayName]）。
@@ -52,13 +56,24 @@ fun ProfileListScreen(
     onOpenProfile: (Long) -> Unit,
     onNewFromCurl: () -> Unit,
 ) {
+    // builtinKey 非空 = seed 种进来的内置预设；自定义的那一栏恒为 null。
+    val (builtin, custom) = profiles.partition { it.builtinKey != null }
     SettingsSubPage(titleRes = Res.string.settings_profiles, onBack = onBack) {
         item { DisclaimerCard() }
 
-        item { SectionTitle(text = stringResource(Res.string.profiles_section_builtin)) }
-        items(profiles.size) { index ->
-            val profile = profiles[index]
-            ProfileCard(profile, defaultName, onClick = { onOpenProfile(profile.id) })
+        if (builtin.isNotEmpty()) {
+            item { SectionTitle(text = stringResource(Res.string.profiles_section_builtin)) }
+            // 带 key 而不是 `items(size)`：列表是 Flow 推来的，删掉中间一条时按位置的
+            // 写法会让后面每一行都换个身份重组成，卡片状态（和动画）整个错位。
+            items(builtin, key = { it.id }) { profile ->
+                ProfileCard(profile, defaultName, onClick = { onOpenProfile(profile.id) })
+            }
+        }
+        if (custom.isNotEmpty()) {
+            item { SectionTitle(text = stringResource(Res.string.profiles_custom)) }
+            items(custom, key = { it.id }) { profile ->
+                ProfileCard(profile, defaultName, onClick = { onOpenProfile(profile.id) })
+            }
         }
 
         item { SectionTitle(text = stringResource(Res.string.profiles_section_add)) }
@@ -110,7 +125,7 @@ private fun ProfileCard(profile: ClientProfile, defaultName: String, onClick: ()
                 modifier = Modifier.weight(1f, fill = false),
             )
             if (profile.verified) AppChip(text = stringResource(Res.string.profiles_verified))
-            if (profile.builtinKey == null) AppChip(text = stringResource(Res.string.profiles_custom))
+            // 自定义不再打角标：分组标题已经说了它是哪一类，行内再标一次是同一件事画两遍。
         }
         AppText(
             text = profile.userAgent,

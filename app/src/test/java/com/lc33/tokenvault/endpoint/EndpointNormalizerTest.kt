@@ -61,6 +61,48 @@ class EndpointNormalizerTest {
         assertEquals("https://api.deepseek.com/v1/chat/completions", ds.byProtocol[Protocol.CHAT])
     }
 
+    /**
+     * 用户漏掉开头的 `/` 是常态（浏览器地址栏不需要它）。补齐而不是报错：错的只是
+     * 格式、意图明确；不补则拼出 `https://hostv1/...`——host 段被吃掉一截的 404。
+     */
+    @Test
+    fun `路径覆盖缺前导斜杠时自动补齐`() {
+        val ds = ok(
+            "https://api.deepseek.com/v1",
+            mapOf(Protocol.ANTHROPIC to "anthropic/v1/messages"),
+        )
+        assertEquals("https://api.deepseek.com/anthropic/v1/messages", ds.byProtocol[Protocol.ANTHROPIC])
+    }
+
+    /** 用户把**完整请求地址**当 API 请求地址贴进来——cURL 导入会剥后缀，手输也必须剥。 */
+    @Test
+    fun `完整 chat completions 地址当 base 输入时剥后缀`() {
+        val e = ok("https://host.example/v1/chat/completions")
+        assertEquals("https://host.example", e.apiRoot)
+        assertEquals("v1", e.ver)
+        assertEquals("https://host.example/v1/chat/completions", e.byProtocol[Protocol.CHAT])
+    }
+
+    @Test
+    fun `responses 与 messages 与 models 尾巴同样剥掉`() {
+        assertEquals(
+            "https://host.example",
+            ok("https://host.example/v1/responses").apiRoot,
+        )
+        val anthropic = ok("https://host.example/v1/messages")
+        assertEquals("https://host.example", anthropic.apiRoot)
+        assertEquals("https://host.example/v1/messages", anthropic.byProtocol[Protocol.ANTHROPIC])
+        assertEquals("https://host.example", ok("https://host.example/v1/models").apiRoot)
+    }
+
+    /** 只认已知尾巴，不做"凡末段像资源名就砍"的泛化：自建 `/api` 前缀必须原样留着。 */
+    @Test
+    fun `自建 api 前缀不被误剥`() {
+        val e = ok("http://192.168.1.9:3000/api")
+        assertEquals("http://192.168.1.9:3000/api", e.apiRoot)
+        assertEquals("http://192.168.1.9:3000/api/v1/chat/completions", e.byProtocol[Protocol.CHAT])
+    }
+
     @Test
     fun `无 scheme 补 https`() {
         val e = ok("api.deepseek.com/v1")

@@ -10,6 +10,12 @@ package com.lc33.tokenvault.domain
  * 保证不了"至少一张"，所以这一段必须有代码 + 有单测。
  *
  * 只做决策不做写入：写入是 DAO 在 `@Transaction` 里的事，而决策规则值得被单独测。
+ *
+ * **未接线：计划内功能。** v3 把"默认 Key"这一列整个去掉了（`MIGRATION_2_3`，排序本身
+ * 才是优先级，见 `RoomBackupStore.LEGACY_DEFAULT_FIRST`），于是这条不变量在生产里
+ * **没有调用点**——只有 `DefaultKeyPolicyTest` 在测它。留着是因为四个余额适配器那个
+ * 坑还在：等"每家的默认 Key"以别的形式回来（比如按排序首位取）时，规则要现成。
+ * 读代码时别把它当成活的链路。
  */
 object DefaultKeyPolicy {
 

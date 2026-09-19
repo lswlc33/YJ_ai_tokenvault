@@ -3,6 +3,7 @@ package com.lc33.tokenvault.screens.settings
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.runtime.Composable
@@ -53,6 +54,11 @@ fun SettingsSubPage(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
+                // 键盘弹起时把列表顶起来：二级设置页里带输入框的那几页（阈值、客户端关键字）
+                // 保存行就是列表的最后一项，不 imePadding 的话它正好被键盘盖住，
+                // 用户输完却找不到"保存"。edge-to-edge 之后 manifest 的 adjustResize 不再生效，
+                // 这一层是唯一的机会。页面自身不再另加 imePadding，不会双重抬高。
+                .imePadding()
                 .appTopBarScroll(scrollState),
             contentPadding = padding,
         ) {

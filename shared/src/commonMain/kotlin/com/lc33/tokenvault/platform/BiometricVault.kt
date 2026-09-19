@@ -74,6 +74,15 @@ sealed interface BiometricEnableOutcome {
     /** 这台设备现在用不了（没录指纹 / 硬件不可用）。 */
     data object Unavailable : BiometricEnableOutcome
 
+    /**
+     * 生物识别被系统临时锁住（连续验证失败太多次，iOS 的 `BiometryLockout`）。
+     *
+     * 单独一档而不是塞进 [Error] 的理由很实际：这一档**凭据没坏**，"重新启用一次"
+     * 既没必要也做不到（DEK 还没解锁）。用户要的是先用 PIN 解锁、过一会儿再来开，
+     * 而不是被引导去删掉一份完全正常的 Keychain 项。
+     */
+    data object LockedOut : BiometricEnableOutcome
+
     /** 其它错误。[message] 是系统给的文案，直接显示比我们自己编更准。 */
     data class Error(val message: String) : BiometricEnableOutcome
 }
@@ -94,5 +103,12 @@ sealed interface BiometricUnlockOutcome {
      */
     data object Invalidated : BiometricUnlockOutcome
 
+    /**
+     * 系统临时锁住生物识别（连续失败太多次）。**不能当成 [Invalidated] 处理**：
+     * 那样会把一份完全正常的凭据关掉，用户还得用 PIN 重新启用一次——凭空多一道损失。
+     */
+    data object LockedOut : BiometricUnlockOutcome
+
+    /** 其它错误。[message] 是系统给的文案，直接显示比我们自己编更准。 */
     data class Error(val message: String) : BiometricUnlockOutcome
 }

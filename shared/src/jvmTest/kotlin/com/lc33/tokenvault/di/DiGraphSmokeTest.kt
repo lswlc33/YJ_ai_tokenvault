@@ -25,13 +25,40 @@ import com.lc33.tokenvault.platform.AutoLocker
 import com.lc33.tokenvault.platform.BootStore
 import com.lc33.tokenvault.platform.SecureClipboard
 import com.lc33.tokenvault.platform.VaultSession
+import com.lc33.tokenvault.ui.shell.AppearanceViewModel
+import com.lc33.tokenvault.ui.shell.BalanceThresholdsViewModel
+import com.lc33.tokenvault.ui.shell.ClientKeywordsViewModel
+import com.lc33.tokenvault.ui.shell.DashboardViewModel
+import com.lc33.tokenvault.ui.shell.DataViewModel
+import com.lc33.tokenvault.ui.shell.ImportViewModel
+import com.lc33.tokenvault.ui.shell.KeyDetailViewModel
+import com.lc33.tokenvault.ui.shell.KeyEditorViewModel
+import com.lc33.tokenvault.ui.shell.LockViewModel
+import com.lc33.tokenvault.ui.shell.LogEntryViewModel
+import com.lc33.tokenvault.ui.shell.LogViewModel
+import com.lc33.tokenvault.ui.shell.ManageViewModel
+import com.lc33.tokenvault.ui.shell.MemberViewModel
+import com.lc33.tokenvault.ui.shell.ProfileEditorViewModel
+import com.lc33.tokenvault.ui.shell.ProfileListViewModel
+import com.lc33.tokenvault.ui.shell.ProbeRunViewModel
+import com.lc33.tokenvault.ui.shell.ProbeSettingsViewModel
+import com.lc33.tokenvault.ui.shell.ProviderDetailViewModel
+import com.lc33.tokenvault.ui.shell.ProviderEditorViewModel
+import com.lc33.tokenvault.ui.shell.SecurityViewModel
+import com.lc33.tokenvault.ui.shell.SyncViewModel
+import com.lc33.tokenvault.ui.shell.UpdateViewModel
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
 import org.koin.core.Koin
 import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
+import org.koin.core.parameter.parametersOf
 import org.koin.core.qualifier.named
 
 /**
@@ -53,6 +80,7 @@ class DiGraphSmokeTest {
     @AfterTest
     fun tearDown() {
         stopKoin()
+        Dispatchers.resetMain()
     }
 
     @Test
@@ -98,5 +126,58 @@ class DiGraphSmokeTest {
         assertNotNull(koin.get<ProbeEngine>())
         assertNotNull(koin.get<UpdateEngine>())
         assertNotNull(koin.get<Redactor>())
+    }
+
+    /**
+     * 全部 ViewModel 能被 Koin 解析。
+     *
+     * 单独一条测试、单独一次 startKoin：`viewModelModule` 必须一起装上图，
+     * 否则 23 个 `viewModelOf` 里任何一个构造参数对不上（少注册一个仓库、
+     * 类型写歪、新增依赖忘了进 coreModule）都要等到真机上点开那一页才炸。
+     * `:app:testDebugUnitTest` 抓不到这件事——那些测试全的手工 new ViewModel，
+     * 从不走 Koin，而这一条是唯一的机器防线。
+     *
+     * **Main 调度器必须先立起来**：`ViewModel.viewModelScope` 用的是
+     * `Dispatchers.Main.immediate`，JVM 上没有 Android 那个 Main，不 setMain 就是
+     * "Module with the Main dispatcher had failed to initialize"，测不到任何真问题。
+     *
+     * 这里刻意用 [StandardTestDispatcher] 而且**从不推进它的调度器**：`stateIn(Eagerly)`
+     * 与 `init { launch { … } }` 因此只是排队、不执行，构造完就停。这样既验证了
+     * 类型解析（本测试唯一的目的），又不会真去开 Room、在 ~/.tokenvault 落下业务数据。
+     */
+    @Test
+    fun `全部 ViewModel 能被 Koin 解析`() {
+        Dispatchers.setMain(StandardTestDispatcher())
+        koin = startKoin {
+            modules(platformModule, coreModule, viewModelModule)
+        }.koin
+
+        // 无路由参数的：整张图只靠 single 就能起来
+        assertNotNull(koin.get<AppearanceViewModel>())
+        assertNotNull(koin.get<BalanceThresholdsViewModel>())
+        assertNotNull(koin.get<ClientKeywordsViewModel>())
+        assertNotNull(koin.get<DashboardViewModel>())
+        assertNotNull(koin.get<DataViewModel>())
+        assertNotNull(koin.get<LockViewModel>())
+        assertNotNull(koin.get<LogViewModel>())
+        assertNotNull(koin.get<ManageViewModel>())
+        assertNotNull(koin.get<MemberViewModel>())
+        assertNotNull(koin.get<ProbeRunViewModel>())
+        assertNotNull(koin.get<ProbeSettingsViewModel>())
+        assertNotNull(koin.get<ProfileListViewModel>())
+        assertNotNull(koin.get<SecurityViewModel>())
+        assertNotNull(koin.get<SyncViewModel>())
+        assertNotNull(koin.get<UpdateViewModel>())
+
+        // 带路由参数的：id 与"默认名模板"由调用方以 parametersOf 传入，
+        // 这里的值只用于把构造走通（不查库，所以 1L 这种假 id 无副作用）。
+        val labelTemplate: (Int) -> String = { n -> "label-$n" }
+        assertNotNull(koin.get<ImportViewModel> { parametersOf(1L) })
+        assertNotNull(koin.get<KeyDetailViewModel> { parametersOf(1L, 2L) })
+        assertNotNull(koin.get<KeyEditorViewModel> { parametersOf(1L, 2L, labelTemplate) })
+        assertNotNull(koin.get<LogEntryViewModel> { parametersOf(1L) })
+        assertNotNull(koin.get<ProfileEditorViewModel> { parametersOf(1L) })
+        assertNotNull(koin.get<ProviderDetailViewModel> { parametersOf(1L) })
+        assertNotNull(koin.get<ProviderEditorViewModel> { parametersOf(1L, labelTemplate) })
     }
 }

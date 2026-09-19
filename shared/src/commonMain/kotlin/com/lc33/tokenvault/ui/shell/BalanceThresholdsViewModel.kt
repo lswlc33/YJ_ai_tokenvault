@@ -3,8 +3,13 @@ package com.lc33.tokenvault.ui.shell
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lc33.tokenvault.domain.repo.SettingsRepository
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -21,6 +26,7 @@ import kotlinx.coroutines.launch
  */
 class BalanceThresholdsViewModel constructor(
     private val settings: SettingsRepository,
+    private val failures: SettingsFailures,
 ) : ViewModel() {
 
     /**
@@ -34,10 +40,20 @@ class BalanceThresholdsViewModel constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /**
+     * 写库成功。**由这里发、页面收到才退回**：以前是先回"已保存"再异步写库，
+     * 写失败时用户已经离开这一页，而阈值还是旧的（下次低额判断就用错了线）。
+     */
+    private val _saved = MutableSharedFlow<Unit>(
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    val saved: SharedFlow<Unit> = _saved.asSharedFlow()
+
+    /**
      * 保存。解析两个输入框 → 校验（非负数字）→ 写库。
      *
      * 校验失败返回 [SaveResult.Invalid]，调用方据此在对应输入框下提示，而不是弹窗。
-     * 成功返回 [SaveResult.Saved]，调用方据此返回上一页。
+     * 校验通过返回 [SaveResult.Accepted]：**这只表示写入已发起**，退出这一页要等 [saved]。
      */
     fun save(usdText: String, cnyText: String): SaveResult {
         val usd = usdText.trim().toDoubleOrNull()
@@ -46,14 +62,18 @@ class BalanceThresholdsViewModel constructor(
             return SaveResult.Invalid
         }
         viewModelScope.launch {
-            settings.setBalanceThresholds(mapOf("USD" to usd, "CNY" to cny))
+            runCatching { settings.setBalanceThresholds(mapOf("USD" to usd, "CNY" to cny)) }
+                .onSuccess { _saved.tryEmit(Unit) }
+                // 写不进去时这一页留在原地（不会退回），另由 SettingsFailures 报一条提示。
+                .onFailure { failures.report() }
         }
-        return SaveResult.Saved
+        return SaveResult.Accepted
     }
 
     /** 保存结果。 */
     sealed interface SaveResult {
-        data object Saved : SaveResult
+        /** 校验通过，写入已在路上；落库成功由 [saved] 说。 */
+        data object Accepted : SaveResult
         data object Invalid : SaveResult
     }
 }

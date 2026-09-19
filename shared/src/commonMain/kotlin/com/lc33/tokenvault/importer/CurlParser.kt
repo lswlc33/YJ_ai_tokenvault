@@ -8,8 +8,12 @@ package com.lc33.tokenvault.importer
  *
  * 三条职责（§8.2）：
  * 1. 解析 `-H/--header`、`-A/--user-agent`、`-X/--request`、`-d/--data/--data-raw/--data-binary`、
- *    `--compressed`。
- * 2. 处理续行（`\` 与 Windows 的 `^`）、单双引号、`$'…'` 转义形式。
+ *    `--compressed`。长选项的等号写法（`--header=X`）与值粘在短选项后面的写法
+ *    （`-XPOST`、`-d{...}`）都先拆成"选项 + 值"两个 token 再走同一套分支。
+ * 2. 处理续行（`\` 与 Windows 的 `^`）、单双引号、`$'…'` 转义形式。`$'…'` 是 Bash 的
+ *    ANSI-C quoting，Fiddler / mitmproxy 的"Copy as cURL"会把整段 raw request 塞进去
+ *    （`$'POST /x HTTP/1.1\r\nHost: …'`），所以**转义还原在 tokenize 这一层做**——
+ *    外壳在那里就被剥掉了，等到 parseHeader 已经无从判断哪些反斜杠本来是转义。
  * 3. **自动剔除** `Authorization` / `x-api-key` / `cookie` / `content-length` / `host` /
  *    `connection` / `accept-encoding`（这几个由代码或 OkHttp 接管），并在结果里明确告知
  *    剔除了哪些，供预览页展示。
@@ -32,9 +36,29 @@ object CurlParser {
         "stream", "temperature", "top_p", "system",
     )
 
+    /**
+     * 允许"等号传值 / 值直接粘在选项后"的选项名，只列解析器真吃得下的那些。
+     * 其余选项（`--compressed`、`-s`、`--data-urlencode`）本来就该整 token 放过，
+     * 拆它们只会把 URL 的 query 与不认识的值搅进解析结果。
+     */
+    private val INLINE_OPTIONS = setOf(
+        "-H", "--header", "-A", "--user-agent", "-X", "--request",
+        "-d", "--data", "--data-raw", "--data-binary",
+    )
+
+    /** `$'…'` 里认得的转义（Bash ANSI-C quoting 的常用子集）。认不出的原样保留反斜杠。 */
+    private val ANSI_C_ESCAPES = mapOf(
+        'n' to '\n',
+        't' to '\t',
+        'r' to '\r',
+        '\\' to '\\',
+        '\'' to '\'',
+        '"' to '"',
+    )
+
     fun parse(text: String): CurlResult {
         val normalized = normalizeMarkdownLinks(text)
-        val tokens = tokenize(normalized)
+        val tokens = expandInlineOptions(tokenize(normalized))
         val headers = mutableListOf<Pair<String, String>>()
         var userAgent: String? = null
         var method: String? = null
@@ -55,11 +79,17 @@ object CurlParser {
                     i += 2
                 }
                 tok == "-X" || tok == "--request" -> {
-                    method = tokens.getOrNull(i + 1)
+                    // 统一大写：curl 允许 `-X post`，而下游（预设落库 / 预览展示）比较的是
+                    // `POST`。留着小写就成了"同一条命令两次解析结果不一样"的隐形差异。
+                    method = tokens.getOrNull(i + 1)?.uppercase()
                     i += 2
                 }
                 tok == "-d" || tok == "--data" || tok == "--data-raw" || tok == "--data-binary" -> {
-                    dataBody = tokens.getOrNull(i + 1)
+                    val raw = tokens.getOrNull(i + 1) ?: break
+                    // **拼接而不是覆盖**：curl 自己的语义就是把多个 `-d` 用 `&` 串成同一个
+                    // body（`-d a=1 -d b=2` → `a=1&b=2`）。旧实现后一条吃掉前一条，
+                    // 分段导出的 raw request 就只剩最后一段，bodyPatch 跟着缺字段。
+                    dataBody = dataBody?.let { "$it&$raw" } ?: raw
                     i += 2
                 }
                 tok == "--compressed" -> i += 1
@@ -161,10 +191,24 @@ object CurlParser {
                     }
                 }
                 dollarQuote -> {
-                    if (ch == '\'') {
-                        dollarQuote = false
-                    } else {
-                        current.append(ch)
+                    // ANSI-C quoting：**在这里**把 `\n` / `\t` 等还原成真字符。
+                    // `$'…'` 的外壳被剥掉之后，token 里已经不再有"这是带转义的引号串"的
+                    // 痕迹，`unescapeShell` 那层事后补不回来（曾经的漏网：Fiddler 风格
+                    // `$'POST /x HTTP/1.1\r\nHost: …'` 整段原样落进 body，`\r\n` 还是两个字面字符）。
+                    when {
+                        ch == '\'' -> dollarQuote = false
+                        ch == '\\' && i + 1 < joined.length -> {
+                            val unescaped = ANSI_C_ESCAPES[joined[i + 1]]
+                            if (unescaped != null) {
+                                current.append(unescaped)
+                                i++ // 反斜杠吃掉下一个字符
+                            } else {
+                                // 认不出的转义**原样保留**（含反斜杠）：猜语义不如不猜，
+                                // Windows 路径 `C:\a` 这类字面反斜杠才不会凭空消失。
+                                current.append(ch)
+                            }
+                        }
+                        else -> current.append(ch)
                     }
                 }
                 // `$'…'`：`$` 后紧跟 `'` 才是一对（避免把普通 `$` 误判成引号）
@@ -192,15 +236,47 @@ object CurlParser {
             i++
         }
         if (inToken) tokens += current.toString()
+        // 引号没闭合（`$'…` 少了收尾的 `'`）时上面的循环会把 dollarQuote 留成 true。
+        // 结果照原样吐出去即可——半截命令比崩掉更有用，预览页会显示解析出来的那部分。
 
         return tokens
     }
 
     /**
+     * 把"值粘在选项里"的两种写法拆成两个 token：
+     * - 长选项的等号形式：`--header=x-app: cli` → `--header`, `x-app: cli`。
+     * - 短选项直接跟值：`-XPOST` → `-X`, `POST`；`-d{...}` → `-d`, `{...}`。
+     *
+     * 只认 [INLINE_OPTIONS] 里的那些选项名，其余带 `=` 或短横线的 token 原样放过——
+     * URL 的 query（`?a=1`）与 `--data-urlencode` 都不该被动过。
+     */
+    private fun expandInlineOptions(tokens: List<String>): List<String> {
+        val out = ArrayList<String>(tokens.size)
+        for (tok in tokens) {
+            val eq = tok.indexOf('=')
+            val longName = if (tok.startsWith("--") && eq > 0) tok.substring(0, eq) else null
+            val shortName = if (tok.length > 2 && tok[0] == '-' && tok[1] != '-') tok.substring(0, 2) else null
+            when {
+                longName != null && longName in INLINE_OPTIONS -> {
+                    out += longName
+                    out += tok.substring(eq + 1)
+                }
+                shortName != null && shortName in INLINE_OPTIONS && tok.length > 2 -> {
+                    out += shortName
+                    out += tok.substring(2)
+                }
+                else -> out += tok
+            }
+        }
+        return out
+    }
+
+    /**
      * 解析一个 `-H` 的参数为 (key, value)。
      *
-     * 处理 `$'…'` 转义形式（Bash 的 ANSI-C quoting，如 `$'x-app: cli'`）：剥掉 `$''` 外壳，
-     * 再还原 `\n` / `\t` 等转义。普通形式按第一个 `:` 切分，`key` 与 `value` 都去空白。
+     * 普通形式按第一个 `:` 切分，`key` 与 `value` 都去空白。`$'…'` 的转义**正常情况下
+     * 已在 tokenize 还原**；这里再走一遍 [unescapeShell] 只为覆盖"外壳被另一层引号保住"
+     * 的写法（`-H "$'x-app: cli'"`），那种 token 里确实还带着 `$'` 字面量。
      */
     private fun parseHeader(raw: String): Pair<String, String> {
         val body = unescapeShell(raw)
@@ -209,7 +285,12 @@ object CurlParser {
         return body.substring(0, colon).trim() to body.substring(colon + 1).trim()
     }
 
-    /** 剥掉 `$'…'` 外壳并还原常见转义。 */
+    /**
+     * 剥掉 `$'…'` 外壳并还原常见转义。
+     *
+     * 注意与 [tokenize] 的分工：正常路径上 `$'…'` 的外壳与转义都在 tokenize 处理掉了
+     * （那里才知道引号到底哪一对），这个函数只是上面注释里那种"外层还有一对引号"的补漏。
+     */
     private fun unescapeShell(raw: String): String {
         var s = raw.trim()
         if (s.startsWith("$'") && s.endsWith("'")) {

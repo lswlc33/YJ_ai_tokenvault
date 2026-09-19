@@ -7,9 +7,11 @@ import com.lc33.tokenvault.backup.BackupKeySettings
 import com.lc33.tokenvault.backup.BackupItemCounts
 import com.lc33.tokenvault.backup.BackupPayload
 import com.lc33.tokenvault.backup.BackupProvider
+import com.lc33.tokenvault.backup.BackupSetting
 import com.lc33.tokenvault.backup.BackupStore
 import com.lc33.tokenvault.backup.gunzip
 import com.lc33.tokenvault.backup.gzip
+import com.lc33.tokenvault.backup.requireMatchingBackupVersions
 import com.lc33.tokenvault.crypto.KdfParams
 import com.lc33.tokenvault.crypto.RandomBytes
 import com.lc33.tokenvault.domain.model.LogCategory
@@ -77,6 +79,16 @@ class BackupEngine constructor(
             clientProfiles = snapshot.clientProfiles,
             appSettings = snapshot.appSettings,
         )
+        // 坏密文的行在 `readSnapshot` 里被跳过了（导出仍然成功），这里补一条 WARN：
+        // 少了哪几行必须查得到，否则"备份成功"是在骗人。只有表名与行号，没有任何值。
+        if (snapshot.skippedRows.isNotEmpty()) {
+            audit.record(
+                level = LogLevel.WARN,
+                category = LogCategory.BACKUP,
+                message = "backup skipped unreadable rows",
+                detail = "rows=${snapshot.skippedRows.joinToString(",")}",
+            )
+        }
         val payloadJson = json.encodeToString(BackupPayload.serializer(), payload).encodeToByteArray()
         val compressed = gzip(payloadJson)
 
@@ -161,6 +173,20 @@ class BackupEngine constructor(
             )
             throw BackupCorruptException("bad payload json")
         }
+        // header 与 payload 里的版本号必须对得上：两者一个在明文区、一个在密文区，
+        // 能被独立改写成两套含义。不一致就在**写库之前**挡掉（红线 9），
+        // 而不是按 header 选了解析器、却用 payload 那套字段往库里搬。
+        try {
+            requireMatchingBackupVersions(decoded.header, payload)
+        } catch (t: Throwable) {
+            audit.record(
+                level = LogLevel.ERROR,
+                category = LogCategory.BACKUP,
+                message = "restore backup version mismatch",
+                detail = t.message,
+            )
+            throw t
+        }
 
         // 整个恢复（清空 + 导入）在单个事务里：中途失败不能留半库（覆盖模式尤其如此）。
         return store.inTransaction {
@@ -178,7 +204,7 @@ class BackupEngine constructor(
 
         var imported = 0
         for (provider in payload.providers) {
-            val ref = provider.name to provider.apiRoot
+            val ref = ProviderRef.of(provider)
             val existingId = if (mode != RestoreMode.OVERWRITE) {
                 store.findProviderId(provider.name, provider.apiRoot)
             } else {
@@ -206,23 +232,50 @@ class BackupEngine constructor(
         }
     }
 
+    /**
+     * 包里的一条子记录归属哪一家供应商。
+     *
+     * 新包按 [BackupProvider.ref]（包内唯一）精确匹配。老包没有这一项，只能退回
+     * `name + apiRoot` 配对——那正是"同名同 apiRoot 的两家互相镜像对方的 Key"的来源，
+     * 但旧包必须还能恢复，所以这条兜底留着，只对老包生效。
+     */
+    private data class ProviderRef(val name: String, val apiRoot: String, val ref: String?) {
+
+        fun matches(childName: String, childApiRoot: String, childRef: String?): Boolean =
+            if (ref != null) {
+                childRef == ref
+            } else {
+                childName == name && childApiRoot == apiRoot
+            }
+
+        companion object {
+            fun of(provider: BackupProvider): ProviderRef =
+                ProviderRef(provider.name, provider.apiRoot, provider.ref)
+        }
+    }
+
     private suspend fun restoreKeys(
         payload: BackupPayload,
-        ref: Pair<String, String>,
+        ref: ProviderRef,
         providerId: Long,
         mode: RestoreMode,
         provider: BackupProvider,
         profileIdByKey: Map<String, Long>,
     ): Map<String, Long> {
         val keyIdsBySecret = mutableMapOf<String, Long>()
-        for (key in payload.apiKeys.filter { it.providerName to it.providerApiRoot == ref }) {
+        for (key in payload.apiKeys.filter {
+            ref.matches(it.providerName, it.providerApiRoot, it.providerRef)
+        }
+        ) {
             // 合并 / 仅新增：按重算后的指纹去重（§12.1 指纹在导入端重算）
             if (mode != RestoreMode.OVERWRITE && store.keyExists(providerId, key.secret)) {
                 store.findKeyId(providerId, key.secret)?.let { keyIdsBySecret[key.secret] = it }
                 continue
             }
             val profileKey = key.settings?.clientProfileKey ?: provider.clientProfileKey
-            val profileId = profileKey?.let { profileIdByKey[it] }
+            // 未改动的内置预设不进包（红线 4），所以包里的引用查不到条目：那要去**库里**找，
+            // `ProfileSeeder` 每次启动都会把它种好。查不到就当没绑，绝不能顺手插一条空的。
+            val profileId = profileKey?.let { profileIdByKey[it] ?: store.findProfileId(it) }
             val restoredKey = if (key.settings == null) {
                 key.copy(settings = legacySettings(provider))
             } else {
@@ -261,11 +314,14 @@ class BackupEngine constructor(
     )
     private suspend fun restoreAccounts(
         payload: BackupPayload,
-        ref: Pair<String, String>,
+        ref: ProviderRef,
         providerId: Long,
         mode: RestoreMode,
     ) {
-        for (account in payload.providerAccounts.filter { it.providerName to it.providerApiRoot == ref }) {
+        for (account in payload.providerAccounts.filter {
+            ref.matches(it.providerName, it.providerApiRoot, it.providerRef)
+        }
+        ) {
             if (mode != RestoreMode.OVERWRITE && store.accountExists(providerId, account.username)) {
                 continue
             }
@@ -275,12 +331,15 @@ class BackupEngine constructor(
 
     private suspend fun restoreModels(
         payload: BackupPayload,
-        ref: Pair<String, String>,
+        ref: ProviderRef,
         providerId: Long,
         mode: RestoreMode,
         keyIdsBySecret: Map<String, Long>,
     ) {
-        for (model in payload.models.filter { it.providerName to it.providerApiRoot == ref }) {
+        for (model in payload.models.filter {
+            ref.matches(it.providerName, it.providerApiRoot, it.providerRef)
+        }
+        ) {
             val keyId = if (model.keySecret == null) {
                 store.findKeyId(providerId, null) ?: continue
             } else {
@@ -295,10 +354,21 @@ class BackupEngine constructor(
         }
     }
 
-    private suspend fun restoreSettings(settings: List<com.lc33.tokenvault.backup.BackupSetting>, mode: RestoreMode) {
+    /**
+     * 设置合并。**两列都要比**：加密项（WebDAV 用户名 / 密码）落在 `valueBlob` 上、
+     * `value` 是 null，只看 `value` 会把"本机已经有密文"当成"这一项还没有"，
+     * 于是合并恢复把凭据覆盖成空。
+     */
+    private suspend fun restoreSettings(settings: List<BackupSetting>, mode: RestoreMode) {
         for (setting in settings) {
-            if (mode != RestoreMode.OVERWRITE && store.findSetting(setting.key) != null) continue
-            store.putSetting(setting.key, setting.value)
+            if (mode != RestoreMode.OVERWRITE) {
+                val existing = store.findSetting(setting.key)
+                // 本机这一项只要有任何一列有值就保留本机（合并=不覆盖已有），
+                // 只有"整行是空的"或压根没有这一行才从包里补。
+                if (existing != null && existing.isSet) continue
+                if (existing != null && existing.sameValueAs(setting)) continue
+            }
+            store.putSetting(setting)
         }
     }
 }

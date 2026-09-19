@@ -42,6 +42,25 @@ enum class PinError {
 
     /** PIN 不对（解锁）。 */
     Wrong,
+
+    /**
+     * 生物识别被系统暂时锁住（连续验证失败太多次）。
+     *
+     * 单独一档而不是并进"PIN 错误"：这一次用户没碰 PIN，说他的 PIN 错了是假话；
+     * 而它也不是"凭据失效"（那样要引导他重开一次，其实只要等几分钟）。
+     */
+    BiometryLockedOut,
+
+    /** 生物识别这条路本身没走通（系统弹窗起不来、取回的 DEK 不是本库那把）。 */
+    BiometryFailed,
+
+    /**
+     * boot 文件写不进去（损坏、或并发写冲突）。
+     *
+     * 界面必须说这一句而不是静默弹回：这一档的表现是"我按了、看起来什么都没发生"，
+     * 而它恰恰意味着"什么都**没有**被改动"——用户需要知道现在还不能靠这个开关。
+     */
+    BootWriteFailed,
 }
 
 /** 改 PIN 的三步。顺序即流程。 */
@@ -135,4 +154,11 @@ data class LockCallbacks(
     // ---- BootCorrupt（红线 26）：只有这两个出口，没有第三条路
     val onRestoreFromBackup: () -> Unit = {},
     val onWipeAndStartOver: () -> Unit = {},
+
+    /**
+     * 「从备份恢复」这一条走得通吗。默认 false：恢复要先能选文件（SAF），那一半还没落地。
+     * 页面据此把它画成禁用态并说明原因——留一个点了没反应的出口，等于把用户推向
+     * 另一个出口（清空全部数据）。
+     */
+    val restoreFromBackupEnabled: Boolean = false,
 )

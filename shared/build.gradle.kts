@@ -121,7 +121,7 @@ kotlin {
             // backup/ 的 gzip（GzipSink/GzipSource 全 KMP，native 走 zlib）。
             implementation(libs.okio)
             // Ktor Client（阶段2 OkHttp→Ktor）：net/ 层的 HTTP 引擎。
-            // 用 `api` 而不是 `implementation`：HttpEngine / ProxyProvider 的公开构造签名里
+            // 用 `api` 而不是 `implementation`：HttpEngine / WebDavClient 的公开构造签名里
             // 有 io.ktor.client.HttpClient，:app 需要能看见它。
             api(libs.ktor.client.core)
 
@@ -190,6 +190,9 @@ kotlin {
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.ktor.client.mock)
+            // HostGate 的间隔语义要"睡多久"可断言：只有 runTest 的虚拟时间能让
+            // delay 不真睡、放行时刻精确可查（net/HttpEngineTest 用它测门闸排队）。
+            implementation(libs.kotlinx.coroutines.test)
         }
     }
 }

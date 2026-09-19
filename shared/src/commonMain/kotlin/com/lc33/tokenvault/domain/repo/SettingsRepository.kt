@@ -2,6 +2,7 @@ package com.lc33.tokenvault.domain.repo
 
 import com.lc33.tokenvault.domain.AutoLockTimeout
 import com.lc33.tokenvault.domain.DefaultProbeSettings
+import com.lc33.tokenvault.domain.model.LastBackup
 import com.lc33.tokenvault.domain.model.LogLevel
 import com.lc33.tokenvault.domain.model.LogRetention
 import com.lc33.tokenvault.domain.model.PredictiveBackExitDirection
@@ -80,15 +81,6 @@ interface SettingsRepository {
     fun observeClientKeywords(): Flow<List<String>>
 
     suspend fun setClientKeywords(keywords: List<String>)
-
-    /**
-     * 手动 HTTP 代理（§7.5、§13.4 探测设置页）。`host:port` 字符串，空 = 走系统代理。
-     *
-     * 代理对国内用户是刚需（访问 GitHub、被墙的中转站）。**没写过时发空串**（系统代理）。
-     */
-    fun observeProxy(): Flow<String>
-
-    suspend fun setProxy(hostPort: String)
 
     /**
      * 客户端嗅探开关（§8.2、§13.4 探测设置页）。
@@ -176,4 +168,14 @@ interface SettingsRepository {
     fun observeMember(): Flow<Boolean>
 
     suspend fun setMember(enabled: Boolean)
+
+    /**
+     * 最近一次**成功**备份（时间 + 落点）。null = 这台机器上从来没成功备份过。
+     *
+     * 存在的理由：同步页那张状态卡以前只活在 ViewModel 里，退页即丢，"上次备份"于是
+     * 永远写着"还没有备份"，与远端真有包这件事对不上。
+     */
+    fun observeLastBackup(): Flow<LastBackup?>
+
+    suspend fun setLastBackup(backup: LastBackup)
 }

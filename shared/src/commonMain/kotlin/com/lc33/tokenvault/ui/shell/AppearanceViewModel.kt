@@ -29,6 +29,7 @@ import kotlinx.coroutines.launch
 class AppearanceViewModel constructor(
     private val bootStore: BootStore,
     private val settings: SettingsRepository,
+    private val failures: SettingsFailures,
 ) : ViewModel() {
 
     val colorScheme: StateFlow<AppColorSchemeMode> = bootStore.revision
@@ -48,16 +49,18 @@ class AppearanceViewModel constructor(
         settings.observePredictiveBackExitDirection()
             .stateIn(viewModelScope, SharingStarted.Eagerly, PredictiveBackExitDirection.AlwaysRight)
 
+    // 三处写入都过 SettingsFailures.guard：写库异常冒出协程就是崩应用，而
+    // "开关翻过去了、重启又回原样"必须由提示说出来，不能让用户自己猜。
     fun onBlurNavBarChange(enabled: Boolean) {
-        viewModelScope.launch { settings.setBlurNavBar(enabled) }
+        viewModelScope.launch { failures.guard { settings.setBlurNavBar(enabled) } }
     }
 
     fun onPredictiveBackStyleChange(style: PredictiveBackStyle) {
-        viewModelScope.launch { settings.setPredictiveBackStyle(style) }
+        viewModelScope.launch { failures.guard { settings.setPredictiveBackStyle(style) } }
     }
 
     fun onPredictiveBackExitDirectionChange(direction: PredictiveBackExitDirection) {
-        viewModelScope.launch { settings.setPredictiveBackExitDirection(direction) }
+        viewModelScope.launch { failures.guard { settings.setPredictiveBackExitDirection(direction) } }
     }
 
     private fun readColorScheme(): AppColorSchemeMode {

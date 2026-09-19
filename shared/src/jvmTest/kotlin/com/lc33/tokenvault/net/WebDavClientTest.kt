@@ -7,7 +7,9 @@ import com.lc33.tokenvault.domain.model.WebDavCredentials
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.headersOf
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -53,6 +55,24 @@ class WebDavClientTest {
             listOf("yuanji-backup-1.yjv", "yuanji-backup-2.yjv"),
             WebDavClient.parseBackupNames(xml),
         )
+    }
+
+    /**
+     * 部分 Nextcloud 反代把文件名里的 `/` 编码成 `%2F` 写进 href。顺序必须是
+     * **先按原始 href 取末段、再解码**：先解码会让那个 `/` 变成真分隔符，
+     * `substringAfterLast('/')` 只截到后半截，列出的名字对不上实际文件。
+     */
+    @Test
+    fun `href 里的编码斜杠先取末段再解码`() {
+        val xml = """
+            <D:multistatus xmlns:D="DAV:">
+              <D:response><D:href>/dav/YuanJi/meta%2Fbackup.yjv</D:href></D:response>
+              <D:response><D:href>/dav/YuanJi/space%20name.yjv</D:href></D:response>
+            </D:multistatus>
+        """.trimIndent()
+        val names = WebDavClient.parseBackupNames(xml)
+        assertTrue(names.any { it == "meta/backup.yjv" }, "meta%2Fbackup 应保留完整文件名，实际 $names")
+        assertTrue(names.any { it == "space name.yjv" }, "编码空格应还原为字符本身，实际 $names")
     }
 
     @Test
@@ -133,6 +153,60 @@ class WebDavClientTest {
                 text.contains("user") || text.contains("pass")
             },
         )
+        credentials.zeroize()
+    }
+
+    /**
+     * 探测那一侧刻意关掉重定向（`HttpEngine.buildClient`），而 WebDAV 的 3xx 是真实配置差异：
+     * 反代要求补尾斜杠、http→https。客户端自己**同动词**跟一次，PUT 不能变成 GET——
+     * 降级之后备份字节压根没发出去，却还会报"已上传"。
+     */
+    @Test
+    fun `3xx 用同一动词跟一次相对 Location`() {
+        val config = WebDavConfig(url = "https://dav.example.com/dav", remoteDirectory = "/YuanJi")
+        val credentials = WebDavCredentials("user".toCharArray(), "pass".toCharArray())
+        val seen = mutableListOf<Pair<String, String>>()
+        val engine = MockEngine { request ->
+            seen += request.method.value to request.url.toString()
+            if (request.url.toString().endsWith("a.yjv")) {
+                respond(ByteArray(0), HttpStatusCode.MovedPermanently, headersOf(HttpHeaders.Location, "/dav/YuanJi/a.yjv/"))
+            } else {
+                respond(ByteArray(0), HttpStatusCode.Created)
+            }
+        }
+        // 与生产同一个配置：Ktor 的自动跟随会按 RFC 把非 GET 降级，这里要验的是我们自己那套
+        val client = WebDavClient(HttpClient(engine) { followRedirects = false })
+
+        runBlocking { client.put(config, credentials, "a.yjv", byteArrayOf(4)) }
+
+        assertEquals(
+            listOf(
+                "PUT" to "https://dav.example.com/dav/YuanJi/a.yjv",
+                "PUT" to "https://dav.example.com/dav/YuanJi/a.yjv/",
+            ),
+            seen,
+        )
+        credentials.zeroize()
+    }
+
+    @Test
+    fun `只跟一次，还回 3xx 就报出去`() {
+        // 自环的 302 不能一直转；第二次的状态交给 ensureSuccess 定性。
+        val config = WebDavConfig(url = "https://dav.example.com/dav", remoteDirectory = "/YuanJi")
+        val credentials = WebDavCredentials("user".toCharArray(), "pass".toCharArray())
+        var hits = 0
+        val engine = MockEngine { request ->
+            hits += 1
+            assertEquals("PUT", request.method.value)
+            respond(ByteArray(0), HttpStatusCode.Found, headersOf(HttpHeaders.Location, "https://dav.example.com/dav/loop"))
+        }
+        val client = WebDavClient(HttpClient(engine) { followRedirects = false })
+
+        val e = assertFailsWith<WebDavHttpException> {
+            runBlocking { client.put(config, credentials, "a.yjv", byteArrayOf(4)) }
+        }
+        assertEquals(302, e.status)
+        assertEquals(2, hits)
         credentials.zeroize()
     }
 }

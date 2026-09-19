@@ -5,6 +5,22 @@ import com.lc33.tokenvault.domain.model.BalanceSnapshot
 import com.lc33.tokenvault.domain.model.KeySettings
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * 同一供应商内已经有这把密钥了（指纹相同）。
+ *
+ * `api_keys(providerId, fingerprint)` 是**唯一索引**，所以这不是"礼貌提示"而是数据库
+ * 根本不接受的写入。[add] 与 [ApiKeyRepository.replaceSecret] 在写之前预检，把它变成
+ * 一个领域错误：调用方能据此给出可懂的失败，而不是让 SQLite 的约束异常从事务里冒出来
+ * （那句 `UNIQUE constraint failed: api_keys.providerId, api_keys.fingerprint` 用户读不懂，
+ * 日志里也指不出是哪一家）。
+ *
+ * [existingId] 是已存在那一行的 id，用于"其实已经导进来了"这种幂等处理；未知时为 null。
+ */
+class DuplicateApiKeyException(
+    val providerId: Long,
+    val existingId: Long? = null,
+) : IllegalStateException("api key already exists in provider $providerId")
+
 interface ApiKeyRepository {
     fun observeByProvider(providerId: Long): Flow<List<ApiKey>>
     fun observeAll(): Flow<List<ApiKey>>
@@ -22,6 +38,7 @@ interface ApiKeyRepository {
      * @param secret 明文密钥。实现会算指纹、加密并落库；调用方负责擦掉自己的数组。
      * @param settings 这把 Key 的请求与探测配置。
      * @param balanceToken NewAPI 一类余额适配器的独立访问令牌明文；null 表示不写，空数组表示清掉。
+     * @throws DuplicateApiKeyException 这家已经有指纹相同的 Key（唯一索引，写不进去）
      */
     suspend fun add(
         providerId: Long,
@@ -32,6 +49,12 @@ interface ApiKeyRepository {
         balanceToken: CharArray? = null,
     ): Long
 
+    /**
+     * 换掉这把 Key 的密钥。
+     *
+     * @throws DuplicateApiKeyException 换上去的密钥与同家另一把 Key 指纹相同——那等于凭空
+     * 造一条唯一索引冲突，必须让调用方知道，而不是让整笔写回滚后抛一句数据库错误。
+     */
     suspend fun replaceSecret(id: Long, secret: CharArray)
 
     /** 只改名称、备注与排序，不碰密文与行为配置。 */

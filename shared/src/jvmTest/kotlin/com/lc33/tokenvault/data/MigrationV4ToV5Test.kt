@@ -127,6 +127,76 @@ class MigrationV4ToV5Test {
     }
 
     /**
+     * 4→5 那两条新加的机制：**开头留 seed、末尾 reconcile**。
+     *
+     * 这一段是本轮改动里最危险、又最容易被"迁移跑通了"三个字糊过去的一处——它赌的是
+     * "迁移期间外键到底开没开"，而那由运行时决定。所以两种结果都要钉住：
+     * 被级联带走的配置行要原样补回，父行已经不在了的孤儿行要清掉（清不掉的话末尾那次
+     * `PRAGMA foreign_key_check` 自检会把整次升级判成失败，测试直接红）。
+     */
+    @Test
+    fun `v4 重建两张表不带走 key_settings，孤儿行由 reconcile 清掉`() = runBlocking {
+        val dir = createTempDirectory(prefix = "vault-migration-reconcile-").toFile()
+        try {
+            val dbFile = File(dir, "vault.db")
+            createDatabase(dbFile, version = 4)
+            // 造库用的是裸连接，SQLite 的 `PRAGMA foreign_keys` 默认关着，所以 999 那一行
+            // （父 Key 早就不在了）插得进去——这正是迁移开始前库里可能有的样子。
+            insertKeySettings(dbFile, keyId = 1L, apiRoot = "https://api.example.com")
+            insertKeySettings(dbFile, keyId = 999L, apiRoot = "https://orphan.example.com")
+
+            val database = Room.databaseBuilder<VaultDatabase>(name = dbFile.absolutePath)
+                .setDriver(BundledSQLiteDriver())
+                .addMigrations(
+                    VaultDatabase.MIGRATION_4_5,
+                    VaultDatabase.MIGRATION_5_6,
+                    VaultDatabase.MIGRATION_6_7,
+                )
+                .build()
+
+            val settings = database.keySettingsDao()
+            assertEquals(
+                "https://api.example.com",
+                settings.findByKey(1L)?.apiRoot,
+                "DROP TABLE api_keys 的级联不许把 Key 的配置一起带走",
+            )
+            assertEquals(null, settings.findByKey(999L), "取不到的孤儿行要清掉，别留给自检")
+            assertEquals(listOf(1L), settings.findAll().map { it.keyId })
+            // models 那一行也还挂在原来那把 Key 上（seed 同样补了它）
+            assertEquals(1, database.modelDao().findByProvider(1L).size)
+
+            database.close()
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    /**
+     * 用裸连接插一行 `key_settings`。
+     *
+     * 不走 DAO：DAO 属于当前 schema（v7），在迁移**之前**插入必须按 v4 那份列定义来写，
+     * 与 [createDatabase] 里其余几条 INSERT 同一个理由。
+     */
+    private fun insertKeySettings(file: File, keyId: Long, apiRoot: String) {
+        val connection = BundledSQLiteDriver().open(file.absolutePath)
+        try {
+            connection.execSQL(
+                """
+                INSERT INTO key_settings (keyId, apiBaseUrl, apiRoot, apiVersion, supportedProtocols,
+                    pathOverrides, authStyle, allowInsecure, clientProfileId, timeoutSeconds,
+                    balanceKind, balanceBaseUrl, balanceUserId, balanceTokenEnc, balanceConfig,
+                    quotaPerUnit, quotaCalibrated, probeEnabled, probeReachability, probeKeyValidity,
+                    probeBalance, probeModels, probeModelReachability, probeQuickModel, updatedAt)
+                VALUES ($keyId, '$apiRoot/v1', '$apiRoot', 'v1', 'chat', '{}', 'auto', 0, NULL, NULL,
+                    'none', NULL, NULL, NULL, '{}', NULL, 0, 1, 1, 1, 1, 0, 0, 0, 1)
+                """.trimIndent(),
+            )
+        } finally {
+            connection.close()
+        }
+    }
+
+    /**
      * 用导出 schema 造库：建表语句与索引一律取自对应的 json。
      * 手写一遍 DDL 就测不出"迁移漏了某个索引"这类事故了——索引对不上同样会让 Room 报错。
      */

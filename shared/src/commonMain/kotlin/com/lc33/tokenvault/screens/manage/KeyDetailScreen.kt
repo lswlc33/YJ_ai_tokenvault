@@ -23,6 +23,7 @@ import com.lc33.tokenvault.screens.model.UiModelRow
 import com.lc33.tokenvault.ui.common.StatusDot
 import com.lc33.tokenvault.ui.common.colorOf
 import com.lc33.tokenvault.ui.common.labelOf
+import com.lc33.tokenvault.ui.common.protocolLabel
 import com.lc33.tokenvault.ui.common.relativeLabel
 import com.lc33.tokenvault.ui.miuix.AppActionRow
 import com.lc33.tokenvault.ui.miuix.AppBottomSheet
@@ -80,6 +81,7 @@ import tokenvault.shared.generated.resources.detail_key_more_cd
 import tokenvault.shared.generated.resources.detail_key_connection
 import tokenvault.shared.generated.resources.detail_probe_key
 import tokenvault.shared.generated.resources.groups_delete
+import tokenvault.shared.generated.resources.dialog_cancel
 import tokenvault.shared.generated.resources.key_sort_down
 import tokenvault.shared.generated.resources.key_sort_up
 import tokenvault.shared.generated.resources.secret_copy_cd
@@ -474,6 +476,8 @@ fun KeyDetailScreen(
         onDismissRequest = { pendingDelete = false },
         title = stringResource(Res.string.groups_delete),
         confirmText = stringResource(Res.string.groups_delete),
+        // 删的是真数据（密钥 + 它名下的模型），只给一个「删除」按钮等于逼用户猜退出方式。
+        dismissText = stringResource(Res.string.dialog_cancel),
         onConfirm = {
             pendingDelete = false
             onDelete()

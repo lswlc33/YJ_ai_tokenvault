@@ -34,6 +34,7 @@ class RecordingAuditLog : AuditLogRepository {
         detail: String?,
         providerId: Long?,
         keyId: Long?,
+        runId: Long?,
         requestUrl: String?,
         requestBody: String?,
         responseBody: String?,
@@ -47,6 +48,8 @@ class RecordingAuditLog : AuditLogRepository {
         flowOf(emptyList())
 
     override suspend fun trimOlderThan(before: Long) = Unit
+
+    override suspend fun trimToCount(keep: Int) = Unit
 
     override suspend fun clear() {
         records.clear()

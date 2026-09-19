@@ -2,7 +2,7 @@ package com.lc33.tokenvault.screens.manage
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,6 +25,7 @@ import com.lc33.tokenvault.domain.Protocol
 import com.lc33.tokenvault.platform.PlatformBackHandler
 import com.lc33.tokenvault.screens.model.KeyDraft
 import com.lc33.tokenvault.screens.model.UiModelRow
+import com.lc33.tokenvault.ui.common.protocolLabel
 import com.lc33.tokenvault.ui.common.relativeLabel
 import com.lc33.tokenvault.ui.shell.KEY_BALANCE_KINDS
 import com.lc33.tokenvault.ui.miuix.AppActionRow
@@ -63,6 +64,7 @@ import tokenvault.shared.generated.resources.detail_add_model
 import tokenvault.shared.generated.resources.detail_key_secret
 import tokenvault.shared.generated.resources.detail_model_delete
 import tokenvault.shared.generated.resources.groups_delete
+import tokenvault.shared.generated.resources.dialog_cancel
 import tokenvault.shared.generated.resources.detail_models_empty_auto
 import tokenvault.shared.generated.resources.detail_models_empty_manual
 import tokenvault.shared.generated.resources.detail_models_refresh
@@ -337,7 +339,10 @@ fun KeyEditorScreen(
                         supportingText = stringResource(Res.string.editor_base_url_hint),
                         errorText = baseUrlError,
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing)) {
+                    // FlowRow 而不是 Row：chip 文案是本地化的，中文/英文长度不同，而三种协议
+                    // 并排在窄屏（360dp）上会顶出屏幕右缘——Row 不换行，多出来的那枚直接被裁掉，
+                    // 用户于是「没有」第三个协议可点。
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing)) {
                         Protocol.entries.forEach { protocol ->
                             val selected = protocol in draft.protocols
                             AppFilterChip(
@@ -686,6 +691,9 @@ fun KeyEditorScreen(
         onDismissRequest = { pendingDeleteModelId = null },
         title = stringResource(Res.string.detail_model_delete),
         confirmText = stringResource(Res.string.groups_delete),
+        // 删除类弹层必须给取消（AppDialog 契约）：只剩一个「删除」时，点空白退出
+        // 和点确认在手指下只差几毫米。
+        dismissText = stringResource(Res.string.dialog_cancel),
         onConfirm = {
             pendingDeleteModelId?.let(onDeleteModel)
             pendingDeleteModelId = null
@@ -698,6 +706,8 @@ fun KeyEditorScreen(
         title = stringResource(Res.string.editor_discard_title),
         summary = stringResource(Res.string.editor_discard_summary),
         confirmText = stringResource(Res.string.editor_discard_confirm),
+        // 「放弃修改」同样是不可撤销的动作，退路要写在按钮上而不是让用户猜返回键。
+        dismissText = stringResource(Res.string.dialog_cancel),
         onConfirm = {
             showDiscard = false
             onBack()

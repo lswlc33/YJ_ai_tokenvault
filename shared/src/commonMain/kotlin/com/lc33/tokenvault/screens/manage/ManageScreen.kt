@@ -25,7 +25,6 @@ import org.jetbrains.compose.resources.stringResource
 import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.add_cd
 import tokenvault.shared.generated.resources.dashboard_empty_new
-import tokenvault.shared.generated.resources.group_all
 import tokenvault.shared.generated.resources.manage_batch_change_group
 import tokenvault.shared.generated.resources.manage_batch_delete
 import tokenvault.shared.generated.resources.manage_batch_delete_cd
@@ -44,9 +43,15 @@ import tokenvault.shared.generated.resources.manage_groups_cd
 import tokenvault.shared.generated.resources.manage_search_hint
 import tokenvault.shared.generated.resources.manage_select_all
 import tokenvault.shared.generated.resources.manage_selected_count
+import tokenvault.shared.generated.resources.manage_sort_balance
+import tokenvault.shared.generated.resources.manage_sort_cd
+import tokenvault.shared.generated.resources.manage_sort_last_probe
+import tokenvault.shared.generated.resources.manage_sort_manual
+import tokenvault.shared.generated.resources.manage_sort_name
 import tokenvault.shared.generated.resources.manage_title
 import tokenvault.shared.generated.resources.refresh_status_cd
 import com.lc33.tokenvault.screens.model.ManageUiState
+import com.lc33.tokenvault.screens.model.ProviderSort
 import com.lc33.tokenvault.ui.common.EmptyState
 import com.lc33.tokenvault.ui.common.LoadingState
 import com.lc33.tokenvault.ui.miuix.AppBottomSheet
@@ -55,6 +60,9 @@ import com.lc33.tokenvault.ui.miuix.AppFab
 import com.lc33.tokenvault.ui.miuix.AppFilterChip
 import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppIconButton
+import com.lc33.tokenvault.ui.miuix.AppIconMenu
+import com.lc33.tokenvault.ui.miuix.AppMenuGroup
+import com.lc33.tokenvault.ui.miuix.AppMenuItem
 import com.lc33.tokenvault.ui.miuix.AppScaffold
 import com.lc33.tokenvault.ui.miuix.AppSearchField
 import com.lc33.tokenvault.ui.miuix.AppActionRow
@@ -93,6 +101,11 @@ fun ManageScreen(
     onClearSelection: () -> Unit,
     onBatchDelete: (Set<Long>) -> Unit,
     onBatchSetGroup: (Set<Long>, Long?) -> Unit,
+    /**
+     * 排序档。以前 [ManageViewModel] 那一整套 `onSort` / `sortProviders` / `manage_sort_*`
+     * 文案都齐了却没有入口，界面永远停在「手动排序」那一档。
+     */
+    onSort: (ProviderSort) -> Unit,
 ) {
     val scrollState = rememberAppTopBarScrollState()
     val tokens = LocalAppTokens.current
@@ -157,6 +170,9 @@ fun ManageScreen(
                             contentDescription = stringResource(Res.string.manage_groups_cd),
                             onClick = onOpenGroups,
                         )
+                        // 排序收进一个菜单：四档摆成第二行 chip 会把分组筛选条挤歪，
+                        // 而排序不是每次进页面都要动的东西。
+                        SortMenu(current = state.sort, onSort = onSort)
                     }
                 },
             )
@@ -255,6 +271,34 @@ fun ManageScreen(
             },
         )
     }
+}
+
+/** 顶栏的排序菜单。四档各一项，当前那档打勾。 */
+@Composable
+private fun SortMenu(current: ProviderSort, onSort: (ProviderSort) -> Unit) {
+    val options = listOf(
+        ProviderSort.MANUAL to Res.string.manage_sort_manual,
+        ProviderSort.NAME to Res.string.manage_sort_name,
+        ProviderSort.BALANCE to Res.string.manage_sort_balance,
+        ProviderSort.LAST_PROBE to Res.string.manage_sort_last_probe,
+    )
+    AppIconMenu(
+        icon = AppIcon.Sort,
+        contentDescription = stringResource(Res.string.manage_sort_cd),
+        // 选完就收：这是单选菜单，不像日志页那个要连着改好几项。
+        collapseOnSelection = true,
+        groups = listOf(
+            AppMenuGroup(
+                options.map { (sort, label) ->
+                    AppMenuItem(
+                        text = stringResource(label),
+                        selected = sort == current,
+                        onClick = { onSort(sort) },
+                    )
+                },
+            ),
+        ),
+    )
 }
 
 /** 分组筛选条。第一枚固定是「全部」，其余是用户自定义分组，整行横向可滑。 */

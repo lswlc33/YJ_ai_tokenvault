@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
  */
 class ProbeSettingsViewModel constructor(
     private val settings: SettingsRepository,
+    private val failures: SettingsFailures,
 ) : ViewModel() {
 
     /** 客户端嗅探开关。默认开（[SettingsRepository.observeSniffClientProfile] 兜底 true）。 */
@@ -44,8 +45,9 @@ class ProbeSettingsViewModel constructor(
     val defaultProbeModelReachability: StateFlow<Boolean> = defaultProbe.map { it.modelReachability }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    // 开关写不进库时界面已经翻过去了：不报一条提示，用户看到的就是一个会自己回弹的假开关。
     fun onSniffClientProfileChange(enabled: Boolean) {
-        viewModelScope.launch { settings.setSniffClientProfile(enabled) }
+        viewModelScope.launch { failures.guard { settings.setSniffClientProfile(enabled) } }
     }
 
     /** 改单个布尔，其余字段保持现状（`defaultProbe.value` 是当前快照）。 */
@@ -62,6 +64,6 @@ class ProbeSettingsViewModel constructor(
 
     private fun patch(transform: (DefaultProbeSettings) -> DefaultProbeSettings) {
         val next = transform(defaultProbe.value)
-        viewModelScope.launch { settings.setDefaultProbeSettings(next) }
+        viewModelScope.launch { failures.guard { settings.setDefaultProbeSettings(next) } }
     }
 }

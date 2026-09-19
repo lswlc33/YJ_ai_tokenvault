@@ -19,10 +19,18 @@ object CatalogNormalize {
 
     fun normalize(modelId: String): String {
         var s = modelId.lowercase()
-        s = s.removeSuffix("-latest")
-        s = DATE_SUFFIX.replace(s, "")
-        s = CAPABILITY_SUFFIX.replace(s, "")
-        s = s.replace('.', '-').replace('_', '-')
-        return s
+        // **反复剥离到不动点**：两类正则都锚在行尾 `$`，所以一次只能剥掉最末尾那一层。
+        // 复合后缀 `gpt-4o-2024-08-06:free` 就是旧实现的漏网之鱼：日期那条先跑，但串
+        // 尾是 `:free` 匹配不上；能力后缀再把 `:free` 剥掉后日期才露在尾部，却已经过了
+        // 它那一轮。结果留在 `gpt-4o-2024-08-06`，与目录里的 `gpt-4o` 对不上，
+        // 第三级归一化匹配整段失效。每一轮只会让串变短，所以循环必然收敛。
+        while (true) {
+            val stripped = s.removeSuffix("-latest")
+                .let { DATE_SUFFIX.replace(it, "") }
+                .let { CAPABILITY_SUFFIX.replace(it, "") }
+            if (stripped == s) break
+            s = stripped
+        }
+        return s.replace('.', '-').replace('_', '-')
     }
 }

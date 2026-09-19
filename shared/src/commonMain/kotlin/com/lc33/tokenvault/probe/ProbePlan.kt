@@ -27,6 +27,9 @@ data class PlannedTask(
     val clientProfileId: Long? = null,
     val authStyle: AuthStyle = AuthStyle.AUTO,
     val allowInsecure: Boolean,
+
+    /** `key.settings.timeoutSeconds` 换算成毫秒；null = 用引擎级兜底（§8.1）。 */
+    val timeoutMs: Long? = null,
 )
 
 data class ProbePlan(
@@ -73,6 +76,9 @@ object ProbePlanBuilder {
                 }
                 val host = hostOf(endpoints.apiRoot)
                 perHost[host] = (perHost[host] ?: 0) + 1
+                // 每把 Key 自己的超时（秒 → 毫秒）。0 / 负数按"没填"处理：
+                // 一个 0 毫秒的超时等于每个请求必失败，那不该是用户能意外得到的结果。
+                val timeoutMs = settings.timeoutSeconds?.takeIf { it > 0 }?.times(1_000L)
 
                 if (settings.probe.reachability) {
                     settings.supportedProtocols.forEach { protocol ->
@@ -89,6 +95,7 @@ object ProbePlanBuilder {
                             clientProfileId = settings.clientProfileId,
                             authStyle = settings.authStyle,
                             allowInsecure = settings.allowInsecure,
+                            timeoutMs = timeoutMs,
                         )
                     }
                 }
@@ -108,6 +115,7 @@ object ProbePlanBuilder {
                         clientProfileId = settings.clientProfileId,
                         authStyle = settings.authStyle,
                         allowInsecure = settings.allowInsecure,
+                        timeoutMs = timeoutMs,
                     )
                 }
             }

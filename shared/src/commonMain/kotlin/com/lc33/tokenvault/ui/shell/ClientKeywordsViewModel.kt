@@ -3,8 +3,12 @@ package com.lc33.tokenvault.ui.shell
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lc33.tokenvault.domain.repo.SettingsRepository
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -18,6 +22,7 @@ import kotlinx.coroutines.launch
  */
 class ClientKeywordsViewModel constructor(
     private val settings: SettingsRepository,
+    private val failures: SettingsFailures,
 ) : ViewModel() {
 
     /** 已存的关键词。**null = 还没读到**（Room 首帧异步，见 BalanceThresholdsViewModel）。 */
@@ -25,12 +30,25 @@ class ClientKeywordsViewModel constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /**
+     * 写库成功。**由这里发、页面收到才退回**：以前是先退页再异步写，写失败时用户
+     * 已经在上一页了，而关键词表还是旧的——那句"已经保存"就成了假话。
+     */
+    private val _saved = MutableSharedFlow<Unit>(
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    val saved: SharedFlow<Unit> = _saved.asSharedFlow()
+
+    /**
      * 保存。把 [items] 整份写库。空列表表示"回到默认"（与没写过等价），
      * 因为 [com.lc33.tokenvault.data.repo.RoomSettingsRepository] 对空/缺省都回退默认表。
      */
     fun save(items: List<String>) {
         viewModelScope.launch {
-            settings.setClientKeywords(items)
+            runCatching { settings.setClientKeywords(items) }
+                .onSuccess { _saved.tryEmit(Unit) }
+                // 写不进去时这一页留在原地，失败提示由 SettingsFailures 统一投一条。
+                .onFailure { failures.report() }
         }
     }
 }

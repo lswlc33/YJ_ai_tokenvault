@@ -25,6 +25,8 @@ class RoomProbeRunRepository constructor(
 
     override suspend fun clear() = dao.clear()
 
+    override suspend fun trimToCount(keep: Int) = dao.trimToCount(keep)
+
     private fun ProbeRun.toEntity() = ProbeRunEntity(
         id = id,
         scope = scope,

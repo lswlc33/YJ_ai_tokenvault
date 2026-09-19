@@ -119,6 +119,7 @@ class BackupEngineTest {
                 detail: String?,
                 providerId: Long?,
                 keyId: Long?,
+                runId: Long?,
                 requestUrl: String?,
                 requestBody: String?,
                 responseBody: String?,
@@ -134,6 +135,8 @@ class BackupEngineTest {
             ) = kotlinx.coroutines.flow.flowOf(emptyList<com.lc33.tokenvault.domain.model.AuditEntry>())
 
             override suspend fun trimOlderThan(before: Long) = Unit
+
+            override suspend fun trimToCount(keep: Int) = Unit
 
             override suspend fun clear() = Unit
         }

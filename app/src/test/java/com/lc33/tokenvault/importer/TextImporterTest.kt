@@ -1,6 +1,7 @@
 package com.lc33.tokenvault.importer
 
 import com.lc33.tokenvault.domain.BalanceKind
+import com.lc33.tokenvault.domain.LoginMethod
 import com.lc33.tokenvault.domain.Protocol
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -191,6 +192,102 @@ class TextImporterTest {
         """.trimIndent()
         val record = parse(text).single()
         assertNull(record.note)
+    }
+
+    @Test
+    fun `单个连字符的备注不再被当成空值`() {
+        // EMPTY_VALUES 里曾有 `-`：真实备注就写"-"（"待补"的速记）时整条备注被吞成 null，
+        // 而导出侧的空值一律写 `无`，所以 `-` 只会误伤、不会漏认。
+        val text = """
+            供应商名称 A
+            备注 -
+            API请求地址 https://a.com/v1
+        """.trimIndent()
+        assertEquals("-", parse(text).single().note)
+    }
+
+    @Test
+    fun `登录方式解析后要落进账号`() {
+        // 回归：解析写进了 acc.loginMethods，构造 ParsedAccount 时漏传，
+        // 于是导入后的账号永远没有登录方式。
+        val text = """
+            供应商名称 A
+            API请求地址 https://a.com/v1
+            平台账号 company@example.com
+            平台密码 Password1
+            账号备注 公司主号
+            登录地址 https://a.com/login
+            登录方式 github，linuxdo
+        """.trimIndent()
+        val account = parse(text).single().accounts.single()
+        assertEquals(
+            setOf(LoginMethod.GITHUB, LoginMethod.LINUX_DO),
+            account.loginMethods,
+        )
+        assertEquals("https://a.com/login", account.loginUrl)
+    }
+
+    @Test
+    fun `登录方式的斜杠与逗号分隔与未知值`() {
+        // 分隔符历史上认逗号、空格与 `/`；未知值跳过而不是让整份导入失败。
+        val text = """
+            供应商名称 A
+            API请求地址 https://a.com/v1
+            平台账号 a@example.com
+            登录方式 github/wechat
+        """.trimIndent()
+        val account = parse(text).single().accounts.single()
+        assertEquals(setOf(LoginMethod.GITHUB), account.loginMethods)
+    }
+
+    @Test
+    fun `换算比与余额配置与路径覆盖落到记录上`() {
+        val text = """
+            供应商名称 A
+            API请求地址 https://a.com/v1
+            路径覆盖 chat /v1/chat/completions
+            余额查询类型 customJson
+            请求地址 https://a.com
+            余额配置 {"path":"/api/user/self","valuePath":"data.quota"}
+            换算比 500000.0
+            用户ID 199628
+        """.trimIndent()
+        val record = parse(text).single()
+        // `customJson` 的 wireName 带大写，而值先被 lowercase()：大小写敏感就永远读不回来
+        assertEquals(BalanceKind.CUSTOM_JSON, record.balanceKind)
+        assertEquals(mapOf(Protocol.CHAT to "/v1/chat/completions"), record.pathOverrides)
+        assertEquals("""{"path":"/api/user/self","valuePath":"data.quota"}""", record.balanceConfig)
+        assertEquals(500000.0, record.quotaPerUnit!!, 0.0)
+        assertEquals("199628", record.balanceUserId)
+    }
+
+    @Test
+    fun `换算比只收正数与路径覆盖认不出别名则跳过`() {
+        // 0 / 负数会把余额除成 Infinity；挂错协议的路径覆盖比没有覆盖更糟。
+        val text = """
+            供应商名称 A
+            API请求地址 https://a.com/v1
+            路径覆盖 geminipro /v1/x
+            余额查询类型 NewAPI
+            换算比 0
+        """.trimIndent()
+        val record = parse(text).single()
+        assertTrue(record.pathOverrides.isEmpty())
+        assertNull(record.quotaPerUnit)
+    }
+
+    @Test
+    fun `API Key 只有密钥时按顺序分配 label`() {
+        // 旧样本写法（`示例数据.md`）：没有 label，第一张是 `主号`、第二张 `备用 2`。
+        val text = """
+            供应商名称 A
+            API请求地址 https://a.com/v1
+            API Key sk-TEST0001
+            API Key sk-TEST0002
+        """.trimIndent()
+        val record = parse(text).single()
+        assertEquals(listOf("主号", "备用 2"), record.keys.map { it.label })
+        assertEquals("sk-TEST0002", record.keys[1].secret.concatToString())
     }
 
     @Test

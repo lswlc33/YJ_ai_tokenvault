@@ -35,6 +35,7 @@ import com.lc33.tokenvault.endpoint.ProbeResponse
 import com.lc33.tokenvault.net.HttpEngine
 import com.lc33.tokenvault.probe.PlannedTask
 import com.lc33.tokenvault.probe.MODEL_PROBE_PROTOCOL_ORDER
+import com.lc33.tokenvault.probe.ModelListParse
 import com.lc33.tokenvault.probe.ModelListParser
 import com.lc33.tokenvault.probe.modelProbeStateOf
 import com.lc33.tokenvault.probe.ProbeBudget
@@ -53,6 +54,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -63,6 +65,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * 探测引擎宿主（计划.md §8.5）。**不是 ViewModel**——探测要能跨页面存活，
@@ -141,10 +144,14 @@ class ProbeEngine constructor(
     val lastRound: StateFlow<List<ProbeItemResult>> = _lastRound.asStateFlow()
 
     /**
-     * 本轮已经撞过 429 的 host。编排器自己有一份（用来停后续任务），这里再记一份给
-     * **嗅探**用——嗅探在编排器之外，撞到 429 必须立即停（红线 29）。
+     * 本轮撞过 429 的 host 记在 [engine]（HostGate）那里，不在这里再存一份。
+     *
+     * 原来这是一个裸 `mutableSetOf`：编排器的工作线程往里写、这里的 `trySniff` 读，
+     * 而两者跑在不同的协程线程上（`Dispatchers.Default` 是多线程的），既没有可见性
+     * 保证也可能丢更新。门闸本来就是"host 级节流状态"的权威存储、又已经收在一把 Mutex
+     * 后面，并进去比在这里再配一把锁少一个会忘记同步的地方（红线 31 的口径：一件事
+     * 只有一个权威）。
      */
-    private val rateLimitedHosts = mutableSetOf<String>()
 
     /** 一轮探测是否在跑。 */
     val running: Boolean get() = currentJob?.isActive == true
@@ -161,7 +168,11 @@ class ProbeEngine constructor(
      * 仅重试上一轮的失败项与未探测项（明细页"重试失败项"，§13.4）。
      *
      * 复用 [startScoped]：把上一轮 [ProbeItemResult.outcome] 是失败 / 跳过 / 取消的
-     * `taskId` 提出来当过滤条件，只重跑这些任务，其它原样保留在 [lastRound] 里。
+     * `taskId` 提出来当过滤条件，只重跑这些任务。
+     *
+     * **这一轮重跑过的项会覆盖 [lastRound] 里的旧行，没重跑的留着**（[runRoundInner]
+     * 按任务的 `taskId` 决定留谁）：全部清空的话，用户点一次"重试失败项"就把上一轮的
+     * 成功记录一起弄没了，明细页突然只剩三行，看不出"那三家本来是好的"。
      * 返回 false 表示没有可重试的项、或已在跑、或锁定态。
      */
     fun retryFailed(): Boolean {
@@ -172,7 +183,7 @@ class ProbeEngine constructor(
             .map { it.taskId }
             .toSet()
         if (retryIds.isEmpty()) return false
-        return startScoped(runScope = "retry") { it.id in retryIds }
+        return startScoped(runScope = RETRY_SCOPE) { it.id in retryIds }
     }
 
     /**
@@ -256,6 +267,7 @@ class ProbeEngine constructor(
         val fetchedByKey = mutableMapOf<Long, MutableMap<Protocol, MutableSet<String>>>()
         for (task in tasks) {
             val keyIdForTask = task.keyId ?: continue
+            val taskKey = selectedKeys.firstOrNull { it.id == keyIdForTask }
             val response = engine.execute(
                 ProbeRequest(
                     method = "GET",
@@ -263,8 +275,9 @@ class ProbeEngine constructor(
                     headers = task.headers,
                     body = null,
                     protocol = task.protocol,
+                    timeoutMs = task.timeoutMs,
                 ),
-                allowInsecure = selectedKeys.firstOrNull { it.id == keyIdForTask }?.settings?.allowInsecure ?: false,
+                allowInsecure = taskKey?.settings?.allowInsecure ?: false,
             )
             if (response.status == 429) {
                 engine.onRateLimited(task.host)
@@ -278,6 +291,7 @@ class ProbeEngine constructor(
                 error = response.error,
                 level = task.level,
                 clientKeywords = clientKeywords,
+                headers = response.headers,
             )
             if (classification.outcome == ProbeOutcome.SUCCESS) {
                 ok++
@@ -286,7 +300,6 @@ class ProbeEngine constructor(
             }
 
             // 模型列表拉取不该绕过用户关掉的密钥检测开关。
-            val taskKey = selectedKeys.firstOrNull { it.id == keyIdForTask }
             if (taskKey?.settings?.probe?.keyValidity == true) {
                 val scrubbedDetail = classification.detail?.let { redactor.scrub(it) }
                 if (classification.health != null) {
@@ -312,16 +325,7 @@ class ProbeEngine constructor(
             }
 
             if (classification.outcome == ProbeOutcome.SUCCESS) {
-                ModelListParser.parse(response.body, task.protocol)?.let { fetched ->
-                    fetched
-                        .filter { it.protocol in (taskKey?.settings?.supportedProtocols ?: emptySet()) }
-                        .forEach { model ->
-                            fetchedByKey
-                                .getOrPut(keyIdForTask) { mutableMapOf() }
-                                .getOrPut(model.protocol) { mutableSetOf() }
-                                .add(model.modelId)
-                        }
-                }
+                applyParsedModels(response.body, task.protocol, taskKey, providerId, keyIdForTask, fetchedByKey)
             }
         }
 
@@ -340,6 +344,58 @@ class ProbeEngine constructor(
             detail = "provider=$providerId tasks=${tasks.size} ok=$ok fail=$fail models=$discovered",
         )
         return ModelRefreshResult(discovered = discovered, failed = fail > 0 && ok == 0)
+    }
+
+    /**
+     * 把一次 `/models` 响应折进"本轮发现的模型"累加表（累加表最后才会送进
+     * [ModelRepository.applyDiscovered]，那里带着"消失即删"）。
+     *
+     * **只有 `Confirmed` 往下走**。`SuspiciousEmpty`（`data` 数组在、但一条带 id 的模型
+     * 都没有）与 `Unparseable`（响应压根不是模型列表）都直接 return：一旦让它们进到
+     * `applyDiscovered(emptyList())`，这把 Key 在本协议下发现过的模型会被整片删掉，而
+     * "密钥能用却列不出任何模型"在中转站上几乎总是异常（登录网关、字段改名、上游在发布），
+     * 不是真的没有。删错的代价是用户看到的模型列表凭空消失，不删的代价只是几行陈旧数据。
+     *
+     * 判定本身在解析层（`probe/ModelListParse`），这里只是"不落地"的那一半——
+     * 仓库层（`data/RoomModelRepository`）不动，它照旧认为"空列表 = 确实没有"。
+     */
+    private suspend fun applyParsedModels(
+        body: String?,
+        protocol: Protocol,
+        key: ApiKey?,
+        providerId: Long,
+        keyId: Long,
+        accumulator: MutableMap<Long, MutableMap<Protocol, MutableSet<String>>>,
+    ) {
+        val allowedProtocols = key?.settings?.supportedProtocols ?: emptySet()
+        when (val parsed = ModelListParser.parse(body, protocol)) {
+            is ModelListParse.Confirmed -> parsed.models
+                .filter { it.protocol in allowedProtocols }
+                .forEach { model ->
+                    accumulator
+                        .getOrPut(keyId) { mutableMapOf() }
+                        .getOrPut(model.protocol) { mutableSetOf() }
+                        .add(model.modelId)
+                }
+
+            ModelListParse.SuspiciousEmpty -> audit.record(
+                level = LogLevel.WARN,
+                category = LogCategory.PROBE,
+                message = "model list skipped: no usable entries",
+                detail = "provider=$providerId key=$keyId protocol=${protocol.wireName}",
+                providerId = providerId,
+                keyId = keyId,
+            )
+
+            ModelListParse.Unparseable -> audit.record(
+                level = LogLevel.WARN,
+                category = LogCategory.PROBE,
+                message = "model list skipped: not a model list",
+                detail = "provider=$providerId key=$keyId protocol=${protocol.wireName}",
+                providerId = providerId,
+                keyId = keyId,
+            )
+        }
     }
 
     /**
@@ -539,6 +595,7 @@ class ProbeEngine constructor(
             modelId = modelId,
             authStyle = keySettings.authStyle,
             prompt = prompt,
+            timeoutMs = timeoutMsOf(keySettings),
         )
         val patchedBody = mergeBodyPatch(
             baseRequest.body ?: "",
@@ -554,24 +611,32 @@ class ProbeEngine constructor(
             body = HeaderAssembler.expandPlaceholders(patchedBody, placeholders),
         )
         val response = engine.execute(request, allowInsecure = keySettings.allowInsecure)
-        if (response.status == 429) {
-            engine.onRateLimited(
-                keySettings.apiRoot.substringAfter("://").substringBefore('/').substringBefore(':'),
-            )
-        }
         val classification = ProbeClassifier.classify(
             status = response.status.takeIf { response.error == null },
             body = response.body,
             error = response.error,
             level = ProbeLevel.L3_MODEL,
             clientKeywords = clientKeywords,
+            headers = response.headers,
         )
+        // 先分类再通知门闸：`Retry-After` 是从响应头里读出来的，顺序反了就等于没读。
+        if (response.status == 429 && response.error == null) {
+            engine.onRateLimited(hostOf(keySettings.apiRoot), classification.retryAfterMs)
+        }
         return ModelProbeAttempt(
             protocol = protocol,
             classification = classification,
             latencyMs = response.latencyMs,
         )
     }
+
+    /** 这把 Key 的 per-request 超时（毫秒）。0 / 负数按"没填"处理，见 `ProbePlanBuilder`。 */
+    private fun timeoutMsOf(settings: KeySettings): Long? =
+        settings.timeoutSeconds?.takeIf { it > 0 }?.times(1_000L)
+
+    /** `scheme://host[:port]/path` → host。门闸按 host 记账，所以哪条路径都要算得一样。 */
+    private fun hostOf(url: String): String =
+        url.substringAfter("://", "").substringBefore('/').substringAfterLast('@').substringBefore(':')
 
     /**
      * 模型行定位：**按 keyId + modelId，不带协议**。
@@ -637,9 +702,10 @@ class ProbeEngine constructor(
             ProbeRun(scope = scope, startedAt = startedAt),
         )
 
-        // 新一轮：清空上一轮的累计快照，明细页随之刷新成"这一轮刚开始"。
-        _lastRound.value = emptyList()
-        rateLimitedHosts.clear()
+        // 本轮的 429 名单从空开始（间隔不清——撞过就是真节流，跨轮有效）。
+        engine.clearRateLimitedMarks()
+        // 先取一份上一轮的快照：重试范围要在它基础上留行，见下面 `_lastRound` 的起头。
+        val previousRound = _lastRound.value
 
         // 拉全量供应商、密钥、预设（只碰明文列，不解密密钥本身，§6.1 推论 3）。
         val providerList: List<Provider> = providers.observeSummaries().first().map { it.provider }
@@ -666,11 +732,30 @@ class ProbeEngine constructor(
             planned.toTask(profileOf(planned.clientProfileId))?.let { tasks += it }
         }
 
+        // 累计快照起头（§13.4 明细页只读这一份）：
+        // - 重试：留下上一轮**这一轮不重跑**的那些行，重跑到的那几条由新结果覆盖。
+        //   原来这里每轮都无脑清空，而 `retryFailed` 的注释写着"其它原样保留"——
+        //   两句里只有一句是对的，现在以行为准：全清过一次重试会把上一轮的成功记录
+        //   一起弄丢，明细页突然只剩几行，用户看不出"其它家本来是好的"。
+        // - 其它范围（全量 / 单家 / 单 Key）：从空开始，这一轮跑完就是完整结论。
+        val scheduledIds = tasks.map { it.id }.toSet()
+        _lastRound.value = if (scope == RETRY_SCOPE) {
+            previousRound.filter { it.taskId !in scheduledIds }
+        } else {
+            emptyList()
+        }
+
         val providerTotal = tasks.count { it.level == ProbeLevel.L1_REACHABILITY }
         val keyTotal = tasks.count { it.level == ProbeLevel.L2_KEY_VALIDITY }
         var done = 0
         var ok = 0
         var fail = 0
+        // 被跳过的项单独记：`probe_runs.done` 的口径是"真正发过请求的项"，明细页摘要里的
+        // "未探测 N"就是 `total - done`（见 `UiMapping.toSummary`）。要是把跳过项也计进
+        // done，那个减法就永远得 0 了。进度条反过来要能走到终点，所以它显示 done + skipped。
+        var skipped = 0
+        var providerSkipped = 0
+        var keySkipped = 0
         var providerDone = 0
         var providerOk = 0
         var providerFail = 0
@@ -716,10 +801,8 @@ class ProbeEngine constructor(
         val orchestrator = ProbeOrchestrator(
             transport = transport,
             nowMillis = now,
-            hostIntervalMs = engine::hostIntervalMs,
-            onRateLimited = { host ->
-                engine.onRateLimited(host)
-                rateLimitedHosts += host
+            onRateLimited = { host, retryAfterMs ->
+                engine.onRateLimited(host, retryAfterMs)
             },
             budget = ProbeBudget(),
             clientKeywords = clientKeywords,
@@ -749,30 +832,41 @@ class ProbeEngine constructor(
                     }
                 }
 
-                done++
-                when (final.outcome) {
-                    ProbeOutcome.SUCCESS -> ok++
-                    ProbeOutcome.SKIPPED, ProbeOutcome.CANCELLED -> Unit
-                    else -> fail++
-                }
-                when (taskById[result.taskId]?.level) {
-                    ProbeLevel.L1_REACHABILITY -> {
-                        providerDone++
-                        when (final.outcome) {
-                            ProbeOutcome.SUCCESS -> providerOk++
-                            ProbeOutcome.SKIPPED, ProbeOutcome.CANCELLED -> Unit
-                            else -> providerFail++
-                        }
+                // 计数：跳过项单独一档，见 `skipped` 的声明处。被跳过的项连请求都没发出去，
+                // 既不该写 `checkedAt`，也不该把上一轮的好结论覆盖掉。
+                if (final.outcome == ProbeOutcome.SKIPPED) {
+                    skipped++
+                    when (taskById[result.taskId]?.level) {
+                        ProbeLevel.L1_REACHABILITY -> providerSkipped++
+                        ProbeLevel.L2_KEY_VALIDITY -> keySkipped++
+                        else -> Unit
                     }
-                    ProbeLevel.L2_KEY_VALIDITY -> {
-                        keyDone++
-                        when (final.outcome) {
-                            ProbeOutcome.SUCCESS -> keyOk++
-                            ProbeOutcome.SKIPPED, ProbeOutcome.CANCELLED -> Unit
-                            else -> keyFail++
-                        }
+                } else {
+                    done++
+                    when (final.outcome) {
+                        ProbeOutcome.SUCCESS -> ok++
+                        ProbeOutcome.CANCELLED -> Unit
+                        else -> fail++
                     }
-                    else -> Unit
+                    when (taskById[result.taskId]?.level) {
+                        ProbeLevel.L1_REACHABILITY -> {
+                            providerDone++
+                            when (final.outcome) {
+                                ProbeOutcome.SUCCESS -> providerOk++
+                                ProbeOutcome.CANCELLED -> Unit
+                                else -> providerFail++
+                            }
+                        }
+                        ProbeLevel.L2_KEY_VALIDITY -> {
+                            keyDone++
+                            when (final.outcome) {
+                                ProbeOutcome.SUCCESS -> keyOk++
+                                ProbeOutcome.CANCELLED -> Unit
+                                else -> keyFail++
+                            }
+                        }
+                        else -> Unit
+                    }
                 }
                 // 红线 32：detail 是上游 message 前 200 字符，上游会回显 key 前缀 / 后缀 4 位 /
                 // base64 访问令牌，落库与推流前必须脱敏。在这里统一脱敏一次，`persist`、
@@ -789,31 +883,34 @@ class ProbeEngine constructor(
                     resultTask.level == ProbeLevel.L2_KEY_VALIDITY &&
                     keyById[resultTask.keyId]?.settings?.probe?.models == true
                 ) {
-                    ModelListParser.parse(result.body, resultTask.protocol)?.let { fetched ->
-                        fetched
-                            .filter { it.protocol in keyById[resultTask.keyId]?.settings?.supportedProtocols ?: emptySet() }
-                            .forEach { model ->
-                                fetchedModels
-                                    .getOrPut(resultTask.keyId) { mutableMapOf() }
-                                    .getOrPut(model.protocol) { mutableSetOf() }
-                                    .add(model.modelId)
-                            }
-                    }
+                    applyParsedModels(
+                        body = result.body,
+                        protocol = resultTask.protocol,
+                        key = keyById[resultTask.keyId],
+                        providerId = resultTask.providerId,
+                        keyId = resultTask.keyId,
+                        accumulator = fetchedModels,
+                    )
                 }
 
-                persist(scrubbed, now())
+                // SKIPPED 不落库（红线 11 + §8.4：跳过的连 checkedAt 都不写）。
+                // 不落到库里的同时要推给界面：明细页的"本轮未探测"分组靠的就是这一条。
+                if (scrubbed.outcome != ProbeOutcome.SKIPPED) persist(scrubbed, now())
                 _results.tryEmit(scrubbed)
                 _lastRound.value = _lastRound.value + scrubbed
                 _progress.value = ProbeProgress(
                     runId = runId,
                     running = true,
-                    done = done,
+                    // 进度条显示"已结算"（跑过的 + 被跳过的），否则会永远停在 total 之前：
+                    // 被跳过的项不发请求，但它们的这一轮已经结束了。库里的 `done` 仍是
+                    // "真正跑过请求的项"，摘要卡上的"未探测 N"继续由 `total - done` 算。
+                    done = done + skipped,
                     total = tasks.size,
-                    providerDone = providerDone,
+                    providerDone = providerDone + providerSkipped,
                     providerTotal = providerTotal,
                     providerOk = providerOk,
                     providerFail = providerFail,
-                    keyDone = keyDone,
+                    keyDone = keyDone + keySkipped,
                     keyTotal = keyTotal,
                     keyOk = keyOk,
                     keyFail = keyFail,
@@ -821,24 +918,32 @@ class ProbeEngine constructor(
             }
         } catch (_: CancellationException) {
             // 取消：已落库的结果保留，probe_runs 标 cancelled。
-            finishRun(
-                runId = runId,
-                scope = scope,
-                startedAt = startedAt,
-                total = tasks.size,
-                done = done,
-                ok = ok,
-                fail = fail,
-                providerTotal = providerTotal,
-                providerDone = providerDone,
-                providerOk = providerOk,
-                providerFail = providerFail,
-                keyTotal = keyTotal,
-                keyDone = keyDone,
-                keyOk = keyOk,
-                keyFail = keyFail,
-                cancelled = true,
-            )
+            //
+            // **收尾必须跑在 NonCancellable 里**。这一条协程此刻已经是"已取消"状态，
+            // 里面任何挂起调用（Room 写、审计日志）都会立刻再抛一次 CancellationException，
+            // 于是加了"停止探测"按钮之后：用户点停止，`probe_runs` 那一行永远停在
+            // finishedAt = null、done = 0 的半截状态，明细页显示"上次探测：从未"。
+            // 这里要写的恰好是"这一轮被取消了"这个事实，不能被取消本身打断。
+            withContext(NonCancellable) {
+                finishRun(
+                    runId = runId,
+                    scope = scope,
+                    startedAt = startedAt,
+                    total = tasks.size,
+                    done = done,
+                    ok = ok,
+                    fail = fail,
+                    providerTotal = providerTotal,
+                    providerDone = providerDone,
+                    providerOk = providerOk,
+                    providerFail = providerFail,
+                    keyTotal = keyTotal,
+                    keyDone = keyDone,
+                    keyOk = keyOk,
+                    keyFail = keyFail,
+                    cancelled = true,
+                )
+            }
             return
         }
 
@@ -928,7 +1033,12 @@ class ProbeEngine constructor(
             category = LogCategory.PROBE,
             message = if (cancelled) "probe cancelled" else "probe finished",
             detail = "total=$total ok=$ok fail=$fail cancelled=$cancelled",
+            // 带上轮次：日志页/明细页要能回答"这一轮到底发生了什么"，`runId` 是唯一的线索。
+            runId = runId,
         )
+        // 轮次收尾即裁一次条数：这张表每轮长一行，而明细页只看最近一轮。上限口径与
+        // `LogMaintenance`（启动时那次）共用 `ProbeRunRepository.MAX_RUNS_KEPT`。
+        runRepository.trimToCount(ProbeRunRepository.MAX_RUNS_KEPT)
         _progress.value = null
         _roundResults.tryEmit(RoundResult(total = total, ok = ok, fail = fail, cancelled = cancelled))
     }
@@ -978,6 +1088,7 @@ class ProbeEngine constructor(
             clientProfileId = clientProfileId,
             authStyle = authStyle,
             allowInsecure = allowInsecure,
+            timeoutMs = timeoutMs,
         )
     }
 
@@ -998,7 +1109,7 @@ class ProbeEngine constructor(
         clientKeywords: List<String>,
     ): ProbeItemResult? {
         if (task == null) return null
-        if (task.host in rateLimitedHosts) return null
+        if (engine.isRateLimited(task.host)) return null
         val keyId = task.keyId ?: return null
 
         val secret = try {
@@ -1016,7 +1127,7 @@ class ProbeEngine constructor(
 
             for (attempt in plan) {
                 // 429 熔断：嗅探是本轮请求数的主要放大来源，撞了立刻停（红线 29）。
-                if (task.host in rateLimitedHosts) break
+                if (engine.isRateLimited(task.host)) break
 
                 val auth = ProbeRequestBuilder.authHeaders(task.protocol, secret, attempt.authStyle)
                 val profile = attempt.profile ?: currentProfile
@@ -1028,15 +1139,10 @@ class ProbeEngine constructor(
                         headers = headers,
                         body = task.body,
                         protocol = task.protocol,
+                        timeoutMs = task.timeoutMs,
                     ),
                     allowInsecure = task.allowInsecure,
                 )
-
-                if (response.status == 429) {
-                    rateLimitedHosts += task.host
-                    engine.onRateLimited(task.host)
-                    break
-                }
 
                 val classification = ProbeClassifier.classify(
                     status = response.status.takeIf { response.error == null },
@@ -1044,7 +1150,15 @@ class ProbeEngine constructor(
                     error = response.error,
                     level = task.level,
                     clientKeywords = clientKeywords,
+                    headers = response.headers,
                 )
+
+                // 撞 429：先记进门闸（间隔加倍 + 本轮名单），再停嗅探（红线 29）。
+                // 分类在前是为了把 `Retry-After` 一起递进去。
+                if (response.status == 429 && response.error == null) {
+                    engine.onRateLimited(task.host, classification.retryAfterMs)
+                    break
+                }
 
                 // 还是被拦 → 试下一个预设。
                 if (classification.health == KeyHealth.CLIENT_BLOCKED) continue
@@ -1120,5 +1234,13 @@ class ProbeEngine constructor(
             "Accept" to "application/json",
             "Content-Type" to "application/json; charset=utf-8",
         )
+
+        /**
+         * `probe_runs.scope` 里"仅重试失败项"那一条的取值。
+         *
+         * 做成常量而不是到处写字面量：`runRoundInner` 靠它决定"这一轮的累计快照要不要
+         * 留上一轮的行"，而它必须和 [retryFailed] 传进去的那个值一模一样。
+         */
+        const val RETRY_SCOPE = "retry"
     }
 }

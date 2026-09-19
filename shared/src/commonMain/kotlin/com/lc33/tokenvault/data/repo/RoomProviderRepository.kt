@@ -35,9 +35,15 @@ class RoomProviderRepository constructor(
             }
         }
         val existing = dao.findById(provider.id)
+        // 带着 id 来更新、但那一行已经不在了（别处刚删掉 / 界面拿着过期 id）：Room 的
+        // `@Update` 此时**静默影响 0 行**，接着写一条"已更新"的日志就是在造假——
+        // 用户以为存下了，库里那家还是老的。所以这里显式失败，让调用方拿到可懂的错误。
+        if (existing == null) {
+            throw IllegalStateException("provider ${provider.id} not found while updating")
+        }
         dao.update(
             provider.toEntity().copy(
-                createdAt = existing?.createdAt ?: stamp,
+                createdAt = existing.createdAt,
                 updatedAt = stamp,
             ),
         )

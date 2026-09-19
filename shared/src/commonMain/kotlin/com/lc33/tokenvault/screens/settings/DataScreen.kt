@@ -22,6 +22,7 @@ import tokenvault.shared.generated.resources.data_section_danger
 import tokenvault.shared.generated.resources.data_section_log
 import tokenvault.shared.generated.resources.data_section_organize
 import tokenvault.shared.generated.resources.data_title
+import tokenvault.shared.generated.resources.dialog_cancel
 import tokenvault.shared.generated.resources.groups_title
 import com.lc33.tokenvault.ui.miuix.AppArrowRow
 import com.lc33.tokenvault.ui.miuix.AppDialog
@@ -93,6 +94,8 @@ fun DataScreen(
         title = stringResource(Res.string.data_clear_probe_confirm_title),
         summary = stringResource(Res.string.data_clear_probe_confirm_body),
         confirmText = stringResource(Res.string.data_clear_probe),
+        // 清掉的是历史探测数据、且不可撤销：退路必须是看得见的按钮（AppDialog 契约）。
+        dismissText = stringResource(Res.string.dialog_cancel),
         onConfirm = {
             confirmProbe = false
             onClearProbeResults()
@@ -105,6 +108,7 @@ fun DataScreen(
         title = stringResource(Res.string.data_clear_log_confirm_title),
         summary = stringResource(Res.string.data_clear_log_confirm_body),
         confirmText = stringResource(Res.string.data_clear_log),
+        dismissText = stringResource(Res.string.dialog_cancel),
         onConfirm = {
             confirmLog = false
             onClearLog()

@@ -53,23 +53,44 @@ class ProviderEditorViewModel constructor(
     private val _nameMissing = MutableStateFlow(false)
     val nameMissing: StateFlow<Boolean> = _nameMissing.asStateFlow()
 
+    /**
+     * 保存 / 读取失败。以前写库没有兜底：异常从协程里冒出去直接崩应用；
+     * 成功事件 [_saved] 却在发出之后才动手，于是"已保存"可能是句假话。
+     */
+    private val _failed = MutableSharedFlow<Unit>(
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    val failed: SharedFlow<Unit> = _failed.asSharedFlow()
+
+    /**
+     * 按 id 读不到那一行。**显式报错而不是退化成"新建一家"**：以前读不到就悄悄把这一页
+     * 当新建，用户在改「Agent Router」，按保存却多出一家同名供应商。
+     */
+    private val _loadError = MutableStateFlow(false)
+    val loadError: StateFlow<Boolean> = _loadError.asStateFlow()
+
     private var loadedProvider: com.lc33.tokenvault.domain.model.Provider? = null
 
     init {
         if (providerId != 0L) {
             viewModelScope.launch {
-                val groupList = groupRepository.observeGroups().first()
-                val provider = providers.find(providerId)
-                if (provider != null) {
-                    loadedProvider = provider
-                    _draft.value = provider.toDraft(groupIndexOf(provider.groupId, groupList))
-                }
+                val groupList = runCatching { groupRepository.observeGroups().first() }
+                    .getOrDefault(emptyList())
+                val provider = runCatching { providers.find(providerId) }
+                    .onFailure { _failed.tryEmit(Unit) }
+                    .getOrNull()
+                loadedProvider = provider
+                _loadError.value = provider == null
+                provider?.let { _draft.value = it.toDraft(groupIndexOf(it.groupId, groupList)) }
                 _loaded.value = true
             }
         } else {
             // 新建预填默认名：空名称的供应商在列表里只剩色块和域名，认不出是谁。
             viewModelScope.launch {
-                val count = providers.observeSummaries().first().size
+                val count = runCatching { providers.observeSummaries().first() }
+                    .getOrDefault(emptyList())
+                    .size
                 _draft.value = ProviderDraft(name = defaultProviderLabel(count + 1))
                 _loaded.value = true
             }
@@ -88,9 +109,16 @@ class ProviderEditorViewModel constructor(
             _nameMissing.value = true
             return
         }
+        // 读不到原行时不放行：走下去就是在库里凭空造一家供应商。
+        if (_loadError.value) return
         _nameMissing.value = false
         viewModelScope.launch {
-            val savedId = providers.save(draft.toProvider(loadedProvider, groups.value))
+            // 先落库、成功才发"已保存"并退回；失败留在这一页，用户填的东西还在框里。
+            val savedId = runCatching { providers.save(draft.toProvider(loadedProvider, groups.value)) }
+                .getOrElse {
+                    _failed.tryEmit(Unit)
+                    return@launch
+                }
             // 刚打开「允许检查官网连通性」的话，立刻去查一次——不然用户拨了开关、
             // 页面上却是空的，要等下一次全量刷新才看得到结果，很像没生效。
             // 关掉时不查（那正是关它的意思），已有结果保留着也不算错。

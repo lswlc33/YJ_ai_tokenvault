@@ -6,6 +6,14 @@ import dev.whyoleg.cryptography.algorithms.AES
 import dev.whyoleg.cryptography.materials.key.KeyDecoder
 
 /**
+ * 封套的格式版本与算法标识。**声明在文件顶部、类外**，因为 [SecretBox] 内部的常量与
+ * [isKnownSecretBoxEnvelope] 都要引用它们——`const` 的初始化值必须是编译期常量，
+ * 放在类后面会让"前向引用"这件事依赖编译器实现，不赌。
+ */
+const val SECRET_BOX_FORMAT_VERSION: Byte = 1
+const val SECRET_BOX_CIPHER_AES_256_GCM: Byte = 1
+
+/**
  * AES-256-GCM 的自描述封套。
  *
  * 布局（一律小端无关，因为没有多字节整数）：
@@ -119,9 +127,28 @@ class SecretBox(private val random: RandomBytes = SecureRandomBytes) {
         const val TAG_BITS = 128
         const val TAG_BYTES = TAG_BITS / 8
 
-        private const val FORMAT_VERSION: Byte = 1
-        private const val CIPHER_AES_256_GCM: Byte = 1
+        private const val FORMAT_VERSION: Byte = SECRET_BOX_FORMAT_VERSION
+        private const val CIPHER_AES_256_GCM: Byte = SECRET_BOX_CIPHER_AES_256_GCM
         private const val IV_OFFSET = 2
         private const val HEADER_BYTES = IV_OFFSET + IV_BYTES
+
+        /** 一份合法封套的最短长度：头 + IV + 至少一个 tag。比它短的一定是撕裂或别的东西。 */
+        const val MIN_ENVELOPE_BYTES = HEADER_BYTES + TAG_BYTES
     }
 }
+
+/**
+ * 这份密文的**封套头**是不是本版本认得的（只看版本与算法标识两个字节，不做解密）。
+ *
+ * 存在的理由：boot 文件完全可以长得"合法 JSON、字段齐全、但封套来自更新的版本"，
+ * 存储层的 JSON 校验挡不住它，而把它交给解锁路径的后果是抛异常（崩溃）。
+ * 所以 boot 存储在读的时候先问一句，认不出就直接判损坏，走"从备份恢复"那条明示的出口
+ * （红线 9：跨版本必须显式迁移，不猜）。
+ *
+ * 只适用于 [SecretBox] 自己封套的密文（`dekWrappedByPin` / `dekCheck`）。Android 生物识别
+ * 那条包裹是 Keystore 自己的 `{ivLen, iv, ct}` 布局，不归本封套管，不能用这个函数判。
+ */
+fun isKnownSecretBoxEnvelope(envelope: ByteArray): Boolean =
+    envelope.size >= SecretBox.MIN_ENVELOPE_BYTES &&
+        envelope[0] == SECRET_BOX_FORMAT_VERSION &&
+        envelope[1] == SECRET_BOX_CIPHER_AES_256_GCM

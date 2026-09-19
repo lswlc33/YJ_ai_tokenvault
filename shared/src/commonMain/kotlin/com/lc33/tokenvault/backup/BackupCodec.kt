@@ -108,6 +108,16 @@ class BackupCodec(private val random: RandomBytes = SecureRandomBytes) {
         if (header.schema > BackupHeader.SCHEMA_VERSION) {
             throw BackupTooNewException(header.schema)
         }
+        // 版本校验是**双向**的。过去只挡上界，于是 `format: 0` / `-3` 这种非法或过旧的包
+        // 会一路走到 AES 解密、再当 v1 去恢复：口令明明对却报"备份损坏"，或者更糟——
+        // 用错误的字段含义把半截数据写进库。当前只有 1 这一档，下界就是 1；
+        // 将来引入 0→1 的显式迁移时，改的是这条下界而不是删掉它（红线 9：不静默兼容）。
+        if (header.format < MIN_FORMAT_VERSION) {
+            throw BackupCorruptException("unsupported backup format ${header.format}")
+        }
+        if (header.schema < MIN_SCHEMA_VERSION) {
+            throw BackupCorruptException("unsupported backup schema ${header.schema}")
+        }
 
         val body = bytes.copyOfRange(MAGIC.size + 4 + headerLen, bytes.size)
         val key = Pbkdf2Kdf.derive(password, header.kdf)
@@ -146,6 +156,10 @@ class BackupCodec(private val random: RandomBytes = SecureRandomBytes) {
         val MAGIC = "YJVAULT1".encodeToByteArray()
         const val TAG_BITS = 128
 
+        /** 本应用能读的最老格式 / 表结构版本。只有一档时它等于 [BackupHeader.FORMAT_VERSION]。 */
+        const val MIN_FORMAT_VERSION = 1
+        const val MIN_SCHEMA_VERSION = 1
+
         /** 往 [out] 的 [offset] 处写 4 字节大端 int（替代 ByteBuffer.putInt）。 */
         fun writeIntBE(out: ByteArray, offset: Int, value: Int) {
             out[offset] = (value ushr 24).toByte()
@@ -168,6 +182,29 @@ data class DecodedBackup(
     val header: BackupHeader,
     val payload: ByteArray,
 )
+
+/**
+ * 校验 payload 内嵌的版本号与 header 一致（解出 [BackupPayload] 之后、写库之前调用）。
+ *
+ * [BackupPayload.format] / [BackupPayload.schema] 曾经只是两个没人读的种子字段：header 在
+ * 明文区、payload 在密文区，两者各自能被独立改写（前者改一个字节就绕过所有校验，后者
+ * 要用对的口令重打包）。版本不一致意味着"按 header 选了解析器、却拿另一套字段含义去
+ * 恢复"——那是**静默写坏库**的形状，所以在这里挡住并报出到底是哪一项不一致。
+ *
+ * 抛 [BackupTooNewException] 还是 [BackupCorruptException] 的分工与 [BackupCodec.decode]
+ * 一致：整体过新是"请升级后再恢复"，两处各说一套则是包本身被改坏了。
+ */
+fun requireMatchingBackupVersions(header: BackupHeader, payload: BackupPayload) {
+    if (payload.format > BackupHeader.FORMAT_VERSION || payload.schema > BackupHeader.SCHEMA_VERSION) {
+        throw BackupTooNewException(maxOf(payload.format, payload.schema))
+    }
+    if (payload.format != header.format) {
+        throw BackupCorruptException("payload format ${payload.format} != header format ${header.format}")
+    }
+    if (payload.schema != header.schema) {
+        throw BackupCorruptException("payload schema ${payload.schema} != header schema ${header.schema}")
+    }
+}
 
 /** 备份包损坏（magic 不对 / header 解析失败 / 口令错 / 密文被改）。 */
 class BackupCorruptException(message: String) : Exception(message)

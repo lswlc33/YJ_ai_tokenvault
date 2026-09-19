@@ -3,6 +3,7 @@ package com.lc33.tokenvault.screens.settings
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,6 +57,12 @@ fun BalanceThresholdsScreen(
     val cnyState = rememberAppTextFieldState(trimZero(loaded["CNY"] ?: BalanceSnapshot.DEFAULT_THRESHOLDS["CNY"]!!))
     var showError by remember { mutableStateOf(false) }
 
+    // 退出这一页等的是"落库成功"事件，而不是 save() 的返回值：
+    // 先退再写会让写失败发生在用户已经离开之后。
+    LaunchedEffect(viewModel) {
+        viewModel.saved.collect { onBack() }
+    }
+
     SettingsSubPage(titleRes = Res.string.probe_thresholds, onBack = onBack) {
         item {
             AppCard(
@@ -99,7 +106,8 @@ fun BalanceThresholdsScreen(
                 onClick = {
                     when (viewModel.save(usdState.text, cnyState.text)) {
                         BalanceThresholdsViewModel.SaveResult.Invalid -> showError = true
-                        BalanceThresholdsViewModel.SaveResult.Saved -> onBack()
+                        // Accepted 只代表写入已发起，退回由 [saved] 事件驱动。
+                        BalanceThresholdsViewModel.SaveResult.Accepted -> Unit
                     }
                 },
                 modifier = Modifier

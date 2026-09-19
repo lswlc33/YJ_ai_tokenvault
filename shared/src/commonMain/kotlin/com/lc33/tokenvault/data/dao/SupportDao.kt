@@ -32,6 +32,10 @@ interface ProviderAccountDao {
     @Query("SELECT * FROM provider_accounts WHERE id = :id")
     suspend fun findById(id: Long): ProviderAccountEntity?
 
+    /** 这一家已有几个账号：新增时的 `sortOrder`，只要一个数，不必把整表读回来。 */
+    @Query("SELECT COUNT(*) FROM provider_accounts WHERE providerId = :providerId")
+    suspend fun countByProvider(providerId: Long): Int
+
     @Insert
     suspend fun insert(account: ProviderAccountEntity): Long
 
@@ -69,9 +73,7 @@ interface ProviderAccountDao {
         now: Long,
     )
 
-    /** 登录方式是明文元数据，单独写，避免整行替换把两段密文一起暴露给编辑路径。 */
-    @Query("UPDATE provider_accounts SET loginMethods = :loginMethods, updatedAt = :now WHERE id = :id")
-    suspend fun setLoginMethods(id: Long, loginMethods: String, now: Long)
+    /** 登录方式的单独更新走 [setMeta]（它本来就带这一列），不再另开一条只有两列的语句。 */
 
     /** 回填密码密文，同理只动密码列。 */
     @Query("UPDATE provider_accounts SET passwordEnc = :enc, updatedAt = :now WHERE id = :id")
@@ -217,6 +219,15 @@ interface ModelDao {
     suspend fun applyTransientOutcome(id: Long, lastOutcome: String, detail: String?, probedAt: Long)
 }
 
+/**
+ * 模型目录（`model_catalog`）。
+ *
+ * **未接线：计划内功能。** 表、实体、这张 DAO 与 `catalog/ModelCatalogMatcher` 都在，
+ * 但没有任何生产路径往里写数据、也没有任何读路径经过它——目录同步的入口还没做，
+ * 属于计划内功能。所以这里的方法看着像死代码，实际是
+ * 等接线的那一半；接线时的落点是模型同步那条链路（`RoomModelRepository` 的 discover
+ * 写入之后），不是探测本身。
+ */
 @Dao
 interface ModelCatalogDao {
 
@@ -256,9 +267,15 @@ interface ProbeRunDao {
     @Update
     suspend fun update(run: ProbeRunEntity)
 
-    /** 只保留最近几轮：探测明细页只看最近一轮，历史留着只是占地方。 */
-    @Query("DELETE FROM probe_runs WHERE id NOT IN (SELECT id FROM probe_runs ORDER BY startedAt DESC LIMIT :keep)")
-    suspend fun trim(keep: Int)
+    /**
+     * 只保留最近 [keep] 轮：探测明细页只看最近一轮，历史留着只是占地方。
+     *
+     * 与 `AuditLogDao.trimToCount` 同名同语义（条数上限；天数上限是 `LogMaintenance` 的另一半）。
+     * 按条数而不是按时间裁，是因为轮次的 `startedAt` 来自本机时钟：用户改过时间就可能
+     * 把整表判成"太老"，条数不受时钟影响。
+     */
+    @Query("DELETE FROM probe_runs WHERE id NOT IN (SELECT id FROM probe_runs ORDER BY startedAt DESC, id DESC LIMIT :keep)")
+    suspend fun trimToCount(keep: Int)
 
     /** 清空（备份"覆盖恢复"用——红线 28：探测结果不搬，恢复后一律未探测）。 */
     @Query("DELETE FROM probe_runs")
@@ -288,27 +305,29 @@ data class AuditLogSummary(
 @Dao
 interface AuditLogDao {
 
+    /**
+     * 列表按等级过滤（日志页的等级开关）。
+     *
+     * `ORDER BY at DESC, id DESC`：**同一毫秒写进多条**是常态（一轮探测里每个请求一条），
+     * 只按 `at` 排时 SQLite 对这些并列行的顺序没有承诺，翻页与"最新在前"都会抖。
+     * 主键单调递增，用它兜底就是稳定的插入序。
+     */
     @Query(
         """
         SELECT id, at, level, category, providerId, keyId, runId, message, detail, requestUrl
-        FROM audit_log ORDER BY at DESC LIMIT :limit
-        """,
-    )
-    fun observeRecent(limit: Int): Flow<List<AuditLogSummary>>
-
-    @Query(
-        """
-        SELECT id, at, level, category, providerId, keyId, runId, message, detail, requestUrl
-        FROM audit_log WHERE level IN (:levels) ORDER BY at DESC LIMIT :limit
+        FROM audit_log WHERE level IN (:levels) ORDER BY at DESC, id DESC LIMIT :limit
         """,
     )
     fun observeRecentByLevels(levels: List<String>, limit: Int): Flow<List<AuditLogSummary>>
 
-    @Query("SELECT * FROM audit_log WHERE providerId = :providerId ORDER BY at DESC LIMIT :limit")
+    /** 某家供应商的日志（详情页）。同样是 `at` + `id` 双键排序，理由见 [observeRecentByLevels]。 */
+    @Query(
+        """
+        SELECT * FROM audit_log WHERE providerId = :providerId
+        ORDER BY at DESC, id DESC LIMIT :limit
+        """,
+    )
     fun observeByProvider(providerId: Long, limit: Int): Flow<List<AuditLogEntity>>
-
-    @Query("SELECT * FROM audit_log WHERE keyId = :keyId ORDER BY at DESC LIMIT :limit")
-    fun observeByKey(keyId: Long, limit: Int): Flow<List<AuditLogEntity>>
 
     /** 单条。日志详情页（网络报文明细）按 id 取，避免把整段报文塞进列表。 */
     @Query("SELECT * FROM audit_log WHERE id = :id")
@@ -320,8 +339,8 @@ interface AuditLogDao {
     @Query("DELETE FROM audit_log")
     suspend fun clear()
 
-    /** 条数上限。 */
-    @Query("DELETE FROM audit_log WHERE id NOT IN (SELECT id FROM audit_log ORDER BY at DESC LIMIT :keep)")
+    /** 条数上限。`id DESC` 兜并列时间戳，免得同一毫秒的几条谁被裁随机。 */
+    @Query("DELETE FROM audit_log WHERE id NOT IN (SELECT id FROM audit_log ORDER BY at DESC, id DESC LIMIT :keep)")
     suspend fun trimToCount(keep: Int)
 
     /** 天数上限。两条都要有，因为"十万条但都是今天的"与"十条但有三年前的"都不该留。 */

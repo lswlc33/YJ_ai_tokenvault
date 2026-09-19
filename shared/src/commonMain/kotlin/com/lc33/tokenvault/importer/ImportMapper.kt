@@ -22,8 +22,13 @@ fun ParsedRecord.toKeySettings(): KeySettings {
         apiRoot = endpoints?.apiRoot ?: baseUrl,
         apiVersion = endpoints?.ver ?: "v1",
         supportedProtocols = supportedProtocols,
+        // 这三项过去在解析器里认得、却在映射时被丢掉：导出一份再导入一次，
+        // 路径覆盖 / 换算比 / customJson 配置全归零，用户看到的是"配置莫名其妙没了"。
+        pathOverrides = pathOverrides,
         balanceKind = balanceKind,
         balanceBaseUrl = balanceBaseUrl,
         balanceUserId = balanceUserId,
+        quotaPerUnit = quotaPerUnit,
+        balanceConfig = balanceConfig.orEmpty().ifBlank { "{}" },
     )
 }

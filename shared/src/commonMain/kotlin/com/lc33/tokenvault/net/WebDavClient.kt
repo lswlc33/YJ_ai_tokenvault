@@ -11,13 +11,16 @@ import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.header
 import io.ktor.client.request.request
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsBytes
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
+import io.ktor.http.URLBuilder
 import io.ktor.http.contentType
 import io.ktor.http.decodeURLPart
+import io.ktor.http.takeFrom
 import kotlinx.coroutines.CancellationException
 import com.lc33.tokenvault.crypto.zeroize
 import kotlin.io.encoding.Base64
@@ -36,9 +39,7 @@ class WebDavClient constructor(
 
     suspend fun listBackups(config: WebDavConfig, credentials: WebDavCredentials): List<String> =
         logged("PROPFIND", remoteDirectoryUrl(config)) {
-            val response = client.request(remoteDirectoryUrl(config)) {
-                method = HttpMethod("PROPFIND")
-                applyAuth(credentials)
+            val response = requestDav("PROPFIND", remoteDirectoryUrl(config), credentials) {
                 header(HttpHeaders.Depth, "1")
                 contentType(ContentType.Application.Xml)
                 setBody(PROP_REQUEST_BODY)
@@ -49,9 +50,7 @@ class WebDavClient constructor(
 
     suspend fun put(config: WebDavConfig, credentials: WebDavCredentials, fileName: String, bytes: ByteArray) {
         logged("PUT", remoteFileUrl(config, fileName)) {
-            val response = client.request(remoteFileUrl(config, fileName)) {
-                method = HttpMethod.Put
-                applyAuth(credentials)
+            val response = requestDav("PUT", remoteFileUrl(config, fileName), credentials) {
                 setBody(bytes)
             }
             ensureSuccess(response.status.value, "PUT")
@@ -61,20 +60,14 @@ class WebDavClient constructor(
 
     suspend fun get(config: WebDavConfig, credentials: WebDavCredentials, fileName: String): ByteArray =
         logged("GET", remoteFileUrl(config, fileName)) {
-            val response = client.request(remoteFileUrl(config, fileName)) {
-                method = HttpMethod.Get
-                applyAuth(credentials)
-            }
+            val response = requestDav("GET", remoteFileUrl(config, fileName), credentials)
             ensureSuccess(response.status.value, "GET")
             response.status.value to response.bodyAsBytes()
         }
 
     suspend fun delete(config: WebDavConfig, credentials: WebDavCredentials, fileName: String) {
         logged("DELETE", remoteFileUrl(config, fileName)) {
-            val response = client.request(remoteFileUrl(config, fileName)) {
-                method = HttpMethod.Delete
-                applyAuth(credentials)
-            }
+            val response = requestDav("DELETE", remoteFileUrl(config, fileName), credentials)
             ensureSuccess(response.status.value, "DELETE")
             response.status.value to Unit
         }
@@ -87,6 +80,43 @@ class WebDavClient constructor(
     ) {
         runCatching { audit?.record(level = level, category = LogCategory.HTTP, message = message, detail = detail) }
     }
+
+    /**
+     * 发一次 DAV 请求；上游回 3xx 时**同动词、同请求体**跟着 `Location` 再发一次，只跟一次。
+     *
+     * 为什么要在这里自己跟：探测那一侧刻意关掉了重定向（见 `HttpEngine.buildClient`——3xx 对
+     * 探活没有意义，跟过去只会把"上游在跳转"这件事藏起来），但 WebDAV 的 3xx 是真实的配置差异：
+     * 尾斜杠、http→https、目录被反代挪走。不处理的表现是"某天备份同步全红"，而用户在自己
+     * 那一侧改不动上游那个斜杠。
+     *
+     * 为什么不用 Ktor 的 `HttpRedirect` 插件：它按 RFC 把 301/302/303 上的非 GET 降级成 GET，
+     * 于是 PUT 的备份字节压根没发出去、我们却报"已上传"——静默丢数据比报错糟得多。
+     * 只跟一次：还回 3xx 就交给 [ensureSuccess] 报出去（自环的 302 不能一直转）。
+     */
+    private suspend fun requestDav(
+        verb: String,
+        url: String,
+        credentials: WebDavCredentials,
+        configure: HttpRequestBuilder.() -> Unit = {},
+    ): HttpResponse {
+        val first = client.request(url) {
+            method = HttpMethod(verb)
+            applyAuth(credentials)
+            configure()
+        }
+        if (first.status.value !in 300..399) return first
+        // 没有 Location 的 3xx 无处可跟，原样交出去让 ensureSuccess 定性。
+        val location = first.headers[HttpHeaders.Location]?.let { resolve(url, it) } ?: return first
+        return client.request(location) {
+            method = HttpMethod(verb)
+            applyAuth(credentials)
+            configure()
+        }
+    }
+
+    /** `Location` 允许是绝对地址，也可能是相对当前 URL 的一段（尾斜杠那类跳转常见）。 */
+    private fun resolve(base: String, location: String): String =
+        URLBuilder(base).apply { takeFrom(location) }.buildString()
 
     private suspend fun <T> logged(verb: String, url: String, block: suspend () -> Pair<Int, T>): T =
         try {
@@ -109,7 +139,20 @@ class WebDavClient constructor(
             throw t
         }
 
-    private fun safeTarget(url: String): String = url.substringBefore('?').substringBefore('#')
+    /**
+     * 日志里的目标地址：去 query / fragment，并**剥掉 userinfo**。
+     *
+     * 与 `HttpEngine.safeTarget` 同一条规矩：有人会把凭据直接写进 WebDAV 地址
+     * （`https://user:pass@dav.example.com/…`），而日志会被复制、截图、分享出去。
+     */
+    private fun safeTarget(url: String): String {
+        val base = url.substringBefore('?').substringBefore('#')
+        val schemeEnd = base.indexOf("://").let { if (it < 0) 0 else it + 3 }
+        val pathStart = base.indexOf('/', startIndex = schemeEnd).let { if (it < 0) base.length else it }
+        return base.substring(0, schemeEnd) +
+            base.substring(schemeEnd, pathStart).substringAfterLast('@') +
+            base.substring(pathStart)
+    }
 
     private fun HttpRequestBuilder.applyAuth(credentials: WebDavCredentials) {
         header(HttpHeaders.Authorization, basic(credentials.username, credentials.password))
@@ -135,13 +178,18 @@ class WebDavClient constructor(
         /**
          * 从 PROPFIND 响应里取 `.yjv` 文件名。只要 href，不解析资源类型：
          * 本项目只按固定后缀过滤，目录没有 `.yjv` 后缀，天然不会混进来。
+         *
+         * **先按原始 href 取末段、再解码**，顺序不能倒。有些服务端（Nextcloud 的部分
+         * 反代配置）会把文件名里的 `/` 编码成 `%2F` 写进 href：先 `decodeURLPart()` 就
+         * 把它变回一个真斜杠，于是 `substringAfterLast('/')` 只截到文件名的后半截，
+         * 列出来的名字对不上实际文件，下载与删除都指向一个不存在的文件名。
+         * 反过来（先取末段）永远不会多切一刀，编码字符留到解码那一步再还原。
          */
         internal fun parseBackupNames(xml: String): List<String> {
             val hrefRegex = Regex("""<(?:[A-Za-z0-9_.-]+:)?href>(.*?)</(?:[A-Za-z0-9_.-]+:)?href>""")
             return hrefRegex.findAll(xml)
                 .mapNotNull { match ->
-                    val href = match.groupValues[1].trim().decodeURLPart()
-                    val name = href.substringAfterLast('/')
+                    val name = match.groupValues[1].trim().substringAfterLast('/').decodeURLPart()
                     name.takeIf { it.endsWith(BACKUP_EXTENSION) }
                 }
                 .distinct()

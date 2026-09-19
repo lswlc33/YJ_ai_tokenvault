@@ -66,6 +66,8 @@ fun ApiKey.toDraft(profiles: List<ClientProfile>): KeyDraft = KeyDraft(
     protocols = settings.supportedProtocols,
     authStyleIndex = KEY_AUTH_STYLES.indexOf(settings.authStyle).coerceAtLeast(0),
     profileIndex = profileIndexOf(settings.clientProfileId, profiles),
+    // 草稿只画 Anthropic 这一格，所以只回显它；其余协议的覆盖不进草稿（也就不会被
+    // 顺手改掉），保存时由 [mergedPathOverrides] 原样带回去。
     pathOverrideAnthropic = settings.pathOverrides[Protocol.ANTHROPIC].orEmpty(),
     timeoutSeconds = settings.timeoutSeconds?.toString().orEmpty(),
     allowInsecure = settings.allowInsecure,
@@ -97,11 +99,9 @@ fun KeyDraft.toSettings(
         apiRoot = normalized.endpoints.apiRoot,
         apiVersion = normalized.endpoints.ver,
         supportedProtocols = protocols,
-        pathOverrides = if (pathOverrideAnthropic.isBlank()) {
-            emptyMap()
-        } else {
-            mapOf(Protocol.ANTHROPIC to pathOverrideAnthropic)
-        },
+        // 路径覆盖**按协议逐项合并**：编辑页只画 Anthropic 这一格，整份重写会把备份恢复
+        // 带进来的其它协议覆盖静静地清空（"进一趟编辑页，路径就没了"）。
+        pathOverrides = mergedPathOverrides(existing?.pathOverrides, pathOverrideAnthropic),
         authStyle = KEY_AUTH_STYLES.getOrElse(authStyleIndex) { AuthStyle.AUTO },
         allowInsecure = allowInsecure,
         clientProfileId = when {
@@ -144,6 +144,22 @@ private fun profileIndexOf(clientProfileId: Long?, profiles: List<ClientProfile>
     if (clientProfileId == null) return 0
     val index = profiles.indexOfFirst { it.id == clientProfileId }
     return if (index < 0) 0 else index + 1
+}
+
+/**
+ * 路径覆盖按协议逐项合并：只动 Anthropic 这一项，其余协议（备份恢复带进来的、
+ * 或别处写进去的）原样保留。留空即表示这一项不设覆盖，所以把它整条删掉。
+ */
+private fun mergedPathOverrides(
+    existing: Map<Protocol, String>?,
+    anthropicOverride: String,
+): Map<Protocol, String> {
+    val merged = (existing ?: emptyMap())
+        .filterKeys { it != Protocol.ANTHROPIC }
+        .toMutableMap()
+    if (anthropicOverride.isBlank()) merged.remove(Protocol.ANTHROPIC)
+    else merged[Protocol.ANTHROPIC] = anthropicOverride.trim()
+    return merged
 }
 
 /**

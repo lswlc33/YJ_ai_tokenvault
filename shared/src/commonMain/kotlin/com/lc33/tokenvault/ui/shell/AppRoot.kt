@@ -3,7 +3,10 @@ package com.lc33.tokenvault.ui.shell
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
@@ -63,21 +66,31 @@ fun AppRoot() {
             },
             onOnboardingNext = vm::onOnboardingNext,
             onOnboardingBack = vm::onOnboardingBack,
-            // 从备份恢复要走 SAF 选文件，那是 M9 的事。现在按不动比按了没反应好，
-            // 所以这一项留空——BootCorruptScreen 会把它画成禁用态。
+            // 从备份恢复要走 SAF 选文件，那是 M9 的事：现在连回调都还没有，所以
+            // `restoreFromBackupEnabled` 留在默认值 false —— BootCorruptScreen 会把它画成
+            // 禁用态并写清"这一版还没实现"，而不是让人按了没反应。
             onRestoreFromBackup = {},
             onWipeAndStartOver = vm::onWipeAndStartOver,
         )
     }
 
     AppTheme(mode = colorScheme) {
+        // 锁屏前所在的一级页。这一份状态**必须在 LockGate 之外**：锁定时整棵业务树会被
+        // 换掉（§7.4，明文 UI 状态要随之销毁），[VaultShell] 里的 pager 连同它的
+        // rememberPagerState 一起没了，不记在这里的话解锁后永远回到「总览」。
+        // AppRoot 自己从不退出组合，所以这一格既活得过锁屏、也活得过转屏；给它显式 key
+        // 是因为 rememberSaveable 的自动 key 按组合位置编号，锁屏前后树形一变就会错领。
+        var topLevelPage by rememberSaveable(key = "top-level-page") { mutableIntStateOf(0) }
         LockGate(
             phase = phase,
             state = uiState,
             callbacks = callbacks,
             biometricAvailable = biometricAvailable,
         ) {
-            VaultShell()
+            VaultShell(
+                initialTabPage = topLevelPage,
+                onTabPageChange = { topLevelPage = it },
+            )
         }
     }
 }

@@ -42,6 +42,21 @@ class ModelCatalogMatcherTest {
         assertEquals("claude-opus-4", CatalogNormalize.normalize("Claude-Opus-4"))
     }
 
+    @Test
+    fun `归一化剥离复合后缀到不动点`() {
+        // 日期与能力两类正则都锚在行尾，一次只能剥掉最末尾那一层。
+        // `gpt-4o-2024-08-06:free` 必须先去掉 `:free` 才轮得到日期，否则结果停在
+        // `gpt-4o-2024-08-06`，与目录里的 `gpt-4o` 对不上，第三级归一化匹配整段失效。
+        assertEquals("gpt-4o", CatalogNormalize.normalize("gpt-4o-2024-08-06:free"))
+        assertEquals("gpt-4o", CatalogNormalize.normalize("gpt-4o-20240806:thinking"))
+        assertEquals("gpt-4o", CatalogNormalize.normalize("gpt-4o:free-latest"))
+        assertEquals("gpt-4o", CatalogNormalize.normalize("gpt-4o-2024-08-06:free:beta"))
+        // 每一轮只会让串变短，所以循环必然收敛；不在表里的中段后缀不受影响。
+        assertEquals("gpt-4o-mini", CatalogNormalize.normalize("gpt-4o-mini-2024-07-18"))
+        assertEquals("gpt-4o:mini", CatalogNormalize.normalize("gpt-4o:mini"))
+        assertEquals("o3", CatalogNormalize.normalize("o3"))
+    }
+
     // ------------------------------------------------------------------ 三级匹配
 
     @Test

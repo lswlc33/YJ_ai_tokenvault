@@ -1,5 +1,8 @@
 package com.lc33.tokenvault.balance
 
+import kotlin.math.abs
+import kotlin.math.floor
+
 /**
  * 金额格式化（§9.1）。
  *
@@ -10,7 +13,7 @@ package com.lc33.tokenvault.balance
  *
  * 为什么不用 `java.math.BigDecimal`：它是 JVM 专属类型，会挡住 iOS 端编译
  * （阶段2 KMP 化）。这里用 `Long` 存"分"做定点运算，语义与
- * `BigDecimal.setScale(2, HALF_UP)` 完全一致——金额本来就是 2 位小数的定点数，
+ * `BigDecimal.setScale(2, HALF_UP)` 一致——金额本来就是 2 位小数的定点数，
  * 用整数分表示不丢精度，也天然跨平台。
  *
  * 货币符号由币种查表得到（红线 15：不硬编码符号、不硬编码阈值）。
@@ -19,25 +22,39 @@ object FormatMoney {
 
     /** 定点舍入到 2 位小数（"分"）。所有展示与求和前的唯一入口。 */
     fun roundedCents(amount: Double): Long {
-        // 等价 BigDecimal.valueOf(amount).setScale(2, HALF_UP)。关键在**不能用浮点乘法**
-        // （round(x * 100) 会把 0.005 算成 0，因为 0.005*100 = 0.4999...）：
-        // BigDecimal.valueOf 内部用 Double.toString 拿到**最短精确十进制表示**再精确舍入，
-        // 这里同样基于字符串做十进制 HALF_UP 舍入到 2 位。
-        val s = amount.toString() // 如 "0.005"、"42.099999999999994"、"358.0"、"-3.0"
-        val negative = s.startsWith("-")
-        val body = if (negative) s.substring(1) else s
-        val dot = body.indexOf('.')
-        val intPart = if (dot < 0) body else body.substring(0, dot)
-        val fracPart = if (dot < 0) "" else body.substring(dot + 1)
+        // 等价 BigDecimal.valueOf(amount).setScale(2, HALF_UP)，但**全程算术、不碰字符串表示**。
+        //
+        // 旧实现是剥 `Double.toString` 的十进制外壳，而 `toString` 在 `|v| >= 1e7` 或
+        // `< 1e-3` 时输出科学计数法：`8.0E-4` 直接 NumberFormatException，`9.98E-4` 被算成
+        // 999 分，`1.2345678E7` 被算成 1.23 分。金额可以任意大（火山那类企业账户上千万元），
+        // 所以那条路径早晚会撞上。
+        if (amount.isNaN()) return 0L // 脏数据不该让仪表盘崩掉，也没有"分"可舍
+        val negative = amount < 0
+        // 局部量刻意不叫 `abs`：下面还要用 `kotlin.math.abs` 这个函数，同名变量在调用位置
+        // 上容易读成"把 Double 当函数调"，改名比让读者去查重载解析规则便宜。
+        val magnitude = abs(amount)
+        if (!magnitude.isFinite() || magnitude * 100.0 >= Long.MAX_VALUE.toDouble()) {
+            // 夹到极值而不是抛：调用方是首页求和，一个坏值不该掀掉整屏。
+            return if (negative) -Long.MAX_VALUE else Long.MAX_VALUE
+        }
 
-        // 小数补齐到 3 位：前两位是"分"，第三位决定 HALF_UP 进位。
-        val frac = fracPart.padEnd(3, '0')
-        val whole = intPart.toLong()
-        val cents = frac.substring(0, 2).toInt()
-        val roundUp = frac[2] >= '5'
+        val scaled = magnitude * 100.0
+        var cents = floor(scaled).toLong()
+        val frac = scaled - cents
+        // HALF_UP 是**十进制**语义：`0.145` 应当进位，但它的 `double` 是 0.14499999999999999…，
+        // 乘 100 得 14.499999999999998，严格按"加半分后截断"会掉到 14 分。
+        // 判等用的容差只需盖住乘法自身的舍入误差（约 scaled * 2^-53），再放宽一点仍然远小于
+        // 半分，既救回 0.145 / 2.675 这类"恰好半分"，也不会把 0.1449999996 这种真值误抬。
+        //
+        // **必须封顶**：`scaled * 1e-14` 只在 scaled 小于约 5e13（也就是金额约 5e11 元）时才是
+        // "半分的一个零头"。1e15 元时它算出来是 1000 分，于是 `abs(frac - 0.5) <= tolerance`
+        // 对任何值都成立——每一笔大额的余额都被凭空抬高一 cent（1e15 → 100000000000000001 分）。
+        // 到了 double 连"分以下"都表示不出来的量级，半分判断已经没有真值可依，一律不进位。
+        val tolerance = (1e-9 + scaled * 1e-14).coerceAtMost(HALF_CENT_SNAP_CEILING)
+        if (frac > 0.5 || abs(frac - 0.5) <= tolerance) cents += 1
 
-        val total = whole * 100 + cents + (if (roundUp) 1 else 0)
-        return if (negative) -total else total
+        // 负数按绝对值舍入再取负号 == 远离零进位，与 BigDecimal 的 HALF_UP 对 -0.005 → -1 分一致。
+        return if (negative) -cents else cents
     }
 
     /** 两个金额相加（先各自舍入再相加），返回"分"。 */
@@ -75,4 +92,13 @@ object FormatMoney {
         "GBP" to "£",
         "JPY" to "¥",
     )
+
+    /**
+     * 半分判等容差的上限，单位是"分"（即千分之一分）。
+     *
+     * 为什么是这个量级：容差要盖住的只是 `double` 的表示误差（约 `scaled * 2^-53`），
+     * 一旦它长到千分之一分以上，抬上去的那一位就不再是"救回恰好半分"，而是凭空造出一分。
+     * 它同时保证容差永远够不到半分（0.5），所以 `frac == 0` 的整数金额不会被无条件进位。
+     */
+    private const val HALF_CENT_SNAP_CEILING = 1e-3
 }

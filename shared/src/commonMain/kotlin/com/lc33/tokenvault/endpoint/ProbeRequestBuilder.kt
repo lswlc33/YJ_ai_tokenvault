@@ -39,6 +39,7 @@ object ProbeRequestBuilder {
         protocol: Protocol,
         apiKey: CharArray?,
         authStyle: AuthStyle? = null,
+        timeoutMs: Long? = null,
     ): ProbeRequest {
         val headers = authHeaders(protocol, apiKey, authStyle)
         return ProbeRequest(
@@ -46,6 +47,7 @@ object ProbeRequestBuilder {
             url = modelsUrl,
             headers = headers,
             protocol = protocol,
+            timeoutMs = timeoutMs,
         )
     }
 
@@ -62,6 +64,7 @@ object ProbeRequestBuilder {
         modelId: String,
         authStyle: AuthStyle? = null,
         prompt: String = DEFAULT_INFERENCE_PROMPT,
+        timeoutMs: Long? = null,
     ): ProbeRequest {
         val headers = authHeaders(protocol, apiKey, authStyle)
         val body = when (protocol) {
@@ -75,6 +78,7 @@ object ProbeRequestBuilder {
             headers = headers,
             body = body,
             protocol = protocol,
+            timeoutMs = timeoutMs,
         )
     }
 

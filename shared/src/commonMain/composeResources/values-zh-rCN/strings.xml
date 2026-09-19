@@ -27,6 +27,7 @@
     <string name="dashboard_balance_updated">更新于 %1$s</string>
     <string name="dashboard_balance_failed">%1$d 个供应商的余额查询失败</string>
     <string name="dashboard_balance_none">还没有配置余额查询</string>
+    <string name="dashboard_balance_detail">查看余额明细</string>
     <string name="dashboard_counts_title">内容</string>
     <string name="common_loading">加载中…</string>
     <string name="count_providers">供应商</string>
@@ -60,6 +61,8 @@
     <string name="dashboard_backup_title">备份</string>
     <string name="dashboard_backup_never">尚未备份。忘记 PIN 或更换设备将无法恢复数据。</string>
     <string name="dashboard_backup_last">上次备份 %1$s · %2$s</string>
+    <string name="backup_target_local">本地文件</string>
+    <string name="backup_target_webdav">WebDAV</string>
     <string name="dashboard_backup_now">立即备份</string>
     <string name="dashboard_empty_title">还没有内容</string>
     <string name="dashboard_empty_desc">可手动添加，或粘贴文本批量导入密钥、端点、模型与余额配置。</string>
@@ -164,6 +167,7 @@
     <string name="manage_sort_name">名称</string>
     <string name="manage_sort_balance">余额</string>
     <string name="manage_sort_last_probe">最近探测</string>
+    <string name="manage_sort_cd">排序方式</string>
     <string name="manage_selected_count">已选 %1$d 项</string>
     <string name="manage_select_all">全选</string>
     <string name="manage_deselect_all">取消全选</string>
@@ -180,6 +184,9 @@
     <string name="manage_empty_search_desc">请尝试其他关键词，或清空搜索条件。</string>
     <string name="groups_title">分组</string>
     <string name="groups_add_failed">分组保存失败，可能存在同名分组。</string>
+    <string name="groups_rename_failed">分组改名失败，可能有另一个分组已经叫这个名字。</string>
+    <string name="groups_delete_failed">分组删除失败，本机数据没有变化，请重试。</string>
+    <string name="manage_write_failed">改动没能保存，本机数据没有变化，请重试。</string>
     <string name="provider_editor_title">编辑供应商</string>
     <string name="detail_edit_cd">编辑</string>
     <string name="detail_section_keys">密钥</string>
@@ -220,11 +227,16 @@
 
     <!-- Security -->
     <string name="security_section_credential">凭据</string>
-    <string name="security_change_pin">修改 PIN 或改用口令</string>
+    <string name="security_change_pin">修改 PIN</string>
     <string name="security_change_pin_summary">仅重新加密数据密钥，不修改任何数据，可立即完成</string>
     <string name="security_biometric">允许使用生物识别验证</string>
     <string name="security_biometric_summary">它是通向同一个数据密钥的另一条路，不是第二道锁。凭据由硬件安全存储保管，重新录入指纹会让它自动失效。</string>
     <string name="security_biometric_unavailable">这台设备还没录入指纹或人脸，或强生物识别不可用</string>
+    <string name="security_biometric_failed_detail">没能开启生物识别：%1$s</string>
+    <string name="security_biometric_locked_out">连续验证失败次数过多，生物识别已被系统暂时锁定。请先用 PIN 解锁，稍后再试。</string>
+    <string name="security_biometric_disable_failed">生物识别开关已关，但这台设备上可能还留着一份凭据。</string>
+    <string name="security_biometric_disable_failed_detail">没能从这台设备上删掉那份凭据：%1$s</string>
+    <string name="security_boot_write_failed">这一次改动没能写进保险库设置文件，所以开关状态没有变化。请重试；若一直失败，请从备份恢复。</string>
     <string name="security_section_lock">自动锁定</string>
     <string name="security_lock_now">立即锁定</string>
     <string name="security_lock_now_summary">清除内存中的数据密钥并返回锁屏，不会删除任何数据。</string>
@@ -265,11 +277,6 @@
     <string name="probe_keywords_add">添加关键词</string>
     <string name="probe_keywords_empty">暂无关键词，将使用默认列表。</string>
     <string name="probe_keywords_delete">删除</string>
-    <string name="probe_section_network">网络</string>
-    <string name="probe_proxy">手动 HTTP 代理</string>
-    <string name="probe_proxy_summary">留空则使用系统代理</string>
-    <string name="probe_proxy_hint">主机与端口，例如 127.0.0.1:7890。探测、余额查询与更新检查都会使用该代理，留空则使用系统代理。</string>
-    <string name="probe_proxy_invalid">请输入 host:port，例如 127.0.0.1:7890</string>
 
     <!-- Data -->
     <string name="data_section_organize">组织</string>
@@ -289,6 +296,7 @@
     <string name="log_settings_cd">日志设置</string>
     <string name="log_clear_cd">清空日志</string>
     <string name="log_filter_summary">显示所选等级及以上的日志。</string>
+    <string name="log_recent_limit_note">仅显示最近 %1$d 条日志。</string>
     <string name="log_retention">保留时间</string>
     <string-array name="log_retention_options">
         <item>7 天</item>
@@ -361,11 +369,16 @@
     <string name="sync_passphrase_required">备份口令不能为空；默认沿用 PIN，请输入当前 PIN（或改用长口令）。</string>
     <string name="sync_result_exported">备份已导出</string>
     <string name="sync_result_restored">已恢复 %1$d 家供应商</string>
-    <string name="sync_result_failed">失败：%1$s</string>
+    <string name="sync_export_failed">备份失败，原因详见日志。</string>
+    <string name="sync_restore_failed">恢复失败，原因详见日志。</string>
+    <string name="sync_webdav_failed">同步失败，请检查 WebDAV 设置后重试，原因详见日志。</string>
     <string name="sync_restore_mode">合并方式</string>
+    <string name="sync_restore_mode_summary">「合并」会去掉本机已有的重复项，「仅新增」只写入本机没有的，「覆盖」会先清空本机再写入。</string>
     <string name="sync_mode_overwrite">覆盖</string>
     <string name="sync_mode_merge">合并</string>
     <string name="sync_mode_add_only">仅新增</string>
+    <string name="sync_overwrite_confirm_title">覆盖本机数据？</string>
+    <string name="sync_overwrite_confirm_summary">这份备份里没有的供应商、密钥、模型和平台账号都会被删除。想保留就改选「合并」或「仅新增」。</string>
     <string name="sync_confirm">确定</string>
     <string name="sync_cancel">取消</string>
 
@@ -381,7 +394,7 @@
     <string name="update_published">发布于 %1$s</string>
     <string name="update_open_download">前往下载</string>
     <string name="update_error_no_network">网络不可用，请检查网络连接后重试。</string>
-    <string name="update_error_unreachable">无法访问 GitHub，可在「探测 → HTTP 代理」中配置代理。</string>
+    <string name="update_error_unreachable">无法访问 GitHub，请检查网络后重试。</string>
     <string name="update_honesty_default_off">· 不自动检查，仅在点击「立即检查」时发起。</string>
     <string name="update_honesty_anonymous">· 每次检查仅向 GitHub releases 接口发送一个匿名请求，不包含设备信息、标识或金库数据。</string>
     <string name="update_honesty_no_silent_install">· 不支持应用内安装。该功能需要「安装未知应用」权限，管理密钥的应用不应申请此权限；下载与安装由浏览器和系统安装器完成。</string>
@@ -470,6 +483,7 @@
     <string name="editor_balance_custom_currency">币种</string>
     <string name="editor_error_missing_secret">请填写 API Key。</string>
     <string name="editor_error_missing_name">请填写名称。</string>
+    <string name="editor_row_missing">这一条没能从库里读到，保存已被挡住。请返回，再从列表里打开一次。</string>
     <string name="editor_default_key_name">密钥 %1$d</string>
     <string name="editor_default_account_name">账号 %1$d</string>
     <string name="editor_default_provider_name">供应商 %1$d</string>
@@ -552,6 +566,7 @@
     <string name="import_error_no_command">未识别到可导入的 cURL 命令。</string>
     <string name="import_error_multiple_commands">一次只能识别一条 cURL 命令。</string>
     <string name="import_error_missing_key">该 cURL 中未识别到 API Key。</string>
+    <string name="import_error_failed">导入失败，请检查命令格式后重试。</string>
     <string name="import_result_base_url">Base URL</string>
     <string name="import_result_protocol">协议</string>
     <string name="import_result_api_key">API Key</string>
@@ -596,7 +611,13 @@
     <string name="probe_run_skipped">本轮未探测</string>
     <string name="probe_run_succeeded">成功</string>
     <string name="probe_run_retry">仅重试失败项与未探测项</string>
+    <string name="probe_run_stop">停止探测</string>
     <string name="probe_run_empty_desc">尚未进行探测，暂无结果。</string>
+    <!-- 为什么这一项没测。分组标题只说"本轮未探测"，原因要说得出来。 -->
+    <string name="probe_skip_host_budget">未探测：这一家的请求数已达本轮上限</string>
+    <string name="probe_skip_total_budget">未探测：本轮时间预算已用完</string>
+    <string name="probe_skip_rate_limited">未探测：这一轮该站点已经限流过</string>
+    <string name="probe_skip_cancelled">未探测：本轮已停止</string>
     <!-- 探测级别 -->
     <string name="probe_level_reachability">端点可达性</string>
     <string name="probe_level_key_validity">密钥有效性</string>
@@ -636,6 +657,7 @@
     <string name="feedback_undo_failed">恢复失败，该项可能已被重建</string>
     <string name="feedback_copied">已复制</string>
     <string name="feedback_providers_deleted">已删除所选供应商</string>
+    <string name="feedback_providers_deleted_partial">已删除 %1$d 家，另有 %2$d 家没能删除</string>
     <string name="feedback_key_deleted">密钥已删除</string>
     <string name="feedback_model_deleted">模型已删除</string>
     <string name="feedback_account_deleted">账号已删除</string>
@@ -662,8 +684,11 @@
     <string name="feedback_models_refreshed">模型列表已刷新</string>
     <string name="feedback_model_probed">已探测该模型</string>
     <string name="feedback_probe_retried">正在重试失败项</string>
+    <string name="feedback_probe_retry_nothing">现在没有需要重试的失败项</string>
+    <string name="feedback_probe_stopped">已停止</string>
     <string name="feedback_logs_cleared">日志已清空</string>
     <string name="feedback_probe_results_cleared">探测结果已清空</string>
+    <string name="data_clear_failed">清空失败，库里还是原样。</string>
 
     <!-- PIN 输入 -->
     <string name="pin_dots_cd">已输入 %1$d 位，共 %2$d 位</string>
@@ -671,12 +696,16 @@
     <string name="pin_error_wrong">PIN 错误</string>
     <string name="pin_error_mismatch">两次输入不一致</string>
     <string name="pin_error_too_simple">过于简单。请勿使用 123456 等连续数字或 111111 等重复数字。</string>
+    <string name="pin_error_biometry_locked_out">连续验证失败次数过多，生物识别已被系统暂时锁定。请改用 PIN，或几分钟后再试。</string>
+    <string name="pin_error_biometry_failed">生物识别未能完成，请改用 PIN 解锁。</string>
+    <string name="pin_error_boot_write_failed">保险库设置文件未能更新，本次操作没有生效。</string>
 
     <!-- boot 存储读不出来 -->
     <string name="boot_corrupt_title">无法读取金库配置文件</string>
     <string name="boot_corrupt_body">该文件保存了解开数据密钥所需的参数，缺少它将无法打开数据库中已加密的密钥。</string>
     <string name="boot_corrupt_untouched">当前尚未修改任何数据。应用不会自动重建该文件，重建后已保存的密钥将无法解密。</string>
     <string name="boot_corrupt_restore">从备份恢复</string>
+    <string name="boot_corrupt_restore_unavailable">当前版本还没有实现：这一页还不能选择备份文件。</string>
     <string name="boot_corrupt_wipe">清空并重新开始</string>
     <string name="boot_corrupt_diagnostic">诊断信息，反馈问题时请附上：</string>
     <string name="boot_corrupt_wipe_confirm_title">确定清空？</string>
@@ -719,7 +748,7 @@
     <string name="onboarding_welcome_title">设置 PIN 前的三点说明</string>
     <string name="onboarding_welcome_subtitle">以下三点会影响你应在此保存的内容。</string>
     <string name="onboarding_welcome_what">API 密钥、平台账号密码与访问令牌按字段使用 AES-256-GCM 加密；供应商名称、端点、模型 ID 与余额为明文存储。</string>
-    <string name="onboarding_welcome_limit">6 位 PIN 无法抵御将文件复制到其他设备进行离线破解的攻击，请勿保存与其他服务复用的密码；设置中可改用任意长度的口令。</string>
+    <string name="onboarding_welcome_limit">6 位 PIN 无法抵御将文件复制到其他设备进行离线破解的攻击，请勿保存与其他服务复用的密码。解锁 PIN 固定 6 位数字，应用内不提供改成长口令的入口；只有导出的备份可以单独设一道任意长度的口令。</string>
     <string name="onboarding_welcome_local">所有数据仅保存在本机，没有账号、服务器或上传，唯一的对外输出是你自行导出的加密备份文件。</string>
     <string name="onboarding_pin_title">设置 6 位 PIN</string>
     <string name="onboarding_pin_subtitle">PIN 仅用于包裹数据密钥，之后修改 PIN 只需重新加密该密钥，不会重新加密你的数据。</string>

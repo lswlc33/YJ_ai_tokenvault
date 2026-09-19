@@ -47,3 +47,7 @@ DerivedData/
 
 # WorkBuddy 项目数据（本地工作记忆，不入库）
 .workbuddy/
+
+# Qoder 的本地知识库缓存（repowiki 生成的卡片）。与上面两条同类：逐机生成、不是源码，
+# 且会随每次分析重写，提交进去只会让 diff 淹掉真正的改动。要留文档请显式放进 docs/。
+.qoder/

@@ -49,17 +49,25 @@ jobs:
           fi
 
           # 2. 只有 ui/miuix 能 import MIUIX（实验期库，升级时只改这一层）
+          #    阶段3 起 UI 全在 shared/src/commonMain，app 下只剩两个壳文件：
+          #    只扫 $src 等于这条 grep 空转，所以两处都要扫（与 ArchitectureRulesTest 一致）。
           check "ui/miuix 之外直接 import 了 MIUIX（计划.md §4.3）" \
-            "grep -rn 'import top.yukonga.miuix' $src --include='*.kt' | grep -v '/ui/miuix/'"
+            "grep -rn 'import top.yukonga.miuix' $src $shared_src --include='*.kt' | grep -v '/ui/miuix/'"
 
           # 3. MIUIX 的 Window* 弹层一律禁用：独立系统窗口，FLAG_SECURE 不继承
           check "用了 MIUIX 的 Window* 弹层（计划.md §7.5、§13.2）" \
-            "grep -rnE 'Window(Dialog|BottomSheet|[A-Za-z]*Popup|[A-Za-z]*Menu|[A-Za-z]*Preference)' $src --include='*.kt'"
+            "grep -rnE 'Window(Dialog|BottomSheet|[A-Za-z]*Popup|[A-Za-z]*Menu|[A-Za-z]*Preference)' $src $shared_src --include='*.kt'"
 
           # 4. screens/ 不碰 SQL，也不构造 HTTP 请求
-          if [ -d "$src/screens" ]; then
+          screens=""
+          for d in "$src/screens" "$shared_src/screens"; do [ -d "$d" ] && screens="$screens $d"; done
+          if [ -n "$screens" ]; then
             check "screens/ 里出现 SQL 或 HTTP 构造（计划.md §4.3）" \
-              "grep -rnE '(SELECT |INSERT +INTO|UPDATE +[A-Za-z_]+ +SET|DELETE +FROM|CREATE +TABLE|Request\.Builder)' $src/screens --include='*.kt'"
+              "grep -rnE '(SELECT |INSERT +INTO|UPDATE +[A-Za-z_]+ +SET|DELETE +FROM|CREATE +TABLE|Request\.Builder)' $screens --include='*.kt'"
+          else
+            # 两个根下都没有 screens/ 就说明目录被改名或搬走了：这时上面三条 grep 全都无从下手，
+            # 静默跳过会让这道闸永久绿灯。宁可红一次，让人回来改这条。
+            echo "::error::两个源码根下都找不到 screens/，第 4 条 grep 已失效"; fail=1
           fi
 
           # 5. 真实凭据永不入库。src/test/ 与 src/androidTest/ 里的 sk-TEST… 是测试占位符，

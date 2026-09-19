@@ -50,4 +50,23 @@ interface ProbeRunRepository {
 
     /** 清空 `probe_runs`（数据页"清空探测结果"）。 */
     suspend fun clear()
+
+    /**
+     * 只保留最近 [keep] 轮。
+     *
+     * 轮次是探测一次就长一条的（一轮一批 Key，明细页只看最近一轮），所以这是唯一一处
+     * "按条数淘汰"的清理：它跟时钟无关，用户把系统时间改到三年前也不会把历史全裁掉。
+     */
+    suspend fun trimToCount(keep: Int)
+
+    companion object {
+        /**
+         * 轮次条数上限，[trimToCount] 的默认口径。
+         *
+         * 写在这里而不是各调用方自己抄一个数：`LogMaintenance`（启动时）与
+         * `ProbeEngine.finishRun`（每轮收尾）裁的是同一张表，两处数字不一致就会
+         * 互相"补裁"，看起来像偶发丢历史。
+         */
+        const val MAX_RUNS_KEPT = 50
+    }
 }

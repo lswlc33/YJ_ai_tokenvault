@@ -150,7 +150,12 @@ data class ModelEntity(
     val sortOrder: Int = 0,
 )
 
-/** models.dev 的派生索引，只存用得上的字段。匹配是索引查询而不是全表扫描。 */
+/**
+ * models.dev 的派生索引，只存用得上的字段。匹配是索引查询而不是全表扫描。
+ *
+ * **未接线：计划内功能。** 表与索引已随 v1 建好，但目录同步的入口还没做，生产里没有任何
+ * 读写路径经过它（`ModelCatalogMatcher` 同理）。见 `ModelCatalogDao` 的说明。
+ */
 @Entity(
     tableName = "model_catalog",
     indices = [Index(value = ["modelId"]), Index(value = ["normId"])],

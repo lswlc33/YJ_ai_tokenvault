@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.lc33.tokenvault.crypto.zeroize
 import com.lc33.tokenvault.domain.SecretMask
 import com.lc33.tokenvault.domain.repo.ApiKeyRepository
+import com.lc33.tokenvault.domain.repo.DuplicateApiKeyException
 import com.lc33.tokenvault.domain.repo.ImportWriter
 import com.lc33.tokenvault.importer.CurlImporter
 import com.lc33.tokenvault.importer.ParsedRecord
@@ -51,6 +52,9 @@ class ImportViewModel constructor(
     private var pendingRecord: ParsedRecord? = null
     private var pendingFingerprint: String? = null
 
+    /** 用户已经在重复提示上点过"仍要导入"：这一次冲突不再回摆提示，见 [import]。 */
+    private var forcedDuplicate = false
+
     fun readClipboard(): String? = clipboard.read()
 
     fun parse(text: String) {
@@ -60,7 +64,12 @@ class ImportViewModel constructor(
         _duplicatePrompt.value = false
 
         viewModelScope.launch {
-            val result = CurlImporter.parse(text)
+            // 解析与指纹都过 runCatching：这两处都在协程里，异常冒出去就是崩应用，
+            // 而用户看到的画面与"我粘的东西不对"没区别。失败要说得出"这一条没能处理"。
+            val result = runCatching { CurlImporter.parse(text) }.getOrElse {
+                _error.value = CurlImportError.Failed
+                return@launch
+            }
             when {
                 result.records.isEmpty() -> _error.value = CurlImportError.NoCommand
                 result.records.size > 1 -> _error.value = CurlImportError.MultipleCommands
@@ -72,7 +81,10 @@ class ImportViewModel constructor(
                         return@launch
                     }
                     pendingRecord = record
-                    pendingFingerprint = keys.fingerprintOf(key.secret)
+                    pendingFingerprint = runCatching { keys.fingerprintOf(key.secret) }.getOrElse {
+                        _error.value = CurlImportError.Failed
+                        return@launch
+                    }
                     _preview.value = CurlImportPreview(
                         baseUrl = record.apiBaseUrl.orEmpty(),
                         protocols = record.supportedProtocols.map { it.wireName },
@@ -88,7 +100,11 @@ class ImportViewModel constructor(
         val record = pendingRecord ?: return
         val fingerprint = pendingFingerprint
         viewModelScope.launch {
-            if (fingerprint != null && keys.existsFingerprint(providerId, fingerprint)) {
+            // 预检本身也会写读库（它查的是指纹唯一索引）。查不动时**当作不重复继续导入**：
+            // 真重复了仓库那条唯一索引会挡住并回到重复提示，比卡在这里什么都不做要好。
+            val duplicate = fingerprint != null &&
+                runCatching { keys.existsFingerprint(providerId, fingerprint) }.getOrDefault(false)
+            if (duplicate) {
                 _duplicatePrompt.value = true
             } else {
                 import(record, onDone)
@@ -99,6 +115,7 @@ class ImportViewModel constructor(
     fun confirmDuplicate(onDone: () -> Unit) {
         val record = pendingRecord ?: return
         _duplicatePrompt.value = false
+        forcedDuplicate = true
         viewModelScope.launch { import(record, onDone) }
     }
 
@@ -114,8 +131,30 @@ class ImportViewModel constructor(
             clearPending()
             _preview.value = null
             onDone()
+        } catch (_: DuplicateApiKeyException) {
+            // 仓库层的指纹预检（唯一索引 `api_keys(providerId, fingerprint)`）挡住了这一条。
+            //
+            // 两条路都要给用户一个看得懂的收尾，而不是让异常从协程里冒出去：
+            // - 正常确认（没点过"仍要导入"）：把重复提示摆出来，那正是"这把已经在了"的意思。
+            // - 用户已经点过"仍要导入"（[forcedDuplicate]）：库里**已经存在**同一把密钥，
+            //   他要的结果其实早就达成了——再写一次数据库也不会接受。于是按"已导入"收尾
+            //   关掉这页；悄悄失败或反复弹同一个提示都比这个更难理解。
+            if (forcedDuplicate) {
+                clearPending()
+                _preview.value = null
+                _duplicatePrompt.value = false
+                onDone()
+            } else {
+                _duplicatePrompt.value = true
+            }
+        } catch (_: Throwable) {
+            // 其余失败（写设置那一行炸了、库正忙、明文解不开）必须落在页面上：以前只有
+            // 一个 finally，异常直接冒出协程 = 崩应用，而用户刚按的是"导入"。
+            // 预览留着不清，改两下就能再按一次，不用重贴整条 cURL。
+            _error.value = CurlImportError.Failed
         } finally {
             _importing.value = false
+            forcedDuplicate = false
         }
     }
 
@@ -124,6 +163,7 @@ class ImportViewModel constructor(
         pendingRecord?.balanceToken?.zeroize()
         pendingRecord = null
         pendingFingerprint = null
+        forcedDuplicate = false
     }
 
     override fun onCleared() {

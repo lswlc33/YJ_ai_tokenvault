@@ -45,7 +45,6 @@ import com.lc33.tokenvault.engine.WebDavEngine
 import com.lc33.tokenvault.net.HostGate
 import com.lc33.tokenvault.net.HttpEngine
 import com.lc33.tokenvault.net.WebDavClient
-import com.lc33.tokenvault.net.ProxyProvider
 import com.lc33.tokenvault.platform.APP_VERSION_NAME
 import com.lc33.tokenvault.platform.AutoLocker
 import com.lc33.tokenvault.platform.VaultSession
@@ -70,7 +69,6 @@ import com.lc33.tokenvault.ui.shell.ProfileEditorViewModel
 import com.lc33.tokenvault.ui.shell.ProfileListViewModel
 import com.lc33.tokenvault.ui.shell.ProviderDetailViewModel
 import com.lc33.tokenvault.ui.shell.ProviderEditorViewModel
-import com.lc33.tokenvault.ui.shell.ProxyViewModel
 import com.lc33.tokenvault.ui.shell.SecurityViewModel
 import com.lc33.tokenvault.ui.shell.SyncViewModel
 import com.lc33.tokenvault.ui.shell.UpdateViewModel
@@ -184,14 +182,15 @@ val coreModule = module {
     single<ModelRepository> { RoomModelRepository(get(), get(), get(named(Qualifiers.NOW)), get(), get()) }
     single<ClientProfileRepository> { RoomClientProfileRepository(get(), get()) }
     single<AuditLogRepository> { RoomAuditLogRepository(get(), get(), get(named(Qualifiers.NOW))) }
-    single { LogMaintenance(settings = get(), audit = get(), now = get(named(Qualifiers.NOW))) }
+    single { LogMaintenance(settings = get(), audit = get(), probeRuns = get(), now = get(named(Qualifiers.NOW))) }
     single<ProbeRunRepository> { RoomProbeRunRepository(get()) }
 
     // ------------------------------------------------------------------ 网络与引擎
 
     single { HostGate(nowMillis = ::nowMillis) }
-    single { ProxyProvider(get()) }
-    single { HttpEngine(client = get<ProxyProvider>().client, hostGate = get(), audit = get()) }
+    // 应用内不提供代理（移动端难以可靠实现，走系统全局代理）：client 是稳定单例。
+    single { com.lc33.tokenvault.net.buildClient() }
+    single { HttpEngine(client = get(), hostGate = get(), audit = get()) }
     single { com.lc33.tokenvault.backup.BackupCodec(get()) }
     single<BackupStore> {
         RoomBackupStore(
@@ -215,7 +214,7 @@ val coreModule = module {
             placeholders = get(named(Qualifiers.PLACEHOLDERS)),
         )
     }
-    single { WebDavClient(get<ProxyProvider>().client, audit = get()) }
+    single { WebDavClient(get(), audit = get()) }
     single {
         WebDavEngine(
             settings = get(), backup = get(), client = get(), audit = get(),
@@ -236,6 +235,8 @@ val coreModule = module {
 // ViewModel 统一用 viewModelOf 注册（Koin 反射解析构造参数，SavedStateHandle 自动注入）。
 // 用 koin-compose-viewmodel 的 DSL（org.koin.viewmodel.dsl），Android/iOS 通用。
 val viewModelModule = module {
+    // 六个设置类 ViewModel 共用的"写不进去"失败出口：必须单例，事件才收得到。
+    single { com.lc33.tokenvault.ui.shell.SettingsFailures() }
     viewModelOf(::AppearanceViewModel)
     viewModelOf(::BalanceThresholdsViewModel)
     viewModelOf(::ClientKeywordsViewModel)
@@ -255,7 +256,6 @@ val viewModelModule = module {
     viewModelOf(::ProfileListViewModel)
     viewModelOf(::ProviderDetailViewModel)
     viewModelOf(::ProviderEditorViewModel)
-    viewModelOf(::ProxyViewModel)
     viewModelOf(::SecurityViewModel)
     viewModelOf(::SyncViewModel)
     viewModelOf(::UpdateViewModel)

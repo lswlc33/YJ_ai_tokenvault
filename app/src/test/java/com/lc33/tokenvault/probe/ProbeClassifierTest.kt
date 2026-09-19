@@ -210,6 +210,78 @@ class ProbeClassifierTest {
     }
 
     @Test
+    fun `429 带 Retry-After 头生效`() {
+        // Cloudflare / new-api 网关层常常只回头部不回 body，只读 body 等于漏读。
+        val r = ProbeClassifier.classify(
+            status = 429,
+            body = "Too Many Requests",
+            error = null,
+            level = ProbeLevel.L2_KEY_VALIDITY,
+            headers = mapOf("Retry-After" to "45"),
+        )
+        assertEquals(ProbeOutcome.RATE_LIMITED, r.outcome)
+        assertEquals(45_000L, r.retryAfterMs)
+    }
+
+    @Test
+    fun `429 头部与 body 的退避取较大者`() {
+        val r = ProbeClassifier.classify(
+            status = 429,
+            body = "{\"retry_after\":10}",
+            error = null,
+            level = ProbeLevel.L2_KEY_VALIDITY,
+            headers = mapOf("retry-after" to "60"),
+        )
+        // 上游说了 60 秒就别按 10 秒提前回去；键大小写不敏感。
+        assertEquals(60_000L, r.retryAfterMs)
+    }
+
+    @Test
+    fun `429 的 HTTP-date 形态 Retry-After 按没给处理`() {
+        // HTTP-date 要做日期差值，commonMain 没有 RFC 1123 解析（红线 20），
+        // 日期形态当"没给"，退避走加倍那套——这条锁定降级行为而不是意外崩溃。
+        val r = ProbeClassifier.classify(
+            status = 429,
+            body = "",
+            error = null,
+            level = ProbeLevel.L2_KEY_VALIDITY,
+            headers = mapOf("Retry-After" to "Wed, 21 Oct 2015 07:28:00 GMT"),
+        )
+        assertNull(r.retryAfterMs)
+    }
+
+    @Test
+    fun `200 返回 codex 字样仍判成功`() {
+        // OpenAI 正常回一个含 `codex-mini-latest` 的模型列表。2xx 排在所有关键词之前，
+        // 不能被 CLIENT_BLOCKED 关键词"codex"劫持成"客户端被拦"——那会把一家正常的站判死。
+        val r = ProbeClassifier.classify(
+            status = 200,
+            body = """{"data":[{"id":"codex-mini-latest","object":"model"}]}""",
+            error = null,
+            level = ProbeLevel.L2_KEY_VALIDITY,
+            clientKeywords = listOf("codex"),
+        )
+        assertEquals(ProbeOutcome.SUCCESS, r.outcome)
+        assertEquals(KeyHealth.OK, r.health)
+    }
+
+    @Test
+    fun `302 给中性结论不钉 CONFIG_ERROR`() {
+        // 三端都关了跟随重定向，3xx 会原样落在这里。跳转既可能是"地址该换 https"
+        // 也可能是网关在往登录页引，本地分不清——不该把一家可能能用的站永久判死。
+        val r = ProbeClassifier.classify(
+            302,
+            "",
+            null,
+            ProbeLevel.L1_REACHABILITY,
+        )
+        assertEquals(ProbeOutcome.UPSTREAM_ERROR, r.outcome)
+        assertEquals(ClassificationReason.Redirected, r.reason)
+        assertNull(r.health) // 红线 11：不改写持久结论
+        assertEquals(302, r.httpStatus)
+    }
+
+    @Test
     fun `200 且 content 为空仍判 SUCCESS`() {
         // 红线 34：不能要求文本非空（DeepSeek 推理模型 content 是空串）
         val r = ProbeClassifier.classify(

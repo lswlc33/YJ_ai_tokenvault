@@ -46,17 +46,40 @@ class ProfileEditorViewModel constructor(
     )
     val saved: SharedFlow<Unit> = _saved.asSharedFlow()
 
-    /** 删除成功（只可能是自定义预设）。 */
+    /**
+     * 删除成功（只可能是自定义预设）。
+     */
     private val _deleted = MutableSharedFlow<Unit>(
         extraBufferCapacity = 1,
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
     )
     val deleted: SharedFlow<Unit> = _deleted.asSharedFlow()
 
+    /**
+     * 写入失败（保存或删除没落库）。以前这两处都没有兜底：异常从协程里冒出去直接崩应用，
+     * 而用户按下去看到的是"这一页还开着"，不知道到底存没存上。
+     */
+    private val _failed = MutableSharedFlow<Unit>(
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    val failed: SharedFlow<Unit> = _failed.asSharedFlow()
+
+    /**
+     * 按 id 读不到那一行。**显式报错，不退化成"新建一枚"**：以前读不到就悄悄把这一页
+     * 当成新建，用户以为在改「Chrome」，按保存却多出一枚重名预设。
+     */
+    private val _loadError = MutableStateFlow(false)
+    val loadError: StateFlow<Boolean> = _loadError.asStateFlow()
+
     init {
         if (profileId != 0L) {
             viewModelScope.launch {
-                _profile.value = profiles.findById(profileId)
+                val loaded = runCatching { profiles.findById(profileId) }
+                    .onFailure { _failed.tryEmit(Unit) }
+                    .getOrNull()
+                _loadError.value = loaded == null
+                _profile.value = loaded
                 _loaded.value = true
             }
         }
@@ -64,6 +87,8 @@ class ProfileEditorViewModel constructor(
 
     /** 保存。新建走 [ClientProfileRepository.add]，编辑走 [ClientProfileRepository.update]。 */
     fun save(draft: ProfileEditorDraft) {
+        // 读不到原行时不放行：让这一趟走下去就是在库里凭空造一枚预设。
+        if (_loadError.value) return
         viewModelScope.launch {
             val existing = _profile.value
             val profile = ClientProfile(
@@ -80,10 +105,14 @@ class ProfileEditorViewModel constructor(
                 // 只要用户保存过就置 true：内置条目下次升级不再覆盖（§8.2）
                 userEdited = true,
                 sortOrder = existing?.sortOrder
-                    ?: ((profiles.observeAll().first().maxOfOrNull { it.sortOrder } ?: 0) + 1),
+                    ?: ((runCatching { profiles.observeAll().first() }.getOrNull()
+                        ?.maxOfOrNull { it.sortOrder } ?: 0) + 1),
             )
-            if (existing == null) profiles.add(profile) else profiles.update(profile)
-            _saved.tryEmit(Unit)
+            // 成功才发 saved（界面据此退回）；失败留在这一页并报一条提示，不丢用户的输入。
+            val result = runCatching {
+                if (existing == null) profiles.add(profile) else profiles.update(profile)
+            }
+            if (result.isSuccess) _saved.tryEmit(Unit) else _failed.tryEmit(Unit)
         }
     }
 
@@ -92,8 +121,8 @@ class ProfileEditorViewModel constructor(
         val existing = _profile.value ?: return
         if (existing.builtinKey != null) return
         viewModelScope.launch {
-            profiles.deleteCustom(existing.id)
-            _deleted.tryEmit(Unit)
+            val result = runCatching { profiles.deleteCustom(existing.id) }
+            if (result.isSuccess) _deleted.tryEmit(Unit) else _failed.tryEmit(Unit)
         }
     }
 }

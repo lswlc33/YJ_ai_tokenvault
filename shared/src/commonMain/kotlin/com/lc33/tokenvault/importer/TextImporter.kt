@@ -14,6 +14,10 @@ import com.lc33.tokenvault.domain.Protocol
  * - 记录之间用单独一行 `---` 分隔，最后一条可以没有 `---`（EOF 也是合法终止）。
  * - 字段名与值用空白分隔。
  * - 块字段（`支持端点类型` / `模型列表`）的内容在字段名之后的连续行里。
+ * - `API Key` 的值可以再带 label：`API Key 主号 sk-xxx`（[TextExporter] 写这种），
+ *   也可以只写密钥 `API Key sk-xxx`（旧样本写法，label 由顺序分配）。
+ * - 余额那一组字段（`余额查询类型` / `请求地址` / `访问令牌` / `用户ID` / `换算比` /
+ *   `余额配置`）与 `路径覆盖` 是 [TextExporter] 的往返字段：导出写什么，这里就能读回什么。
  *
  * 块字段的终止规则（§11.1 第 1–5 条，**必须写死**）：
  * 1. 遇到块字段名后进入块模式。
@@ -37,7 +41,8 @@ object TextImporter {
     private val FIELD_NAMES = listOf(
         "供应商名称", "支持端点类型", "API请求地址", "余额查询类型", "客户端预设", // i18n-exempt: 导入格式的字段名
         "官网链接", "模型列表", "请求地址", "访问令牌", "平台账号", "平台密码", // i18n-exempt: 导入格式的字段名
-        "账号备注", "登录方式", "登录地址", "用户ID", "API Key", "备注", // i18n-exempt: 导入格式的字段名
+        "账号备注", "登录方式", "路径覆盖", "登录地址", "换算比", "用户ID", // i18n-exempt: 导入格式的字段名
+        "余额配置", "API Key", "备注", // i18n-exempt: 导入格式的字段名
     )
 
     /** 登录方式支持逗号、空格与 `/` 分隔；未知值跳过而不是让整份导入失败。 */
@@ -59,8 +64,16 @@ object TextImporter {
     /** 块条目：`- 内容`。 */
     private val LIST_ITEM = Regex("""^\s*[-•]\s*(.*)$""")
 
-    /** `无` / `-` / `—` / 空 都表示"没有"（§11.1 备注那行）。 */
-    private val EMPTY_VALUES = setOf("无", "-", "—", "") // i18n-exempt: 匹配粘贴数据的空值写法
+    /** 值内部的空白分隔（`API Key 主号 sk-xxx`、`路径覆盖 chat /v1/x`）。 */
+    private val WHITESPACE = Regex("""\s+""")
+
+    /**
+     * `无` / `—` / 空 都表示"没有"（§11.1 备注那行）。
+     *
+     * **不含 `-`**：单个连字符太常见，真实备注就写"-"（"待补"的速记）时会整条被吞成 null，
+     * 而导出侧的空值一律写 `无`，去掉它不影响任何往返。
+     */
+    private val EMPTY_VALUES = setOf("无", "—", "") // i18n-exempt: 匹配粘贴数据的空值写法
 
     fun parse(text: String): ParseResult {
         val records = mutableListOf<ParsedRecord>()
@@ -102,6 +115,15 @@ object TextImporter {
         var balanceToken: CharArray? = null
         var balanceUserId: String? = null
         var clientProfileRef: String? = null
+
+        /** new-api 系"多少 quota == 1 单位货币"的换算比，缺失时用适配器默认。 */
+        var quotaPerUnit: Double? = null
+
+        /** customJson 的原始配置串（`{...}`），交给 [com.lc33.tokenvault.balance.CustomJsonAdapter] 解读。 */
+        var balanceConfig: String? = null
+
+        /** 协议 → 完整路径覆盖（`路径覆盖 chat /v1/chat/completions`）。 */
+        val pathOverrides = linkedMapOf<Protocol, String>()
 
         val protocols = linkedSetOf<Protocol>()
         val keys = mutableListOf<ParsedKey>()
@@ -163,8 +185,17 @@ object TextImporter {
                 "备注" -> note = if (fValue in EMPTY_VALUES) null else fValue // i18n-exempt: 导入格式的字段名
                 "官网链接" -> websiteUrl = fValue?.trimEnd('/')?.ifEmpty { null } // i18n-exempt: 导入格式的字段名
                 "API Key" -> {
-                    if (!fValue.isNullOrBlank()) {
-                        keys += ParsedKey(label = keyLabel(keys.size), secret = fValue.toCharArray())
+                    // 值按空白再切一刀：**最后一个 token 是密钥，中间的都是 label**。
+                    // 密钥（OpenAI / Anthropic / new-api 都是 base64 字符集）不含空白，
+                    // 所以这个切法无歧义；反过来"secret 在前 label 在后"会让 label 里
+                    // 的空格没法表达。只有一段时它就是密钥，label 按顺序自动分配——
+                    // 这正是 `示例数据.md` 与旧样本的写法，向后兼容不用迁移。
+                    val parts = fValue?.split(WHITESPACE)?.filter { it.isNotBlank() }.orEmpty()
+                    val secret = parts.lastOrNull()
+                    if (secret != null) {
+                        val label = parts.dropLast(1).joinToString(" ").takeIf { it.isNotBlank() }
+                            ?: keyLabel(keys.size)
+                        keys += ParsedKey(label = label, secret = secret.toCharArray())
                     }
                 }
                 "API请求地址" -> apiBaseUrl = fValue // i18n-exempt: 导入格式的字段名
@@ -189,6 +220,24 @@ object TextImporter {
                     }
                 }
                 "用户ID" -> balanceUserId = fValue // i18n-exempt: 导入格式的字段名
+                "换算比" -> { // i18n-exempt: 导入格式的字段名
+                    // 只收正数：0 / 负数会把余额除成 Infinity 或负余额，宁可不存用默认值。
+                    quotaPerUnit = fValue?.trim()?.toDoubleOrNull()?.takeIf { it > 0.0 }
+                }
+                "余额配置" -> { // i18n-exempt: 导入格式的字段名
+                    // customJson 的整份配置（method/path/headers/valuePath/usedPath/currency）。
+                    // 这里**不校验 JSON**：形状对不对由 CustomJsonAdapter 在查询时报，
+                    // 导入阶段把用户写的东西原样搬过去比自作聪明地丢掉更好。
+                    balanceConfig = fValue?.trim()?.takeIf { it.isNotEmpty() }
+                }
+                "路径覆盖" -> { // i18n-exempt: 导入格式的字段名
+                    // `<协议别名> <完整路径>`。别名认不出就整行跳过——存一条挂错协议的路径
+                    // 比没有覆盖更糟（请求会安静地发到另一个端点上）。
+                    val parts = fValue?.split(WHITESPACE)?.filter { it.isNotBlank() }.orEmpty()
+                    val protocol = parts.firstOrNull()?.let { Protocol.fromAlias(it) }
+                    val path = parts.drop(1).joinToString(" ").trim().takeIf { it.isNotEmpty() }
+                    if (protocol != null && path != null) pathOverrides[protocol] = path
+                }
                 "客户端预设" -> clientProfileRef = fValue // i18n-exempt: 导入格式的字段名
                 "平台账号" -> { // i18n-exempt: 导入格式的字段名
                     // 遇到下一个「平台账号」即开新组（§11.1 账号分组规则）
@@ -261,6 +310,9 @@ object TextImporter {
                 username = acc.username,
                 password = acc.password,
                 loginUrl = acc.loginUrl,
+                // 漏传过一次的回归：`登录方式` 解析进了 acc.loginMethods，但这里没带上，
+                // 于是导入后的账号永远没有登录方式——字段解析得再对，收尾漏一步就是零。
+                loginMethods = acc.loginMethods,
             )
         }
 
@@ -270,10 +322,13 @@ object TextImporter {
             websiteUrl = websiteUrl,
             apiBaseUrl = apiBaseUrl,
             supportedProtocols = protocols,
+            pathOverrides = pathOverrides.toMap(),
             balanceKind = balanceKind,
             balanceBaseUrl = balanceBaseUrl,
             balanceToken = balanceToken,
             balanceUserId = balanceUserId,
+            quotaPerUnit = quotaPerUnit,
+            balanceConfig = balanceConfig,
             clientProfileRef = clientProfileRef,
             keys = keys,
             models = models.map { ParsedModel(it.modelId, it.protocol, it.needsReview) },
@@ -404,16 +459,31 @@ object TextImporter {
         return v.contains("官方") || v.contains("official") // i18n-exempt: 匹配粘贴数据的"官方接口"写法
     }
 
-    /** 余额查询类型 → BalanceKind（非官方的那几档）。 */
+    /**
+     * 余额查询类型 → [BalanceKind]（非官方的那几档）。
+     *
+     * 按 [BalanceKind.wireName] **忽略大小写**认，所以导出侧写什么、这里就能读回什么
+     * （往返对称）。大小写不敏感不是宽容：`customJson` 这一档的 wireName 本身带大写，
+     * 而值先被 lowercase() 过，精确比较会让它永远认不出来——导出再导入一次，
+     * 用户手配的任意站余额就静默变成"不查"。
+     * `new-api` 这种带连字符的历史写法单独留着——旧样本里出现过，认不出来等于把用户
+     * 已经配好的余额查询静默降级成"不查"。
+     */
     private fun parseBalanceKind(value: String?): BalanceKind {
         val v = value?.trim()?.lowercase() ?: return BalanceKind.NONE
-        return when {
-            v == "newapi" || v == "new-api" -> BalanceKind.NEWAPI
-            else -> BalanceKind.NONE
-        }
+        if (v == "new-api") return BalanceKind.NEWAPI
+        return BalanceKind.entries.firstOrNull { it.wireName.equals(v, ignoreCase = true) } ?: BalanceKind.NONE
     }
 
-    /** 剥离行尾说明文字（如"不填默认是端点域名"），空或等于 origin 则存 null。 */
+    /**
+     * 剥离行尾说明文字（如"不填默认是端点域名"）与结尾斜杠。
+     *
+     * 取第一个空白前的部分当地址，空串则存 null。
+     * **刻意不做"等于 API请求地址就存 null"的归一**：用户显式写了这一行就该照原样留下
+     * （`TextImporterTest` 里那条"请求地址剥离行尾说明文字"就是它的契约），而"没填就用端点
+     * 域名"这层兜底本来就由适配器写在 `balanceBaseUrl ?: apiRoot` 上，两处都归一反而看不出
+     * 用户到底填没填。
+     */
     private fun parseBalanceUrl(value: String?): String? {
         if (value.isNullOrBlank()) return null
         // 取第一个空白前的部分作为地址

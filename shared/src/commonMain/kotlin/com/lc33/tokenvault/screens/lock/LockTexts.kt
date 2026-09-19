@@ -2,6 +2,9 @@ package com.lc33.tokenvault.screens.lock
 
 import org.jetbrains.compose.resources.StringResource
 import tokenvault.shared.generated.resources.Res
+import tokenvault.shared.generated.resources.pin_error_biometry_failed
+import tokenvault.shared.generated.resources.pin_error_biometry_locked_out
+import tokenvault.shared.generated.resources.pin_error_boot_write_failed
 import tokenvault.shared.generated.resources.pin_error_mismatch
 import tokenvault.shared.generated.resources.pin_error_too_simple
 import tokenvault.shared.generated.resources.pin_error_wrong
@@ -19,6 +22,9 @@ fun pinErrorRes(error: PinError): StringResource = when (error) {
     PinError.Mismatch -> Res.string.pin_error_mismatch
     PinError.TooSimple -> Res.string.pin_error_too_simple
     PinError.Wrong -> Res.string.pin_error_wrong
+    PinError.BiometryLockedOut -> Res.string.pin_error_biometry_locked_out
+    PinError.BiometryFailed -> Res.string.pin_error_biometry_failed
+    PinError.BootWriteFailed -> Res.string.pin_error_boot_write_failed
 }
 
 /** 倒计时的 `mm:ss`。ASCII 数字，倒计时不需要跟着语言变。KMP 无 String.format，手写补零。 */

@@ -18,7 +18,6 @@ import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import tokenvault.shared.generated.resources.Res
-import tokenvault.shared.generated.resources.health_stale_this_round
 import tokenvault.shared.generated.resources.manage_context
 import tokenvault.shared.generated.resources.detail_key_models_refresh
 import tokenvault.shared.generated.resources.detail_account_password
@@ -27,13 +26,7 @@ import tokenvault.shared.generated.resources.manage_latency
 import tokenvault.shared.generated.resources.manage_latency_time
 import tokenvault.shared.generated.resources.manage_models_count
 import tokenvault.shared.generated.resources.manage_pinned
-import tokenvault.shared.generated.resources.login_method_github
-import tokenvault.shared.generated.resources.login_method_linuxdo
-import tokenvault.shared.generated.resources.protocol_anthropic
-import tokenvault.shared.generated.resources.protocol_chat
-import tokenvault.shared.generated.resources.protocol_responses
 import com.lc33.tokenvault.domain.LoginMethod
-import com.lc33.tokenvault.domain.Protocol
 import com.lc33.tokenvault.screens.model.UiAccountRow
 import com.lc33.tokenvault.screens.model.UiHealth
 import com.lc33.tokenvault.screens.model.UiKeyRow
@@ -43,6 +36,8 @@ import com.lc33.tokenvault.screens.model.UiProviderRow
 import com.lc33.tokenvault.ui.common.StatusDot
 import com.lc33.tokenvault.ui.common.colorOf
 import com.lc33.tokenvault.ui.common.labelOf
+import com.lc33.tokenvault.ui.common.loginMethodLabel
+import com.lc33.tokenvault.ui.common.protocolLabel
 import com.lc33.tokenvault.ui.common.relativeLabel
 import com.lc33.tokenvault.ui.miuix.AppBasicRow
 import com.lc33.tokenvault.ui.miuix.AppCard
@@ -63,20 +58,6 @@ import com.lc33.tokenvault.ui.theme.LocalProviderPalette
 private fun rowModifier(): Modifier = Modifier
     .fillMaxWidth()
     .padding(horizontal = LocalAppTokens.current.screenPadding)
-
-/** 协议 chip 的展示文案。底层的 wireName 不直接给用户看。 */
-@Composable
-internal fun protocolLabel(protocol: Protocol): String = stringResource(
-    when (protocol) {
-        Protocol.CHAT -> Res.string.protocol_chat
-        Protocol.RESPONSES -> Res.string.protocol_responses
-        Protocol.ANTHROPIC -> Res.string.protocol_anthropic
-    },
-)
-
-@Composable
-internal fun protocolLabel(wireName: String): String =
-    Protocol.fromWireName(wireName)?.let { protocolLabel(it) } ?: wireName
 
 /** 色块 + 首字母。长列表里认行靠它，不承担任何状态语义。 */
 @Composable
@@ -171,15 +152,6 @@ internal fun ProviderRow(
                         text = stringResource(Res.string.manage_latency, latency),
                         style = AppTextStyle.Footnote,
                         color = appSecondaryTextColor,
-                    )
-                }
-                if (row.staleThisRound) {
-                    // 红线 11：瞬时失败不改写健康结论，但要让用户知道"这一轮没验证成"
-                    AppText(
-                        text = stringResource(Res.string.health_stale_this_round),
-                        style = AppTextStyle.Footnote,
-                        color = appSecondaryTextColor,
-                        maxLines = 1,
                     )
                 }
             }
@@ -399,10 +371,6 @@ internal fun ModelRow(
 }
 
 @Composable
-private fun loginMethodLabel(method: LoginMethod): String = when (method) {
-    LoginMethod.GITHUB -> stringResource(Res.string.login_method_github)
-    LoginMethod.LINUX_DO -> stringResource(Res.string.login_method_linuxdo)
-}@Composable
 internal fun AccountRow(
     row: UiAccountRow,
     onClick: (() -> Unit)? = null,

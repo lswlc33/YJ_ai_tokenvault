@@ -21,6 +21,7 @@ class ProbePlanBuilderTest {
         baseUrl: String = "https://api$providerId.example.test/v1",
         protocols: Set<Protocol> = setOf(Protocol.CHAT),
         probe: KeyProbeSettings = KeyProbeSettings(),
+        timeoutSeconds: Int? = null,
     ) = ApiKey(
         id = id,
         providerId = providerId,
@@ -33,6 +34,7 @@ class ProbePlanBuilderTest {
             apiRoot = baseUrl.removeSuffix("/v1"),
             supportedProtocols = protocols,
             probe = probe,
+            timeoutSeconds = timeoutSeconds,
         ),
         health = KeyHealth.UNKNOWN,
     )
@@ -126,5 +128,28 @@ class ProbePlanBuilderTest {
         val plan = ProbePlanBuilder.build(listOf(p)) { pid -> keys.filter { it.providerId == pid } }
 
         assertTrue(plan.tasks.isEmpty())
+    }
+
+    /** §8.1：Key 自己的超时进骨架任务，后面才谈得上透传到 net 层。 */
+    @Test
+    fun `每把 Key 的超时换算成毫秒进任务骨架`() {
+        val p = provider(1)
+        val keys = listOf(key(10, 1, protocols = setOf(Protocol.CHAT, Protocol.ANTHROPIC), timeoutSeconds = 60))
+        val plan = ProbePlanBuilder.build(listOf(p)) { pid -> keys.filter { it.providerId == pid } }
+
+        assertTrue(plan.tasks.isNotEmpty())
+        plan.tasks.forEach { assertEquals(60_000L, it.timeoutMs) }
+    }
+
+    @Test
+    fun `零与负数超时按没填处理`() {
+        // 0 毫秒的超时等于每个请求必失败，不该是用户能意外得到的结果。
+        val p = provider(1)
+        val plan = ProbePlanBuilder.build(listOf(p)) { pid ->
+            listOf(key(10, 1, timeoutSeconds = 0), key(11, 1, timeoutSeconds = -5)).filter { it.providerId == pid }
+        }
+
+        assertTrue(plan.tasks.isNotEmpty())
+        plan.tasks.forEach { assertEquals(null, it.timeoutMs) }
     }
 }

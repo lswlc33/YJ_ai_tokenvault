@@ -52,9 +52,16 @@ import com.lc33.tokenvault.ui.miuix.rememberAppSnackbarState
  * 把 topBar 放上来的代价很具体：要么变成一个按路由分支的巨型 `when`，
  * 要么需要"页面进入时向 Shell 注册标题"的机制（导航过程中必然有一帧错配），
  * 而且顶栏折叠动效必须和当前页面那个可滚动容器绑定，Shell 持有它就得往下传。
+ *
+ * [initialTabPage] / [onTabPageChange] 只为一件事服务：把"锁屏前在哪一页"记在这棵树之外。
+ * 锁定时 [LockGate] 会把整个 Shell 换掉，pager 自己的状态随之销毁，
+ * 没有这一对外提的状态就只会退回「总览」。
  */
 @Composable
-fun VaultShell() {
+fun VaultShell(
+    initialTabPage: Int,
+    onTabPageChange: (Int) -> Unit,
+) {
     val backStack = rememberVaultBackStack()
     var backStackRevision by remember { mutableIntStateOf(0) }
     val snackbar = rememberAppSnackbarState()
@@ -110,14 +117,19 @@ fun VaultShell() {
 
     // 一级页是一台可左右滑的 pager，三个 tab 平级。权威的选中页在 [TopLevelPagerState]，
     // 底栏高亮和页面内容都读它——不再从 backStack 反推 tab，因为切 tab 根本不压栈了。
-    // 初始页从栈底还原：进程恢复后用户停在哪一页，栈底就是哪个路由。
+    // 初始页取 [initialTabPage]（AppRoot 那份活过锁屏的记录），**不再**取栈底路由：
+    // 锁定会把导航栈连同这一层一起销毁，解锁后栈重建成 DashboardRoute，
+    // 拿栈底当页码就等价于"每次都回总览"。
     val pagerState = rememberPagerState(
-        initialPage = topLevelIndexOf(backStack.firstOrNull()).coerceAtLeast(0),
+        initialPage = initialTabPage.coerceIn(0, TopLevelRoutes.lastIndex),
     ) { TopLevelRoutes.size }
     val pager = rememberTopLevelPagerState(pagerState)
 
     // 手指滑出来的页要收回来。底栏点击不经过这里：animateToPage 起手就认过目标页了。
     LaunchedEffect(pagerState.currentPage) { pager.syncPage() }
+
+    // 每次换页都把结果交回 AppRoot 那份记录：这一格才是"锁屏前在哪一页"的权威。
+    LaunchedEffect(pager.selectedPage) { onTabPageChange(pager.selectedPage) }
 
     // 二级页压在 pager 之上（底栏退场）；一级页时底栏高亮由 pager 决定。
     val showingTopLevel = topLevelIndexOf(backStack.lastOrNull()) >= 0

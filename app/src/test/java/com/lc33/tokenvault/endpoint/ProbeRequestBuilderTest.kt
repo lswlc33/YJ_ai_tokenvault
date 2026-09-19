@@ -10,7 +10,7 @@ import org.junit.Test
  * 测试 2：协议请求构造（计划.md §14.3，§5.2 + §8.3）。
  *
  * 三种协议的 method / URL / 头 / body 逐字段断言（含 `max_tokens = 16`）。
- * 真实发出的报文（走 OkHttp）在 `net/OkHttpEngineTest` 里用 MockWebServer 验证。
+ * 真实发出的报文在 `shared/jvmTest` 的 `net/HttpEngineTest` 里用 MockEngine 验证。
  */
 class ProbeRequestBuilderTest {
 
@@ -91,6 +91,26 @@ class ProbeRequestBuilderTest {
             null,
         )
         assertEquals(listOf("Authorization" to "Bearer yj-probe-invalid"), req.headers)
+    }
+
+    /** §8.1：Key 上的 `timeoutSeconds` 要一路带到 net 层，这里先看构造端有没有接上。 */
+    @Test
+    fun `超时随请求透传`() {
+        val list = ProbeRequestBuilder.modelsList(
+            "https://api.example.com/v1/models",
+            Protocol.CHAT,
+            "sk-test".toCharArray(),
+            timeoutMs = 30_000,
+        )
+        assertEquals(30_000L, list.timeoutMs)
+        val inference = ProbeRequestBuilder.inference(
+            "https://api.example.com/v1/chat/completions",
+            Protocol.CHAT,
+            "sk-test".toCharArray(),
+            "gpt-5.6-sol",
+            timeoutMs = 45_000,
+        )
+        assertEquals(45_000L, inference.timeoutMs)
     }
 
     @Test

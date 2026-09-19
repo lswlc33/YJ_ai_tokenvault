@@ -26,21 +26,27 @@ import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppPreferenceGroup
 import com.lc33.tokenvault.ui.miuix.AppScaffold
 import com.lc33.tokenvault.ui.miuix.AppSwitchRow
+import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppTextField
+import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.AppTopBar
 import com.lc33.tokenvault.ui.miuix.SectionTitle
 import com.lc33.tokenvault.ui.miuix.appTopBarScroll
 import com.lc33.tokenvault.ui.miuix.rememberAppTextFieldState
 import com.lc33.tokenvault.ui.miuix.rememberAppTopBarScrollState
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
+import com.lc33.tokenvault.ui.theme.LocalStatusPalette
 import org.jetbrains.compose.resources.stringArrayResource
 import org.jetbrains.compose.resources.stringResource
 import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.back_cd
+import tokenvault.shared.generated.resources.dialog_cancel
+import tokenvault.shared.generated.resources.editor_url_err_scheme
 import tokenvault.shared.generated.resources.editor_color
 import tokenvault.shared.generated.resources.editor_group
 import tokenvault.shared.generated.resources.editor_name
 import tokenvault.shared.generated.resources.editor_error_missing_name
+import tokenvault.shared.generated.resources.editor_row_missing
 import tokenvault.shared.generated.resources.editor_note
 import tokenvault.shared.generated.resources.editor_pinned
 import tokenvault.shared.generated.resources.editor_check_website
@@ -61,6 +67,7 @@ fun ProviderEditorScreen(
     draft: ProviderDraft,
     groupNames: List<String>,
     nameMissing: Boolean,
+    loadFailed: Boolean = false,
     onChange: (ProviderDraft) -> Unit,
     onBack: () -> Unit,
     onSave: (ProviderDraft) -> Unit,
@@ -75,18 +82,31 @@ fun ProviderEditorScreen(
     val name = rememberAppTextFieldState(draft.name)
     val note = rememberAppTextFieldState(draft.note)
     val website = rememberAppTextFieldState(draft.website)
+    // 格式被拦过一次才显示错误：一进页面就飘红是在指责用户还没做的事。
+    var websiteRejected by remember { mutableStateOf(false) }
     val currentDraft by rememberUpdatedState(draft)
     val initialDraft = remember { draft }
     val dirty = name.text != draft.name || note.text != draft.note || website.text != draft.website ||
         draft != initialDraft
 
-    fun submit() = onSave(
-        currentDraft.copy(
-            name = name.text.trim(),
-            note = note.text.trim(),
-            website = website.text.trim(),
-        ),
-    )
+    fun submit() {
+        val site = website.text.trim()
+        // 官网是可选栏，但填了就得是个能直接打开的地址：它会被「检查官网连通性」和
+        // openExternalUrl 原样使用，`www.deepseek.com` 这种少了 scheme 的写法丢给浏览器
+        // 会成一次搜索，用户看到的却是"这个软件打不开官网"。与其到时候莫名，保存前拦下。
+        if (site.isNotEmpty() && !isHttpUrl(site)) {
+            websiteRejected = true
+            return
+        }
+        websiteRejected = false
+        onSave(
+            currentDraft.copy(
+                name = name.text.trim(),
+                note = note.text.trim(),
+                website = site,
+            ),
+        )
+    }
 
     PlatformBackHandler(enabled = dirty) { showDiscard = true }
 
@@ -118,6 +138,22 @@ fun ProviderEditorScreen(
                 .appTopBarScroll(scrollState),
             contentPadding = padding,
         ) {
+            // 读不到那一行要挂在页面上，不能只飘一条 toast：这一页的长相与"新建一家"
+            // 完全一样，而保存此刻是被挡住的——只有 toast 的话用户会反复按那枚对勾。
+            if (loadFailed) {
+                item {
+                    AppText(
+                        text = stringResource(Res.string.editor_row_missing),
+                        style = AppTextStyle.Footnote,
+                        color = LocalStatusPalette.current.error,
+                        modifier = Modifier.padding(
+                            start = tokens.screenPadding,
+                            end = tokens.screenPadding,
+                            top = tokens.itemSpacing,
+                        ),
+                    )
+                }
+            }
             item { SectionTitle(text = stringResource(Res.string.editor_section_basic)) }
             item {
                 Column(
@@ -138,7 +174,17 @@ fun ProviderEditorScreen(
                         },
                     )
                     AppTextField(state = note, label = stringResource(Res.string.editor_note))
-                    AppTextField(state = website, label = stringResource(Res.string.editor_website))
+                    // 沿用请求地址那一条 scheme 文案（红线 17：同一种状态全应用一套说法），
+                    // 只是这一栏可以留空，所以空值不报错。
+                    AppTextField(
+                        state = website,
+                        label = stringResource(Res.string.editor_website),
+                        errorText = if (websiteRejected && website.text.isNotBlank() && !isHttpUrl(website.text.trim())) {
+                            stringResource(Res.string.editor_url_err_scheme)
+                        } else {
+                            null
+                        },
+                    )
                 }
             }
             // 「允许检查官网连通性」单独成块，紧跟官网地址：它说的就是上面那一条地址
@@ -196,9 +242,20 @@ fun ProviderEditorScreen(
         title = stringResource(Res.string.editor_discard_title),
         summary = stringResource(Res.string.editor_discard_summary),
         confirmText = stringResource(Res.string.editor_discard_confirm),
+        // 「放弃修改」不可撤销，退路要写在按钮上，而不是让用户猜要点空白处才能留下。
+        dismissText = stringResource(Res.string.dialog_cancel),
         onConfirm = {
             showDiscard = false
             onBack()
         },
     )
 }
+
+/**
+ * 官网的粗校验：只认 http / https 绝对地址（大小写不限）。
+ *
+ * 刻意"粗"：这一栏不参与端点推导，只要能被浏览器直接打开就算合格，所以不做域名解析、
+ * 不查 TLD——那些规则会误伤 `http://192.168.1.7:3000` 这种自建面板地址。
+ */
+private fun isHttpUrl(raw: String): Boolean =
+    raw.startsWith("http://", ignoreCase = true) || raw.startsWith("https://", ignoreCase = true)

@@ -77,8 +77,6 @@ data class UiProviderRow(
     /** 余额快照的查询时间。null = 还没查过。 */
     val balanceCheckedAt: Long? = null,
     val health: UiHealth,
-    /** `lastOutcome` 是瞬时类时为真：主状态仍是上一次的持久结论（红线 11）。 */
-    val staleThisRound: Boolean = false,
     /**
      * 手动排序的次序（`providers.sortOrder`）。「手动排序」这一档用它排；其它档忽略它。
      */
@@ -161,7 +159,6 @@ data class UiModelRow(
     val health: UiHealth,
     val contextLabel: String?,
     val lastSeenAt: Long? = null,
-    val probedAt: Long? = null,
 )
 
 data class UiAccountRow(

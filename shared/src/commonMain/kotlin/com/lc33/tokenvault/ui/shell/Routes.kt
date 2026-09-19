@@ -87,10 +87,6 @@ data object BalanceThresholdsRoute : VaultRoute
 @Serializable
 data object ClientKeywordsRoute : VaultRoute
 
-/** 手动 HTTP 代理编辑（探测设置页的二级页）。 */
-@Serializable
-data object ProxyRoute : VaultRoute
-
 @Serializable
 data object ProfileListRoute : VaultRoute
 

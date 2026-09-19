@@ -141,10 +141,17 @@ abstract class VaultDatabase : RoomDatabase() {
          *
          * 旧供应商上的连接 / 余额 / 探测配置复制到该供应商每一把 Key；
          * 旧默认 Key 排到最前，作为排序优先级的迁移结果。
+         *
+         * 末尾跑 [reconcileForeignKeys]：重建两张表期间外键是关着的（见那里的说明），
+         * 级联到底有没有 fire、有没有留下悬空行，都由那一次清理 + 自检收口。
          */
         val MIGRATION_2_3: Migration = object : Migration(2, 3) {
             override fun migrate(connection: SQLiteConnection) {
-                connection.execSQL("PRAGMA foreign_keys = OFF")
+                // 这里原来写着一对 `PRAGMA foreign_keys = OFF / ON`：**在事务里改这个开关是
+                // 无效的**（SQLite 明确忽略，迁移整段就跑在事务里），所以它从没起过作用。
+                // 真正让重建表不被级联删空的是 Room 自己——它在整个迁移前后调
+                // `setForeignKeyConstraintsEnabled(false)`。开关留着只会让人以为
+                // "重建完外键就自动恢复成 ON 了"，那与 `reconcileForeignKeys` 的自检互相矛盾。
 
                 // 1) key_settings：一把 Key 一行。
                 connection.execSQL(
@@ -207,6 +214,10 @@ abstract class VaultDatabase : RoomDatabase() {
                     JOIN providers p ON p.id = k.providerId
                     """.trimIndent(),
                 )
+                // 下一段要 `DROP TABLE api_keys`，而 `key_settings.keyId` 是 `ON DELETE CASCADE`。
+                // 外键在迁移期间是不是真的关着，取决于运行时（见 `reconcileForeignKeys`），
+                // 所以先留一份 seed，末尾把被连带删掉的行原样补回来——配置不能靠赌。
+                connection.execSQL("CREATE TEMP TABLE key_settings_seed AS SELECT * FROM key_settings")
 
                 // 2) api_keys：去掉 isDefault，补 note，保留原 id / 外键 / 探测结果。
                 connection.execSQL(
@@ -309,7 +320,17 @@ abstract class VaultDatabase : RoomDatabase() {
                         "ON providers(pinned, sortOrder, id)",
                 )
 
-                connection.execSQL("PRAGMA foreign_keys = ON")
+                // 补回被 `DROP TABLE api_keys` 连带级联掉的配置行（seed 的列序与 key_settings 一致）。
+                connection.execSQL(
+                    """
+                    INSERT INTO key_settings
+                    SELECT * FROM key_settings_seed s
+                    WHERE s.keyId NOT IN (SELECT keyId FROM key_settings)
+                    """.trimIndent(),
+                )
+                connection.execSQL("DROP TABLE key_settings_seed")
+
+                connection.reconcileForeignKeys("2->3")
             }
         }
 
@@ -343,13 +364,32 @@ abstract class VaultDatabase : RoomDatabase() {
          *
          * 旧数据里 `enabled = 0` 的行**不删**，只是不再有这层含义——它们会重新参与探测与展示。
          * 迁移里删用户数据是不可接受的：真不要了，用户自己在列表里删。
+         * （`reconcileForeignKeys` 删的是**父行已经不在了**的悬空行：那种行任何查询都取不到，
+         * 留着只会让末尾的外键自检把整次升级判成失败。）
          *
          * minSdk 33 的 SQLite 没有 `ALTER TABLE ... DROP COLUMN`（3.35 才有），
          * 所以照 v3 的做法重建两张表。
          */
         val MIGRATION_4_5: Migration = object : Migration(4, 5) {
             override fun migrate(connection: SQLiteConnection) {
-                connection.execSQL("PRAGMA foreign_keys = OFF")
+                // 与 v3 同一处订正：事务里改 `PRAGMA foreign_keys` 无效，Room 已在迁移整段
+                // 前后关掉外键约束，这里不再重复写那两行。
+
+                // 0) 先留两份 seed：下面 `DROP TABLE api_keys` 的级联口径由运行时决定
+                //    （`key_settings.keyId` 与 `models.keyId` 都是 `ON DELETE CASCADE`），
+                //    万一真的级联了，末尾还能原样补回，而不是把用户的配置与模型列表陪葬。
+                //    `models` 那份必须显式列列：v4 的 models 还有 `enabled`，重建后没有。
+                connection.execSQL("CREATE TEMP TABLE key_settings_seed AS SELECT * FROM key_settings")
+                connection.execSQL(
+                    """
+                    CREATE TEMP TABLE models_seed AS
+                    SELECT id, providerId, keyId, modelId, protocol, displayName, source,
+                           discoveredVia, favorite, needsReview, catalogKey, probeState,
+                           lastOutcome, probeDetail, latencyMs, probedAt, firstSeenAt,
+                           lastSeenAt, sortOrder
+                    FROM models
+                    """.trimIndent(),
+                )
 
                 // 1) api_keys：去掉 enabled。
                 connection.execSQL(
@@ -461,7 +501,25 @@ abstract class VaultDatabase : RoomDatabase() {
                 connection.execSQL("CREATE INDEX IF NOT EXISTS index_models_keyId ON models(keyId)")
                 connection.execSQL("CREATE INDEX IF NOT EXISTS index_models_catalogKey ON models(catalogKey)")
 
-                connection.execSQL("PRAGMA foreign_keys = ON")
+                // 补回被级联带走的行（按主键判缺，两边都在的行走不到这里）。
+                connection.execSQL(
+                    """
+                    INSERT INTO key_settings
+                    SELECT * FROM key_settings_seed s
+                    WHERE s.keyId NOT IN (SELECT keyId FROM key_settings)
+                    """.trimIndent(),
+                )
+                connection.execSQL(
+                    """
+                    INSERT INTO models
+                    SELECT * FROM models_seed s
+                    WHERE s.id NOT IN (SELECT id FROM models)
+                    """.trimIndent(),
+                )
+                connection.execSQL("DROP TABLE key_settings_seed")
+                connection.execSQL("DROP TABLE models_seed")
+
+                connection.reconcileForeignKeys("4->5")
             }
         }
 
@@ -498,3 +556,55 @@ abstract class VaultDatabase : RoomDatabase() {
 
 @Suppress("NO_ACTUAL_FOR_EXPECT")
 expect object VaultDatabaseConstructor : RoomDatabaseConstructor<VaultDatabase>
+
+/**
+ * 重建表之后收一次外键的尾：先把**父行已经不存在**的悬空行清掉，再用
+ * `PRAGMA foreign_key_check` 自检；仍有违例就让这条迁移抛异常失败。
+ *
+ * 为什么事后要自己收：整段迁移跑在事务里，而 `PRAGMA foreign_keys` 在事务里改是**无效**的
+ * （SQLite 直接忽略）——外键开还是关完全由 Room 在迁移前后决定。于是 `DROP TABLE api_keys`
+ * 到底有没有把 `key_settings` / `models` 一起按 `ON DELETE CASCADE` 级联掉，取决于运行时的
+ * SQLite 版本与驱动实现，不是这条迁移里能写死的。与其赌它，不如事后核对一次并补上缺口
+ * （缺口的来源是各迁移开头的 seed 临时表）。
+ *
+ * 这里删的不是用户数据：所有读路径都从 `providers` / `api_keys` 起 JOIN，父行没了的子行
+ * 在界面上根本取不到，留着只会在下一次探测时以"配置行不存在"的形式回来。
+ */
+private fun SQLiteConnection.reconcileForeignKeys(from: String) {
+    execSQL("DELETE FROM api_keys WHERE providerId NOT IN (SELECT id FROM providers)")
+    execSQL("DELETE FROM key_settings WHERE keyId NOT IN (SELECT id FROM api_keys)")
+    execSQL("DELETE FROM provider_accounts WHERE providerId NOT IN (SELECT id FROM providers)")
+    execSQL(
+        """
+        DELETE FROM models
+        WHERE providerId NOT IN (SELECT id FROM providers)
+           OR (keyId IS NOT NULL AND keyId NOT IN (SELECT id FROM api_keys))
+        """.trimIndent(),
+    )
+    execSQL(
+        "UPDATE providers SET groupId = NULL " +
+            "WHERE groupId IS NOT NULL AND groupId NOT IN (SELECT id FROM groups)",
+    )
+    execSQL(
+        "UPDATE key_settings SET clientProfileId = NULL " +
+            "WHERE clientProfileId IS NOT NULL AND clientProfileId NOT IN (SELECT id FROM client_profiles)",
+    )
+    if (hasForeignKeyViolations()) {
+        throw IllegalStateException("foreign key violations remain after migration $from")
+    }
+}
+
+/**
+ * `PRAGMA foreign_key_check` 有没有输出行 = 有没有违例。
+ *
+ * 用 `prepare` + `step` 而不是表值函数 `pragma_foreign_key_check()`：Android 系统那份 SQLite
+ * 不一定编进了 pragma 表值函数（编译选项问题），而 PRAGMA 语句本身一定能 prepare。
+ */
+private fun SQLiteConnection.hasForeignKeyViolations(): Boolean {
+    val statement = prepare("PRAGMA foreign_key_check")
+    try {
+        return statement.step()
+    } finally {
+        statement.close()
+    }
+}

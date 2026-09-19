@@ -8,6 +8,9 @@ import com.lc33.tokenvault.domain.repo.ApiKeyRepository
 import com.lc33.tokenvault.domain.repo.AuditLogRepository
 import com.lc33.tokenvault.domain.repo.ProbeRunRepository
 import com.lc33.tokenvault.domain.repo.TransactionRunner
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -15,6 +18,10 @@ import kotlinx.coroutines.launch
  *
  * 这一页只有两个会改数据的东西：清空探测结果、清空日志。它们都是「不可撤销」，
  * 所以确认对话框在页面层弹，这里只负责真动手。
+ *
+ * **提示由这里发、而不是调用方按完就报"已清空"**：两件清空都是真写库（一次事务 +
+ * 一次整表删除），以前协程里没有任何兜底——写失败时异常冒出协程直接崩应用，
+ * 而界面早就告诉用户"已清空"了。成功与失败都走 [events]，页面只负责把语义念成文案。
  */
 class DataViewModel constructor(
     private val keys: ApiKeyRepository,
@@ -23,23 +30,42 @@ class DataViewModel constructor(
     private val transactions: TransactionRunner,
 ) : ViewModel() {
 
+    /** 一次性事件：只带语义，文案在资源里（红线 19）。 */
+    sealed interface Event {
+        data object ProbeResultsCleared : Event
+        data object LogCleared : Event
+
+        /** 那一次清空没写成，库里还是原样。 */
+        data object Failed : Event
+    }
+
+    private val _events = Channel<Event>(Channel.BUFFERED)
+    val events: Flow<Event> = _events.receiveAsFlow()
+
     /** 清空探测结果：重置所有密钥的探测字段 + 清空 `probe_runs`。密钥本身保留。 */
     fun clearProbeResults() {
         viewModelScope.launch {
-            transactions.inTransaction {
-                keys.resetProbeResults()
-                probeRuns.clear()
-            }
-            audit.record(
-                level = LogLevel.INFO,
-                category = LogCategory.PROBE,
-                message = "probe results cleared",
-            )
+            runCatching {
+                transactions.inTransaction {
+                    keys.resetProbeResults()
+                    probeRuns.clear()
+                }
+                audit.record(
+                    level = LogLevel.INFO,
+                    category = LogCategory.PROBE,
+                    message = "probe results cleared",
+                )
+            }.onSuccess { _events.send(Event.ProbeResultsCleared) }
+                .onFailure { _events.send(Event.Failed) }
         }
     }
 
     /** 清空日志（audit_log 整表）。 */
     fun clearLog() {
-        viewModelScope.launch { audit.clear() }
+        viewModelScope.launch {
+            runCatching { audit.clear() }
+                .onSuccess { _events.send(Event.LogCleared) }
+                .onFailure { _events.send(Event.Failed) }
+        }
     }
 }

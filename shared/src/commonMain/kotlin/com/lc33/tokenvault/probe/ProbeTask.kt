@@ -44,6 +44,9 @@ data class ProbeTask(
 
     /** 这把 Key 是否显式允许 HTTP。 */
     val allowInsecure: Boolean = false,
+
+    /** 这把 Key 自己的超时（毫秒），透传给 `net/HttpEngine`。null = 用引擎兜底。 */
+    val timeoutMs: Long? = null,
 )
 
 /** 一个任务的结果。 */
@@ -68,6 +71,15 @@ data class ProbeItemResult(
 
     /** 原始响应体。只给引擎做模型列表解析，绝不直接进 UI 或日志。 */
     val body: String? = null,
+
+    /**
+     * 为什么被跳过。只有 [outcome] 是 [ProbeOutcome.SKIPPED] 时非空。
+     *
+     * 明细页的"本轮未探测"分组要回答的是"为什么没测"（撞了 host 预算 / 超总预算 /
+     * 这家已经 429），光有一句"未探测"用户就只能猜。SkipReason 是枚举而不是文案，
+     * 因为纯 Kotlin 层读不到资源（红线 19），本地化由 UI 层映射。
+     */
+    val skipReason: SkipReason? = null,
 )
 
 /** 一轮探测的进度。 */
@@ -87,7 +99,7 @@ data class ProbeProgress(
     val keyFail: Int = 0,
 )
 
-/** 探测被跳过 / 取消的原因分类（测试 14 断言用）。 */
+/** 探测被跳过 / 取消的原因分类（测试 14 断言 + 明细页"本轮未探测"分组的文案映射）。 */
 enum class SkipReason {
     /** 撞了 host 预算。 */
     HostBudgetExhausted,
@@ -101,17 +113,6 @@ enum class SkipReason {
     /** 被取消 / 金库锁定。 */
     Cancelled,
 }
-
-/**
- * 一轮探测的编排结果。含每个任务的结果与"为什么被跳过"。
- *
- * [results] 是**逐项**的（不是一次性返回）——编排器通过 [ProbeEngine] 的流推流，
- * 这里只是落库前的聚合形态，供测试断言。
- */
-data class ProbeRunOutcome(
-    val results: List<ProbeItemResult>,
-    val skipped: Map<String, SkipReason>,
-)
 
 /**
  * 模型可达性探测按什么顺序试协议（§8.6 的手动快捷探测）。

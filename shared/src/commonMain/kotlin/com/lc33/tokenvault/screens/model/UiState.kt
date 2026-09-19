@@ -116,11 +116,20 @@ data class ProbeProgress(
         get() = if (keyTotal <= 0) 0f else keyDone.toFloat() / keyTotal.toFloat()
 }
 
+/**
+ * 备份状态（同步页顶部那张卡）。
+ *
+ * 给的是**时间戳 + 落点枚举**，不是一句 "just now"：ViewModel 读不到资源（红线 19），
+ * 相对时间要 `relativeLabel`、"本机文件 / WebDAV" 要 `stringResource`，都由页面现取。
+ * 以前这里由 ViewModel 拼英文字面量塞进 UiState，中文界面上就蹦出 "just now / WebDAV"。
+ */
 data class BackupStatus(
-    val lastBackupAgo: String? = null,
-    val targetLabel: String? = null,
-    val sizeLabel: String? = null,
+    val lastBackupAtMs: Long? = null,
+    val target: UiBackupTarget? = null,
 )
+
+/** 最近一次备份落在哪里。只有两档，文案由页面映射。 */
+enum class UiBackupTarget { Local, WebDav }
 
 data class DashboardUiState(
     val loading: Boolean = false,
@@ -130,7 +139,9 @@ data class DashboardUiState(
     val attention: List<AttentionItem> = emptyList(),
     val lastRun: ProbeRunSummary? = null,
     val progress: ProbeProgress? = null,
-    val backup: BackupStatus = BackupStatus(),
+    // 这里没有"备份状态"那一项：总览按规格只有余额 / 概览 / 探测三块（none.md 仪表盘），
+    // 备份的真话（最近一次成功备份的时间与落点）在同步页那张卡上，由 SyncViewModel 给。
+    // 以前留过一个恒为空的 backup 字段，只让 ViewModel 硬拼一个"还没有备份"。
 
     /**
      * 渲染这一屏时的“现在”，给相对时间用。同 [ProviderDetailUiState.nowMs]：

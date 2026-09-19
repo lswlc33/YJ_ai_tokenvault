@@ -155,25 +155,6 @@ class SettingsRepositoryTest {
         assertEquals("[\"a\",\"b\"]", raw)
     }
 
-    // ---------------------------------------------------------------- 代理
-
-    @Test
-    fun `代理没写过时发空串`() = runTest {
-        repo.observeProxy().test {
-            assertEquals("", awaitItem())
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
-
-    @Test
-    fun `代理写了立刻能读回来`() = runTest {
-        repo.setProxy("127.0.0.1:7890")
-        repo.observeProxy().test {
-            assertEquals("127.0.0.1:7890", awaitItem())
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
-
     // ---------------------------------------------------------------- 前台空闲 / 屏幕关闭锁定
 
     @Test

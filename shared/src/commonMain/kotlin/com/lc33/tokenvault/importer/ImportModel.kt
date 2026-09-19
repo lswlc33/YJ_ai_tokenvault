@@ -34,6 +34,9 @@ data class ParsedRecord(
     /** 解析出的协议集合。由「支持端点类型」块给出。 */
     val supportedProtocols: Set<Protocol> = emptySet(),
 
+    /** 协议 → 完整路径覆盖（「路径覆盖 <别名> <路径>」）。落进 `KeySettings.pathOverrides`。 */
+    val pathOverrides: Map<Protocol, String> = emptyMap(),
+
     /** 余额查询类型。 */
     val balanceKind: BalanceKind = BalanceKind.NONE,
 
@@ -44,6 +47,12 @@ data class ParsedRecord(
     val balanceToken: CharArray? = null,
 
     val balanceUserId: String? = null,
+
+    /** 「换算比」：多少 quota 等于 1 单位货币。null 表示用适配器默认（500000）。 */
+    val quotaPerUnit: Double? = null,
+
+    /** 「余额配置」原文（customJson 的 JSON）。null 表示没写，落库时用 `{}`。 */
+    val balanceConfig: String? = null,
 
     /** 客户端预设名 / builtinKey 的原文。匹配不到内置预设时记 issue 并忽略。 */
     val clientProfileRef: String? = null,
@@ -64,10 +73,13 @@ data class ParsedRecord(
             websiteUrl == other.websiteUrl &&
             apiBaseUrl == other.apiBaseUrl &&
             supportedProtocols == other.supportedProtocols &&
+            pathOverrides == other.pathOverrides &&
             balanceKind == other.balanceKind &&
             balanceBaseUrl == other.balanceBaseUrl &&
             balanceToken.contentEquals(other.balanceToken) &&
             balanceUserId == other.balanceUserId &&
+            quotaPerUnit == other.quotaPerUnit &&
+            balanceConfig == other.balanceConfig &&
             clientProfileRef == other.clientProfileRef &&
             keys == other.keys &&
             models == other.models &&
@@ -78,8 +90,11 @@ data class ParsedRecord(
     override fun hashCode(): Int {
         var result = name.hashCode()
         result = 31 * result + supportedProtocols.hashCode()
+        result = 31 * result + pathOverrides.hashCode()
         result = 31 * result + balanceKind.hashCode()
         result = 31 * result + (balanceToken?.contentHashCode() ?: 0)
+        result = 31 * result + (quotaPerUnit?.hashCode() ?: 0)
+        result = 31 * result + (balanceConfig?.hashCode() ?: 0)
         result = 31 * result + keys.hashCode()
         result = 31 * result + models.hashCode()
         result = 31 * result + accounts.hashCode()
@@ -131,13 +146,16 @@ data class ParsedAccount(
         return label == other.label &&
             username.contentEquals(other.username) &&
             password.contentEquals(other.password) &&
-            loginUrl == other.loginUrl
+            loginUrl == other.loginUrl &&
+            // 登录方式曾经"解析出来了但没进 equals"，往返断言就永远查不出它丢在收尾那一步。
+            loginMethods == other.loginMethods
     }
 
     override fun hashCode(): Int {
         var result = label.hashCode()
         result = 31 * result + (username?.contentHashCode() ?: 0)
         result = 31 * result + (password?.contentHashCode() ?: 0)
+        result = 31 * result + loginMethods.hashCode()
         return result
     }
 }

@@ -12,7 +12,6 @@ import com.lc33.tokenvault.domain.repo.ProviderRepository
 import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.platform.nowMillis
 import com.lc33.tokenvault.probe.ProbeProgress
-import com.lc33.tokenvault.screens.model.BackupStatus
 import com.lc33.tokenvault.screens.model.DashboardUiState
 import com.lc33.tokenvault.screens.model.ProbeRunSummary
 import com.lc33.tokenvault.screens.model.UiProviderRow
@@ -57,6 +56,9 @@ class DashboardViewModel constructor(
             Snapshot(summaries, allKeys)
         }
 
+    // 共享策略用 Lazily 而不是 WhileSubscribed(5s)：后者退订会把 StateFlow 复位成
+    // `loading = true`，于是切后台再回来整页闪一次加载态（六块卡全变回骨架）。
+    // Room 的流是事件驱动而不是轮询，ViewModel 活着就一直订着没有额外代价。
     val state: StateFlow<DashboardUiState> = combine(
         snapshot,
         settings.observeBalanceThresholds(),
@@ -68,7 +70,7 @@ class DashboardViewModel constructor(
             progress = progress?.toUiProgress(),
             lastRun = lastRun?.toSummary(),
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), DashboardUiState(loading = true))
+    }.stateIn(viewModelScope, SharingStarted.Lazily, DashboardUiState(loading = true))
 
     /**
      * 余额明细那个二级页要的行。
@@ -78,7 +80,7 @@ class DashboardViewModel constructor(
      */
     val providerRows: StateFlow<List<UiProviderRow>> = snapshot
         .map { snap -> snap.rows() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     /** 仪表盘“开始探测”。结果与进度由 ProbeEngine 的状态流回 UI。 */
     fun startProbe(): Boolean = probeEngine.start()
@@ -153,8 +155,9 @@ class DashboardViewModel constructor(
         // 这里给时间戳。没跑过就是 null → 卡片画"还没探测过"。
         lastRun = lastRun,
         progress = progress,
-        // 备份在 M9。空的 BackupStatus 会让那张卡画成 warn 色的"还没有备份"，这是真话
-        backup = BackupStatus(),
+        // 备份状态不在这里：总览按规格只有余额 / 概览 / 探测三块，而以前这里硬编码一个
+        // 空的 BackupStatus，等于对界面撒谎说"这台机器还没备份过"。真话（最近一次成功
+        // 备份的时间与落点）在同步页那张卡上，来自 app_settings 的持久记录。
         nowMs = nowMillis(),
     )
 
@@ -175,9 +178,4 @@ class DashboardViewModel constructor(
             keySucceeded = keyOk,
             keyFailed = keyFail,
         )
-
-    private companion object {
-        /** 转屏时别退订：退订会让六块卡在重建后闪一下空态。 */
-        const val STOP_TIMEOUT_MS = 5_000L
-    }
 }

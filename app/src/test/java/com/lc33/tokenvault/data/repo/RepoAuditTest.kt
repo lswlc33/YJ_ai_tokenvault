@@ -102,6 +102,7 @@ class RepoAuditTest {
                 detail: String?,
                 providerId: Long?,
                 keyId: Long?,
+                runId: Long?,
                 requestUrl: String?,
                 requestBody: String?,
                 responseBody: String?,
@@ -114,6 +115,8 @@ class RepoAuditTest {
             override fun observeRecent(limit: Int, minLevel: LogLevel) = flowOf(emptyList<AuditEntry>())
 
             override suspend fun trimOlderThan(before: Long) = Unit
+
+            override suspend fun trimToCount(keep: Int) = Unit
 
             override suspend fun clear() = Unit
         }

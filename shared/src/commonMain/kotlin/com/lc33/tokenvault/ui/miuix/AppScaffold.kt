@@ -6,18 +6,21 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
+import com.lc33.tokenvault.di.Qualifiers
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
+import org.koin.core.qualifier.named
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
@@ -295,6 +298,16 @@ class AppFeedbackHost internal constructor(
         queue.trySend(feedback)
     }
 
+    /**
+     * 收口：不再取新条目。由 [rememberAppFeedbackHost] 在退出组合时调用。
+     *
+     * 只 `close()` 而**不取消**协程——手上那一条（尤其正在写的撤销）要让它做完，
+     * 这才是把 host 挂到应用级作用域想要的结果；同时又不让它无限留着。
+     */
+    internal fun detach() {
+        queue.close()
+    }
+
     private suspend fun present(feedback: AppFeedback) {
         val undo = feedback.undo
         val acted = snackbar.show(
@@ -315,8 +328,18 @@ class AppFeedbackHost internal constructor(
 
 @Composable
 fun rememberAppFeedbackHost(snackbar: AppSnackbarState): AppFeedbackHost {
-    val scope = rememberCoroutineScope()
-    return remember(snackbar, scope) { AppFeedbackHost(scope, snackbar) }
+    // 作用域不能用 rememberCoroutineScope：那条路把整台队列绑在 Shell 的组合上，
+    // 一锁屏（LockGate 换掉整棵树）协程当场被取消，而"撤销"要做的写库正跑在半路上——
+    // 结果是删了五家、恢复两家，剩三家无声消失。APP_SCOPE 是应用级的 SupervisorJob，
+    // 活得比任何一棵组合树久，撤销那一步因此能做完。
+    val appScope = koinInject<CoroutineScope>(named(Qualifiers.APP_SCOPE))
+    val host = remember(snackbar, appScope) { AppFeedbackHost(appScope, snackbar) }
+    // 每次锁屏/解锁都会新建一个宿主，所以退组合时必须关掉队列：
+    // 循环做完手上那条就自己收口，不在 APP_SCOPE 上留一条永远悬着的协程。
+    DisposableEffect(host) {
+        onDispose { host.detach() }
+    }
+    return host
 }
 
 /** 由 Shell 提供，页面通过它发提示，不各自持有一个 host。 */

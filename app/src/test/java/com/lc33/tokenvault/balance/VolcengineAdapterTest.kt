@@ -69,6 +69,17 @@ class VolcengineAdapterTest {
     }
 
     @Test
+    fun `余额字段是数字还是字符串都认`() {
+        // 火山的 SDK 在不同版本里 number 与 string 两种写法都回过，
+        // 把字符串判成"缺字段"等于自己制造一次"余额总是查不到"。
+        val asString = adapter().parse(200, """{"Result":{"AvailableBalance":"123.45"}}""")
+        assertEquals(123.45, asString.amount!!, 1e-9)
+        // `Result` 形状变了要报解析失败，而不是抛类型转换异常冒到调用方
+        val e = runCatching { adapter().parse(200, """{"Result":"oops"}""") }.exceptionOrNull()
+        assertTrue(e is BalanceParseException)
+    }
+
+    @Test
     fun `欠款字段不当余额报`() {
         // ArrearsBalance 是欠款额，出现在响应里也不能被读成余额。
         val body = """{"Result":{"ArrearsBalance":66.0}}"""

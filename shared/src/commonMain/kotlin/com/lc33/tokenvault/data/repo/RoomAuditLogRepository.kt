@@ -34,6 +34,7 @@ class RoomAuditLogRepository constructor(
         detail: String?,
         providerId: Long?,
         keyId: Long?,
+        runId: Long?,
         requestUrl: String?,
         requestBody: String?,
         responseBody: String?,
@@ -45,6 +46,7 @@ class RoomAuditLogRepository constructor(
                 category = category.wireName,
                 providerId = providerId,
                 keyId = keyId,
+                runId = runId,
                 message = redactor.scrub(message),
                 detail = detail?.let { redactor.scrub(it) },
                 // 报文同样要过一道脱敏：上游经常把密钥原样回显在响应里
@@ -66,6 +68,8 @@ class RoomAuditLogRepository constructor(
     }
 
     override suspend fun trimOlderThan(before: Long) = dao.trimOlderThan(before)
+
+    override suspend fun trimToCount(keep: Int) = dao.trimToCount(keep)
 
     override suspend fun clear() = dao.clear()
 }

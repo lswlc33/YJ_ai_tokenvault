@@ -24,14 +24,20 @@ import tokenvault.shared.generated.resources.probe_run_empty_desc
 import tokenvault.shared.generated.resources.probe_run_failed
 import tokenvault.shared.generated.resources.probe_run_retry
 import tokenvault.shared.generated.resources.probe_run_skipped
+import tokenvault.shared.generated.resources.probe_run_stop
 import tokenvault.shared.generated.resources.probe_run_succeeded
 import tokenvault.shared.generated.resources.probe_run_title
+import tokenvault.shared.generated.resources.probe_skip_cancelled
+import tokenvault.shared.generated.resources.probe_skip_host_budget
+import tokenvault.shared.generated.resources.probe_skip_rate_limited
+import tokenvault.shared.generated.resources.probe_skip_total_budget
 import tokenvault.shared.generated.resources.probe_level_reachability
 import tokenvault.shared.generated.resources.probe_level_key_validity
 import tokenvault.shared.generated.resources.probe_level_model
 import tokenvault.shared.generated.resources.probe_level_balance
 import tokenvault.shared.generated.resources.time_duration_seconds
 import com.lc33.tokenvault.domain.ProbeLevel
+import com.lc33.tokenvault.probe.SkipReason
 import com.lc33.tokenvault.screens.model.ProbeRunSummary
 import com.lc33.tokenvault.screens.model.UiHealth
 import com.lc33.tokenvault.ui.common.StatusDot
@@ -67,13 +73,18 @@ data class ProbeItemRow(
     val health: UiHealth,
     val detail: String?,
     val latencyMs: Long?,
+    /**
+     * "为什么没测"（§13.4 本轮未探测分组）。只有被跳过 / 被取消的行非空；
+     * 文案在页面侧用资源映射（枚举不带资源引用，红线 19）。
+     */
+    val skipReason: SkipReason? = null,
 )
 
 /**
  * 探测明细（计划.md §13.4，`ProbeRunRoute`）。
  *
- * 探测是**动作**不是内容，所以它是仪表盘的二级页而不是一级页。这一页只做两件事：
- * 看结果、重试。
+ * 探测是**动作**不是内容，所以它是仪表盘的二级页而不是一级页。这一页做三件事：
+ * 看结果、重试、中途停止。
  *
  * **级别与范围开关不在这里**，在设置 → 探测：它们是配置不是动作，放在结果页会让人
  * 以为改了就立刻重跑。
@@ -88,8 +99,11 @@ fun ProbeRunScreen(
     failed: List<ProbeItemRow>,
     skipped: List<ProbeItemRow>,
     succeeded: List<ProbeItemRow>,
+    /** 这一轮还在跑：画"停止探测"入口、藏掉重试（引擎拒绝并发轮，摆着也是空点）。 */
+    running: Boolean,
     onBack: () -> Unit,
     onRetryFailed: () -> Unit,
+    onStopProbe: () -> Unit,
     onOpenProvider: (Long) -> Unit,
 ) {
     val scrollState = rememberAppTopBarScrollState()
@@ -110,9 +124,9 @@ fun ProbeRunScreen(
             )
         },
     ) { padding ->
-        // 三组都空且没有上一轮：这一页没有任何内容可画。不给空态的表现是一屏白，
+        // 三组都空且没有上一轮、也没在跑：这一页没有任何内容可画。不给空态的表现是一屏白，
         // 而那看起来像加载失败
-        if (lastRun == null && failed.isEmpty() && skipped.isEmpty() && succeeded.isEmpty()) {
+        if (lastRun == null && !running && failed.isEmpty() && skipped.isEmpty() && succeeded.isEmpty()) {
             EmptyState(
                 title = stringResource(Res.string.dashboard_probe_never),
                 description = stringResource(Res.string.probe_run_empty_desc),
@@ -127,11 +141,16 @@ fun ProbeRunScreen(
             contentPadding = padding,
             verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
         ) {
+            // 停止入口只跟着"在跑"这件事走，不跟 lastRun 走：首轮探测进行中进来时
+            // 还没有任何已完成的轮次，那恰恰是最想按停止的时刻。
+            if (running) {
+                item { StopGroup(onStopProbe) }
+            }
             if (lastRun != null) {
                 // 描述与入口分开：本轮结果是一场"读取"，重试是一条"动作"。
                 // 摆在同一张卡里，读起来像"点这一行才会看到结果"。
                 item { SummaryCard(lastRun, nowMs) }
-                if (failed.isNotEmpty() || skipped.isNotEmpty()) {
+                if (!running && (failed.isNotEmpty() || skipped.isNotEmpty())) {
                     item { RetryGroup(onRetryFailed) }
                 }
             }
@@ -196,6 +215,30 @@ private fun RetryGroup(onRetry: () -> Unit) {
     }
 }
 
+/**
+ * 停止入口单独成组。形态沿用页面主体的行式动作（[AppActionRow]），
+ * 不引入文本按钮——页面正文不长出按钮（架构红线，ArchitectureRulesTest 机器检查）。
+ */
+@Composable
+private fun StopGroup(onStop: () -> Unit) {
+    AppPreferenceGroup(inset = true) {
+        AppActionRow(
+            text = stringResource(Res.string.probe_run_stop),
+            onClick = onStop,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+/** "为什么没测"的一句话（§13.4）。枚举在引擎侧、文案在这里：纯 Kotlin 层读不到资源（红线 19）。 */
+@Composable
+private fun skipReasonLabel(reason: SkipReason): String = when (reason) {
+    SkipReason.HostBudgetExhausted -> stringResource(Res.string.probe_skip_host_budget)
+    SkipReason.TotalBudgetExhausted -> stringResource(Res.string.probe_skip_total_budget)
+    SkipReason.HostRateLimited -> stringResource(Res.string.probe_skip_rate_limited)
+    SkipReason.Cancelled -> stringResource(Res.string.probe_skip_cancelled)
+}
+
 @Composable
 private fun ItemCard(row: ProbeItemRow, onOpenProvider: (Long) -> Unit) {
     val tokens = LocalAppTokens.current
@@ -245,6 +288,17 @@ private fun ItemCard(row: ProbeItemRow, onOpenProvider: (Long) -> Unit) {
             // 状态点：颜色由 health 决定，标签用四档通用文案（labelOf）。与列表页同一条
             // 约定——这里不造一套"密钥无效/余额不足"的专属文案（红线 17：同一状态全应用一套文案）。
             StatusDot(color = colorOf(row.health), label = labelOf(row.health))
+            // 被跳过的行没有 detail（连请求都没发出去），"为什么没测"就是它唯一的说明；
+            // 真给了 detail（例如 429 熔断前最后一响）则两条都画，前者是结论后者是原因。
+            val skipLabel = row.skipReason?.let { skipReasonLabel(it) }
+            if (skipLabel != null) {
+                AppText(
+                    text = skipLabel,
+                    style = AppTextStyle.Footnote,
+                    color = appSecondaryTextColor,
+                    modifier = Modifier.padding(top = 3.dp),
+                )
+            }
             if (row.detail != null) {
                 // 上游 message 已经过 Redactor：它经常回显密钥的一部分（M0.5 实测）
                 AppText(

@@ -8,63 +8,36 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.unit.dp
 import tokenvault.shared.generated.resources.Res
-import tokenvault.shared.generated.resources.count_accounts
 import tokenvault.shared.generated.resources.count_keys
 import tokenvault.shared.generated.resources.count_models
 import tokenvault.shared.generated.resources.count_providers
-import tokenvault.shared.generated.resources.dashboard_attention_fix_client
-import tokenvault.shared.generated.resources.dashboard_attention_none
-import tokenvault.shared.generated.resources.dashboard_attention_title
-import tokenvault.shared.generated.resources.dashboard_backup_last
-import tokenvault.shared.generated.resources.dashboard_backup_never
-import tokenvault.shared.generated.resources.dashboard_backup_now
-import tokenvault.shared.generated.resources.dashboard_backup_title
+import tokenvault.shared.generated.resources.dashboard_balance_detail
 import tokenvault.shared.generated.resources.dashboard_balance_failed
 import tokenvault.shared.generated.resources.dashboard_balance_no_fx
 import tokenvault.shared.generated.resources.dashboard_balance_none
 import tokenvault.shared.generated.resources.dashboard_balance_title
 import tokenvault.shared.generated.resources.dashboard_balance_updated
 import tokenvault.shared.generated.resources.dashboard_counts_title
-import tokenvault.shared.generated.resources.dashboard_health_all_ok
-import tokenvault.shared.generated.resources.dashboard_health_empty
-import tokenvault.shared.generated.resources.dashboard_health_title
 import tokenvault.shared.generated.resources.dashboard_probe_counts
 import tokenvault.shared.generated.resources.dashboard_probe_key_label
 import tokenvault.shared.generated.resources.dashboard_probe_last_updated
 import tokenvault.shared.generated.resources.dashboard_probe_provider_label
 import tokenvault.shared.generated.resources.dashboard_probe_detail
-import tokenvault.shared.generated.resources.dashboard_probe_finished
 import tokenvault.shared.generated.resources.dashboard_probe_never
 import tokenvault.shared.generated.resources.dashboard_probe_no_autolock
 import tokenvault.shared.generated.resources.dashboard_probe_running
 import tokenvault.shared.generated.resources.dashboard_probe_title
 import tokenvault.shared.generated.resources.refresh_cd
-import tokenvault.shared.generated.resources.time_duration_seconds
-import com.lc33.tokenvault.screens.model.AttentionItem
-import com.lc33.tokenvault.screens.model.AttentionKind
-import com.lc33.tokenvault.screens.model.BackupStatus
 import com.lc33.tokenvault.screens.model.BalanceSummary
 import com.lc33.tokenvault.screens.model.ContentCounts
 import com.lc33.tokenvault.screens.model.DashboardUiState
-import com.lc33.tokenvault.screens.model.HealthBreakdown
-import com.lc33.tokenvault.screens.model.UiHealth
-import com.lc33.tokenvault.ui.common.BarSegment
-import com.lc33.tokenvault.ui.common.RelativeBucket
-import com.lc33.tokenvault.ui.common.SegmentedBar
 import com.lc33.tokenvault.ui.common.StatTile
-import com.lc33.tokenvault.ui.common.StatusDot
-import com.lc33.tokenvault.ui.common.colorOf
-import com.lc33.tokenvault.ui.common.durationSeconds
-import com.lc33.tokenvault.ui.common.labelOf
-import com.lc33.tokenvault.ui.common.messageOf
 import com.lc33.tokenvault.ui.common.relativeLabel
 import com.lc33.tokenvault.ui.miuix.AppAccentCard
 import com.lc33.tokenvault.ui.miuix.AppCard
-import com.lc33.tokenvault.ui.miuix.AppDivider
 import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppIconButton
 import com.lc33.tokenvault.ui.miuix.AppLinearProgress
@@ -75,7 +48,6 @@ import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.appOnPrimaryColor
 import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
-import com.lc33.tokenvault.ui.theme.LocalStatusPalette
 
 /** 卡片统一的外边距。仪表盘每块卡都用它，间距只在一处定义。 */
 @Composable
@@ -93,6 +65,8 @@ internal fun BalanceCard(
     balance: BalanceSummary,
     nowMs: Long,
     onRefresh: () -> Unit,
+    /** 跳到余额明细页（`BalanceBreakdownRoute`）。 */
+    onOpenDetail: () -> Unit,
 ) {
     val tokens = LocalAppTokens.current
     // 实色主色底。曾经试过玻璃材质（背景模糊 + vibrancy + 动态光斑）来"彰显高级感"，
@@ -161,6 +135,17 @@ internal fun BalanceCard(
             )
         }
     }
+    // 「查看明细」画在主题色卡**外面**：整张 accent 卡看着像一个整体，把行入口塞进去
+    // 会读成"点卡的任何一处都进明细"。什么都没查到时明细页是空的，入口也就不出现。
+    if (balance.perCurrency.isNotEmpty() || balance.failedProviderCount > 0) {
+        AppPreferenceGroup(modifier = cardModifier(), inset = false) {
+            AppActionRow(
+                text = stringResource(Res.string.dashboard_balance_detail),
+                onClick = onOpenDetail,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
 }
 
 @Composable
@@ -179,98 +164,6 @@ internal fun CountsCard(counts: ContentCounts, onOpenManage: () -> Unit) {
             StatTile(value = counts.providers.toString(), label = stringResource(Res.string.count_providers))
             StatTile(value = counts.keys.toString(), label = stringResource(Res.string.count_keys))
             StatTile(value = counts.models.toString(), label = stringResource(Res.string.count_models))
-        }
-    }
-}
-
-@Composable
-internal fun HealthCard(health: HealthBreakdown) {
-    val tokens = LocalAppTokens.current
-    AppCard(modifier = cardModifier()) {
-        CardTitle(stringResource(Res.string.dashboard_health_title))
-        if (health.total == 0) {
-            AppText(
-                text = stringResource(Res.string.dashboard_health_empty),
-                style = AppTextStyle.Secondary,
-                color = appSecondaryTextColor,
-                modifier = Modifier.padding(vertical = tokens.itemSpacing),
-            )
-            return@AppCard
-        }
-        SegmentedBar(
-            segments = listOf(
-                BarSegment(health.ok, colorOf(UiHealth.Ok)),
-                BarSegment(health.warn, colorOf(UiHealth.Warn)),
-                BarSegment(health.error, colorOf(UiHealth.Error)),
-                BarSegment(health.unknown, colorOf(UiHealth.Unknown)),
-            ),
-            modifier = Modifier.padding(vertical = tokens.itemSpacing),
-        )
-        if (health.allOk) {
-            // 全绿时不必列四行图例，一句话更清楚
-            StatusDot(
-                color = colorOf(UiHealth.Ok),
-                label = pluralStringResource(Res.plurals.dashboard_health_all_ok, health.total, health.total),
-            )
-            return@AppCard
-        }
-        listOf(
-            UiHealth.Ok to health.ok,
-            UiHealth.Warn to health.warn,
-            UiHealth.Error to health.error,
-            UiHealth.Unknown to health.unknown,
-        ).filter { it.second > 0 }.forEach { (state, count) ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 3.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                StatusDot(
-                    color = colorOf(state),
-                    label = labelOf(state),
-                    modifier = Modifier.weight(1f),
-                )
-                AppText(text = count.toString(), style = AppTextStyle.Secondary)
-            }
-        }
-    }
-}
-
-@Composable
-internal fun AttentionCard(items: List<AttentionItem>, onOpenProvider: (Long) -> Unit) {
-    val tokens = LocalAppTokens.current
-    AppCard(modifier = cardModifier()) {
-        CardTitle(stringResource(Res.string.dashboard_attention_title))
-        if (items.isEmpty()) {
-            StatusDot(
-                color = colorOf(UiHealth.Ok),
-                label = stringResource(Res.string.dashboard_attention_none),
-                modifier = Modifier.padding(top = tokens.itemSpacing),
-            )
-            return@AppCard
-        }
-        items.forEachIndexed { index, item ->
-            if (index > 0) AppDivider(modifier = Modifier.padding(vertical = tokens.itemSpacing))
-            Column(modifier = Modifier.padding(top = tokens.itemSpacing)) {
-                StatusDot(color = colorOf(item.health), label = item.providerName)
-                AppText(
-                    text = messageOf(item.kind),
-                    style = AppTextStyle.Secondary,
-                    color = appSecondaryTextColor,
-                    modifier = Modifier.padding(top = 2.dp),
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing)) {
-                    // 只有“被客户端校验拦下”这一档有一键修法，其余三档点整行进详情页
-                    if (item.kind == AttentionKind.ClientBlocked) {
-                        AppActionRow(
-                            text = stringResource(Res.string.dashboard_attention_fix_client),
-                            onClick = { onOpenProvider(item.providerId) },
-                            inset = false,
-                        )
-                    }
-                }
-            }
         }
     }
 }
@@ -422,43 +315,6 @@ private fun ProbeMetricCard(title: String, metric: ProbeMetric) {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 6.dp),
-        )
-    }
-}
-
-@Composable
-internal fun BackupCard(backup: BackupStatus, onOpenSync: () -> Unit) {
-    val tokens = LocalAppTokens.current
-    val palette = LocalStatusPalette.current
-    // 备份状态卡与「立即备份」入口分开：描述与动作混在一张卡里，
-    // 整张卡看起来都像入口。
-    AppCard(modifier = cardModifier()) {
-        CardTitle(stringResource(Res.string.dashboard_backup_title))
-        val lastBackupAgo = backup.lastBackupAgo
-        if (lastBackupAgo == null) {
-            AppText(
-                text = stringResource(Res.string.dashboard_backup_never),
-                style = AppTextStyle.Secondary,
-                color = appOnPrimaryColor,
-                modifier = Modifier.padding(top = tokens.itemSpacing),
-            )
-        } else {
-            AppText(
-                text = stringResource(
-                    Res.string.dashboard_backup_last,
-                    lastBackupAgo,
-                    backup.targetLabel ?: "",
-                ),
-                style = AppTextStyle.Secondary,
-                modifier = Modifier.padding(top = tokens.itemSpacing),
-            )
-        }
-    }
-    AppPreferenceGroup(modifier = cardModifier(), inset = false) {
-        AppActionRow(
-            text = stringResource(Res.string.dashboard_backup_now),
-            onClick = onOpenSync,
-            modifier = Modifier.fillMaxWidth(),
         )
     }
 }

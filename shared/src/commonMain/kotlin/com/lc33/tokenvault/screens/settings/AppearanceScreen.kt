@@ -24,6 +24,7 @@ import com.lc33.tokenvault.ui.miuix.AppSwitchRow
 import com.lc33.tokenvault.ui.miuix.SectionTitle
 import com.lc33.tokenvault.domain.model.PredictiveBackExitDirection
 import com.lc33.tokenvault.domain.model.PredictiveBackStyle
+import com.lc33.tokenvault.platform.supportsInAppLanguageSwitch
 import com.lc33.tokenvault.ui.theme.AppColorSchemeMode
 
 /**
@@ -31,7 +32,8 @@ import com.lc33.tokenvault.ui.theme.AppColorSchemeMode
  *
  * 语言那一行故意是 `AppArrowRow` 而不是应用内的下拉：Android 13+ 有系统级的
  * 「应用语言」页，自己再做一份就有两个权威（红线 31 的精神），所以这里只负责
- * 把用户送去系统设置。
+ * 把用户送去系统设置。iOS 上这条路走不通（切换要重启应用才生效），所以整组语言
+ * 按 [supportsInAppLanguageSwitch] 不画。
  *
  * 这一页两项都有各自的权威存储：配色是 `boot.themeMode`、底栏模糊是
  * `app_settings.blurNavBar`（红线 31），都由 `AppearanceViewModel` 读写。配色下拉是
@@ -86,14 +88,19 @@ fun AppearanceScreen(
             }
         }
 
-        item { SectionTitle(text = stringResource(Res.string.appearance_section_language)) }
-        item {
-            AppPreferenceGroup {
-                AppArrowRow(
-                    title = stringResource(Res.string.appearance_language),
-                    summary = stringResource(Res.string.appearance_language_summary),
-                    onClick = onOpenSystemLocaleSettings,
-                )
+        // 「应用语言」整组按能力位决定画不画（红线 19：做不到的不进界面）。Android 13+ 有
+        // 系统级的 per-app 语言页，跳过去就行；iOS 上切换之后必须重启应用才生效，而 Compose
+        // 侧资源跟着 bundle 语言走还没走通，于是那一行在 iOS 上只会给出一个按了看不出效果的入口。
+        if (supportsInAppLanguageSwitch) {
+            item { SectionTitle(text = stringResource(Res.string.appearance_section_language)) }
+            item {
+                AppPreferenceGroup {
+                    AppArrowRow(
+                        title = stringResource(Res.string.appearance_language),
+                        summary = stringResource(Res.string.appearance_language_summary),
+                        onClick = onOpenSystemLocaleSettings,
+                    )
+                }
             }
         }
     }

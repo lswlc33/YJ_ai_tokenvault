@@ -109,6 +109,8 @@ class AndroidBiometricVault(
             }
             BiometricEnableOutcome.Cancelled -> BiometricUnlockOutcome.Cancelled
             BiometricEnableOutcome.Unavailable -> BiometricUnlockOutcome.Invalidated
+            // 暂时锁住 ≠ 凭据失效：boot 里那份包裹是好的，什么都不许改，等一会儿再来。
+            BiometricEnableOutcome.LockedOut -> BiometricUnlockOutcome.LockedOut
             is BiometricEnableOutcome.Error -> BiometricUnlockOutcome.Error(outcome.message)
         }
     }
@@ -141,6 +143,12 @@ class AndroidBiometricVault(
                         BiometricPrompt.ERROR_USER_CANCELED,
                         BiometricPrompt.ERROR_CANCELED,
                         -> BiometricEnableOutcome.Cancelled
+
+                        // 锁住单独一档：`errString` 那一句（"尝试次数过多，请稍后再试"）
+                        // 会随 ROM 变化，而调用方要做的判断（**不许清 boot**）只取决于这一档本身。
+                        BiometricPrompt.ERROR_LOCKOUT,
+                        BiometricPrompt.ERROR_LOCKOUT_PERMANENT,
+                        -> BiometricEnableOutcome.LockedOut
 
                         else -> BiometricEnableOutcome.Error(errString.toString())
                     },

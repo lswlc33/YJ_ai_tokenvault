@@ -5,9 +5,10 @@ import com.lc33.tokenvault.domain.model.BalanceSnapshot
 import com.lc33.tokenvault.domain.model.KeySettings
 import com.lc33.tokenvault.endpoint.ProbeRequest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * OpenRouter / SiliconFlow / Moonshot 三个"复用默认 Key、单字段"的余额适配器。
@@ -44,7 +45,14 @@ class SimpleBalanceAdapter(
         }
         val root = runCatching { json.parseToJsonElement(body).jsonObject }.getOrNull()
             ?: throw BalanceParseException(kind, "no_json")
-        val amount = root[field]?.jsonPrimitive?.doubleOrNull
+        // 字段层级有两种公开写法：顶层（`{"totalBalance": "12.3"}`）与包在 `data` 里
+        // （`{"data": {"totalBalance": …}}`）。SiliconFlow 公开文档给的是后者，而旧实现
+        // 只读顶层，于是那条查询永远以 `missing_totalBalance` 失败。
+        // 顺序是"先顶层、再下钻 data 一层"：顶层能命中的既有供应商一律不受影响，
+        // 只多认一种包裹形状。**两种形状都未用真实账号实测**（§9.2，M7 实测不过就删预设）。
+        val located = root[field] ?: (root["data"] as? JsonObject)?.get(field)
+        // `doubleOrNull` 同时吃 JSON number 与字符串两种写法（`12.3` / `"12.3"`）。
+        val amount = (located as? JsonPrimitive)?.doubleOrNull
             ?: throw BalanceParseException(kind, "missing_$field")
 
         return BalanceSnapshot(

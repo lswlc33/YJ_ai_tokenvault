@@ -6,6 +6,18 @@
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<!--
+		这个包支持哪两种语言（与 Android 侧 app 的 localeFilters 同一份清单：zh-rCN + en）。
+		不声明的话系统只认 CFBundleDevelopmentRegion，凡是由系统代绘的那几处文案就无从
+		挑语言——Face ID 授权框上的说明（NSFaceIDUsageDescription）、分享面板、文件 App 里的
+		应用名都算。声明它不等于应用内能立刻换语言：那一行入口在 iOS 上按
+		PlatformCapabilities.supportsInAppLanguageSwitch 整行不画，切换还要重启应用才生效。
+	-->
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>zh-Hans</string>
+	</array>
 	<key>CFBundleDisplayName</key>
 	<string>TokenVault</string>
 	<key>CFBundleExecutable</key>

@@ -60,5 +60,13 @@ value class FieldAad private constructor(val value: String) {
             require(slot.isNotBlank()) { "slot name must not be blank" }
             return FieldAad("boot:dek:$slot")
         }
+
+        /**
+         * `boot.dekCheck` 用的 AAD —— 平台 DEK 身份校验那一份固定明文的密文。
+         *
+         * 与任何槽位的 AAD 都不同，所以"把某条包裹搬进 dekCheck"会在认证阶段失败。
+         * 值本身是常量，改了它等于让所有已引导设备的校验失败。
+         */
+        fun ofDekCheck(): FieldAad = FieldAad("boot:dek-check")
     }
 }

@@ -57,16 +57,28 @@ enum class ClassificationReason {
 
     /** 400（L2）——密钥有效但请求参数不被接受。 */
     ParamRejectedButKeyValid,
+
+    /**
+     * 3xx：地址在跳别处。三端都已显式关掉"自动跟随重定向"（`net/buildClient`），
+     * 所以 3xx 会原样落到这里——它既不是"密钥坏了"也不是"路径写错"，而是**需要人
+     * 看一眼**：多半是站点把 http 换成 https、或加了登录网关。不钉 CONFIG_ERROR，
+     * 那种灰点会把一家其实能用的站永久判死。
+     */
+    Redirected,
 }
 
 /**
  * 错误分类矩阵（计划.md §8.4）的纯函数实现。
  *
- * **判定顺序不可变**，四条原则是 M0.5 实测逼出来的：
- * 1. 额度关键词优先于状态码——`403` + `该令牌额度已用尽` 是 INSUFFICIENT 不是 FORBIDDEN。
- * 2. 除 401/403 外的结构化响应都证明鉴权通过——L2 遇 400 是"密钥有效、请求要调"。
- * 3. 客户端校验关键词排在 401 **之前**——Agent Router 用 401 拦非白名单客户端。
- * 4. 响应体经常不是 JSON 甚至是空的——解析失败不能升级成 CONFIG_ERROR。
+ * **判定顺序不可变**，五条原则是 M0.5 实测逼出来的：
+ * 1. **2xx 一律先判成功**（除了 body 里带 `error` 字段那种）。早先关键词排在 2xx 之前，
+ *    于是 OpenAI 用 `200` 正常回一个名叫 `codex-mini-latest` 的模型列表，被 `codex`
+ *    这条关键词命中、判成 CLIENT_BLOCKED——把一家完全正常的站判成"客户端被拦"，还会触发
+ *    一轮无谓的嗅探。关键词只在**非 2xx** 时用作细分。
+ * 2. 额度关键词优先于状态码——`403` + `该令牌额度已用尽` 是 INSUFFICIENT 不是 FORBIDDEN。
+ * 3. 除 401/403 外的结构化响应都证明鉴权通过——L2 遇 400 是"密钥有效、请求要调"。
+ * 4. 客户端校验关键词排在 401 **之前**——Agent Router 用 401 拦非白名单客户端。
+ * 5. 响应体经常不是 JSON 甚至是空的——解析失败不能升级成 CONFIG_ERROR。
  *
  * 关键词匹配一律对 body 做**小写 + 去空白**后比，且只取前 2 KB（防一整页 HTML 拖垮正则）。
  */
@@ -108,6 +120,13 @@ object ProbeClassifier {
         error: Throwable?,
         level: ProbeLevel,
         clientKeywords: List<String> = DEFAULT_CLIENT_KEYWORDS,
+
+        /**
+         * 响应头（小写键自动忽略）。目前只用来读 `Retry-After`——退避时间是上游给的，
+         * 只从 body 里找 `retry_after` 会漏掉所有按标准只回头部的实现（Cloudflare、
+         * new-api 的网关层都是这样）。
+         */
+        headers: Map<String, String> = emptyMap(),
     ): Classification {
         // 第 1 行：取消。
         if (error is kotlinx.coroutines.CancellationException) {
@@ -115,7 +134,7 @@ object ProbeClassifier {
         }
 
         // 第 2 行：网络类失败。都不许改写 health。
-        // error 非空即网络层失败——net 层（OkHttpEngine）保证 error 只承载网络异常，
+        // error 非空即网络层失败——net 层（HttpEngine）保证 error 只承载网络异常，
         // 业务错误都体现在 status code 里。这里不 `is` 判断 JVM 的 IOException 族：
         // 那是 JVM 专属类型，会挡住 iOS 端编译（阶段2 KMP 化），而它们本就都归同一个结果。
         if (error != null) {
@@ -130,7 +149,27 @@ object ProbeClassifier {
 
         val normalized = normalizeBody(body)
 
-        // 第 3 行：客户端校验关键词，**含 401**，排在鉴权之前。
+        // 第 3 / 4 行：2xx。排在所有关键词之前——见上面"判定顺序"的第 1 条原则。
+        if (code in 200..299) {
+            val isErrorJson = body?.trim()?.let { hasErrorField(it) } ?: false
+            return if (isErrorJson) {
+                Classification(
+                    ProbeOutcome.CONCLUSIVE_FAIL,
+                    health = KeyHealth.CONFIG_ERROR,
+                    detail = truncate(body),
+                    reason = ClassificationReason.UnexpectedContent,
+                    httpStatus = code,
+                )
+            } else {
+                Classification(
+                    ProbeOutcome.SUCCESS,
+                    health = KeyHealth.OK,
+                    httpStatus = code,
+                )
+            }
+        }
+
+        // 第 5 行：客户端校验关键词，**含 401**，排在鉴权之前（只对非 2xx 生效）。
         if (matchesAny(normalized, clientKeywords)) {
             return Classification(
                 ProbeOutcome.CONCLUSIVE_FAIL,
@@ -192,7 +231,7 @@ object ProbeClassifier {
                 detail = bodyText,
                 reason = if (bodyText == null) ClassificationReason.UpstreamGaveNoReason else null,
                 httpStatus = code,
-                retryAfterMs = parseRetryAfter(body),
+                retryAfterMs = maxOfOrNull(parseRetryAfter(body), parseRetryAfterHeader(headers)),
             )
         }
 
@@ -247,23 +286,21 @@ object ProbeClassifier {
             )
         }
 
-        // 第 15 / 16 行：2xx。
-        if (code in 200..299) {
-            val isErrorJson = body?.trim()?.let { hasErrorField(it) } ?: false
-            return if (isErrorJson) {
-                Classification(
-                    ProbeOutcome.CONCLUSIVE_FAIL,
-                    health = KeyHealth.CONFIG_ERROR,
-                    reason = ClassificationReason.UnexpectedContent,
-                    httpStatus = code,
-                )
-            } else {
-                Classification(
-                    ProbeOutcome.SUCCESS,
-                    health = KeyHealth.OK,
-                    httpStatus = code,
-                )
-            }
+        // 第 15 行：3xx。三端都显式关掉了自动跟随（`net/buildClient` 的
+        // `followRedirects = false` + OkHttp 引擎层 `followRedirects(false)`），所以这里
+        // 收到的是真 3xx，而不是"跟完之后的 200"。
+        //
+        // 为什么不钉 CONFIG_ERROR：跳转本身既可能是"地址该换成 https 了"（用户能改），
+        // 也可能是网关在把请求往登录页引（改了也没用）。本地没有信息可以区分，
+        // 按红线 11 给一次瞬时结论（不改写 health、不改写 okAt），明细页靠
+        // [ClassificationReason.Redirected] 说明"要人看一眼"。
+        if (code in 300..399) {
+            return Classification(
+                ProbeOutcome.UPSTREAM_ERROR,
+                detail = truncate(body),
+                reason = ClassificationReason.Redirected,
+                httpStatus = code,
+            )
         }
 
         // 兜底：任何没覆盖到的状态码按配置错误处理。
@@ -298,13 +335,34 @@ object ProbeClassifier {
         return body.trim().take(200)
     }
 
-    /** 429 的退避时间：从 body 里 `retry_after` 提取（响应头里的由 net 层并入后比较）。 */
+    /** 429 的退避时间：从 body 里 `retry_after` 提取（响应头里的由 [parseRetryAfterHeader] 给）。 */
     private fun parseRetryAfter(body: String?): Long? {
         val seconds = body?.let { b ->
             Regex("retry_after[\"']?\\s*[:=]\\s*(\\d+)", RegexOption.IGNORE_CASE)
                 .find(b)?.groupValues?.get(1)?.toLongOrNull()
         }
         return seconds?.let { it * 1000 }
+    }
+
+    /**
+     * `Retry-After` 响应头（RFC 9110）：要么是多少秒，要么是一个 HTTP-date。
+     *
+     * 只接住数字那一形态。HTTP-date 要按 `Expires` 与当前时刻做差值，而 commonMain 里
+     * 没有能解析 RFC 1123 日期的东西（`java.time` 是 JVM 专属、挡住 iOS 编译，红线 20）；
+     * 实测的中转站与 Cloudflare 都回秒数，日期形态按"没给"处理，退避仍走加倍那套。
+     */
+    private fun parseRetryAfterHeader(headers: Map<String, String>): Long? {
+        val raw = headers.entries.firstOrNull { (name, _) ->
+            name.equals("Retry-After", ignoreCase = true)
+        }?.value?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        return raw.toLongOrNull()?.takeIf { it >= 0 }?.times(1_000)
+    }
+
+    /** 两个来源都给就取更大的那个（上游说了 60 秒，就别按 10 秒的 body 值提前回去）。 */
+    private fun maxOfOrNull(a: Long?, b: Long?): Long? = when {
+        a == null -> b
+        b == null -> a
+        else -> maxOf(a, b)
     }
 
     private const val MAX_BODY_SCAN = 2048

@@ -62,6 +62,20 @@ data class BootRecord(
     /** 退避终点的绝对时刻。存绝对时刻而不是剩余秒数，理由同上。 */
     val pinLockUntil: Long? = null,
 
+    /**
+     * 平台 DEK 那条路（生物识别）的**身份校验密文**：`SecretBox(固定明文, HKDF(DEK,"dekcheck"))`。
+     *
+     * 为什么需要它：生物识别取回的 DEK 是平台直接交回的字节，没有任何认证 tag 可验，
+     * 于是"任何 32 字节都算解锁成功"。有了这一份，会话在采纳之前能确认"这就是当初那把 DEK"。
+     *
+     * **可空且旧记录允许缺字段**：`format` 仍是 1（加一个带默认值的可选字段不构成破坏性变更，
+     * 而 bump 版本会让所有老设备落 BootCorrupt）。缺字段的记录在采纳平台 DEK 时**跳过校验**
+     * ——见 `VaultSession.unlockWithDek`，那里写清了为什么"跳过"比"拒绝"更能接受：
+     * 拒绝会把升级用户的生物识别入口直接打死，而这条路本来在旧版本上就是无校验的。
+     */
+    @Serializable(with = ByteArrayAsBase64::class)
+    val dekCheck: ByteArray? = null,
+
     /** 配色模式。锁屏页也要用，所以权威存储在这里。 */
     val themeMode: String = DEFAULT_THEME_MODE,
 
@@ -83,6 +97,7 @@ data class BootRecord(
             dekWrappedByBiometric.contentEquals(other.dekWrappedByBiometric) &&
             pinFailCount == other.pinFailCount &&
             pinLockUntil == other.pinLockUntil &&
+            dekCheck.contentEquals(other.dekCheck) &&
             themeMode == other.themeMode &&
             localeTag == other.localeTag
     }
@@ -97,6 +112,7 @@ data class BootRecord(
         result = 31 * result + (dekWrappedByBiometric?.contentHashCode() ?: 0)
         result = 31 * result + pinFailCount
         result = 31 * result + (pinLockUntil?.hashCode() ?: 0)
+        result = 31 * result + (dekCheck?.contentHashCode() ?: 0)
         result = 31 * result + themeMode.hashCode()
         result = 31 * result + localeTag.hashCode()
         return result
@@ -109,6 +125,7 @@ data class BootRecord(
             listOfNotNull(
                 dekWrappedByPin?.let { "pin" },
                 dekWrappedByBiometric?.let { "bio" },
+                dekCheck?.let { "check" },
             ).joinToString("/") +
             "])"
 

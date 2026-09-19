@@ -50,6 +50,13 @@ class RoomProviderAccountRepository constructor(
         loginMethods: Set<LoginMethod>,
         note: String?,
     ): Long {
+        // 空用户名统一成"没有用户名"（null）：`usernameEnc` / `usernameFp` 两列都是可空的，
+        // 而 `(providerId, usernameFp)` 是**唯一索引**——留一个空串指纹就会给 `""` 算出一个
+        // 真实指纹，于是同一家里第二条"没填用户名"的账号（只有标签 + 密码的账号很常见，
+        // 比如只需要登录链接的站点）会被索引挡掉，报一个用户完全看不懂的约束冲突。
+        // NULL 不参与唯一性比较，所以两条并存。密码同理：空串不当成"有一个空密码"。
+        val username = username?.takeIf { it.isNotEmpty() }
+        val password = password?.takeIf { it.isNotEmpty() }
         val usernameBytes = username?.toUtf8()
         val passwordBytes = password?.toUtf8()
         return try {
@@ -68,7 +75,7 @@ class RoomProviderAccountRepository constructor(
                         loginUrl = loginUrl,
                         loginMethods = loginMethods.toLoginMethodsCsv(),
                         note = note?.trim()?.takeIf { it.isNotEmpty() },
-                        sortOrder = dao.findAll().count { it.providerId == providerId },
+                        sortOrder = dao.countByProvider(providerId),
                         createdAt = stamp,
                         updatedAt = stamp,
                     ),
@@ -170,10 +177,17 @@ class RoomProviderAccountRepository constructor(
         }
     }
 
+    /**
+     * 只改登录方式。
+     *
+     * 整行替换（[ProviderAccountDao.update]）在这里是安全的：这一行是刚从库里读回来的原样
+     * 数据，两段密文与 `usernameFp` 一起写回去，值不变。少开一条只改两列的语句，DAO 里
+     * 就少一个"改了 A 忘了 B"的机会。
+     */
     override suspend fun setLoginMethods(id: Long, methods: Set<LoginMethod>) {
-        val providerId = dao.findById(id)?.providerId
-        dao.setLoginMethods(id, methods.toLoginMethodsCsv(), now())
-        audit.recordSafe(LogLevel.INFO, LogCategory.ACCOUNT, "account login methods updated", "id=$id methods=${methods.joinToString { it.wireName }}", providerId = providerId)
+        val existing = dao.findById(id) ?: throw IllegalStateException("provider account $id not found")
+        dao.update(existing.copy(loginMethods = methods.toLoginMethodsCsv(), updatedAt = now()))
+        audit.recordSafe(LogLevel.INFO, LogCategory.ACCOUNT, "account login methods updated", "id=$id methods=${methods.joinToString { it.wireName }}", providerId = existing.providerId)
     }
 
     private fun aadUsername(id: Long) = FieldAad.of(TABLE, id, COLUMN_USERNAME)

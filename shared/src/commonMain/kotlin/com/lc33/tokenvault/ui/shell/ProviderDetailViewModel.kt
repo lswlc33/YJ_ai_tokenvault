@@ -13,7 +13,6 @@ import com.lc33.tokenvault.domain.SecretMask
 import com.lc33.tokenvault.domain.model.AiModel
 import com.lc33.tokenvault.domain.model.ApiKey
 import com.lc33.tokenvault.domain.model.Provider
-import com.lc33.tokenvault.domain.model.KeySettings
 import com.lc33.tokenvault.domain.model.ProviderAccount
 import com.lc33.tokenvault.domain.repo.ApiKeyRepository
 import com.lc33.tokenvault.domain.repo.ModelRepository
@@ -95,6 +94,9 @@ class ProviderDetailViewModel constructor(
         /** 模型/账号保存成功。 */
         data object ModelSaved : Event
         data object AccountSaved : Event
+
+        /** 模型/账号**没能**写进库。没有这一条时失败是静默的：弹层收了、列表没变。 */
+        data object WriteFailed : Event
 
         /** 一键探测已发出（官网 / 密钥 / 模型列表 / 余额）。结果本身由状态流回填。 */
         data object Probed : Event
@@ -186,7 +188,7 @@ class ProviderDetailViewModel constructor(
                 nowMs = nowMillis(),
             )
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
+    }.stateIn(viewModelScope, SharingStarted.Lazily, null)
 
     init {
         // 订阅而不是提供一个 refresh()：新增、删除、换明文都会让这条 Flow 再发一次，
@@ -254,23 +256,12 @@ class ProviderDetailViewModel constructor(
         }
     }
 
-    /** 新增一把。新 Key 先继承该合集下排序第一把 Key 的配置；没有旧 Key 时给空配置。 */
-    fun onAddKey(label: String, note: String, secret: CharArray) {
-        viewModelScope.launch {
-            try {
-                val settings = keys.observeByProvider(providerId).first()
-                    .firstOrNull()?.settings
-                    ?: KeySettings(apiBaseUrl = "", apiRoot = "")
-                withContext(Dispatchers.Default) {
-                    keys.add(providerId, label, note, secret, settings)
-                }
-            } finally {
-                secret.zeroize()
-            }
-        }
-    }
-
-    /** 新增平台账号。凭据字段用 CharArray 进入仓库，成功后由调用方与仓库共同擦除。 */
+    /**
+     * 新增平台账号。凭据字段用 CharArray 进入仓库，成功后由调用方与仓库共同擦除。
+     *
+     * 成功 / 失败都要回事件：以前只有成功路径发（新增发、编辑不发），失败时弹层已经收了，
+     * 列表却什么都没多出来——那是"点了保存没反应"。
+     */
     fun onAddAccount(
         label: String,
         note: String,
@@ -280,16 +271,19 @@ class ProviderDetailViewModel constructor(
     ) {
         viewModelScope.launch {
             try {
-                accounts.add(
-                    providerId = providerId,
-                    label = label,
-                    username = username,
-                    password = password,
-                    loginUrl = null,
-                    loginMethods = loginMethods,
-                    note = note,
-                )
-                _events.trySend(Event.AccountSaved)
+                runCatching {
+                    accounts.add(
+                        providerId = providerId,
+                        label = label,
+                        username = username,
+                        password = password,
+                        loginUrl = null,
+                        loginMethods = loginMethods,
+                        note = note,
+                    )
+                }.onSuccess { _events.trySend(Event.AccountSaved) }.onFailure {
+                    _events.trySend(Event.WriteFailed)
+                }
             } finally {
                 username?.zeroize()
                 password?.zeroize()
@@ -313,15 +307,19 @@ class ProviderDetailViewModel constructor(
         viewModelScope.launch {
             try {
                 val clear = CharArray(0)
-                accounts.update(
-                    id = id,
-                    label = label,
-                    username = if (usesPassword) username else clear,
-                    password = if (usesPassword) password else clear,
-                    loginUrl = null,
-                    loginMethods = loginMethods,
-                    note = note,
-                )
+                runCatching {
+                    accounts.update(
+                        id = id,
+                        label = label,
+                        username = if (usesPassword) username else clear,
+                        password = if (usesPassword) password else clear,
+                        loginUrl = null,
+                        loginMethods = loginMethods,
+                        note = note,
+                    )
+                }.onSuccess { _events.trySend(Event.AccountSaved) }.onFailure {
+                    _events.trySend(Event.WriteFailed)
+                }
             } finally {
                 username?.zeroize()
                 password?.zeroize()
@@ -348,12 +346,18 @@ class ProviderDetailViewModel constructor(
                     protocol = protocol,
                     needsReview = modelId.any { it.isWhitespace() || it.isUpperCase() },
                 )
-                _events.trySend(Event.ModelSaved)
+            }.onSuccess { _events.trySend(Event.ModelSaved) }.onFailure {
+                _events.trySend(Event.WriteFailed)
             }
         }
     }
 
-    /** 手动编辑模型。只改明文元数据，不触发网络请求。 */
+    /**
+     * 手动编辑模型。只改明文元数据，不触发网络请求。
+     *
+     * 保存成功也要回一条"已保存"：以前只有新增路径发，编辑那一趟弹层收了、行没变、
+     * 什么提示都没有，用户分不清"没改"和"没保存上"。
+     */
     fun onUpdateModel(
         id: Long,
         modelId: String,
@@ -361,25 +365,41 @@ class ProviderDetailViewModel constructor(
         displayName: String?,
     ) {
         viewModelScope.launch {
-            val existing = models.observeByProvider(providerId).first()
-                .firstOrNull { it.id == id } ?: return@launch
-            models.update(
-                existing.copy(
-                    modelId = modelId.trim(),
-                    protocol = protocol,
-                    displayName = displayName?.trim()?.ifEmpty { null },
-                ),
-            )
+            val existing = runCatching { models.observeByProvider(providerId).first() }
+                .getOrNull()?.firstOrNull { it.id == id }
+            if (existing == null) {
+                _events.trySend(Event.WriteFailed)
+                return@launch
+            }
+            runCatching {
+                models.update(
+                    existing.copy(
+                        modelId = modelId.trim(),
+                        protocol = protocol,
+                        displayName = displayName?.trim()?.ifEmpty { null },
+                    ),
+                )
+            }.onSuccess { _events.trySend(Event.ModelSaved) }.onFailure {
+                _events.trySend(Event.WriteFailed)
+            }
         }
     }
 
     fun onDeleteModel(id: Long) {
         viewModelScope.launch {
-            val undo = models.delete(id)
-            _events.trySend(Event.ModelDeleted(undo))
+            runCatching { models.delete(id) }
+                .onSuccess { undo -> _events.trySend(Event.ModelDeleted(undo)) }
+                .onFailure { _events.trySend(Event.WriteFailed) }
         }
     }
 
+    /**
+     * 展开一条账号看明文。
+     *
+     * 标题与登录方式**从仓库现取**而不是读 [state]：那条流在退订的瞬间是 null
+     * （切后台再回来的第一帧就是），以前读到 null 就悄悄擦掉明文直接返回，
+     * 表现成"点查看账号明文没反应"。
+     */
     fun onRevealAccount(accountId: Long) {
         val generation = ++revealGeneration
         revealJob?.cancel()
@@ -394,7 +414,8 @@ class ProviderDetailViewModel constructor(
                 plain.zeroize()
                 return@launch
             }
-            val account = state.value?.accounts?.firstOrNull { it.id == accountId }
+            val account = runCatching { accounts.observeByProvider(providerId).first() }
+                .getOrNull()?.firstOrNull { it.id == accountId }
             if (account == null) {
                 plain.zeroize()
                 return@launch
@@ -404,7 +425,7 @@ class ProviderDetailViewModel constructor(
             plain.password?.let(knownSecrets::add)
             _revealedAccount.value = AccountRevealState(
                 accountId = accountId,
-                loginMethods = account.loginMethods.mapNotNull { LoginMethod.fromWireName(it) }.toSet(),
+                loginMethods = account.loginMethods,
                 label = account.label,
                 username = plain.username?.let { it.concatToString() },
                 password = plain.password?.let { it.concatToString() },
@@ -461,10 +482,11 @@ class ProviderDetailViewModel constructor(
      *
      * 不在这里发"已刷新"：刷新是异步的，写在这是说了句还没发生的事。什么时候刷完由
      * [ProbeEngine.modelResults] 告诉 Shell。
+     *
+     * 返回值是"**这一发有没有真的发出去**"（引擎在跑别的轮 / 锁定态时是 false）：
+     * 页面用它决定要不要说"正在刷新模型列表"，否则就是发了一条没在发生的提示。
      */
-    fun refreshModels(keyId: Long? = null) {
-        probeEngine.refreshModels(providerId, keyId)
-    }
+    fun refreshModels(keyId: Long? = null): Boolean = probeEngine.refreshModels(providerId, keyId)
 
     private fun Provider.toDetailRow(
         rows: List<UiKeyRow>,
@@ -495,7 +517,6 @@ class ProviderDetailViewModel constructor(
             balanceConfigured = balanceConfiguredOf(keyList),
             balanceCheckedAt = aggregateBalance?.checkedAt,
             health = aggregateOf(rows),
-            staleThisRound = false,
             // 官网延迟只在**连通**时给：失败那次拿到的耗时说明不了任何事，
             // 显示出来会被读成"通了但很慢"。
             reachabilityLatencyMs = website.latencyMs.takeIf { website.ok },
@@ -514,9 +535,5 @@ class ProviderDetailViewModel constructor(
 
     override fun onCleared() {
         revealedAccountPlain?.zeroize()
-    }
-
-    private companion object {
-        const val STOP_TIMEOUT_MS = 5_000L
     }
 }

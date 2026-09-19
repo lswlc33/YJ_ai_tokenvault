@@ -58,19 +58,30 @@ class ManageViewModel constructor(
     /** 多选模式的选中集合。空集合 = 非多选态。 */
     private val selection = MutableStateFlow<Set<Long>>(emptySet())
 
-    /** 分组新增 / 重命名的失败提示。同名会被唯一索引挡住，不能静默吞掉。 */
-    private val _groupError = MutableSharedFlow<Unit>(
+    /**
+     * 分组写入的失败原因。**带语义而不是带文案**（文案在资源里，本层读不到，红线 19）。
+     * 以前三种操作共用一条 Unit 事件、页面上统一念"新增失败"，于是改个名失败也被告知
+     * "分组没能新建"。给档位，页面按档位念那一句。
+     */
+    enum class GroupOp { Add, Rename, Delete }
+
+    /** 分组新增 / 重命名 / 删除的失败提示。同名会被唯一索引挡住，不能静默吞掉。 */
+    private val _groupError = MutableSharedFlow<GroupOp>(
         extraBufferCapacity = 1,
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
     )
-    val groupError: SharedFlow<Unit> = _groupError.asSharedFlow()
+    val groupError: SharedFlow<GroupOp> = _groupError.asSharedFlow()
 
     /**
      * 一次性事件。只带语义、不带文案（文案解析在 composable 层）。
      */
     sealed interface Event {
-        /** 批量删除的供应商，[undo] 非空时提示要带"撤销"。 */
-        data class ProvidersDeleted(val undo: UndoableDeletion?) : Event
+        /**
+         * 批量删除的供应商。[deleted] 是**真的删掉**的家数，[failed] 是删失败的家数
+         * （逐家删时某一家可能正被外键引用而失败）；提示按这两个数说真话，
+         * 而不是"全删了"。[undo] 非空时提示要带"撤销"。
+         */
+        data class ProvidersDeleted(val deleted: Int, val failed: Int, val undo: UndoableDeletion?) : Event
 
         /** 分组新增成功。 */
         data object GroupAdded : Event
@@ -80,6 +91,9 @@ class ManageViewModel constructor(
 
         /** 分组已删除（不撤销：只把供应商落回「全部」，可重新创建）。 */
         data object GroupDeleted : Event
+
+        /** 本地写入失败：改分组、保存排序这一类"发起即忘"的动作。 */
+        data object WriteFailed : Event
     }
 
     private val _events = Channel<Event>(Channel.BUFFERED)
@@ -169,7 +183,7 @@ class ManageViewModel constructor(
             sort = ctrl.sort,
             selection = ctrl.selection,
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), ManageUiState(loading = true))
+    }.stateIn(viewModelScope, SharingStarted.Lazily, ManageUiState(loading = true))
 
     /**
      * 顶栏刷新：发起一次全量探测（密钥 L1/L2 + 开了自动获取的模型列表）+ 官网连通性 + 余额。
@@ -228,10 +242,19 @@ class ManageViewModel constructor(
     fun batchDelete(ids: Set<Long>) {
         viewModelScope.launch {
             // 逐个取撤销句柄再合成一条：提示里只有一个"撤销"，按下去要把这一批全恢复。
-            val undos = ids.mapNotNull { id -> runCatching { providers.delete(id) }.getOrNull() }
+            // **按成功数报**：以前逐家 runCatching 吞掉异常后仍念"已删除"，于是"三家删了
+            // 两家"也是同一句提示，用户以为那一架还在回收站里、其实没动。
+            var failed = 0
+            val undos = ids.mapNotNull { id ->
+                runCatching { providers.delete(id) }.onFailure { failed++ }.getOrNull()
+            }
             selection.value = emptySet()
             _events.trySend(
-                Event.ProvidersDeleted(undos.takeIf { it.isNotEmpty() }?.combined()),
+                Event.ProvidersDeleted(
+                    deleted = undos.size,
+                    failed = failed,
+                    undo = undos.takeIf { it.isNotEmpty() }?.combined(),
+                ),
             )
         }
     }
@@ -239,7 +262,10 @@ class ManageViewModel constructor(
     /** 批量改分组。走 [ProviderRepository.setGroup]（一条 SQL 更新多行）。 */
     fun batchSetGroup(ids: Set<Long>, groupId: Long?) {
         viewModelScope.launch {
+            // 失败要说话：改完分组列表按分组筛着，写不进去时那一筛永远是空的，
+            // 而用户看到的样子与"分组里就是没有东西"完全一样。
             runCatching { providers.setGroup(ids.toList(), groupId) }
+                .onFailure { _events.trySend(Event.WriteFailed) }
             selection.value = emptySet()
         }
     }
@@ -250,7 +276,7 @@ class ManageViewModel constructor(
         viewModelScope.launch {
             runCatching { groups.add(name) }
                 .onSuccess { _events.trySend(Event.GroupAdded) }
-                .onFailure { _groupError.tryEmit(Unit) }
+                .onFailure { _groupError.tryEmit(GroupOp.Add) }
         }
     }
 
@@ -258,22 +284,23 @@ class ManageViewModel constructor(
         viewModelScope.launch {
             runCatching { groups.rename(id, name) }
                 .onSuccess { _events.trySend(Event.GroupRenamed) }
-                .onFailure { _groupError.tryEmit(Unit) }
+                .onFailure { _groupError.tryEmit(GroupOp.Rename) }
         }
     }
 
     /** 删分组**不删供应商**：外键是 SET NULL，那些供应商落回「全部」。 */
     fun onDeleteGroup(id: Long) {
         viewModelScope.launch {
-            groups.delete(id)
-            // 正筛着这个分组时把筛选退回「全部」，否则列表会停在一个不存在的分组上、显示空
-            if (selectedGroupId.value == id) selectedGroupId.value = null
-            _events.trySend(Event.GroupDeleted)
+            // 以前整条链路没有 runCatching：删失败时异常从协程里冒出去直接崩应用，
+            // 而"分组删不掉"在现场多半是并发写入撞车，重试就好。
+            runCatching { groups.delete(id) }
+                .onSuccess {
+                    // 正筛着这个分组时把筛选退回「全部」，否则列表会停在一个不存在的分组上、显示空
+                    if (selectedGroupId.value == id) selectedGroupId.value = null
+                    _events.trySend(Event.GroupDeleted)
+                }
+                .onFailure { _groupError.tryEmit(GroupOp.Delete) }
         }
-    }
-
-    fun onDeleteProvider(id: Long) {
-        viewModelScope.launch { providers.delete(id) }
     }
 
     /** 编辑供应商列表页：逐个修改分组。 */
@@ -283,16 +310,15 @@ class ManageViewModel constructor(
 
     /** 编辑供应商列表页：保存分组的排序结果。与供应商排序同为一次「保存」提交。 */
     fun reorderGroups(idsInOrder: List<Long>) {
-        viewModelScope.launch { runCatching { groups.reorder(idsInOrder) } }
+        viewModelScope.launch {
+            runCatching { groups.reorder(idsInOrder) }.onFailure { _events.trySend(Event.WriteFailed) }
+        }
     }
 
     /** 编辑供应商列表页：保存手动拖动后的顺序。 */
     fun reorderProviders(idsInOrder: List<Long>) {
-        viewModelScope.launch { runCatching { providers.reorder(idsInOrder) } }
-    }
-
-    private companion object {
-        /** 转屏时别退订：退订会让列表在重建后闪一下空态。 */
-        const val STOP_TIMEOUT_MS = 5_000L
+        viewModelScope.launch {
+            runCatching { providers.reorder(idsInOrder) }.onFailure { _events.trySend(Event.WriteFailed) }
+        }
     }
 }

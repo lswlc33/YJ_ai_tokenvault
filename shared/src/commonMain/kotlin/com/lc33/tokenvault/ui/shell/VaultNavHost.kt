@@ -1,7 +1,6 @@
 package com.lc33.tokenvault.ui.shell
 
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -46,7 +45,6 @@ import com.lc33.tokenvault.screens.settings.MemberScreen
 import com.lc33.tokenvault.screens.settings.ProbeSettingsScreen
 import com.lc33.tokenvault.screens.settings.ProfileEditorScreen
 import com.lc33.tokenvault.screens.settings.ProfileListScreen
-import com.lc33.tokenvault.screens.settings.ProxyScreen
 import com.lc33.tokenvault.screens.settings.SecurityScreen
 import com.lc33.tokenvault.screens.settings.SettingsScreen
 import com.lc33.tokenvault.screens.settings.SyncScreen
@@ -54,7 +52,7 @@ import com.lc33.tokenvault.screens.settings.UpdateScreen
 import com.lc33.tokenvault.ui.miuix.AppDialog
 import com.lc33.tokenvault.ui.miuix.AppSecretTextField
 import com.lc33.tokenvault.ui.miuix.AppSwitchRow
-import com.lc33.tokenvault.ui.miuix.AppTextButton
+import com.lc33.tokenvault.ui.miuix.AppTabRow
 import com.lc33.tokenvault.ui.miuix.AppTextField
 import com.lc33.tokenvault.ui.miuix.AppFeedback
 import com.lc33.tokenvault.ui.miuix.AppUndoFeedback
@@ -65,6 +63,7 @@ import com.lc33.tokenvault.ui.miuix.rememberSecretTextFieldState
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 import tokenvault.shared.generated.resources.clipboard_label_account
@@ -84,11 +83,13 @@ import tokenvault.shared.generated.resources.feedback_key_deleted
 import tokenvault.shared.generated.resources.feedback_model_deleted
 import tokenvault.shared.generated.resources.feedback_model_saved
 import tokenvault.shared.generated.resources.feedback_providers_deleted
+import tokenvault.shared.generated.resources.feedback_providers_deleted_partial
 import tokenvault.shared.generated.resources.feedback_account_saved
 import tokenvault.shared.generated.resources.feedback_balance_refreshed
 import tokenvault.shared.generated.resources.feedback_clipboard_empty
 import tokenvault.shared.generated.resources.feedback_clipboard_filled
 import tokenvault.shared.generated.resources.feedback_imported
+import tokenvault.shared.generated.resources.data_clear_failed
 import tokenvault.shared.generated.resources.feedback_key_saved
 import tokenvault.shared.generated.resources.feedback_logs_cleared
 import tokenvault.shared.generated.resources.feedback_model_probed
@@ -97,7 +98,9 @@ import tokenvault.shared.generated.resources.feedback_pin_changed
 import tokenvault.shared.generated.resources.feedback_probe_started
 import tokenvault.shared.generated.resources.feedback_probe_key_sent
 import tokenvault.shared.generated.resources.feedback_probe_results_cleared
+import tokenvault.shared.generated.resources.feedback_probe_retry_nothing
 import tokenvault.shared.generated.resources.feedback_probe_retried
+import tokenvault.shared.generated.resources.feedback_probe_stopped
 import tokenvault.shared.generated.resources.feedback_profile_saved
 import tokenvault.shared.generated.resources.feedback_provider_saved
 import tokenvault.shared.generated.resources.feedback_undone
@@ -112,26 +115,35 @@ import tokenvault.shared.generated.resources.editor_url_err_scheme
 import tokenvault.shared.generated.resources.editor_profile_default
 import tokenvault.shared.generated.resources.group_all
 import tokenvault.shared.generated.resources.groups_add_failed
+import tokenvault.shared.generated.resources.groups_delete_failed
+import tokenvault.shared.generated.resources.groups_rename_failed
+import tokenvault.shared.generated.resources.manage_write_failed
 import tokenvault.shared.generated.resources.profile_name_default
 import tokenvault.shared.generated.resources.Res
+import tokenvault.shared.generated.resources.sync_cancel
 import tokenvault.shared.generated.resources.sync_confirm
+import tokenvault.shared.generated.resources.sync_export_failed
 import tokenvault.shared.generated.resources.sync_insecure_http_warning
 import tokenvault.shared.generated.resources.sync_mode_add_only
 import tokenvault.shared.generated.resources.sync_mode_merge
 import tokenvault.shared.generated.resources.sync_mode_overwrite
+import tokenvault.shared.generated.resources.sync_overwrite_confirm_summary
+import tokenvault.shared.generated.resources.sync_overwrite_confirm_title
 import tokenvault.shared.generated.resources.sync_passphrase_hint
 import tokenvault.shared.generated.resources.sync_passphrase_prompt
 import tokenvault.shared.generated.resources.sync_passphrase_required
 import tokenvault.shared.generated.resources.sync_remote_count
+import tokenvault.shared.generated.resources.sync_restore_failed
 import tokenvault.shared.generated.resources.sync_restore_mode
+import tokenvault.shared.generated.resources.sync_restore_mode_summary
 import tokenvault.shared.generated.resources.sync_result_exported
-import tokenvault.shared.generated.resources.sync_result_failed
 import tokenvault.shared.generated.resources.sync_result_restored
 import tokenvault.shared.generated.resources.sync_result_webdav_configured
 import tokenvault.shared.generated.resources.sync_result_webdav_uploaded
 import tokenvault.shared.generated.resources.sync_webdav_credentials_keep
 import tokenvault.shared.generated.resources.sync_webdav_credentials_required
 import tokenvault.shared.generated.resources.sync_webdav_directory_label
+import tokenvault.shared.generated.resources.sync_webdav_failed
 import tokenvault.shared.generated.resources.sync_webdav_insecure_required
 import tokenvault.shared.generated.resources.sync_webdav_password_hide
 import tokenvault.shared.generated.resources.sync_webdav_password_label
@@ -174,6 +186,17 @@ fun VaultNavHost(
         }
     }
 
+    // "设置写不进去"的六个 ViewModel 共用一条失败流（SettingsFailures 单例）。
+    // 收集挂在 Shell 上：谁写失败都投同一条提示，页面不必各自开收集器。
+    val settingsFailures: SettingsFailures = koinInject()
+    val shellFeedback = LocalAppFeedback.current
+    val settingsWriteFailed = stringResource(Res.string.manage_write_failed)
+    LaunchedEffect(settingsFailures) {
+        settingsFailures.events.collect {
+            shellFeedback?.post(AppFeedback(settingsWriteFailed))
+        }
+    }
+
     @Composable
     fun PageContent(route: VaultRoute) {
         when (route) {
@@ -189,6 +212,9 @@ fun VaultNavHost(
                 // 三个一级页平级，压在栈上会让返回语义变成"回到总览"。
                 onOpenManage = { pager.animateToPage(topLevelIndexOf(ManageRoute)) },
                 onOpenProbeDetail = { navigate(ProbeRunRoute) },
+                // 余额明细页只有这一个入口：没有它 BalanceBreakdownRoute 是一座孤岛，
+                // 那一页写了失败分组与成功分组，却没人跳得进去。
+                onOpenBalanceBreakdown = { navigate(BalanceBreakdownRoute) },
                 onRefreshBalance = {
                     vm.refreshBalance()
                     feedback?.post(AppFeedback(balanceRefreshed))
@@ -218,26 +244,38 @@ fun VaultNavHost(
             val groupAdded = stringResource(Res.string.feedback_group_added)
             val groupRenamed = stringResource(Res.string.feedback_group_renamed)
             val groupDeleted = stringResource(Res.string.feedback_group_deleted)
+            val writeFailed = stringResource(Res.string.manage_write_failed)
             LaunchedEffect(vm) {
                 vm.events.collect { event ->
                     when (event) {
-                        is ManageViewModel.Event.ProvidersDeleted -> feedback?.post(
-                            AppFeedback(
-                                message = providersDeleted,
-                                undo = event.undo?.let { deletion ->
-                                    AppUndoFeedback(
-                                        actionLabel = undoLabel,
-                                        undoneMessage = undone,
-                                        failedMessage = undoFailed,
-                                        action = { deletion.undo() },
-                                    )
-                                },
-                            ),
-                        )
+                        is ManageViewModel.Event.ProvidersDeleted -> {
+                            // 按真的删掉几家、几家失败说：三家删了两家也说"已删除所选供应商"，
+                            // 用户就会以为剩下那家进了回收站、其实一步没动。
+                            val message = if (event.failed == 0) {
+                                providersDeleted
+                            } else {
+                                getString(Res.string.feedback_providers_deleted_partial, event.deleted, event.failed)
+                            }
+                            feedback?.post(
+                                AppFeedback(
+                                    message = message,
+                                    undo = event.undo?.let { deletion ->
+                                        AppUndoFeedback(
+                                            actionLabel = undoLabel,
+                                            undoneMessage = undone,
+                                            failedMessage = undoFailed,
+                                            action = { deletion.undo() },
+                                        )
+                                    },
+                                ),
+                            )
+                        }
                         ManageViewModel.Event.GroupAdded -> feedback?.post(AppFeedback(groupAdded))
                         ManageViewModel.Event.GroupRenamed -> feedback?.post(AppFeedback(groupRenamed))
                         // 删分组不提供撤销：它只把供应商落回「全部」，重新建一个即可。
                         ManageViewModel.Event.GroupDeleted -> feedback?.post(AppFeedback(groupDeleted))
+                        // 这一页也会写库（批量改分组），失败不能不出声。
+                        ManageViewModel.Event.WriteFailed -> feedback?.post(AppFeedback(writeFailed))
                     }
                 }
             }
@@ -260,6 +298,7 @@ fun VaultNavHost(
                 onClearSelection = vm::clearSelection,
                 onBatchDelete = vm::batchDelete,
                 onBatchSetGroup = vm::batchSetGroup,
+                onSort = vm::onSort,
             )
         }
 
@@ -319,6 +358,7 @@ fun VaultNavHost(
                 val accountSaved = stringResource(Res.string.feedback_account_saved)
                 val probeStarted = stringResource(Res.string.feedback_probe_started)
                 val modelsRefreshing = stringResource(Res.string.feedback_models_refreshing)
+                val writeFailed = stringResource(Res.string.manage_write_failed)
                 LaunchedEffect(vm) {
                     vm.events.collect { event ->
                         // 删除留当前页（不像删密钥要退出页面），所以只投提示；
@@ -339,6 +379,9 @@ fun VaultNavHost(
                             }
                             ProviderDetailViewModel.Event.Probed -> {
                                 feedback?.post(AppFeedback(probeStarted)); return@collect
+                            }
+                            ProviderDetailViewModel.Event.WriteFailed -> {
+                                feedback?.post(AppFeedback(writeFailed)); return@collect
                             }
                         }
                         feedback?.post(
@@ -370,8 +413,10 @@ fun VaultNavHost(
                             onOpenKey = { keyId -> navigate(KeyDetailRoute(route.id, keyId)) },
                             onProbeAll = vm::probeAll,
                             onRefreshKeyModels = { keyId ->
-                                vm.refreshModels(keyId)
-                                feedback?.post(AppFeedback(modelsRefreshing))
+                                // 返回值 false = 上一次刷新还在跑或锁定态。那一发压根没出去，
+                                // 却念一句"正在刷新模型列表"，用户等到的就是没发生的事；
+                                // 真跑起来之后引擎会从 modelResults 回一条结果，这里不用再补。
+                                if (vm.refreshModels(keyId)) feedback?.post(AppFeedback(modelsRefreshing))
                             },
                             onAddModel = vm::onAddModel,
                             onUpdateModel = vm::onUpdateModel,
@@ -408,6 +453,7 @@ fun VaultNavHost(
                 val keyProbed = stringResource(Res.string.feedback_probe_key_sent)
                 val modelsRefreshing = stringResource(Res.string.feedback_models_refreshing)
                 val modelProbed = stringResource(Res.string.feedback_model_probed)
+                val writeFailed = stringResource(Res.string.manage_write_failed)
                 LaunchedEffect(vm) {
                     vm.events.collect { event ->
                         when (event) {
@@ -433,6 +479,8 @@ fun VaultNavHost(
                                 feedback?.post(AppFeedback(copied))
                             KeyDetailViewModel.Event.Probed ->
                                 feedback?.post(AppFeedback(keyProbed))
+                            KeyDetailViewModel.Event.WriteFailed ->
+                                feedback?.post(AppFeedback(writeFailed))
                         }
                     }
                 }
@@ -457,8 +505,8 @@ fun VaultNavHost(
                                 feedback?.post(AppFeedback(modelProbed))
                             },
                             onRefreshModels = {
-                                vm.refreshModels()
-                                feedback?.post(AppFeedback(modelsRefreshing))
+                                // 同 ProviderDetailRoute：引擎没接这一发就不预告"正在刷新"。
+                                if (vm.refreshModels()) feedback?.post(AppFeedback(modelsRefreshing))
                             },
                             onMoveUp = vm::moveUp,
                             onMoveDown = vm::moveDown,
@@ -580,6 +628,12 @@ fun VaultNavHost(
             val biometricEnabled by vm.biometricEnabled.collectAsStateWithLifecycle()
             val biometricAvailable by vm.biometricAvailable.collectAsStateWithLifecycle()
             val biometricBusy by vm.biometricBusy.collectAsStateWithLifecycle()
+            // 三条"这件事没成"的说明：启用失败的系统原文、被系统暂时锁住、boot 写不进去。
+            // 都从 VM 派生，页面自己不记（红线 31）。
+            val biometricError by vm.biometricError.collectAsStateWithLifecycle()
+            val biometricLockedOut by vm.biometricLockedOut.collectAsStateWithLifecycle()
+            val biometricDisableFailed by vm.biometricDisableFailed.collectAsStateWithLifecycle()
+            val bootWriteFailed by vm.bootWriteFailed.collectAsStateWithLifecycle()
             // 启用时的系统验证框文案在组合期解析（VM 读不到资源），点开关时连同结果一起交给 VM。
             val enableTitle = stringResource(Res.string.biometric_prompt_enable_title)
             val enableSubtitle = stringResource(Res.string.biometric_prompt_enable_subtitle)
@@ -605,6 +659,10 @@ fun VaultNavHost(
                 onBack = back,
                 onChangePin = { navigate(ChangePinRoute) },
                 onLockNow = vm::onLockNow,
+                biometricError = biometricError,
+                biometricLockedOut = biometricLockedOut,
+                biometricDisableFailed = biometricDisableFailed,
+                bootWriteFailed = bootWriteFailed,
             )
         }
             is ChangePinRoute -> {
@@ -660,7 +718,6 @@ fun VaultNavHost(
                 },
                 onEditThresholds = { navigate(BalanceThresholdsRoute) },
                 onEditKeywords = { navigate(ClientKeywordsRoute) },
-                onEditProxy = { navigate(ProxyRoute) },
             )
         }
             is BalanceThresholdsRoute -> {
@@ -673,13 +730,6 @@ fun VaultNavHost(
             is ClientKeywordsRoute -> {
             val vm: ClientKeywordsViewModel = koinViewModel()
             ClientKeywordsScreen(
-                viewModel = vm,
-                onBack = back,
-            )
-        }
-            is ProxyRoute -> {
-            val vm: ProxyViewModel = koinViewModel()
-            ProxyScreen(
                 viewModel = vm,
                 onBack = back,
             )
@@ -701,8 +751,13 @@ fun VaultNavHost(
             val vm: ProfileEditorViewModel = koinViewModel(parameters = { parametersOf(route.id) })
             val loaded by vm.loaded.collectAsStateWithLifecycle()
             val profile by vm.profile.collectAsStateWithLifecycle()
+            val loadFailed by vm.loadError.collectAsStateWithLifecycle()
             val feedback = LocalAppFeedback.current
             val profileSaved = stringResource(Res.string.feedback_profile_saved)
+            val writeFailed = stringResource(Res.string.manage_write_failed)
+            // 同 ProviderEditorRoute：读不到那一行要**摆在页面上**（不是一条会消失的 toast），
+            // 否则这一页看着像"新建预设"，按保存却什么都不发生。
+            LaunchedEffect(vm) { vm.failed.collect { feedback?.post(AppFeedback(writeFailed)) } }
             // 预设删除不提供撤销：自定义预设重新建一个即可，删除没有级联副作用。
             LaunchedEffect(vm) {
                 vm.saved.collect {
@@ -717,6 +772,7 @@ fun VaultNavHost(
             } else {
                 ProfileEditorScreen(
                     initial = profile,
+                    loadFailed = loadFailed,
                     onBack = back,
                     onSave = vm::save,
                     onDelete = vm::delete,
@@ -730,18 +786,27 @@ fun VaultNavHost(
             // 快照代价大，且确认框已经写明「不可撤销」。
             val probeResultsCleared = stringResource(Res.string.feedback_probe_results_cleared)
             val logsCleared = stringResource(Res.string.feedback_logs_cleared)
+            val clearFailed = stringResource(Res.string.data_clear_failed)
+            // 成败都由 ViewModel 报：按下去就投"已清空"是在赌那次事务一定成，
+            // 而这两步都是真删数据（`DataViewModel.events` 存在的理由就是这个）。
+            LaunchedEffect(vm) {
+                vm.events.collect { event ->
+                    when (event) {
+                        DataViewModel.Event.ProbeResultsCleared ->
+                            feedback?.post(AppFeedback(probeResultsCleared))
+                        DataViewModel.Event.LogCleared ->
+                            feedback?.post(AppFeedback(logsCleared))
+                        DataViewModel.Event.Failed ->
+                            feedback?.post(AppFeedback(clearFailed))
+                    }
+                }
+            }
             DataScreen(
                 onBack = back,
                 onOpenGroups = { navigate(GroupsRoute) },
                 onOpenLog = { navigate(LogRoute) },
-                onClearProbeResults = {
-                    vm.clearProbeResults()
-                    feedback?.post(AppFeedback(probeResultsCleared))
-                },
-                onClearLog = {
-                    vm.clearLog()
-                    feedback?.post(AppFeedback(logsCleared))
-                },
+                onClearProbeResults = vm::clearProbeResults,
+                onClearLog = vm::clearLog,
             )
         }
             is LicensesRoute -> {
@@ -755,6 +820,18 @@ fun VaultNavHost(
             val retention by vm.retention.collectAsStateWithLifecycle()
             val feedback = LocalAppFeedback.current
             val logsCleared = stringResource(Res.string.feedback_logs_cleared)
+            val clearFailed = stringResource(Res.string.data_clear_failed)
+            val writeFailed = stringResource(Res.string.manage_write_failed)
+            // 清空与改保留期都是真写库，先报成功就可能报一句假话（红线：成败由 ViewModel 说）。
+            LaunchedEffect(vm) {
+                vm.events.collect { event ->
+                    when (event) {
+                        LogViewModel.Event.Cleared -> feedback?.post(AppFeedback(logsCleared))
+                        LogViewModel.Event.ClearFailed -> feedback?.post(AppFeedback(clearFailed))
+                        LogViewModel.Event.RetentionFailed -> feedback?.post(AppFeedback(writeFailed))
+                    }
+                }
+            }
             LogScreen(
                 entries = entries,
                 levelFilter = levelFilter,
@@ -762,10 +839,7 @@ fun VaultNavHost(
                 onLevelFilterChange = vm::setLevelFilter,
                 onRetentionChange = vm::setRetention,
                 onOpenEntry = { id -> navigate(LogEntryRoute(id)) },
-                onClear = {
-                    vm.clear()
-                    feedback?.post(AppFeedback(logsCleared))
-                },
+                onClear = vm::clear,
                 onBack = back,
             )
         }
@@ -814,8 +888,13 @@ fun VaultNavHost(
             val groups by vm.groups.collectAsStateWithLifecycle()
             val loaded by vm.loaded.collectAsStateWithLifecycle()
             val nameMissing by vm.nameMissing.collectAsStateWithLifecycle()
+            val loadFailed by vm.loadError.collectAsStateWithLifecycle()
             val feedback = LocalAppFeedback.current
             val providerSaved = stringResource(Res.string.feedback_provider_saved)
+            val writeFailed = stringResource(Res.string.manage_write_failed)
+            // 读 / 写失败都要说话：`onSave` 在 loadError 时是直接 return 的，
+            // 没人订阅这两条流的话，表现就是"按了保存，页面一动不动"。
+            LaunchedEffect(vm) { vm.failed.collect { feedback?.post(AppFeedback(writeFailed)) } }
             LaunchedEffect(vm) {
                 vm.saved.collect {
                     feedback?.post(AppFeedback(providerSaved))
@@ -832,6 +911,7 @@ fun VaultNavHost(
                     draft = draft,
                     groupNames = listOf(ungrouped) + groups.map { it.name },
                     nameMissing = nameMissing,
+                    loadFailed = loadFailed,
                     onChange = vm::onChange,
                     onBack = back,
                     onSave = vm::onSave,
@@ -886,12 +966,41 @@ fun VaultNavHost(
             )
         }
             is GroupsRoute -> {
+            // 这是**第二个** ManageViewModel 实例（每条路由一个 ViewModelStore），所以它的
+            // 事件与失败都得在这一页自己收：以前只收 groupError 那一条、而且统一念
+            // "分组保存失败"，于是改名失败被告知"没能新建"，删除成功与排序没落库干脆没人开口。
             val vm: ManageViewModel = koinViewModel()
             val manage by vm.state.collectAsStateWithLifecycle()
             val feedback = LocalAppFeedback.current
+            val groupAdded = stringResource(Res.string.feedback_group_added)
+            val groupRenamed = stringResource(Res.string.feedback_group_renamed)
+            val groupDeleted = stringResource(Res.string.feedback_group_deleted)
             val groupAddFailed = stringResource(Res.string.groups_add_failed)
-            LaunchedEffect(vm, groupAddFailed) {
-                vm.groupError.collect { feedback?.post(AppFeedback(groupAddFailed)) }
+            val groupRenameFailed = stringResource(Res.string.groups_rename_failed)
+            val groupDeleteFailed = stringResource(Res.string.groups_delete_failed)
+            val writeFailed = stringResource(Res.string.manage_write_failed)
+            LaunchedEffect(vm) {
+                vm.events.collect { event ->
+                    when (event) {
+                        // 批量删除只能在管理页发起，这一页删不了供应商，所以不会有这条。
+                        is ManageViewModel.Event.ProvidersDeleted -> Unit
+                        ManageViewModel.Event.GroupAdded -> feedback?.post(AppFeedback(groupAdded))
+                        ManageViewModel.Event.GroupRenamed -> feedback?.post(AppFeedback(groupRenamed))
+                        ManageViewModel.Event.GroupDeleted -> feedback?.post(AppFeedback(groupDeleted))
+                        // 保存排序 / 改分组写不进去：列表看着像"排好了"，重进页面又变回去。
+                        ManageViewModel.Event.WriteFailed -> feedback?.post(AppFeedback(writeFailed))
+                    }
+                }
+            }
+            LaunchedEffect(vm) {
+                vm.groupError.collect { op ->
+                    val message = when (op) {
+                        ManageViewModel.GroupOp.Add -> groupAddFailed
+                        ManageViewModel.GroupOp.Rename -> groupRenameFailed
+                        ManageViewModel.GroupOp.Delete -> groupDeleteFailed
+                    }
+                    feedback?.post(AppFeedback(message))
+                }
             }
             GroupsScreen(
                 groups = manage.groups,
@@ -912,16 +1021,28 @@ fun VaultNavHost(
             val run by vm.state.collectAsStateWithLifecycle()
             val feedback = LocalAppFeedback.current
             val probeRetried = stringResource(Res.string.feedback_probe_retried)
+            val probeRetryNothing = stringResource(Res.string.feedback_probe_retry_nothing)
+            val probeStopped = stringResource(Res.string.feedback_probe_stopped)
             ProbeRunScreen(
                 lastRun = run.lastRun,
                 nowMs = run.nowMs,
                 failed = run.failed,
                 skipped = run.skipped,
                 succeeded = run.succeeded,
+                running = run.running,
                 onBack = back,
                 onRetryFailed = {
-                    vm.retryFailed()
-                    feedback?.post(AppFeedback(probeRetried))
+                    // 按引擎的返回值说：没接这一发（正在跑 / 锁定态 / 压根没有失败项）却念
+                    // "正在重试失败项"，用户等到的就是一句没发生的事。
+                    val started = vm.retryFailed()
+                    feedback?.post(AppFeedback(if (started) probeRetried else probeRetryNothing))
+                },
+                onStopProbe = {
+                    // 走 VM 的既有 cancel 路径（引擎侧 Job.cancel() + NonCancellable 收尾，
+                    // 把 probe_runs 写成 cancelled 而不是留半截）。这一句只说"已经让它停了"，
+                    // 本轮结果不再由 Shell 补发：那条流对 cancelled 一轮刻意不出声。
+                    vm.cancelProbe()
+                    feedback?.post(AppFeedback(probeStopped))
                 },
                 onOpenProvider = { id -> navigate(ProviderDetailRoute(id)) },
             )
@@ -1025,12 +1146,15 @@ private fun SyncRouteContent(
         vm.events.collect { event ->
             when (event) {
                 is SyncEvent.ExportSucceeded -> feedback?.post(AppFeedback(exported))
-                is SyncEvent.ExportFailed ->
-                    feedback?.post(AppFeedback(getString(Res.string.sync_result_failed, event.message ?: "?")))
+                // 三条失败提示都不带异常原文（原文里有 WebDAV 地址、文件名甚至凭据片段，
+                // 摊在屏幕上等于把日志公开，还可能被截图）。原因由引擎写进 audit_log，
+                // 这里只说"失败了 + 下一步去哪看"。
+                SyncEvent.ExportFailed ->
+                    feedback?.post(AppFeedback(getString(Res.string.sync_export_failed)))
                 is SyncEvent.RestoreSucceeded ->
                     feedback?.post(AppFeedback(getString(Res.string.sync_result_restored, event.importedProviders)))
-                is SyncEvent.RestoreFailed ->
-                    feedback?.post(AppFeedback(getString(Res.string.sync_result_failed, event.message ?: "?")))
+                SyncEvent.RestoreFailed ->
+                    feedback?.post(AppFeedback(getString(Res.string.sync_restore_failed)))
                 SyncEvent.WebDavConfigSaved -> {
                     remoteBackups = null
                     feedback?.post(AppFeedback(getString(Res.string.sync_result_webdav_configured)))
@@ -1049,8 +1173,8 @@ private fun SyncRouteContent(
                             ),
                         ),
                     )
-                is SyncEvent.WebDavFailed ->
-                    feedback?.post(AppFeedback(getString(Res.string.sync_result_failed, event.message ?: "?")))
+                SyncEvent.WebDavFailed ->
+                    feedback?.post(AppFeedback(getString(Res.string.sync_webdav_failed)))
             }
         }
     }
@@ -1067,6 +1191,14 @@ private fun SyncRouteContent(
             pendingRestore = PendingRestore(bytes, password)
             restoreModePicker = true
             passphraseState.clear()
+            pendingAction = null
+        },
+        // 用户退出文件选择器（Android SAF 返回 null uri / iOS 的 documentPickerWasCancelled）。
+        // 口令弹层是"等选完才收口"的那一层，不接这一句它就会留在屏幕上没人应答；
+        // 与下面 onDismissRequest 做同样的收口，顺带把已经用不上的口令擦掉。
+        onCancelled = {
+            passphraseState.clear()
+            passphraseError = null
             pendingAction = null
         },
     )
@@ -1217,84 +1349,109 @@ private fun SyncRouteContent(
         )
     }
 
-    AppDialog(
+    RestoreModePicker(
         show = restoreModePicker,
-        onDismissRequest = {
+        onDismiss = {
             pendingRestore?.password?.zeroize()
             pendingRestore = null
             restoreModePicker = false
         },
-        title = stringResource(Res.string.sync_restore_mode),
-        confirmText = null,
-    ) {
-        RestoreModeButton(stringResource(Res.string.sync_mode_merge)) {
+        onChosen = { mode ->
             pendingRestore?.let {
-                vm.restore(it.bytes, it.password, RestoreMode.MERGE)
+                vm.restore(it.bytes, it.password, mode)
                 it.password.zeroize()
             }
             pendingRestore = null
             restoreModePicker = false
-        }
-        RestoreModeButton(stringResource(Res.string.sync_mode_overwrite)) {
-            pendingRestore?.let {
-                vm.restore(it.bytes, it.password, RestoreMode.OVERWRITE)
-                it.password.zeroize()
-            }
-            pendingRestore = null
-            restoreModePicker = false
-        }
-        RestoreModeButton(stringResource(Res.string.sync_mode_add_only)) {
-            pendingRestore?.let {
-                vm.restore(it.bytes, it.password, RestoreMode.ADD_ONLY)
-                it.password.zeroize()
-            }
-            pendingRestore = null
-            restoreModePicker = false
-        }
-    }
+        },
+    )
 
-    AppDialog(
+    RestoreModePicker(
         show = webDavRestoreModePicker,
-        onDismissRequest = {
+        onDismiss = {
             pendingWebDavPassword?.zeroize()
             pendingWebDavPassword = null
             webDavRestoreModePicker = false
         },
-        title = stringResource(Res.string.sync_restore_mode),
-        confirmText = null,
-    ) {
-        RestoreModeButton(stringResource(Res.string.sync_mode_merge)) {
+        onChosen = { mode ->
             pendingWebDavPassword?.let {
-                vm.restoreLatestFromWebDav(it, RestoreMode.MERGE)
+                vm.restoreLatestFromWebDav(it, mode)
                 it.zeroize()
             }
             pendingWebDavPassword = null
             webDavRestoreModePicker = false
-        }
-        RestoreModeButton(stringResource(Res.string.sync_mode_overwrite)) {
-            pendingWebDavPassword?.let {
-                vm.restoreLatestFromWebDav(it, RestoreMode.OVERWRITE)
-                it.zeroize()
-            }
-            pendingWebDavPassword = null
-            webDavRestoreModePicker = false
-        }
-        RestoreModeButton(stringResource(Res.string.sync_mode_add_only)) {
-            pendingWebDavPassword?.let {
-                vm.restoreLatestFromWebDav(it, RestoreMode.ADD_ONLY)
-                it.zeroize()
-            }
-            pendingWebDavPassword = null
-            webDavRestoreModePicker = false
-        }
-    }
+        },
+    )
 
 }
 
 
+/**
+ * 恢复模式选择：一段三选一 + 一次确认。
+ *
+ * 以前这里是三枚文本按钮（AppTextButton），点一下立刻写库——两个问题叠在一起：
+ *
+ * 1. 「覆盖」会先把本机库清空，而它当时**没有任何取消出口**（只能点弹层外或按返回，
+ *    那等于让人靠猜来退出一个破坏性动作），按错一格就是数据没了；
+ * 2. 三枚按钮也不表达"当前选了哪一档"。
+ *
+ * 现在选择与提交分开：默认落在「合并」（三档里唯一不丢东西的那一档，破坏性那档要主动选过去），
+ * 确定才写入，取消/点外面都原样收回；选中「覆盖」时再单独确认一次，把要没的东西说清楚。
+ *
+ * 文案由调用方（composable 层）解析，本层不碰资源以外的事——但 [RestoreMode] 是引擎侧的枚举，
+ * VM 读不到资源，所以档位仍然以枚举交给 [onChosen]。
+ */
 @Composable
-private fun RestoreModeButton(text: String, onClick: () -> Unit) {
-    AppTextButton(text = text, onClick = onClick, modifier = Modifier.fillMaxWidth())
+private fun RestoreModePicker(
+    show: Boolean,
+    onDismiss: () -> Unit,
+    onChosen: (RestoreMode) -> Unit,
+) {
+    // 顺序即分段切换的顺序，也是 indexOf 的依据；三档都在，少一档就没有"不丢东西"的默认了。
+    val modes = listOf(RestoreMode.MERGE, RestoreMode.OVERWRITE, RestoreMode.ADD_ONLY)
+    val labels = listOf(
+        stringResource(Res.string.sync_mode_merge),
+        stringResource(Res.string.sync_mode_overwrite),
+        stringResource(Res.string.sync_mode_add_only),
+    )
+    // remember(show)：每次重新打开都回到默认档，上一次选中的「覆盖」不该替下一次做决定。
+    var chosen by remember(show) { mutableStateOf(RestoreMode.MERGE) }
+    var confirmOverwrite by remember(show) { mutableStateOf(false) }
+
+    AppDialog(
+        show = show && !confirmOverwrite,
+        onDismissRequest = onDismiss,
+        title = stringResource(Res.string.sync_restore_mode),
+        summary = stringResource(Res.string.sync_restore_mode_summary),
+        confirmText = stringResource(Res.string.sync_confirm),
+        onConfirm = {
+            if (chosen == RestoreMode.OVERWRITE) {
+                confirmOverwrite = true
+            } else {
+                onChosen(chosen)
+            }
+        },
+        dismissText = stringResource(Res.string.sync_cancel),
+        onDismiss = onDismiss,
+    ) {
+        AppTabRow(
+            tabs = labels,
+            selectedIndex = modes.indexOf(chosen),
+            onSelect = { index -> chosen = modes[index] },
+        )
+    }
+
+    AppDialog(
+        show = show && confirmOverwrite,
+        onDismissRequest = { confirmOverwrite = false },
+        title = stringResource(Res.string.sync_overwrite_confirm_title),
+        summary = stringResource(Res.string.sync_overwrite_confirm_summary),
+        confirmText = stringResource(Res.string.sync_confirm),
+        onConfirm = { onChosen(RestoreMode.OVERWRITE) },
+        // 这一层的取消只退回上一格：模式选择还开着，用户可以改选「合并」。
+        dismissText = stringResource(Res.string.sync_cancel),
+        onDismiss = { confirmOverwrite = false },
+    )
 }
 
 /** 口令确认之后要触发的动作。 */

@@ -8,8 +8,10 @@ import com.lc33.tokenvault.domain.Protocol
 import com.lc33.tokenvault.domain.model.ApiKey
 import com.lc33.tokenvault.domain.repo.ApiKeyRepository
 import com.lc33.tokenvault.domain.repo.ClientProfileRepository
+import com.lc33.tokenvault.domain.repo.DuplicateApiKeyException
 import com.lc33.tokenvault.domain.repo.ModelRepository
 import com.lc33.tokenvault.domain.repo.SettingsRepository
+import com.lc33.tokenvault.domain.repo.TransactionRunner
 import com.lc33.tokenvault.domain.repo.UndoableDeletion
 import com.lc33.tokenvault.endpoint.EndpointError
 import com.lc33.tokenvault.endpoint.NormalizeResult
@@ -40,6 +42,9 @@ class KeyEditorViewModel constructor(
     private val settings: SettingsRepository,
     private val probeEngine: ProbeEngine,
     private val knownSecrets: KnownSecrets,
+
+    /** 保存的三步（元数据 / 行为配置 / 密钥）要落在同一个事务里，见 [save]。 */
+    private val transactions: TransactionRunner,
     private val providerId: Long,
     private val keyId: Long,
     /** 新建 Key 的默认名（「密钥 N」）。由界面注入：ViewModel 读不到资源（红线 19）。 */
@@ -252,23 +257,37 @@ class KeyEditorViewModel constructor(
                     )
                     currentKey = keys.find(addedId)
                 } else {
-                    keys.updateMeta(
-                        existing.copy(
-                            label = draft.label.trim(),
-                            note = draft.note.trim(),
-                            sortOrder = draft.sortOrder,
-                        ),
-                    )
-                    keys.updateSettings(
-                        id = existing.id,
-                        settings = draft.toSettings(existing.settings, normalized, profiles.value),
-                        balanceToken = balanceToken,
-                    )
-                    if (secret != null && secret.isNotEmpty()) {
-                        keys.replaceSecret(existing.id, secret)
+                    // 三步一个事务：改名 + 行为配置 + 换密钥。
+                    //
+                    // 分开写的话，第二步失败（配额、坏 profileId、锁屏）就留下"名称改了但
+                    // 配置还是旧的"这种半份保存，而界面上只弹一句保存失败、用户以为什么都没变。
+                    // 第三步（换密钥）撞唯一索引时更糟：前两部落库、密钥还是老的。
+                    transactions.inTransaction {
+                        keys.updateMeta(
+                            existing.copy(
+                                label = draft.label.trim(),
+                                note = draft.note.trim(),
+                                sortOrder = draft.sortOrder,
+                            ),
+                        )
+                        keys.updateSettings(
+                            id = existing.id,
+                            settings = draft.toSettings(existing.settings, normalized, profiles.value),
+                            balanceToken = balanceToken,
+                        )
+                        if (secret != null && secret.isNotEmpty()) {
+                            keys.replaceSecret(existing.id, secret)
+                        }
                     }
                 }
                 _saved.tryEmit(Unit)
+            } catch (_: DuplicateApiKeyException) {
+                // 同一家里已经有这把一模一样的密钥了（唯一索引），这次保存整体回滚。
+                //
+                // 这里复用 `SaveFailed` 那条通道：界面按它显示"保存失败，输入已保留"，
+                // 语义是对的（什么都没写进去）。要更进一步得单开一句"这把密钥已经存在"，
+                // 那要新增 `SaveError` 分支 + 两份文案，交界面那轮一起做。
+                _saveError.value = SaveError.SaveFailed
             } catch (_: Exception) {
                 _saveError.value = SaveError.SaveFailed
             } finally {

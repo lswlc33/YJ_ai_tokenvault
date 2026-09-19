@@ -3,6 +3,7 @@ package com.lc33.tokenvault.screens.manage
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,12 +20,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.back_cd
+import tokenvault.shared.generated.resources.dialog_cancel
 import tokenvault.shared.generated.resources.editor_save
+import tokenvault.shared.generated.resources.editor_error_missing_name
 import tokenvault.shared.generated.resources.group_all
 import tokenvault.shared.generated.resources.groups_add
 import tokenvault.shared.generated.resources.groups_add_title
@@ -94,6 +96,10 @@ fun GroupsScreen(
 ) {
     val scrollState = rememberAppTopBarScrollState()
     val tokens = LocalAppTokens.current
+    // 图标按钮的最小可点尺寸：MIUIX 的 IconButton 只保证 40dp，而改名/删除/排序都是这页的
+    // 主动作，统一垫到 minTouchTarget（48dp）。分组行的行高也按同一档垫（见下面「全部」那一行），
+    // 否则会出现"按钮 48、行 40"两种高度混排。
+    val iconButtonTouchHeight = Modifier.heightIn(min = tokens.minTouchTarget)
     val realGroups = groups.filter { it.id != null }
     val allLabel = stringResource(Res.string.group_all)
     val ungrouped = stringResource(Res.string.manage_batch_ungrouped)
@@ -183,10 +189,12 @@ fun GroupsScreen(
                         .fillMaxWidth()
                         .padding(horizontal = tokens.screenPadding),
                 ) {
-                    // 40dp = MIUIX IconButton 的最小高。分组行右侧各带一枚 40dp 的图标按钮，
-                    // 「全部」这一行没有按钮，不垫同样的最小高就会比下面的自定义分组矮一截。
+                    // 「全部」这一行右侧没有按钮，不垫一行最小高就会比下面的自定义分组矮一截。
+                    // 垫的是 minTouchTarget（48dp）而不是 MIUIX IconButton 自带的 40dp 最小高：
+                    // 下面每行的图标按钮也一并垫到 48dp（见 iconButtonTouchHeight），
+                    // 40dp 是库给的地板、48dp 才是这项目认定的可点下限。
                     Row(
-                        modifier = Modifier.heightIn(min = 40.dp),
+                        modifier = Modifier.heightIn(min = tokens.minTouchTarget),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         AppText(text = allLabel, style = AppTextStyle.Body, modifier = Modifier.weight(1f))
@@ -274,11 +282,13 @@ fun GroupsScreen(
                                 icon = AppIcon.Edit,
                                 contentDescription = stringResource(Res.string.groups_rename),
                                 onClick = { editing = group },
+                                modifier = iconButtonTouchHeight,
                             )
                             AppIconButton(
                                 icon = AppIcon.Delete,
                                 contentDescription = stringResource(Res.string.groups_delete),
                                 onClick = { pendingDelete = group },
+                                modifier = iconButtonTouchHeight,
                             )
                         }
                     }
@@ -399,6 +409,9 @@ fun GroupsScreen(
         title = stringResource(Res.string.groups_delete_title),
         summary = stringResource(Res.string.groups_delete_body),
         confirmText = stringResource(Res.string.groups_delete),
+        // 破坏性动作必须给一个看得见的退路（AppDialog 的契约）：只剩「删除」的弹层里，
+        // 用户唯一的退出方式是点空白或按返回，那是在猜怎么逃。
+        dismissText = stringResource(Res.string.dialog_cancel),
         onConfirm = {
             pendingDelete?.id?.let(onDelete)
             pendingDelete = null
@@ -406,7 +419,7 @@ fun GroupsScreen(
     )
 }
 
-/** 新建 / 重命名共用的取名弹层。空名字不许提交。 */
+/** 新建 / 重命名共用的取名弹层。空名字不许提交，并且要说清为什么没提交。 */
 @Composable
 private fun NameDialog(
     title: String,
@@ -415,6 +428,9 @@ private fun NameDialog(
     onConfirm: (String) -> Unit,
 ) {
     val name = rememberAppTextFieldState(initial)
+    // 空名字点保存以前是"按了没反应"：没有反馈时用户既以为按钮坏了，也可能以为已经存上了，
+    // 后者更糟——他会带着一个空分组名继续往下走。拦下提交的同时把原因写在输入框下面。
+    var emptyName by remember { mutableStateOf(false) }
     AppDialog(
         show = true,
         onDismissRequest = onDismiss,
@@ -422,10 +438,22 @@ private fun NameDialog(
         confirmText = stringResource(Res.string.editor_save),
         onConfirm = {
             val text = name.text.trim()
-            if (text.isNotEmpty()) onConfirm(text)
+            if (text.isEmpty()) {
+                emptyName = true
+            } else {
+                onConfirm(text)
+            }
         },
     ) {
-        AppTextField(state = name, label = stringResource(Res.string.groups_name_label))
+        AppTextField(
+            state = name,
+            label = stringResource(Res.string.groups_name_label),
+            errorText = if (emptyName && name.text.isBlank()) {
+                stringResource(Res.string.editor_error_missing_name)
+            } else {
+                null
+            },
+        )
     }
 }
 
@@ -442,16 +470,23 @@ private fun SortMoveButtons(
     lastIndex: Int,
     onMove: (Int, Int) -> Unit,
 ) {
+    // 垫高给的是**正方形**而不是只垫高度：这两枚按钮带着 90° 旋转，48×40 转过去会占
+    // 40×48 的视觉位置并被自己的布局框裁掉，正方形转完还是同一格。
+    val tokens = LocalAppTokens.current
+    val touchTarget = Modifier.defaultMinSize(
+        minWidth = tokens.minTouchTarget,
+        minHeight = tokens.minTouchTarget,
+    )
     AppIconButton(
         icon = AppIcon.Back,
-        modifier = Modifier.rotate(90f),
+        modifier = touchTarget.then(Modifier.rotate(90f)),
         contentDescription = stringResource(Res.string.key_sort_up),
         onClick = { onMove(index, -1) },
         enabled = index > 0,
     )
     AppIconButton(
         icon = AppIcon.Back,
-        modifier = Modifier.rotate(-90f),
+        modifier = touchTarget.then(Modifier.rotate(-90f)),
         contentDescription = stringResource(Res.string.key_sort_down),
         onClick = { onMove(index, 1) },
         enabled = index < lastIndex,

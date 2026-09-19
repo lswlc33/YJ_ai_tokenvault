@@ -52,9 +52,6 @@ import tokenvault.shared.generated.resources.detail_models_section
 import tokenvault.shared.generated.resources.detail_provider_balance_total
 import tokenvault.shared.generated.resources.detail_reachability_latency
 import tokenvault.shared.generated.resources.dialog_cancel
-import tokenvault.shared.generated.resources.login_method_github
-import tokenvault.shared.generated.resources.login_method_linuxdo
-import tokenvault.shared.generated.resources.detail_accounts_empty
 import tokenvault.shared.generated.resources.detail_accounts_empty_placeholder
 import tokenvault.shared.generated.resources.detail_add_account
 import tokenvault.shared.generated.resources.detail_account_keep_secret
@@ -89,6 +86,8 @@ import com.lc33.tokenvault.screens.model.ProviderDetailUiState
 import com.lc33.tokenvault.screens.model.UiKeyRow
 import com.lc33.tokenvault.screens.model.UiModelRow
 import com.lc33.tokenvault.screens.model.UiProviderRow
+import com.lc33.tokenvault.ui.common.loginMethodLabel
+import com.lc33.tokenvault.ui.common.protocolLabel
 import com.lc33.tokenvault.ui.common.relativeLabel
 import com.lc33.tokenvault.ui.miuix.AppBottomSheet
 import com.lc33.tokenvault.ui.miuix.AppActionRow
@@ -396,6 +395,8 @@ fun ProviderDetailScreen(
         onDismissRequest = { pendingDeleteModelId = null },
         title = stringResource(Res.string.detail_model_delete),
         confirmText = stringResource(Res.string.groups_delete),
+        // 破坏性动作给一个看得见的退路（AppDialog 的契约），别让用户靠点空白处逃生。
+        dismissText = stringResource(Res.string.dialog_cancel),
         onConfirm = {
             pendingDeleteModelId?.let(onDeleteModel)
             pendingDeleteModelId = null
@@ -408,6 +409,7 @@ fun ProviderDetailScreen(
         title = stringResource(Res.string.detail_account_delete_title),
         summary = stringResource(Res.string.detail_account_delete_body),
         confirmText = stringResource(Res.string.detail_account_delete),
+        dismissText = stringResource(Res.string.dialog_cancel),
         onConfirm = {
             pendingDeleteAccountId?.let(onDeleteAccount)
             pendingDeleteAccountId = null
@@ -908,23 +910,6 @@ private fun KeyCard(
     }
 }
 
-
-
-@Composable
-private fun loginMethodLabel(method: LoginMethod): String = when (method) {
-    LoginMethod.GITHUB -> stringResource(Res.string.login_method_github)
-    LoginMethod.LINUX_DO -> stringResource(Res.string.login_method_linuxdo)
-}
-
-/**
- * 头部信息卡：备注、官网与协议。
- *
- * 官网那一行**就是**域名行，不再另外摆一条「官网: https://…」的动作行——同一个地址
- * 出现两次，第二次还带着箭头，读起来像另一个入口。整行可点，点了打开浏览器。
- *
- * 右侧是官网连通性延迟，只在**连通**时出现（失败没有可显示的耗时，硬给一个数
- * 反而像"通了但很慢"）；它与左侧两行文字上下居中，行高不吃亏。
- */
 /**
  * 信息卡有没有东西可画。
  *
@@ -940,6 +925,15 @@ internal fun hasProviderInfo(provider: UiProviderRow): Boolean =
         !provider.websiteUrl.isNullOrBlank() ||
         provider.protocols.isNotEmpty()
 
+/**
+ * 头部信息卡：备注、官网与协议。
+ *
+ * 官网那一行**就是**域名行，不再另外摆一条「官网: https://…」的动作行——同一个地址
+ * 出现两次，第二次还带着箭头，读起来像另一个入口。整行可点，点了打开浏览器。
+ *
+ * 右侧是官网连通性延迟，只在**连通**时出现（失败没有可显示的耗时，硬给一个数
+ * 反而像"通了但很慢"）；它与左侧两行文字上下居中，行高不吃亏。
+ */
 @Composable
 private fun InfoCard(state: ProviderDetailUiState) {
     val tokens = LocalAppTokens.current
@@ -1044,19 +1038,3 @@ private fun BalanceCard(state: ProviderDetailUiState) {
 /** 金额 + 币种符号。符号由币种查表（红线 15 不硬编码）。 */
 private fun com.lc33.tokenvault.screens.model.UiMoney.toDisplay(): String =
     com.lc33.tokenvault.balance.FormatMoney.format(amount.toDoubleOrNull() ?: 0.0, currency)
-
-@Composable
-private fun AccountsEmptyHint() {
-    val tokens = LocalAppTokens.current
-    AppCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = tokens.screenPadding),
-    ) {
-        AppText(
-            text = stringResource(Res.string.detail_accounts_empty),
-            style = AppTextStyle.Secondary,
-            color = appSecondaryTextColor,
-        )
-    }
-}

@@ -27,6 +27,8 @@
     <string name="dashboard_balance_updated">Updated %1$s</string>
     <string name="dashboard_balance_failed">%1$d provider(s) failed the balance query</string>
     <string name="dashboard_balance_none">No balance query configured yet</string>
+    <!-- 总览余额卡下方那一行入口：整张卡不着色，只这一行可点（见 DashboardCards）。 -->
+    <string name="dashboard_balance_detail">View balance breakdown</string>
     <string name="dashboard_counts_title">Content</string>
     <string name="common_loading">Loading…</string>
     <string name="count_providers">Providers</string>
@@ -61,6 +63,8 @@
     <string name="dashboard_backup_title">Backup</string>
     <string name="dashboard_backup_never">No backup yet. Forgetting your PIN or switching devices would make the data unrecoverable.</string>
     <string name="dashboard_backup_last">Last backup %1$s · %2$s</string>
+    <string name="backup_target_local">Local file</string>
+    <string name="backup_target_webdav">WebDAV</string>
     <string name="dashboard_backup_now">Back up now</string>
     <string name="dashboard_empty_title">Nothing here yet</string>
     <string name="dashboard_empty_desc">Add a provider manually, or paste text to import keys, endpoints, models and balance settings in bulk.</string>
@@ -165,6 +169,7 @@
     <string name="manage_sort_name">Name</string>
     <string name="manage_sort_balance">Balance</string>
     <string name="manage_sort_last_probe">Last probe</string>
+    <string name="manage_sort_cd">Sort providers</string>
     <string name="manage_selected_count">%1$d selected</string>
     <string name="manage_select_all">Select all</string>
     <string name="manage_deselect_all">Deselect all</string>
@@ -181,6 +186,10 @@
     <string name="manage_empty_search_desc">Try another keyword or clear the search.</string>
     <string name="groups_title">Groups</string>
     <string name="groups_add_failed">Could not save the group. A group with this name may already exist.</string>
+    <!-- 三句分开写：改个名失败却被告知"分组没能新建"，用户会去找那个根本没建出来的分组。 -->
+    <string name="groups_rename_failed">Could not rename the group. Another group may already use this name.</string>
+    <string name="groups_delete_failed">Could not delete the group. Nothing was changed, try again.</string>
+    <string name="manage_write_failed">The change was not saved. Nothing was written, try again.</string>
     <string name="provider_editor_title">Edit provider</string>
     <string name="detail_edit_cd">Edit</string>
     <string name="detail_section_keys">Keys</string>
@@ -221,11 +230,18 @@
 
     <!-- Security -->
     <string name="security_section_credential">Credentials</string>
-    <string name="security_change_pin">Change PIN or use a passphrase</string>
+    <string name="security_change_pin">Change PIN</string>
     <string name="security_change_pin_summary">Re-encrypts only the data key, so it completes instantly and changes no records</string>
     <string name="security_biometric">Unlock with biometrics</string>
     <string name="security_biometric_summary">Another route to the same data key, not a second lock. It is kept in hardware-backed storage and re-enrolling a fingerprint invalidates it.</string>
     <string name="security_biometric_unavailable">This device has no enrolled fingerprint or face, or strong biometrics is unavailable</string>
+    <!-- 开关没成就要说清没成，以及为什么：这一项的"看起来弹回去了"最容易被当成界面抖动，
+         而用户真正需要的是系统给出的那一句（它本身就跟着系统语言走）。 -->
+    <string name="security_biometric_failed_detail">Could not turn biometrics on: %1$s</string>
+    <string name="security_biometric_locked_out">Biometrics is locked by the system after too many failed attempts. Unlock with your PIN and try again later.</string>
+    <string name="security_biometric_disable_failed">Biometrics is switched off, but this device may still hold a copy of the credential.</string>
+    <string name="security_biometric_disable_failed_detail">Could not remove the credential from this device: %1$s</string>
+    <string name="security_boot_write_failed">Could not save this change to the vault settings file, so nothing was turned on or off. Try again; if it keeps failing, restore from a backup.</string>
     <string name="security_section_lock">Auto-lock</string>
     <string name="security_lock_now">Lock now</string>
     <string name="security_lock_now_summary">Clears the data key from memory and returns to the lock screen. No data is deleted.</string>
@@ -266,11 +282,6 @@
     <string name="probe_keywords_add">Add keyword</string>
     <string name="probe_keywords_empty">No keywords. The default list will be used.</string>
     <string name="probe_keywords_delete">Delete</string>
-    <string name="probe_section_network">Network</string>
-    <string name="probe_proxy">Manual HTTP proxy</string>
-    <string name="probe_proxy_summary">Leave empty to use the system proxy</string>
-    <string name="probe_proxy_hint">Host and port, e.g. 127.0.0.1:7890. Used for probing, balance checks and update checks. Leave empty to use the system proxy.</string>
-    <string name="probe_proxy_invalid">Enter host:port, e.g. 127.0.0.1:7890</string>
 
     <!-- Data -->
     <string name="data_section_organize">Organise</string>
@@ -290,6 +301,7 @@
     <string name="log_settings_cd">Log settings</string>
     <string name="log_clear_cd">Clear logs</string>
     <string name="log_filter_summary">Shows entries at the selected level and above.</string>
+    <string name="log_recent_limit_note">Showing only the most recent %1$d entries.</string>
     <string name="log_retention">Retention</string>
     <string-array name="log_retention_options">
         <item>7 days</item>
@@ -362,11 +374,19 @@
     <string name="sync_passphrase_required">The passphrase is empty. It defaults to your PIN, so enter your current PIN (or a long passphrase).</string>
     <string name="sync_result_exported">Backup exported</string>
     <string name="sync_result_restored">Restored %1$d providers</string>
-    <string name="sync_result_failed">Failed: %1$s</string>
+    <!-- 三句失败提示都不带异常原文：原文里有 WebDAV 地址、文件名甚至凭据片段，投到屏幕上
+         等于把日志摊出来（还可能被截图）。原因进 audit_log，这里只说下一步做什么。 -->
+    <string name="sync_export_failed">Backup failed. See the log for the reason.</string>
+    <string name="sync_restore_failed">Restore failed. See the log for the reason.</string>
+    <string name="sync_webdav_failed">Sync failed. Check the WebDAV settings and try again; the reason is in the log.</string>
     <string name="sync_restore_mode">How to merge</string>
+    <string name="sync_restore_mode_summary">Merge deduplicates what is already here, add-only imports only what is missing, overwrite clears this vault first.</string>
     <string name="sync_mode_overwrite">Overwrite</string>
     <string name="sync_mode_merge">Merge</string>
     <string name="sync_mode_add_only">Add only</string>
+    <!-- 覆盖是这一页唯一会丢掉本机数据的选项，所以它单独再确认一次。 -->
+    <string name="sync_overwrite_confirm_title">Overwrite the vault on this device?</string>
+    <string name="sync_overwrite_confirm_summary">Providers, keys, models and accounts that are not in this backup will be removed. Merge or add-only keeps them.</string>
     <string name="sync_confirm">Confirm</string>
     <string name="sync_cancel">Cancel</string>
 
@@ -382,7 +402,7 @@
     <string name="update_published">Published %1$s</string>
     <string name="update_open_download">Download</string>
     <string name="update_error_no_network">No network connection. Check your connection and try again.</string>
-    <string name="update_error_unreachable">Cannot reach GitHub. You can configure a proxy under Probe → HTTP proxy.</string>
+    <string name="update_error_unreachable">Cannot reach GitHub. Check your network connection and try again.</string>
     <string name="update_honesty_default_off">· No automatic checks; a check runs only when you tap Check now.</string>
     <string name="update_honesty_anonymous">· Each check is a single anonymous request to the GitHub releases API. It contains no device information, identifier or vault data.</string>
     <string name="update_honesty_no_silent_install">· No in-app installation. That would require the install-packages permission, which an app holding your keys should not request; downloads and installation go through your browser and the system installer.</string>
@@ -471,6 +491,7 @@
     <string name="editor_balance_custom_currency">Currency</string>
     <string name="editor_error_missing_secret">Enter an API key.</string>
     <string name="editor_error_missing_name">Enter a name.</string>
+    <string name="editor_row_missing">This entry could not be read from the vault, so saving is blocked. Go back and open it again.</string>
     <string name="editor_default_key_name">Key %1$d</string>
     <string name="editor_default_account_name">Account %1$d</string>
     <string name="editor_default_provider_name">Provider %1$d</string>
@@ -553,6 +574,7 @@
     <string name="import_error_no_command">No importable cURL command was found.</string>
     <string name="import_error_multiple_commands">Only one cURL command can be recognized at a time.</string>
     <string name="import_error_missing_key">No API key could be found in this cURL command.</string>
+    <string name="import_error_failed">Import failed. Check the command format and try again.</string>
     <string name="import_result_base_url">Base URL</string>
     <string name="import_result_protocol">Protocols</string>
     <string name="import_result_api_key">API key</string>
@@ -599,7 +621,13 @@
     <string name="probe_run_skipped">Not probed this round</string>
     <string name="probe_run_succeeded">Succeeded</string>
     <string name="probe_run_retry">Retry the failed and unprobed items</string>
+    <string name="probe_run_stop">Stop probing</string>
     <string name="probe_run_empty_desc">Nothing has been probed yet, so there are no results to show.</string>
+    <!-- Why an item was not probed. The section header says "not probed", these say why. -->
+    <string name="probe_skip_host_budget">Skipped: this host reached its request limit for the round</string>
+    <string name="probe_skip_total_budget">Skipped: the time budget for this round ran out</string>
+    <string name="probe_skip_rate_limited">Skipped: this host rate-limited us earlier in the round</string>
+    <string name="probe_skip_cancelled">Skipped: the round was stopped</string>
     <!-- Probe levels -->
     <string name="probe_level_reachability">Endpoint reachability</string>
     <string name="probe_level_key_validity">Key validity</string>
@@ -638,6 +666,8 @@
     <string name="feedback_undo_failed">Could not restore — the item may have been recreated since</string>
     <string name="feedback_copied">Copied</string>
     <string name="feedback_providers_deleted">Deleted selected providers</string>
+    <!-- 逐家删时某一家可能正被外键引用而失败：全删了与删了一半必须是两句话。 -->
+    <string name="feedback_providers_deleted_partial">Deleted %1$d providers, %2$d could not be deleted</string>
     <string name="feedback_key_deleted">Key deleted</string>
     <string name="feedback_model_deleted">Model deleted</string>
     <string name="feedback_account_deleted">Account deleted</string>
@@ -664,8 +694,13 @@
     <string name="feedback_models_refreshed">Model list refreshed</string>
     <string name="feedback_model_probed">Model probed</string>
     <string name="feedback_probe_retried">Retrying failed items</string>
+    <!-- 引擎没接这一发（正在跑 / 锁定态 / 没有失败项）时不能念上面那句：
+         那一轮要么已经在跑、要么压根没有可重试的东西。 -->
+    <string name="feedback_probe_retry_nothing">No failed item to retry right now</string>
+    <string name="feedback_probe_stopped">Stopped</string>
     <string name="feedback_logs_cleared">Log cleared</string>
     <string name="feedback_probe_results_cleared">Probe results cleared</string>
+    <string name="data_clear_failed">Clear failed. Nothing was removed.</string>
 
     <!-- PIN entry -->
     <string name="pin_dots_cd">%1$d of %2$d digits entered</string>
@@ -673,12 +708,20 @@
     <string name="pin_error_wrong">Incorrect PIN</string>
     <string name="pin_error_mismatch">The two entries do not match</string>
     <string name="pin_error_too_simple">Too easy to guess. Avoid sequences such as 123456 and repeated digits such as 111111.</string>
+    <!-- 锁屏上的三条"不是你的 PIN 的问题"。分开写是因为它们要做的下一件事完全不同：
+         暂时被系统锁住 → 等一会儿；这条路本身失败 → 改用 PIN；写不进文件 → 别再试了，去恢复。 -->
+    <string name="pin_error_biometry_locked_out">Biometrics is temporarily locked after too many failed attempts. Use your PIN, or try again in a few minutes.</string>
+    <string name="pin_error_biometry_failed">Biometrics did not complete. Unlock with your PIN instead.</string>
+    <string name="pin_error_boot_write_failed">The vault settings file could not be updated. Nothing was changed.</string>
 
     <!-- Boot store unreadable -->
     <string name="boot_corrupt_title">Could not read the vault settings file</string>
     <string name="boot_corrupt_body">This file holds the parameters needed to unwrap your data key. Without it the encrypted keys in the database cannot be opened.</string>
     <string name="boot_corrupt_untouched">No data has been changed. The app will not rebuild this file automatically; rebuilding it would leave every stored key as ciphertext that cannot be decrypted.</string>
     <string name="boot_corrupt_restore">Restore from a backup</string>
+    <!-- 这一行是"为什么那个入口按不动"。恢复要选文件（SAF），还没做；
+         不说明就画一个灰掉的入口，用户会以为是自己手机的问题。 -->
+    <string name="boot_corrupt_restore_unavailable">Not available in this version: this screen cannot pick a backup file yet.</string>
     <string name="boot_corrupt_wipe">Erase everything and start over</string>
     <string name="boot_corrupt_diagnostic">Diagnostic information, include this in a bug report:</string>
     <string name="boot_corrupt_wipe_confirm_title">Erase everything?</string>
@@ -722,7 +765,10 @@
     <string name="onboarding_welcome_title">Before you set a PIN</string>
     <string name="onboarding_welcome_subtitle">Three things to know; each affects what you should store here.</string>
     <string name="onboarding_welcome_what">API keys, platform account passwords and access tokens are encrypted field by field with AES-256-GCM. Provider names, endpoints, model ids and balances are stored in the clear.</string>
-    <string name="onboarding_welcome_limit">A six-digit PIN cannot resist offline attacks on files copied from this device. Do not store a password you reuse elsewhere; the settings offer an arbitrary-length passphrase instead.</string>
+    <!-- 原来那句"设置里可改用任意长度的口令"是假承诺：解锁 PIN 目前固定 6 位数字，
+         应用内没有任何改成口令的入口。任意长度的只有备份口令（Sync 那一页），
+         所以这里说清是哪一件事，别让人以为自己的解锁 PIN 可以更短或更长。 -->
+    <string name="onboarding_welcome_limit">A six-digit PIN cannot resist offline attacks on files copied from this device. Do not store a password you reuse elsewhere. The PIN is always six digits; only an exported backup can be protected with a separate passphrase of any length.</string>
     <string name="onboarding_welcome_local">All data stays on this device. There is no account, server or upload; the only output is an encrypted backup file you export yourself.</string>
     <string name="onboarding_pin_title">Choose a 6 digit PIN</string>
     <string name="onboarding_pin_subtitle">The PIN only wraps the data key, so changing it later re-encrypts that key only and never re-encrypts your data.</string>

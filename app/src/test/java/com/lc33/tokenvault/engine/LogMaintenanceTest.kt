@@ -4,7 +4,9 @@ import com.lc33.tokenvault.crypto.Redactor
 import com.lc33.tokenvault.data.entity.AuditLogEntity
 import com.lc33.tokenvault.data.repo.FakeAppSettingDao
 import com.lc33.tokenvault.data.repo.FakeAuditLogDao
+import com.lc33.tokenvault.data.repo.FakeProbeRunDao
 import com.lc33.tokenvault.data.repo.RoomAuditLogRepository
+import com.lc33.tokenvault.data.repo.RoomProbeRunRepository
 import com.lc33.tokenvault.data.repo.RoomSettingsRepository
 import com.lc33.tokenvault.domain.model.LogRetention
 import kotlinx.coroutines.flow.first
@@ -40,7 +42,12 @@ class LogMaintenanceTest {
         val repo = audit(dao)
 
         // 没写过任何设置：默认就是 7 天，不需要用户先去设置页点一下。
-        LogMaintenance(RoomSettingsRepository(FakeAppSettingDao()), repo, { now }).run()
+        LogMaintenance(
+            RoomSettingsRepository(FakeAppSettingDao()),
+            repo,
+            RoomProbeRunRepository(FakeProbeRunDao()),
+            { now },
+        ).run()
 
         assertEquals(listOf("recent"), messages(repo))
     }
@@ -53,7 +60,8 @@ class LogMaintenanceTest {
         val settings = RoomSettingsRepository(FakeAppSettingDao())
         settings.setLogRetention(LogRetention.FOREVER)
 
-        LogMaintenance(settings, repo, { now }).run()
+        // probeRuns 用真仓库 + 假 DAO：条数上限那条路径也要被这条链走一遍。
+        LogMaintenance(settings, repo, RoomProbeRunRepository(FakeProbeRunDao()), { now }).run()
 
         assertEquals(listOf("very old"), messages(repo))
     }
@@ -67,7 +75,8 @@ class LogMaintenanceTest {
         val settings = RoomSettingsRepository(FakeAppSettingDao())
         settings.setLogRetention(LogRetention.THIRTY_DAYS)
 
-        LogMaintenance(settings, repo, { now }).run()
+        // probeRuns 用真仓库 + 假 DAO：条数上限那条路径也要被这条链走一遍。
+        LogMaintenance(settings, repo, RoomProbeRunRepository(FakeProbeRunDao()), { now }).run()
 
         assertEquals(listOf("twenty days"), messages(repo))
     }

@@ -129,9 +129,24 @@ class RoomModelRepository constructor(
         dao.update(model.toEntity())
     }
 
+    /**
+     * 删一行模型。
+     *
+     * 与 Key / 账号 / 供应商同一条规则（§13.4）：**动到用户数据的写操作都要留一条 WARN**，
+     * 撤销句柄丢了就再也找不回这行，日志是唯一能说出"它曾经存在过"的地方。
+     */
     override suspend fun delete(id: Long): UndoableDeletion? {
+        val existing = dao.findById(id)
         val undo = restorer?.deleteModel(id)
         if (restorer == null) dao.delete(id)
+        audit.recordSafe(
+            LogLevel.WARN,
+            LogCategory.VAULT,
+            "model deleted",
+            "id=$id provider=${existing?.providerId} key=${existing?.keyId} model=${existing?.modelId}",
+            providerId = existing?.providerId,
+            keyId = existing?.keyId,
+        )
         return undo
     }
 

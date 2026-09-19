@@ -15,6 +15,7 @@ import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.boot_corrupt_body
 import tokenvault.shared.generated.resources.boot_corrupt_diagnostic
 import tokenvault.shared.generated.resources.boot_corrupt_restore
+import tokenvault.shared.generated.resources.boot_corrupt_restore_unavailable
 import tokenvault.shared.generated.resources.boot_corrupt_title
 import tokenvault.shared.generated.resources.boot_corrupt_untouched
 import tokenvault.shared.generated.resources.boot_corrupt_wipe
@@ -45,12 +46,18 @@ import com.lc33.tokenvault.ui.theme.LocalStatusPalette
  *
  * 「清空重来」带二次确认，且确认文案里逐项写清要删掉什么——这是全应用唯一一个
  * "点下去就再也回不来"的按钮。
+ *
+ * @param restoreEnabled 「从备份恢复」按不按得动。**当前版本传 false**：那条路要先能选文件
+ *   （SAF / 文件 App），而那一半还没落地。画一个灰掉的入口 + 一句"这一版还没实现"，
+ *   比留一个点了没反应的入口诚实——这一页的另一个出口是不可撤销的清空，
+ *   用户必须能分清"哪一条现在真的走得通"。
  */
 @Composable
 fun BootCorruptScreen(
     reason: String,
     onRestoreFromBackup: () -> Unit,
     onWipeAndStartOver: () -> Unit,
+    restoreEnabled: Boolean = false,
 ) {
     val tokens = LocalAppTokens.current
     var askWipe by remember { mutableStateOf(false) }
@@ -76,8 +83,19 @@ fun BootCorruptScreen(
             AppActionRow(
                 text = stringResource(Res.string.boot_corrupt_restore),
                 onClick = onRestoreFromBackup,
+                enabled = restoreEnabled,
                 modifier = Modifier.fillMaxWidth(),
             )
+            if (!restoreEnabled) {
+                // 灰掉的那一行自己解释为什么灰着。这一页只剩两条出路，
+                // 少一条又不说理由，用户就只能去按另一条——而那条是清空全部数据。
+                AppText(
+                    text = stringResource(Res.string.boot_corrupt_restore_unavailable),
+                    style = AppTextStyle.Footnote,
+                    color = appSecondaryTextColor,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
             AppActionRow(
                 text = stringResource(Res.string.boot_corrupt_wipe),
                 onClick = { askWipe = true },

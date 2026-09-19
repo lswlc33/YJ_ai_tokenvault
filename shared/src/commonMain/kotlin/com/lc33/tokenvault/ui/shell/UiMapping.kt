@@ -161,7 +161,6 @@ fun ProviderSummary.toRow(
     /** 只有供应商详情页传它；列表页的卡片不画协议。 */
     protocols: List<String> = emptyList(),
     keys: List<UiKeyRow> = emptyList(),
-    staleThisRound: Boolean = false,
     lastProbeAt: Long? = null,
     balanceConfigured: Boolean = false,
 ): UiProviderRow =
@@ -186,7 +185,6 @@ fun ProviderSummary.toRow(
         balanceConfigured = balanceConfigured,
         balanceCheckedAt = balance?.checkedAt,
         health = health,
-        staleThisRound = staleThisRound,
         sortOrder = provider.sortOrder,
         lastProbeAt = lastProbeAt,
         checkWebsite = provider.checkWebsite,
@@ -303,7 +301,6 @@ fun AiModel.toRow(): UiModelRow = UiModelRow(
     },
     contextLabel = displayName,
     lastSeenAt = lastSeenAt,
-    probedAt = probedAt,
 )
 
 /**
@@ -497,11 +494,14 @@ private fun keyAttentionKindOf(healths: List<KeyHealth>): AttentionKind? = when 
 // ---------------------------------------------------------------- 管理页搜索与排序
 
 /**
- * 管理页搜索（§13.4「搜名称、备注、host、分组名」）。
+ * 管理页搜索（§13.4「搜名称、备注、host、分组名」+ UI_REFACTOR_PLAN「供应商降级为集合，
+ * 搜索要能命中 Key」）。
  *
- * **只碰明文列**：名称 / 备注 / host。不搜密钥、账号、密码本身——那些是加密列（红线 3 的推论），
- * 也根本不在 [UiProviderRow] 上。分组名由调用方连同 row 一起传进来（[groupNameOf]），
- * 因为分组是另一张表，行模型上只有 `groupId`。
+ * **只碰明文列**：供应商名称 / 备注 / 官网 / host、分组名，以及这一家**每一把 Key 的名称
+ * 与备注**。以前只搜供应商维度，"搜 sk- 尾号 / 搜某把 Key 的备注"永远搜不到，而那把 Key
+ * 就在结果卡片里画着——搜得到看见、看不见才叫奇怪。
+ * 不搜密钥、账号、密码本身：那些是加密列（红线 3 的推论），也根本不在 [UiProviderRow] 上。
+ * 分组名由调用方连同 row 一起传进来（[groupNameOf]），因为分组是另一张表，行模型上只有 `groupId`。
  *
  * 匹配是**小写 + 去空白**后的子串包含：与 [ProbeClassifier] 同一套约定，避免
  * "OpenAI "（带空格）这种输入匹配不上。
@@ -511,13 +511,18 @@ private fun keyAttentionKindOf(healths: List<KeyHealth>): AttentionKind? = when 
 fun matchesQuery(row: UiProviderRow, groupName: String?, query: String): Boolean {
     if (query.isBlank()) return true
     val q = query.trim().lowercase()
-    val haystacks = listOfNotNull(
-        row.name,
-        row.note,
-        row.websiteUrl,
-        row.host,
-        groupName,
-    ).map { it.trim().lowercase() }
+    val haystacks = buildList {
+        add(row.name)
+        row.note?.let { add(it) }
+        row.websiteUrl?.let { add(it) }
+        add(row.host)
+        groupName?.let { add(it) }
+        // Key 维度：名称与备注都是明文列，供应商卡片上本来就画着它们
+        row.keys.forEach { key ->
+            add(key.label)
+            add(key.note)
+        }
+    }.map { it.trim().lowercase() }
     return haystacks.any { it.contains(q) }
 }
 

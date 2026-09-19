@@ -24,6 +24,9 @@ interface AuditLogRepository {
      *
      * 三个报文参数只有 HTTP 类日志会传（"网络请求需要完整记录"），其余场景留空。
      * **请求头没有对应参数**，而且是刻意没有的：那里是 `Authorization`。
+     *
+     * [runId] 是这一条属于哪一轮探测（`probe_runs.id`）。日志页要能从"这轮探测"跳到
+     * 明细，靠的就是它；探测之外的写入（备份 / 锁定 / 手工改动）没有轮次，留 null。
      */
     suspend fun record(
         level: LogLevel,
@@ -32,6 +35,7 @@ interface AuditLogRepository {
         detail: String? = null,
         providerId: Long? = null,
         keyId: Long? = null,
+        runId: Long? = null,
         requestUrl: String? = null,
         requestBody: String? = null,
         responseBody: String? = null,
@@ -45,6 +49,15 @@ interface AuditLogRepository {
 
     /** 删除早于 [before] 的日志。 */
     suspend fun trimOlderThan(before: Long)
+
+    /**
+     * 只保留最近 [keep] 条（按写入时间，同毫秒的按主键）。
+     *
+     * 与 [trimOlderThan] 是两条独立的上限，缺一不可："十万条但都是今天的"时间裁不动，
+     * "十条但有三年前的"条数裁不动。日志表里那三列报文单条就能到 8KB，不设上限的话
+     * 一次故障循环就够把库撑大。
+     */
+    suspend fun trimToCount(keep: Int)
 
     /** 清空（数据页的「清空日志」）。 */
     suspend fun clear()

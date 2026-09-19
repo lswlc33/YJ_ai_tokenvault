@@ -10,6 +10,8 @@ import tokenvault.shared.generated.resources.dashboard_backup_last
 import tokenvault.shared.generated.resources.dashboard_backup_never
 import tokenvault.shared.generated.resources.dashboard_backup_now
 import tokenvault.shared.generated.resources.dashboard_backup_title
+import tokenvault.shared.generated.resources.backup_target_local
+import tokenvault.shared.generated.resources.backup_target_webdav
 import tokenvault.shared.generated.resources.sync_export
 import tokenvault.shared.generated.resources.sync_export_summary
 import tokenvault.shared.generated.resources.sync_import
@@ -29,7 +31,10 @@ import tokenvault.shared.generated.resources.sync_webdav_settings_summary
 import tokenvault.shared.generated.resources.sync_webdav_upload
 import tokenvault.shared.generated.resources.sync_webdav_upload_summary
 import com.lc33.tokenvault.domain.model.WebDavConfig
+import com.lc33.tokenvault.platform.nowMillis
 import com.lc33.tokenvault.screens.model.BackupStatus
+import com.lc33.tokenvault.screens.model.UiBackupTarget
+import com.lc33.tokenvault.ui.common.relativeLabel
 import com.lc33.tokenvault.ui.miuix.AppActionRow
 import com.lc33.tokenvault.ui.miuix.AppArrowRow
 import com.lc33.tokenvault.ui.miuix.AppCard
@@ -159,8 +164,8 @@ private fun StatusCard(
             .padding(horizontal = tokens.screenPadding, vertical = tokens.itemSpacing),
     ) {
         AppText(text = stringResource(Res.string.dashboard_backup_title), style = AppTextStyle.Subtitle)
-        val lastBackupAgo = backup.lastBackupAgo
-        if (lastBackupAgo == null) {
+        val lastBackupAtMs = backup.lastBackupAtMs
+        if (lastBackupAtMs == null) {
             AppText(
                 text = stringResource(Res.string.dashboard_backup_never),
                 style = AppTextStyle.Secondary,
@@ -168,11 +173,17 @@ private fun StatusCard(
                 modifier = Modifier.padding(top = tokens.itemSpacing),
             )
         } else {
+            // 相对时间与落点文案都在这里现算：ViewModel 只给时间戳与枚举，
+            // 字面量绝不进 UiState（红线 19）。
+            val targetLabel = when (backup.target) {
+                UiBackupTarget.WebDav -> stringResource(Res.string.backup_target_webdav)
+                else -> stringResource(Res.string.backup_target_local)
+            }
             AppText(
                 text = stringResource(
                     Res.string.dashboard_backup_last,
-                    lastBackupAgo,
-                    backup.targetLabel ?: "",
+                    relativeLabel(nowMillis(), lastBackupAtMs),
+                    targetLabel,
                 ),
                 style = AppTextStyle.Secondary,
                 color = appSecondaryTextColor,

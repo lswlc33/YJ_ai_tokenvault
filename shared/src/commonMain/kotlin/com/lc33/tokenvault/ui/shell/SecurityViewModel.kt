@@ -11,6 +11,7 @@ import com.lc33.tokenvault.platform.AutoLocker
 import com.lc33.tokenvault.platform.BiometricEnableOutcome
 import com.lc33.tokenvault.platform.BiometricPromptText
 import com.lc33.tokenvault.platform.BiometricVault
+import com.lc33.tokenvault.platform.BootRecord
 import com.lc33.tokenvault.platform.BootState
 import com.lc33.tokenvault.platform.BootStore
 import com.lc33.tokenvault.platform.UnlockResult
@@ -153,15 +154,25 @@ class SecurityViewModel constructor(
         second.zeroize()
         _changePin.update { it.copy(busy = true, error = null) }
         viewModelScope.launch {
-            withContext(Dispatchers.Default) {
-                try {
+            // changePin 会抛 IllegalStateException / BootCorruptException（已解锁却读不出 boot：
+            // 解锁之后那份文件被改坏了）。不接住它就是从设置页冒到 Compose 之外。
+            val changed = withContext(Dispatchers.Default) {
+                runCatching {
                     // 红线 2：只重新包裹一次 DEK，一次 boot 写入，业务表零 UPDATE
                     session.changePin(first)
-                } finally {
-                    first.zeroize()
-                    newPin = null
-                }
+                }.isSuccess
             }
+            if (!changed) {
+                first.zeroize()
+                newPin = null
+                // 这句话要说在**改 PIN 这一页**上，而不是挂到 [_bootWriteFailed] 去：后者是安全页
+                // 上生物识别那一组的说明行，用户回到那一页会看到一条与他刚才做的事无关的话，
+                // 而此刻这一屏只剩"忙碌图标消失了"这种静默。
+                _changePin.update { it.copy(busy = false, error = PinError.BootWriteFailed) }
+                return@launch
+            }
+            first.zeroize()
+            newPin = null
             _changePin.value = ChangePinUiState()
             _pinChanged.tryEmit(Unit)
         }
@@ -197,29 +208,96 @@ class SecurityViewModel constructor(
     val biometricBusy: StateFlow<Boolean> = _biometricBusy.asStateFlow()
 
     /**
+     * 上一次启用生物识别时系统给的那一句（`NSError.localizedDescription` /
+     * `BiometricPrompt` 的 errString）。null = 没有失败。
+     *
+     * 为什么不在这里自己编一句话：这一项失败的原因至少有四种（没设锁屏密码、刚换了指纹、
+     * 系统弹窗起不来、Keychain 写入被拒），而系统那一句本来就是跟着用户手机语言走的。
+     * 我们编的"开启失败"只会让人再点一次。
+     */
+    private val _biometricError = MutableStateFlow<String?>(null)
+    val biometricError: StateFlow<String?> = _biometricError.asStateFlow()
+
+    /** 生物识别被系统暂时锁住（连续失败太多次）。与 [biometricError] 分开：这一档不该出现"失败"字样。 */
+    private val _biometricLockedOut = MutableStateFlow(false)
+    val biometricLockedOut: StateFlow<Boolean> = _biometricLockedOut.asStateFlow()
+
+    /**
+     * 关闭这一侧时，平台上那份凭据没删掉（开关已经是关的，但设备里可能还留着一份 DEK）。
+     *
+     * 单独一个布尔而不是把话塞进 [biometricError]：这里通常没有系统原文可念
+     * （`Throwable.message` 经常是 null），而往流里填一句英文兜底就是把红线 19 破在
+     * 最没人防的那一格上——兜底文案该由资源出，VM 只出语义。
+     */
+    private val _biometricDisableFailed = MutableStateFlow(false)
+    val biometricDisableFailed: StateFlow<Boolean> = _biometricDisableFailed.asStateFlow()
+
+    /**
+     * boot 写不进去（[com.lc33.tokenvault.platform.BaseBootStore.update] 抛
+     * [IllegalStateException]：文件已损坏，或并发的另一次读-改-写抢在了前面）。
+     *
+     * 这一档必须是提示、不能是崩溃：`bootStore.update` 的调用点有三个（会话、锁屏的失效善后、
+     * 这里的开关），后两个都不在会话那把锁的保护下，而抛出来的 ISE 会直接从设置页冒到
+     * Compose 之外——用户只是翻了个开关。
+     */
+    private val _bootWriteFailed = MutableStateFlow(false)
+    val bootWriteFailed: StateFlow<Boolean> = _bootWriteFailed.asStateFlow()
+
+    /**
      * 开关生物识别。开启时验证并包裹 DEK，成功才写 boot；关闭时删平台凭据并清包裹。
      *
      * 取消或失败都**不写 boot**，于是开关的状态流仍读回旧值、界面自动弹回，不需要额外的回滚。
+     * 两条失败路各自要说清：拿不到凭据（取消 / 锁住 / 设备不支持）与写不进文件（boot 坏了）。
      */
     fun onBiometricChange(enabled: Boolean, prompt: BiometricPromptText) {
         if (_biometricBusy.value) return
         if (enabled && !vault.isAvailable()) return
+        _biometricError.value = null
+        _biometricLockedOut.value = false
+        _biometricDisableFailed.value = false
+        _bootWriteFailed.value = false
         viewModelScope.launch {
             if (enabled) {
                 _biometricBusy.value = true
                 val outcome = vault.enable(prompt)
                 _biometricBusy.value = false
-                if (outcome is BiometricEnableOutcome.Success) {
-                    bootStore.update {
-                        it.copy(biometricEnabled = true, dekWrappedByBiometric = outcome.blob)
-                    }
+                when (outcome) {
+                    is BiometricEnableOutcome.Success ->
+                        if (!writeBoot { it.copy(biometricEnabled = true, dekWrappedByBiometric = outcome.blob) }) {
+                            // 平台侧已经存好了一份，而 boot 里没记 —— 把它一起撤掉，
+                            // 否则设备上会留下一份没人读的 DEK（开关是关的，谁也用不到它）。
+                            runCatching { vault.disable() }
+                        }
+
+                    BiometricEnableOutcome.Cancelled -> Unit
+
+                    BiometricEnableOutcome.Unavailable ->
+                        // 界面那行 summary 已经在说"这台设备用不了"，不再叠一条。
+                        Unit
+
+                    BiometricEnableOutcome.LockedOut -> _biometricLockedOut.value = true
+
+                    is BiometricEnableOutcome.Error -> _biometricError.value = outcome.message
                 }
             } else {
-                vault.disable()
-                bootStore.update { it.copy(biometricEnabled = false, dekWrappedByBiometric = null) }
+                // 关这一侧要**先删平台凭据、再清 boot**：反过来会在两步之间留下
+                // "boot 说不认识它、设备上还存着一份 DEK"的状态，而这一份再也没人来删。
+                runCatching { vault.disable() }
+                    .onFailure {
+                        // 有系统原文就念原文，没有就靠 [biometricDisableFailed] 那条资源文案说话。
+                        _biometricError.value = it.message
+                        _biometricDisableFailed.value = true
+                    }
+                writeBoot { it.copy(biometricEnabled = false, dekWrappedByBiometric = null) }
             }
         }
     }
+
+    /** [BootStore.update] 的包装：把"写不进去"从异常变成界面上的一句话。返回是否写成功。 */
+    private fun writeBoot(transform: (BootRecord) -> BootRecord): Boolean =
+        runCatching { bootStore.update(transform) }
+            .onFailure { _bootWriteFailed.value = true }
+            .isSuccess
 
     private fun readBiometricEnabled(): Boolean =
         (bootStore.read() as? BootState.Ok)?.record?.biometricEnabled == true

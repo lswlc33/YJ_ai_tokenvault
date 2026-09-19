@@ -37,6 +37,13 @@ class AndroidSecureClipboard(
     private val manager: ClipboardManager? =
         context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
 
+    /**
+     * 「待清除时刻」的落盘位置。用 SharedPreferences 而不是 Room：这一层要在**启动极早期**
+     * （可能数据库还没建、锁屏页还在读 boot）就能读到并清掉，而 Room 那条路会把它拖到
+     * 数据库就绪之后——那正好是最需要它的时机。内容只有一枚时刻与一个标签，都不是秘密。
+     */
+    private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
     private var clearJob: Job? = null
 
     /**
@@ -70,7 +77,19 @@ class AndroidSecureClipboard(
         manager?.setPrimaryClip(clip) ?: return
 
         clearJob?.cancel()
-        if (effectiveSeconds <= 0) return
+        if (effectiveSeconds <= 0) {
+            // 「从不」= 没有待清除时刻。留着上一次那份会让下一次启动误清一次内容。
+            prefs.edit().remove(KEY_CLEAR_AT).remove(KEY_LABEL).apply()
+            return
+        }
+
+        // 落盘"什么时候该清掉它"：延时任务活在进程里，进程没了任务就没了，
+        // 而明文还在剪贴板里（§7.5）。标签是这份内容的**非秘密**指纹，用来在补清时
+        // 分辨"用户后来复制的别的东西"，不写明文（红线 1 的例外只到进程内存为止）。
+        prefs.edit()
+            .putLong(KEY_CLEAR_AT, nowMillis() + effectiveSeconds * 1000L)
+            .putString(KEY_LABEL, label)
+            .apply()
 
         // 记下我们放进去的那份内容，到点只在"还是它"的时候才清。
         // 不比对的话，用户在这 60 秒里复制了别的东西会被我们一起吞掉。
@@ -81,8 +100,40 @@ class AndroidSecureClipboard(
         }
     }
 
+    /**
+     * 启动时补做上次没做成的自动清除（见 [SecureClipboard.recoverOverdueClear]）。
+     *
+     * 三种情况：没有记录 → 什么都不做；已超时且剪贴板上那份**仍是我们放的**（按标签认）→
+     * 立刻清；还没到点 → 按剩余时间重新起一次延时任务。
+     *
+     * 认不出标签时**不清**：宁可让那条明文多待到一个新复制动作覆盖它，也不要在用户刚复制完
+     * 别的东西时把它一起吞掉。这不影响安全性上限——我们自己的那一份在 [clearNow] 与
+     * 会话锁定（`VaultSession.lock`）两条路上都会被清掉。
+     */
+    override fun recoverOverdueClear() {
+        val clearAt = prefs.getLong(KEY_CLEAR_AT, 0L)
+        if (clearAt <= 0L) return
+        val label = prefs.getString(KEY_LABEL, null)
+        val remainingMs = clearAt - nowMillis()
+        if (remainingMs > 0L) {
+            clearJob?.cancel()
+            clearJob = scope.launch {
+                delay(remainingMs)
+                if (currentLabel() == label) clearNow()
+            }
+            return
+        }
+        if (label != null && currentLabel() != label) {
+            // 已经不是我们那份了：这条记录的历史使命结束。
+            prefs.edit().remove(KEY_CLEAR_AT).remove(KEY_LABEL).apply()
+            return
+        }
+        clearNow()
+    }
+
     override fun clearNow() {
         clearJob?.cancel()
+        prefs.edit().remove(KEY_CLEAR_AT).remove(KEY_LABEL).apply()
         // 用空 ClipData 覆盖而不是 clearPrimaryClip()：后者在部分 ROM 上是空实现
         manager?.setPrimaryClip(ClipData.newPlainText("", ""))
     }
@@ -92,4 +143,18 @@ class AndroidSecureClipboard(
 
     private fun currentText(): String? =
         manager?.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text?.toString()
+
+    /**
+     * 当前剪贴板条目的标签。`ClipDescription.label` 是公开信息，不含内容本身。
+     * `getLabel()` 声明的是 `CharSequence`，所以这里要 `toString()` 一次才交得出 [String]
+     * （与上面 [currentText] 同一条理由）。
+     */
+    private fun currentLabel(): String? =
+        manager?.primaryClip?.description?.label?.toString()?.takeIf { it.isNotEmpty() }
+
+    private companion object {
+        const val PREFS = "vault_clipboard"
+        const val KEY_CLEAR_AT = "clearAtEpochMs"
+        const val KEY_LABEL = "label"
+    }
 }

@@ -22,6 +22,10 @@ interface GroupDao {
     @Query("SELECT * FROM groups ORDER BY sortOrder, id")
     suspend fun findAll(): List<GroupEntity>
 
+    /** 现有分组数：新增时的 `sortOrder`，只要一个数。 */
+    @Query("SELECT COUNT(*) FROM groups")
+    suspend fun count(): Int
+
     @Query("SELECT * FROM groups WHERE id = :id")
     suspend fun findById(id: Long): GroupEntity?
 
@@ -37,13 +41,20 @@ interface GroupDao {
     @Query("DELETE FROM groups")
     suspend fun clear()
 
+    /**
+     * 重排。[setSortOrder] 返回受影响行数，**0 行就是那一行已经不在了**（用户在别处删了它，
+     * 或者传进来的是过期 id）：静默跳过会让列表按一份不存在的顺序排好，界面下次刷新时
+     * 顺序又自己变了，用户只会看到"拖了没反应"。
+     */
     @Transaction
     suspend fun reorder(idsInOrder: List<Long>) {
-        idsInOrder.forEachIndexed { index, id -> setSortOrder(id, index) }
+        idsInOrder.forEachIndexed { index, id ->
+            check(setSortOrder(id, index) > 0) { "group $id not found while reordering" }
+        }
     }
 
     @Query("UPDATE groups SET sortOrder = :sortOrder WHERE id = :id")
-    suspend fun setSortOrder(id: Long, sortOrder: Int)
+    suspend fun setSortOrder(id: Long, sortOrder: Int): Int
 }
 
 data class ProviderSummaryRow(
@@ -120,12 +131,19 @@ interface ProviderDao {
         error: String?,
     )
 
-    @Query("UPDATE providers SET sortOrder = :sortOrder, updatedAt = :now WHERE id = :id")
-    suspend fun setSortOrder(id: Long, sortOrder: Int, now: Long)
+    /** 现有供应商数：新增时的 `sortOrder`，只要一个数，不把整表读回来。 */
+    @Query("SELECT COUNT(*) FROM providers")
+    suspend fun count(): Int
 
+    @Query("UPDATE providers SET sortOrder = :sortOrder, updatedAt = :now WHERE id = :id")
+    suspend fun setSortOrder(id: Long, sortOrder: Int, now: Long): Int
+
+    /** 0 行 = 这一行已经不在（过期 id / 别处删了），上抛而不是悄悄少排一家。 */
     @Transaction
     suspend fun reorder(idsInOrder: List<Long>, now: Long) {
-        idsInOrder.forEachIndexed { index, id -> setSortOrder(id, index, now) }
+        idsInOrder.forEachIndexed { index, id ->
+            check(setSortOrder(id, index, now) > 0) { "provider $id not found while reordering" }
+        }
     }
 }
 
@@ -163,11 +181,16 @@ interface ApiKeyDao {
     @Query("SELECT COUNT(*) FROM api_keys WHERE providerId = :providerId AND fingerprint = :fingerprint")
     suspend fun countFingerprint(providerId: Long, fingerprint: String): Int
 
+    /** 冲突预检用：同一把 Key 在本机已有时，把那一行的 id 带回去，让上层能说"和哪一把重复"。 */
+    @Query("SELECT id FROM api_keys WHERE providerId = :providerId AND fingerprint = :fingerprint LIMIT 1")
+    suspend fun findIdByFingerprint(providerId: Long, fingerprint: String): Long?
+
+    /** 这一家已有几把 Key：新增时的 `sortOrder`，只 COUNT，不把整家读回来再数。 */
+    @Query("SELECT COUNT(*) FROM api_keys WHERE providerId = :providerId")
+    suspend fun countByProvider(providerId: Long): Int
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertRaw(key: ApiKeyEntity): Long
-
-    @Update
-    suspend fun update(key: ApiKeyEntity)
 
     @Query("UPDATE api_keys SET secretEnc = :secretEnc, fingerprint = :fingerprint, updatedAt = :now WHERE id = :id")
     suspend fun setSecret(id: Long, secretEnc: ByteArray, fingerprint: String, now: Long)
@@ -245,19 +268,25 @@ interface ApiKeyDao {
     @Transaction
     suspend fun reorder(providerId: Long, idsInOrder: List<Long>, now: Long) {
         idsInOrder.forEachIndexed { index, id ->
-            setSortOrder(providerId = providerId, id = id, sortOrder = index, now = now)
+            // 带上 providerId 条件：别的家的同 id 密钥不可能被排到这家来，0 行就是真出问题了。
+            check(setSortOrder(providerId = providerId, id = id, sortOrder = index, now = now) > 0) {
+                "api key $id not in provider $providerId while reordering"
+            }
         }
     }
 
     @Query("UPDATE api_keys SET sortOrder = :sortOrder, updatedAt = :now WHERE id = :id AND providerId = :providerId")
-    suspend fun setSortOrder(providerId: Long, id: Long, sortOrder: Int, now: Long)
+    suspend fun setSortOrder(providerId: Long, id: Long, sortOrder: Int, now: Long): Int
 }
 
 @Dao
 interface KeySettingsDao {
-    @Query("SELECT * FROM key_settings WHERE keyId = :keyId")
-    fun observeByKey(keyId: Long): Flow<KeySettingsEntity?>
-
+    /**
+     * 读某一行的行为配置。
+     *
+     * 只有同步版：Key 的读路径全部走 `ApiKeyDao` 的 `@Transaction` 查询（Key + 配置一起出来），
+     * 单独再开一条 Flow 会把同一份配置读两遍、还各推各的变更。
+     */
     @Query("SELECT * FROM key_settings WHERE keyId = :keyId")
     suspend fun findByKey(keyId: Long): KeySettingsEntity?
 
@@ -270,9 +299,12 @@ interface KeySettingsDao {
     @Update
     suspend fun update(settings: KeySettingsEntity)
 
-    @Query("UPDATE key_settings SET balanceTokenEnc = :token, updatedAt = :now WHERE keyId = :keyId")
-    suspend fun setBalanceToken(keyId: Long, token: ByteArray?, now: Long)
-
+    /**
+     * 额度换算系数校准（余额页）。
+     *
+     * 只动这两列：整行 `@Update` 要先把 `balanceTokenEnc` 读出来再写回去，
+     * 而校准这件事不需要知道令牌。
+     */
     @Query("UPDATE key_settings SET quotaPerUnit = :quotaPerUnit, quotaCalibrated = 1, updatedAt = :now WHERE keyId = :keyId")
     suspend fun calibrateQuotaPerUnit(keyId: Long, quotaPerUnit: Double, now: Long)
 

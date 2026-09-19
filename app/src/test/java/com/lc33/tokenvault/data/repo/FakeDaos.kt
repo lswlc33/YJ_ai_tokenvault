@@ -63,6 +63,8 @@ internal class FakeGroupDao : GroupDao {
 
     override suspend fun findAll(): List<GroupEntity> = ordered()
 
+    override suspend fun count(): Int = store.size
+
     override suspend fun findById(id: Long): GroupEntity? = store.firstOrNull { it.id == id }
 
     override suspend fun insert(group: GroupEntity): Long {
@@ -86,8 +88,11 @@ internal class FakeGroupDao : GroupDao {
         revision.value++
     }
 
-    override suspend fun setSortOrder(id: Long, sortOrder: Int) =
+    override suspend fun setSortOrder(id: Long, sortOrder: Int): Int {
+        val hit = store.any { it.id == id }
         replace(id) { it.copy(sortOrder = sortOrder) }
+        return if (hit) 1 else 0
+    }
 
     private inline fun replace(id: Long, transform: (GroupEntity) -> GroupEntity) {
         val index = store.indexOfFirst { it.id == id }
@@ -114,6 +119,8 @@ internal class FakeProviderDao : ProviderDao {
 
     override suspend fun findAll(): List<ProviderEntity> = store.toList()
 
+    override suspend fun count(): Int = store.size
+
     override suspend fun insert(provider: ProviderEntity): Long {
         // id != 0 = 写显式主键（对齐 Room 生成的 nullif(?,0)），撤销要靠它。
         if (provider.id != 0L) { store += provider; revision.value++; return provider.id }
@@ -139,8 +146,11 @@ internal class FakeProviderDao : ProviderDao {
         ids.forEach { id -> replace(id) { it.copy(groupId = groupId, updatedAt = now) } }
     }
 
-    override suspend fun setSortOrder(id: Long, sortOrder: Int, now: Long) =
+    override suspend fun setSortOrder(id: Long, sortOrder: Int, now: Long): Int {
+        val hit = store.any { it.id == id }
         replace(id) { it.copy(sortOrder = sortOrder, updatedAt = now) }
+        return if (hit) 1 else 0
+    }
 
     override suspend fun updateWebsiteStatus(
         id: Long,
@@ -177,9 +187,6 @@ internal class FakeKeySettingsDao : KeySettingsDao {
         revision.value++
     }
 
-    override fun observeByKey(keyId: Long): Flow<KeySettingsEntity?> =
-        revision.map { store.firstOrNull { it.keyId == keyId } }
-
     override suspend fun findByKey(keyId: Long): KeySettingsEntity? =
         store.firstOrNull { it.keyId == keyId }
 
@@ -192,12 +199,6 @@ internal class FakeKeySettingsDao : KeySettingsDao {
     }
 
     override suspend fun update(settings: KeySettingsEntity) = insert(settings)
-
-    override suspend fun setBalanceToken(keyId: Long, token: ByteArray?, now: Long) {
-        val index = store.indexOfFirst { it.keyId == keyId }
-        if (index >= 0) store[index] = store[index].copy(balanceTokenEnc = token, updatedAt = now)
-        revision.value++
-    }
 
     override suspend fun calibrateQuotaPerUnit(keyId: Long, quotaPerUnit: Double, now: Long) {
         val index = store.indexOfFirst { it.keyId == keyId }
@@ -255,6 +256,12 @@ internal class FakeApiKeyDao(
     override suspend fun countFingerprint(providerId: Long, fingerprint: String): Int =
         store.count { it.providerId == providerId && it.fingerprint == fingerprint }
 
+    override suspend fun findIdByFingerprint(providerId: Long, fingerprint: String): Long? =
+        store.firstOrNull { it.providerId == providerId && it.fingerprint == fingerprint }?.id
+
+    override suspend fun countByProvider(providerId: Long): Int =
+        store.count { it.providerId == providerId }
+
     override suspend fun insertRaw(key: ApiKeyEntity): Long {
         // id != 0 = 写显式主键（对齐 Room 生成的 nullif(?,0)），撤销要靠它。
         if (key.id != 0L) { store += key; revision.value++; return key.id }
@@ -263,8 +270,6 @@ internal class FakeApiKeyDao(
         revision.value++
         return id
     }
-
-    override suspend fun update(key: ApiKeyEntity) = replace(key.id) { key }
 
     override suspend fun setSecret(id: Long, secretEnc: ByteArray, fingerprint: String, now: Long) =
         replace(id) { it.copy(secretEnc = secretEnc, fingerprint = fingerprint, updatedAt = now) }
@@ -352,15 +357,17 @@ internal class FakeApiKeyDao(
 
     override suspend fun reorder(providerId: Long, idsInOrder: List<Long>, now: Long) {
         idsInOrder.forEachIndexed { index, id ->
-            if (store.any { it.id == id && it.providerId == providerId }) {
-                setSortOrder(providerId, id, index, now)
+            // 与真 DAO 同口径：0 行（这一把不在这家）就抛，别悄悄少排一把。
+            check(setSortOrder(providerId, id, index, now) > 0) {
+                "api key $id not in provider $providerId while reordering"
             }
         }
     }
 
-    override suspend fun setSortOrder(providerId: Long, id: Long, sortOrder: Int, now: Long) {
-        val target = store.firstOrNull { it.id == id && it.providerId == providerId } ?: return
+    override suspend fun setSortOrder(providerId: Long, id: Long, sortOrder: Int, now: Long): Int {
+        val target = store.firstOrNull { it.id == id && it.providerId == providerId } ?: return 0
         replace(id) { target.copy(sortOrder = sortOrder, updatedAt = now) }
+        return 1
     }
 
     private inline fun replace(id: Long, transform: (ApiKeyEntity) -> ApiKeyEntity) {
@@ -400,9 +407,15 @@ internal class FakeProviderAccountDao : ProviderAccountDao {
 
     override suspend fun findById(id: Long): ProviderAccountEntity? = store.firstOrNull { it.id == id }
 
+    override suspend fun countByProvider(providerId: Long): Int = store.count { it.providerId == providerId }
+
     override suspend fun insert(account: ProviderAccountEntity): Long {
         // 与真 Room 生成的 SQL 一致：id != 0 即写显式主键（生成的是 `nullif(?, 0)`）。
         // 撤销按原主键写回全靠这个行为，假 DAO 必须照做，否则测不出真实语义。
+        //
+        // 真库上这里还有唯一索引 `(providerId, usernameFp)`。假 DAO **不**模拟它：
+        // 索引要防的是"同一家里两个同样的用户名"，而测试关心的是仓库传过去的
+        // `usernameFp` 到底是什么（空用户名必须是 NULL），所以那条断言写在用例里。
         if (account.id != 0L) {
             store += account
             revision.value++
@@ -443,9 +456,6 @@ internal class FakeProviderAccountDao : ProviderAccountDao {
 
     override suspend fun setPassword(id: Long, enc: ByteArray?, now: Long) =
         replace(id) { it.copy(passwordEnc = enc, updatedAt = now) }
-
-    override suspend fun setLoginMethods(id: Long, loginMethods: String, now: Long) =
-        replace(id) { it.copy(loginMethods = loginMethods, updatedAt = now) }
 
     private inline fun replace(id: Long, transform: (ProviderAccountEntity) -> ProviderAccountEntity) {
         val index = store.indexOfFirst { it.id == id }
@@ -668,8 +678,12 @@ internal class FakeProbeRunDao : ProbeRunDao {
         revision.value++
     }
 
-    override suspend fun trim(keep: Int) {
-        val kept = store.sortedByDescending { it.startedAt }.take(keep).toSet()
+    override suspend fun trimToCount(keep: Int) {
+        // 与真 DAO 同口径：按 startedAt 倒序留前 keep 条（并列时按 id 兜底，保证可重复）。
+        val kept = store
+            .sortedWith(compareByDescending<ProbeRunEntity> { it.startedAt }.thenByDescending { it.id })
+            .take(keep)
+            .toSet()
         store.removeAll { it !in kept }
         revision.value++
     }
@@ -714,16 +728,11 @@ internal class FakeAuditLogDao : AuditLogDao {
         requestUrl = requestUrl,
     )
 
-    override fun observeRecent(limit: Int): Flow<List<AuditLogSummary>> = revision.map { ordered(limit) }
-
     override fun observeRecentByLevels(levels: List<String>, limit: Int): Flow<List<AuditLogSummary>> =
         revision.map { ordered(limit).filter { it.level in levels } }
 
     override fun observeByProvider(providerId: Long, limit: Int): Flow<List<AuditLogEntity>> =
         revision.map { orderedEntities(limit).filter { it.providerId == providerId } }
-
-    override fun observeByKey(keyId: Long, limit: Int): Flow<List<AuditLogEntity>> =
-        revision.map { orderedEntities(limit).filter { it.keyId == keyId } }
 
     override suspend fun findById(id: Long): AuditLogEntity? = store.firstOrNull { it.id == id }
 
@@ -740,7 +749,11 @@ internal class FakeAuditLogDao : AuditLogDao {
     }
 
     override suspend fun trimToCount(keep: Int) {
-        val kept = store.sortedByDescending { it.at }.take(keep).toSet()
+        // 与真 DAO 同口径：`at DESC, id DESC` 的前 keep 条留下。
+        val kept = store
+            .sortedWith(compareByDescending<AuditLogEntity> { it.at }.thenByDescending { it.id })
+            .take(keep)
+            .toSet()
         store.removeAll { it !in kept }
         revision.value++
     }

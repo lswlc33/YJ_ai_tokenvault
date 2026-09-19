@@ -44,6 +44,12 @@ data class NewDiscoveredModel(
  * @param existing 库里该供应商已有的模型（不限协议）。
  * @param fetched 本轮拉到的模型 id 列表（已经解析出协议，或由调用方先归到本协议）。
  * @param thisProtocol 本轮实际查询的协议。
+ *
+ * **关于 `fetched` 为空**：这里保留了"空列表 → 把本协议的发现项全删"的能力，但调用方
+ * 不该再把"可疑空"传进来——`ModelListParser` 现在把响应分成 Confirmed / SuspiciousEmpty /
+ * Unparseable 三种结局，只有 Confirmed（至少一条带 id）才会走到 `applyDiscovered`。
+ * 判空守在那里而不是在这里，是因为只有解析层知道"这个空是上游真给了个空数组，还是响应
+ * 压根不是模型列表"，合并层只看数据形态，两者一混就没法回头区分了。
  */
 object ModelMerger {
 
