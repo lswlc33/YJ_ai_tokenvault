@@ -12,6 +12,7 @@ import com.lc33.tokenvault.data.entity.AuditLogEntity
 import com.lc33.tokenvault.data.entity.ClientProfileEntity
 import com.lc33.tokenvault.data.entity.ModelCatalogEntity
 import com.lc33.tokenvault.data.entity.ModelEntity
+import com.lc33.tokenvault.data.entity.ModelVendorEntity
 import com.lc33.tokenvault.data.entity.ProbeRunEntity
 import com.lc33.tokenvault.data.entity.ProviderAccountEntity
 import kotlinx.coroutines.flow.Flow
@@ -222,11 +223,15 @@ interface ModelDao {
 /**
  * 模型目录（`model_catalog`）。
  *
- * **未接线：计划内功能。** 表、实体、这张 DAO 与 `catalog/ModelCatalogMatcher` 都在，
- * 但没有任何生产路径往里写数据、也没有任何读路径经过它——目录同步的入口还没做，
- * 属于计划内功能。所以这里的方法看着像死代码，实际是
- * 等接线的那一半；接线时的落点是模型同步那条链路（`RoomModelRepository` 的 discover
- * 写入之后），不是探测本身。
+ * 写入方是 `engine/CatalogSync`（整表替换），读取方是 catalogKey 回填链路
+ * （`RoomModelCatalogRepository`）与模型页的 JOIN。三级匹配的规则本身在
+ * `catalog/ModelCatalogMatcher`（纯函数），这里只负责**按索引取候选**。
+ *
+ * **候选查询一律 `ORDER BY canonical DESC`**：一个热门 id 会被原创厂商和十几家聚合站
+ * 各挂一份，价格互不相同，而匹配器要的恰恰是原创那条。原来 `LIMIT 5` 不带排序，
+ * 意味着 SQLite 先返回哪五条看运气，原创条目完全可能在窗口之外——那样
+ * `ModelCatalogMatcher` 里新加的 canonical 优先就成了空有优先级却拿不到数据。
+ * 把排序下推到 SQL、窗口放宽到 20，才是「先给最好的候选，再让纯函数做决策」。
  */
 @Dao
 interface ModelCatalogDao {
@@ -234,13 +239,45 @@ interface ModelCatalogDao {
     @Query("SELECT * FROM model_catalog WHERE `key` = :key")
     suspend fun findByKey(key: String): ModelCatalogEntity?
 
+    /**
+     * 三级匹配的第一级（升级版）：输入形如 `vendor/model` 时的直达查询。
+     *
+     * 走 [com.lc33.tokenvault.data.entity.ModelCatalogEntity.qualifiedId] 而不是主键：
+     * 目录主键是 `providerSlug/mapKey`，聚合站条目会多一层前缀，用输入串去比主键比不上。
+     */
+    @Query(
+        """
+        SELECT * FROM model_catalog WHERE qualifiedId = :qualifiedId
+        ORDER BY canonical DESC, lastUpdated DESC LIMIT 20
+        """,
+    )
+    suspend fun findByQualifiedId(qualifiedId: String): List<ModelCatalogEntity>
+
     /** 三级匹配的第二级：精确 modelId。 */
-    @Query("SELECT * FROM model_catalog WHERE modelId = :modelId LIMIT 5")
+    @Query(
+        """
+        SELECT * FROM model_catalog WHERE modelId = :modelId
+        ORDER BY canonical DESC, lastUpdated DESC LIMIT 20
+        """,
+    )
     suspend fun findByModelId(modelId: String): List<ModelCatalogEntity>
 
     /** 三级匹配的第三级：归一化 id。 */
-    @Query("SELECT * FROM model_catalog WHERE normId = :normId LIMIT 5")
+    @Query(
+        """
+        SELECT * FROM model_catalog WHERE normId = :normId
+        ORDER BY canonical DESC, lastUpdated DESC LIMIT 20
+        """,
+    )
     suspend fun findByNormId(normId: String): List<ModelCatalogEntity>
+
+    /**
+     * 全表。**回填 `models.catalogKey` 专用**：694 行模型逐行走三级查询是 2,082 次索引
+     * 查询，而整表只有 7.8k 行、一次性读进内存建三份哈希（modelId / qualifiedId / normId）
+     * 就够——回填发生在目录同步之后，本来就在后台协程里，内存换的是「刷一次列表等半天」。
+     */
+    @Query("SELECT * FROM model_catalog")
+    suspend fun findAll(): List<ModelCatalogEntity>
 
     @Query("SELECT COUNT(*) FROM model_catalog")
     suspend fun count(): Int
@@ -249,6 +286,31 @@ interface ModelCatalogDao {
     suspend fun upsertAll(entries: List<ModelCatalogEntity>)
 
     @Query("DELETE FROM model_catalog")
+    suspend fun clear()
+}
+
+/**
+ * models.dev 的厂商表（`model_vendors`，222 行量级）。
+ *
+ * 只读为主：分组标题的展示名与「查看官方文档」的链接。整表替换由 `CatalogSync` 做，
+ * 与目录行同一个事务，避免出现「目录是新的、厂商表还是旧的」。
+ */
+@Dao
+interface ModelVendorDao {
+
+    @Query("SELECT * FROM model_vendors WHERE slug = :slug")
+    suspend fun findBySlug(slug: String): ModelVendorEntity?
+
+    @Query("SELECT * FROM model_vendors ORDER BY name COLLATE NOCASE")
+    fun observeAll(): Flow<List<ModelVendorEntity>>
+
+    @Query("SELECT COUNT(*) FROM model_vendors")
+    suspend fun count(): Int
+
+    @Upsert
+    suspend fun upsertAll(entries: List<ModelVendorEntity>)
+
+    @Query("DELETE FROM model_vendors")
     suspend fun clear()
 }
 

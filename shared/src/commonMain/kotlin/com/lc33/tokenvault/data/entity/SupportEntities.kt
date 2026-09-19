@@ -153,20 +153,59 @@ data class ModelEntity(
 /**
  * models.dev 的派生索引，只存用得上的字段。匹配是索引查询而不是全表扫描。
  *
- * **未接线：计划内功能。** 表与索引已随 v1 建好，但目录同步的入口还没做，生产里没有任何
- * 读写路径经过它（`ModelCatalogMatcher` 同理）。见 `ModelCatalogDao` 的说明。
+ * 表与索引随 v1 建好，v9 补上详情页要展示的几列。写入方是 `engine/CatalogSync`
+ * （整表替换），读取方是 `data/repo/RoomModelCatalogRepository` 与 catalogKey 回填。
+ *
+ * **四个 id 各不相同，别混**（这是本表最容易搞错的地方，规则全在 `CatalogParser` 里）：
+ *
+ * - [providerSlug]：models.dev 的**外层 key**，即「这份列表是谁给的」。
+ * - [key] = `providerSlug/mapKey`：**目录主键，唯一性靠外层兜底**。
+ *   不能用 `vendor/model` 当主键——`deepseek/deepseek-v3.2` 这种带真厂商前缀的 mapKey
+ *   在多家聚合站下各有一份（实测带斜杠的 4,508 个 mapKey 里 4,419 个前缀 ≠ 外层 slug，
+ *   同一个 mapKey 最多被十几家重复挂出），拿它当主键会互相覆盖，最后留下**哪一家的价格
+ *   全看 JSON 里的顺序**。分开之后重复是好事：多条候选，由 [canonical] 挑出原创那条。
+ * - [modelId] = mapKey **原样**（可能带斜杠）。这是用户手里那个字符串的对照物：
+ *   中转站列表里写的就是 `deepseek/deepseek-v3.2`，剥掉前缀反而精确匹配不上了。
+ * - [vendor] = mapKey 的斜杠前缀，无斜杠时就是 [providerSlug]：**展示与分组用的厂商**。
+ *   用户要的「OpenAI 一类、DeepSeek 一类」就是这一列。注意它不总是真厂商——
+ *   原创条目 `openai` 名下的 `gpt-4o` 算出 `openai`（对），聚合站 `tokengo` 名下的
+ *   `deepseek/deepseek-chat` 算出 `deepseek`（也对），而 `tokengo` 名下的裸 id 算出
+ *   `tokengo`（那是「这份列表来自 tokengo」，宁可这样也不靠猜归到某个品牌）。
+ *   **别用 [family] 当厂商**：GPT 系列的 family 是 `gpt`，不是 `openai`。
+ *
+ * [qualifiedId] 是第四级查找键，专门补上「裸 mapKey 的原创条目」够不到的那一路：
+ * `openai` 名下 mapKey 是 `gpt-4o`，而用户输入 `openai/gpt-4o` 时 [modelId] 精确匹配不上，
+ * 靠 `vendor/bareModelId` 拼出来的 `openai/gpt-4o` 才能直达。
  */
 @Entity(
     tableName = "model_catalog",
-    indices = [Index(value = ["modelId"]), Index(value = ["normId"])],
+    indices = [
+        Index(value = ["modelId"]),
+        Index(value = ["normId"]),
+        Index(value = ["qualifiedId"]),
+        // 分组：整页按厂商取数、算每组数量都要按 vendor 过一遍表。
+        Index(value = ["vendor"]),
+        Index(value = ["family"]),
+        Index(value = ["providerSlug"]),
+    ],
 )
 data class ModelCatalogEntity(
-    /** `anthropic/claude-opus-4`。 */
+    /** 目录主键 `providerSlug/mapKey`，见类注释。 */
     @PrimaryKey val key: String,
-    val vendor: String,
+
+    /** models.dev 的外层 key——「这份列表是谁给的」。 */
+    val providerSlug: String = "",
+
+    /** 展示与分组用的厂商 slug：mapKey 的斜杠前缀，无斜杠时是 [providerSlug]。 */
+    val vendor: String = "",
+
+    /** mapKey 原样，可能带 `vendor/` 前缀。 */
     val modelId: String,
 
-    /** 归一化 id，用于模糊匹配（去掉 `-latest`、日期后缀、`:free`）。 */
+    /** `vendor/裸 id`，第一级查找键（见类注释最后一段）。 */
+    val qualifiedId: String = "",
+
+    /** 归一化后的**裸** id，用于第三级模糊匹配（去掉 `-latest`、日期后缀、`:free`）。 */
     val normId: String,
     val name: String? = null,
     val family: String? = null,
@@ -185,6 +224,55 @@ data class ModelCatalogEntity(
     val attachment: Boolean = false,
     val releaseDate: String? = null,
     val lastUpdated: String? = null,
+
+    /**
+     * 这一行是不是**厂商自己挂出来的**，判据是 [providerSlug] == [vendor]。
+     *
+     * 同一个模型在目录里会有多条候选、价格各不相同，消歧必须先看这一列：
+     * `openai` 名下的 `gpt-4o` 是原创（canonical），`tokengo` 名下的 `deepseek/deepseek-chat`
+     * 是转售（vendor=deepseek ≠ 外层 tokengo）。不优先它而「按 lastUpdated 取最新」，
+     * 会把某个聚合站的转售价当成官方价显示——那是最容易被当成上游数据错的错。
+     */
+    val canonical: Boolean = false,
+
+    /** 厂商展示名（[vendor] 对应的那家，来自 models.dev 外层 `name`，如 `OpenAI`）。 */
+    val vendorName: String? = null,
+    val description: String? = null,
+
+    /** 能力位。models.dev 有 `structured_output` / `open_weights`，详情页要说清楚。 */
+    val structuredOutput: Boolean = false,
+    val openWeights: Boolean = false,
+
+    /** `preview` / `deprecated` 之类；models.dev 的 `status`，缺失为 null。 */
+    val status: String? = null,
+
+    /** 训练知识截止时间，models.dev 的 `knowledge`。 */
+    val knowledgeCutoff: String? = null,
+)
+
+/**
+ * models.dev 的厂商表（222 行量级），外层 key 一家一行。
+ *
+ * 存在的理由是 [ModelCatalogEntity.vendor] 只是 slug，分组标题要的是 `OpenAI` 这种展示名，
+ * 「查看官方文档」要的是 `doc`。目录行上冗余一份
+ * [ModelCatalogEntity.vendorName] 是为了整页分组不必每条再回这张表查——注意冗余的是
+ * **按 vendor 查到的那一家**，不是 providerSlug：聚合站 `tokengo` 名下
+ * `deepseek/deepseek-chat` 的 vendor 是 `deepseek`，展示名就该是 DeepSeek 的。
+ */
+@Entity(
+    tableName = "model_vendors",
+    indices = [Index(value = ["slug"], unique = true)],
+)
+data class ModelVendorEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+
+    /** models.dev 的外层 key，与 [ModelCatalogEntity.providerSlug] 同一个东西。 */
+    val slug: String,
+    val name: String,
+
+    /** 上游 API 根地址，只用于展示「它的官方端点长什么样」，不发请求。 */
+    val apiUrl: String? = null,
+    val docUrl: String? = null,
 )
 
 @Entity(tableName = "probe_runs")

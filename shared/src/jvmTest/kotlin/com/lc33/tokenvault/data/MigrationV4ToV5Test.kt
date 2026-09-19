@@ -48,6 +48,7 @@ class MigrationV4ToV5Test {
                     VaultDatabase.MIGRATION_5_6,
                     VaultDatabase.MIGRATION_6_7,
                     VaultDatabase.MIGRATION_7_8,
+                    VaultDatabase.MIGRATION_8_9,
                 )
                 .build()
 
@@ -84,6 +85,7 @@ class MigrationV4ToV5Test {
                     VaultDatabase.MIGRATION_5_6,
                     VaultDatabase.MIGRATION_6_7,
                     VaultDatabase.MIGRATION_7_8,
+                    VaultDatabase.MIGRATION_8_9,
                 )
                 .build()
 
@@ -124,6 +126,7 @@ class MigrationV4ToV5Test {
                 .addMigrations(
                     VaultDatabase.MIGRATION_6_7,
                     VaultDatabase.MIGRATION_7_8,
+                    VaultDatabase.MIGRATION_8_9,
                 )
                 .build()
 
@@ -169,7 +172,10 @@ class MigrationV4ToV5Test {
 
             val database = Room.databaseBuilder<VaultDatabase>(name = dbFile.absolutePath)
                 .setDriver(BundledSQLiteDriver())
-                .addMigrations(VaultDatabase.MIGRATION_7_8)
+                .addMigrations(
+                    VaultDatabase.MIGRATION_7_8,
+                    VaultDatabase.MIGRATION_8_9,
+                )
                 .build()
 
             val left = database.modelDao().findAll().map { it.id }.sorted()
@@ -271,6 +277,7 @@ class MigrationV4ToV5Test {
                     VaultDatabase.MIGRATION_5_6,
                     VaultDatabase.MIGRATION_6_7,
                     VaultDatabase.MIGRATION_7_8,
+                    VaultDatabase.MIGRATION_8_9,
                 )
                 .build()
 

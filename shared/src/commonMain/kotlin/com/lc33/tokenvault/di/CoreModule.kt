@@ -153,6 +153,7 @@ val coreModule = module {
     single { get<VaultDatabase>().clientProfileDao() }
     single { get<VaultDatabase>().modelDao() }
     single { get<VaultDatabase>().modelCatalogDao() }
+    single { get<VaultDatabase>().modelVendorDao() }
     single { get<VaultDatabase>().probeRunDao() }
     single { get<VaultDatabase>().auditLogDao() }
     single { get<VaultDatabase>().appSettingDao() }

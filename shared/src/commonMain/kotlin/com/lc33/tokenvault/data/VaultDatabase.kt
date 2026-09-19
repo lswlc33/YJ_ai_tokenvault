@@ -15,6 +15,7 @@ import com.lc33.tokenvault.data.dao.GroupDao
 import com.lc33.tokenvault.data.dao.KeySettingsDao
 import com.lc33.tokenvault.data.dao.ModelCatalogDao
 import com.lc33.tokenvault.data.dao.ModelDao
+import com.lc33.tokenvault.data.dao.ModelVendorDao
 import com.lc33.tokenvault.data.dao.ProbeRunDao
 import com.lc33.tokenvault.data.dao.ProviderAccountDao
 import com.lc33.tokenvault.data.dao.ProviderDao
@@ -26,6 +27,7 @@ import com.lc33.tokenvault.data.entity.GroupEntity
 import com.lc33.tokenvault.data.entity.KeySettingsEntity
 import com.lc33.tokenvault.data.entity.ModelCatalogEntity
 import com.lc33.tokenvault.data.entity.ModelEntity
+import com.lc33.tokenvault.data.entity.ModelVendorEntity
 import com.lc33.tokenvault.data.entity.ProbeRunEntity
 import com.lc33.tokenvault.data.entity.ProviderAccountEntity
 import com.lc33.tokenvault.data.entity.ProviderEntity
@@ -40,6 +42,7 @@ import com.lc33.tokenvault.data.entity.ProviderEntity
         ClientProfileEntity::class,
         ModelEntity::class,
         ModelCatalogEntity::class,
+        ModelVendorEntity::class,
         ProbeRunEntity::class,
         AuditLogEntity::class,
         AppSettingEntity::class,
@@ -58,12 +61,13 @@ abstract class VaultDatabase : RoomDatabase() {
     abstract fun clientProfileDao(): ClientProfileDao
     abstract fun modelDao(): ModelDao
     abstract fun modelCatalogDao(): ModelCatalogDao
+    abstract fun modelVendorDao(): ModelVendorDao
     abstract fun probeRunDao(): ProbeRunDao
     abstract fun auditLogDao(): AuditLogDao
     abstract fun appSettingDao(): AppSettingDao
 
     companion object {
-        const val VERSION = 8
+        const val VERSION = 9
         const val FILE_NAME = "vault.db"
 
         val MIGRATION_1_2: Migration = object : Migration(1, 2) {
@@ -609,6 +613,74 @@ abstract class VaultDatabase : RoomDatabase() {
                             AND keep.id < models.id
                       )
                     """.trimIndent(),
+                )
+            }
+        }
+
+        /**
+         * v9：把 models.dev 目录真正接上——`model_catalog` 补详情页要用的列，新增 `model_vendors`。
+         *
+         * **全部是加列 / 建表，没有一列被删或改类型，所以不重建任何表**。老库里
+         * `model_catalog` 恒为空（这张表自 v1 就在，但从没有任何写入路径），因此新增的
+         * NOT NULL 列都不需要回填：它们只会被首次目录同步整体写入。
+         *
+         * `vendor` / `modelId` / `normId` 三列 v1 就有，本次只补索引以外的东西和
+         * [com.lc33.tokenvault.data.entity.ModelCatalogEntity.qualifiedId] 这类新查找键。
+         * 索引一律 `IF NOT EXISTS`，命名与 Room 在全新库上生成的保持一致
+         * （`index_<表>_<列>`），否则新建库与升级库的索引集合会悄悄分叉。
+         */
+        val MIGRATION_8_9: Migration = object : Migration(8, 9) {
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL(
+                    "ALTER TABLE model_catalog ADD COLUMN providerSlug TEXT NOT NULL DEFAULT ''",
+                )
+                connection.execSQL(
+                    "ALTER TABLE model_catalog ADD COLUMN qualifiedId TEXT NOT NULL DEFAULT ''",
+                )
+                connection.execSQL(
+                    "ALTER TABLE model_catalog ADD COLUMN canonical INTEGER NOT NULL DEFAULT 0",
+                )
+                connection.execSQL("ALTER TABLE model_catalog ADD COLUMN vendorName TEXT")
+                connection.execSQL("ALTER TABLE model_catalog ADD COLUMN description TEXT")
+                connection.execSQL(
+                    "ALTER TABLE model_catalog ADD COLUMN structuredOutput INTEGER NOT NULL DEFAULT 0",
+                )
+                connection.execSQL(
+                    "ALTER TABLE model_catalog ADD COLUMN openWeights INTEGER NOT NULL DEFAULT 0",
+                )
+                connection.execSQL("ALTER TABLE model_catalog ADD COLUMN status TEXT")
+                connection.execSQL("ALTER TABLE model_catalog ADD COLUMN knowledgeCutoff TEXT")
+
+                connection.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `model_vendors` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `slug` TEXT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `apiUrl` TEXT,
+                        `docUrl` TEXT
+                    )
+                    """.trimIndent(),
+                )
+                connection.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_model_vendors_slug` " +
+                        "ON `model_vendors` (`slug`)",
+                )
+                connection.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_model_catalog_vendor` " +
+                        "ON `model_catalog` (`vendor`)",
+                )
+                connection.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_model_catalog_family` " +
+                        "ON `model_catalog` (`family`)",
+                )
+                connection.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_model_catalog_providerSlug` " +
+                        "ON `model_catalog` (`providerSlug`)",
+                )
+                connection.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_model_catalog_qualifiedId` " +
+                        "ON `model_catalog` (`qualifiedId`)",
                 )
             }
         }
