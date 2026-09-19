@@ -402,6 +402,7 @@
          合成一句"去看日志"就会让最常见的那种失败（两台设备 PIN 不一样）也去翻日志。 -->
     <string name="sync_restore_bad_passphrase">Restore failed: passphrase does not match this backup (or the package is corrupt).</string>
     <string name="sync_restore_too_new">Restore failed: this backup is newer than the app. Update the app first.</string>
+    <string name="sync_restore_unauthorized">Restore failed: the WebDAV server rejected these credentials.</string>
     <string name="sync_webdav_failed">Sync failed. Check the WebDAV settings and try again; the reason is in the log.</string>
     <string name="sync_restore_mode">How to merge</string>
     <string name="sync_restore_mode_summary">Merge deduplicates what is already here, add-only imports only what is missing, overwrite clears this vault first.</string>

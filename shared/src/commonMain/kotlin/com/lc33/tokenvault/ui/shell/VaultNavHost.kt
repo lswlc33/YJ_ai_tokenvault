@@ -148,6 +148,7 @@ import tokenvault.shared.generated.resources.sync_restore_failed
 import tokenvault.shared.generated.resources.sync_restore_mode
 import tokenvault.shared.generated.resources.sync_restore_mode_summary
 import tokenvault.shared.generated.resources.sync_restore_too_new
+import tokenvault.shared.generated.resources.sync_restore_unauthorized
 import tokenvault.shared.generated.resources.sync_result_exported
 import tokenvault.shared.generated.resources.sync_result_remote_deleted
 import tokenvault.shared.generated.resources.sync_result_restored
@@ -1211,6 +1212,7 @@ private fun SyncRouteContent(
                             when (event.reason) {
                                 RestoreFailure.BadPassphrase -> Res.string.sync_restore_bad_passphrase
                                 RestoreFailure.TooNew -> Res.string.sync_restore_too_new
+                                RestoreFailure.Credentials -> Res.string.sync_restore_unauthorized
                                 RestoreFailure.Transfer -> Res.string.sync_webdav_failed
                                 RestoreFailure.Write -> Res.string.sync_restore_failed
                             },

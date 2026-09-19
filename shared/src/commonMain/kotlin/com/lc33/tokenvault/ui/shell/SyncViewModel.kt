@@ -308,8 +308,11 @@ enum class RestoreFailure {
     /** 包比当前应用新，或它的 KDF 迭代数超出可读封顶：先升级再恢复。 */
     TooNew,
 
-    /** 远端那一段没成：列目录、取包、认证失败，或这台设备还没配凭据。 */
+    /** 远端那一段没成：列目录、取包的路径不对，或这台设备还没配凭据。 */
     Transfer,
+
+    /** 服务器直接拒了这套账号密码（401 / 403）。下一步是改凭据，不是改地址或口令。 */
+    Credentials,
 
     /** 包能解开，往库里写这一步失败。兜底档，具体原因只在日志里。 */
     Write,
@@ -319,8 +322,8 @@ enum class RestoreFailure {
 private fun Throwable.toRestoreFailure(): RestoreFailure = when (this) {
     is BackupCorruptException -> RestoreFailure.BadPassphrase
     is BackupTooNewException, is InvalidKdfParamsException -> RestoreFailure.TooNew
+    is WebDavUnauthorizedException -> RestoreFailure.Credentials
     is WebDavHttpException,
-    is WebDavUnauthorizedException,
     is WebDavNotFoundException,
     is WebDavNotConfiguredException,
     -> RestoreFailure.Transfer
