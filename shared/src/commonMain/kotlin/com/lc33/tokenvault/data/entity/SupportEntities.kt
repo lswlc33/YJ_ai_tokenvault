@@ -228,10 +228,9 @@ data class ModelCatalogEntity(
     /**
      * 这一行是不是**厂商自己挂出来的**，判据是 [providerSlug] == [vendor]。
      *
-     * 同一个模型在目录里会有多条候选、价格各不相同，消歧必须先看这一列：
-     * `openai` 名下的 `gpt-4o` 是原创（canonical），`tokengo` 名下的 `deepseek/deepseek-chat`
-     * 是转售（vendor=deepseek ≠ 外层 tokengo）。不优先它而「按 lastUpdated 取最新」，
-     * 会把某个聚合站的转售价当成官方价显示——那是最容易被当成上游数据错的错。
+     * 同一个模型在目录里会有多条候选，而**上下文窗口、是否支持工具调用这些参数是各家
+     * 自己填的**（聚合站会写自己截断后的窗口）。消歧必须先看这一列：不优先原创条目而
+     * 「按 lastUpdated 取最新」，就会把某家转售条目的规格当成厂方规格显示在模型详情页上。
      */
     val canonical: Boolean = false,
 

@@ -223,4 +223,35 @@ interface SettingsRepository {
     fun observeLastBackup(): Flow<LastBackup?>
 
     suspend fun setLastBackup(backup: LastBackup)
+
+    /**
+     * models.dev 目录：上次**成功**同步的时刻（epoch 毫秒）。0 = 从来没同步过。
+     *
+     * 消费方有两处：设置页那句"上次更新：…"，以及 7 天自动更新的判定
+     * （`engine/CatalogSync`）。判定放在读侧而不是写侧定时，是因为这个 app 没有后台
+     * 执行器（不为了一个目录引入 WorkManager），冷启动与进模型页时各查一次已经够准时。
+     */
+    fun observeCatalogLastSyncAt(): Flow<Long>
+
+    suspend fun setCatalogLastSyncAt(epochMillis: Long)
+
+    /**
+     * 上次拿到的 `ETag`。条件请求用它：models.dev 的 `api.json` 是 4.7 MB，
+     * 每 7 天无条件重下一遍在移动网络上不是"慢一点"，是"多烧一份用户的流量"。
+     * 上游回 304 时原样保留，不写空。
+     */
+    fun observeCatalogEtag(): Flow<String?>
+
+    suspend fun setCatalogEtag(etag: String?)
+
+    /**
+     * 要不要每 7 天自动更新目录。默认**开**。
+     *
+     * 关掉的语义只是"不自己发起下载"，手动「立即更新」不受它管；关掉之后模型页照常能用，
+     * 只是分组与厂商信息停在最后一次同步的那份。开关存在的理由是有人就是不想起
+     * 4.7 MB 的后台流量，而不是因为这功能可选。
+     */
+    fun observeCatalogAutoUpdate(): Flow<Boolean>
+
+    suspend fun setCatalogAutoUpdate(enabled: Boolean)
 }

@@ -162,6 +162,35 @@ interface ModelDao {
     @Update
     suspend fun update(model: ModelEntity)
 
+    /**
+     * 批量整行写回。**只给目录回填那一处用**：`models.catalogKey` 是一个一个模型各算各的，
+     * 没有一条 `UPDATE ... WHERE id IN (...)` 能同时写出几百个不同值，而逐行 `update(model)`
+     * 就是几百次单独提交。调用方必须自己包在事务里。
+     */
+    @Update
+    suspend fun updateAll(models: List<ModelEntity>)
+
+    /** 目录回填的进度分母：库里总共有多少行模型。 */
+    @Query("SELECT COUNT(*) FROM models")
+    suspend fun countAll(): Int
+
+    /**
+     * 一把 Key 下还没挂上目录的模型行。给 `ModelCatalogRepository.rekeyUnkeyedModelsOfKey`
+     * 用：一次模型列表刷新通常只新增几十行，不必把已经挂上的几百行再查一遍。
+     */
+    @Query(
+        """
+        SELECT * FROM models
+        WHERE providerId = :providerId AND keyId = :keyId AND catalogKey IS NULL
+        ORDER BY sortOrder, modelId
+        """,
+    )
+    suspend fun findUnkeyedByProviderAndKey(providerId: Long, keyId: Long): List<ModelEntity>
+
+    /** 回填效果：有多少行模型挂上了目录。 */
+    @Query("SELECT COUNT(*) FROM models WHERE catalogKey IS NOT NULL")
+    suspend fun countMatched(): Int
+
     @Query("DELETE FROM models WHERE id = :id")
     suspend fun delete(id: Long)
 

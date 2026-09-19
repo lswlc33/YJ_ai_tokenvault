@@ -12,6 +12,7 @@ import com.lc33.tokenvault.data.repo.RoomAuditLogRepository
 import com.lc33.tokenvault.data.repo.RoomBackupStore
 import com.lc33.tokenvault.data.repo.RoomClientProfileRepository
 import com.lc33.tokenvault.data.repo.RoomGroupRepository
+import com.lc33.tokenvault.data.repo.RoomModelCatalogRepository
 import com.lc33.tokenvault.data.repo.RoomModelRepository
 import com.lc33.tokenvault.data.repo.RoomProviderAccountRepository
 import com.lc33.tokenvault.data.repo.RoomProbeRunRepository
@@ -27,6 +28,7 @@ import com.lc33.tokenvault.domain.repo.AuditLogRepository
 import com.lc33.tokenvault.domain.repo.ClientProfileRepository
 import com.lc33.tokenvault.domain.repo.GroupRepository
 import com.lc33.tokenvault.domain.repo.ImportWriter
+import com.lc33.tokenvault.domain.repo.ModelCatalogRepository
 import com.lc33.tokenvault.domain.repo.ModelRepository
 import com.lc33.tokenvault.domain.repo.ProviderAccountRepository
 import com.lc33.tokenvault.domain.repo.ProbeRunRepository
@@ -44,6 +46,7 @@ import com.lc33.tokenvault.engine.ProbeSession
 import com.lc33.tokenvault.engine.RefreshRound
 import com.lc33.tokenvault.engine.UpdateEngine
 import com.lc33.tokenvault.engine.VaultRefreshRound
+import com.lc33.tokenvault.engine.CatalogSync
 import com.lc33.tokenvault.engine.WebDavEngine
 import com.lc33.tokenvault.engine.scopeCrashGuard
 import com.lc33.tokenvault.net.HostGate
@@ -186,7 +189,12 @@ val coreModule = module {
     single<SettingsRepository> { RoomSettingsRepository(get(), get()) }
     single<WebDavSettingsRepository> { RoomWebDavSettingsRepository(get(), get(), get()) }
     single<ProviderAccountRepository> { RoomProviderAccountRepository(get(), get(), get(), get(named(Qualifiers.NOW)), get(), get()) }
-    single<ModelRepository> { RoomModelRepository(get(), get(), get(named(Qualifiers.NOW)), get(), get()) }
+    single<ModelRepository> {
+        RoomModelRepository(
+            dao = get(), transactions = get(), now = get(named(Qualifiers.NOW)),
+            audit = get(), restorer = get(), catalog = get(),
+        )
+    }
     single<ClientProfileRepository> { RoomClientProfileRepository(get(), get()) }
     single<AuditLogRepository> { RoomAuditLogRepository(get(), get(), get(named(Qualifiers.NOW))) }
     single { LogMaintenance(settings = get(), audit = get(), probeRuns = get(), now = get(named(Qualifiers.NOW))) }
@@ -267,6 +275,31 @@ val coreModule = module {
         WebDavEngine(
             settings = get(), backup = get(), client = get(), audit = get(),
             now = get(named(Qualifiers.NOW)),
+        )
+    }
+    // models.dev 目录。仓库与同步引擎都是应用单例：同步会持续几十秒，页面划走不该打断它，
+    // 而进度流要让设置页和模型页同时看到同一份真相。
+    single<ModelCatalogRepository> {
+        RoomModelCatalogRepository(
+            catalogDao = get(),
+            vendorDao = get(),
+            modelDao = get(),
+            providerDao = get(),
+            transactions = get(),
+        )
+    }
+    // 又是单独一个 client，理由与上面那个备份用的同源：探测那档 20s 读超时是按几十 KB 的
+    // 模型列表定的，拿去下 4.7 MB 就是"蜂窝网上每次都差最后一截"。
+    single {
+        CatalogSync(
+            client = com.lc33.tokenvault.net.buildClient(
+                readTimeoutMs = com.lc33.tokenvault.net.CATALOG_SOCKET_TIMEOUT_MS,
+                callTimeoutMs = com.lc33.tokenvault.net.CATALOG_CALL_TIMEOUT_MS,
+            ),
+            catalog = get(),
+            settings = get(),
+            now = get(named(Qualifiers.NOW)),
+            audit = get(),
         )
     }
     single {

@@ -65,9 +65,9 @@ object ModelCatalogMatcher {
      * 提示命中哪家就用哪家，没提示才优先原创条目。
      *
      * 但少了 canonical 这一档会出一个很难看的结果：一个热门 id 在目录里有原创厂商那一条 +
-     * 十几家聚合站各一条，价格互不相同，而"取 lastUpdated 最新"完全可能挑中某家转售条目——
-     * 于是界面上显示的是别家的价。DAO 侧已经把 `canonical DESC` 排进候选顺序，这里才是
-     * 真正做决定的地方。
+     * 十几家聚合站各一条，而**上下文窗口与能力位是各家自己填的**（聚合站会写自己截断后的
+     * 窗口）。"取 lastUpdated 最新"挑中某家转售条目时，详情页显示的就是别家的规格。
+     * DAO 侧已经把 `canonical DESC` 排进候选顺序，这里才是真正做决定的地方。
      *
      * **只在"唯一原创"时直接采信**。两条都原创（两个厂商各自有一个同名不同实体的模型）时，
      * 取列表第一条等于把决定权交给 SQLite 的返回顺序；这时退回 lastUpdated，
@@ -77,8 +77,19 @@ object ModelCatalogMatcher {
         if (candidates.isEmpty()) return null
         if (candidates.size == 1) return candidates.first()
         if (vendorHint != null) {
-            val hint = vendorHint.lowercase()
-            candidates.firstOrNull { it.vendor.lowercase().contains(hint) }?.let { return it }
+            val hint = vendorHint.lowercase().trim()
+            if (hint.isNotEmpty()) {
+                // **两个方向都要比**。用户给供应商起的名字是「DeepSeek 官方」「API 聚合 - Kimi」
+                // 这种带修饰的长串，而目录上的厂商是个干净 slug：只写 `vendor.contains(hint)`
+                // 的话提示永远落空（"deepseek" 里不包含 "deepseek 官方"），
+                // 这一级消歧等于没做。反方向才是现实里的那一种。
+                candidates.firstOrNull {
+                    val vendor = it.vendor.lowercase()
+                    // 反方向要求 slug 至少三个字符：models.dev 里有两三个字母的 slug，
+                    // 放任 "oa" 这种去被一句长供应商名"包含"，会得到一批毫不相干的命中。
+                    vendor.contains(hint) || (vendor.length >= 3 && hint.contains(vendor))
+                }?.let { return it }
+            }
         }
         val canonical = candidates.filter { it.canonical }
         if (canonical.size == 1) return canonical.first()

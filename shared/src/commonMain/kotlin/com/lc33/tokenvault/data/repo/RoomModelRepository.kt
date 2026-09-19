@@ -9,6 +9,7 @@ import com.lc33.tokenvault.domain.model.AiModel
 import com.lc33.tokenvault.domain.model.LogCategory
 import com.lc33.tokenvault.domain.model.LogLevel
 import com.lc33.tokenvault.domain.repo.AuditLogRepository
+import com.lc33.tokenvault.domain.repo.ModelCatalogRepository
 import com.lc33.tokenvault.domain.repo.ModelRepository
 import com.lc33.tokenvault.domain.repo.TransactionRunner
 import com.lc33.tokenvault.domain.repo.UndoableDeletion
@@ -30,6 +31,14 @@ class RoomModelRepository constructor(
     private val now: () -> Long,
     private val audit: AuditLogRepository? = null,
     private val restorer: UndoRestorer? = null,
+    /**
+     * models.dev 目录。**可空**：没接目录时（测试、以及同步还没跑过的首启）模型照常入库，
+     * 只是 `catalogKey` 留空，模型页把它们归进"未识别"。
+     *
+     * 为什么在插入这一步就要匹配：新发现的模型如果不在这里挂上目录，它会一直待在未识别组
+     * 里，直到下一次目录同步（最坏 7 天）才突然长出厂商和价格——那是用户眼里的 bug。
+     */
+    private val catalog: ModelCatalogRepository? = null,
 ) : ModelRepository {
 
     override fun observeByProvider(providerId: Long): Flow<List<AiModel>> =
@@ -46,6 +55,12 @@ class RoomModelRepository constructor(
         needsReview: Boolean,
     ): Long {
         val stamp = now()
+        // 手动录入也当场挂目录，但走的是单条 lookup 而不是 rekeyUnkeyedModelsOfKey：
+        // 这条方法是批量导入的落点（一次几百个），"扫全 Key 未挂目录的行"在这里会变成
+        // 每插一行就重扫一遍前面所有行——平方级。lookup 是三条索引查询，恒定成本。
+        // vendorHint 给 null：这里只有一个模型、没有消歧上下文，而唯一原创候选那条
+        // 由 canonical 规则自己就能挑对。
+        val catalogKey = catalog?.lookup(modelId.trim(), vendorHint = null)?.key
         return dao.insertIgnoring(
             ModelEntity(
                 providerId = providerId,
@@ -55,6 +70,7 @@ class RoomModelRepository constructor(
                 source = "manual",
                 discoveredVia = null,
                 needsReview = needsReview,
+                catalogKey = catalogKey,
                 firstSeenAt = stamp,
                 sortOrder = dao.findByProviderAndKey(providerId, keyId).size,
             ),
@@ -98,6 +114,11 @@ class RoomModelRepository constructor(
             plan.toTouch.forEach { dao.touchLastSeen(it, stamp) }
             plan.toDelete.forEach { dao.delete(it) }
         }
+        // 事务**外面**补目录：[ModelCatalogRepository.rekeyUnkeyedModelsOfKey] 要读
+        // `model_catalog` 那张 7.8k 行的表，挂在同一个事务里会把事务时长从"几十次插入"
+        // 拉长成"几十次插入 + 几百次索引查询"，而这段事务里全是对用户数据的写。
+        // 放在外面最坏的后果只是"这批行的厂商晚一步出现"，不会出现半批数据。
+        catalog?.rekeyUnkeyedModelsOfKey(providerId, keyId)
         audit.recordSafe(LogLevel.INFO, LogCategory.VAULT, "models discovered", "protocol=${protocol.wireName} count=${modelIds.size}", providerId = providerId, keyId = keyId)
     }
 

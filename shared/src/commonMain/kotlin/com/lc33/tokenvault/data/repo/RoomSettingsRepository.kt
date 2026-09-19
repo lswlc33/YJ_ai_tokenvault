@@ -283,6 +283,38 @@ class RoomSettingsRepository constructor(
         dao.put(AppSettingEntity(key = KEY_LAST_BACKUP_TARGET, value = backup.target.wireName))
     }
 
+    // ------------------------------------------------------------------ models.dev 目录
+
+    override fun observeCatalogLastSyncAt(): Flow<Long> = dao.observeAll()
+        .map { rows ->
+            rows.firstOrNull { it.key == KEY_CATALOG_LAST_SYNC_AT }?.value?.trim()?.toLongOrNull() ?: 0L
+        }
+        .distinctUntilChanged()
+
+    override suspend fun setCatalogLastSyncAt(epochMillis: Long) {
+        // 不 auditChange：这是机器每 7 天自己写的一行，进日志只会把用户真正改过的设置淹掉。
+        dao.put(AppSettingEntity(key = KEY_CATALOG_LAST_SYNC_AT, value = epochMillis.toString()))
+    }
+
+    override fun observeCatalogEtag(): Flow<String?> = dao.observeAll()
+        .map { rows -> rows.firstOrNull { it.key == KEY_CATALOG_ETAG }?.value?.trim()?.ifEmpty { null } }
+        .distinctUntilChanged()
+
+    override suspend fun setCatalogEtag(etag: String?) {
+        dao.put(AppSettingEntity(key = KEY_CATALOG_ETAG, value = etag))
+    }
+
+    override fun observeCatalogAutoUpdate(): Flow<Boolean> = dao.observeAll()
+        .map { rows ->
+            rows.firstOrNull { it.key == KEY_CATALOG_AUTO_UPDATE }?.value.toBooleanDefaultTrue()
+        }
+        .distinctUntilChanged()
+
+    override suspend fun setCatalogAutoUpdate(enabled: Boolean) {
+        dao.put(AppSettingEntity(key = KEY_CATALOG_AUTO_UPDATE, value = enabled.toString()))
+        auditChange(KEY_CATALOG_AUTO_UPDATE)
+    }
+
     private companion object {
         /**
          * 键名照 §7.4 里的写法。
@@ -343,6 +375,18 @@ class RoomSettingsRepository constructor(
         const val KEY_LAST_BACKUP_AT = "lastBackupAtMillis"
 
         const val KEY_LAST_BACKUP_TARGET = "lastBackupTarget"
+
+        /**
+         * models.dev 目录的三件套。见 `SettingsRepository` 里那三对方法的注释。
+         *
+         * 键名沿用这张表里既有的 camelCase 风格（`lastBackupAtMillis`），不跟 `boot` 的
+         * 点分风格混——两处都有各自的既有键，掺着写下次找谁的都得靠猜。
+         */
+        const val KEY_CATALOG_LAST_SYNC_AT = "catalogLastSyncAtMillis"
+
+        const val KEY_CATALOG_ETAG = "catalogEtag"
+
+        const val KEY_CATALOG_AUTO_UPDATE = "catalogAutoUpdate"
 
         /**
          * 阈值 → JSON 对象（键 = 币种代码，值 = 金额）。

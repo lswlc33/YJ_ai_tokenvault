@@ -369,6 +369,29 @@ const val WEBDAV_SOCKET_TIMEOUT_MS = 90_000L
 /** WebDAV 的整次调用上限：5 分钟。备份包是几 MB 级，蜂窝网上行慢也要留够。 */
 const val WEBDAV_CALL_TIMEOUT_MS = 300_000L
 
+/**
+ * models.dev 目录快照的读超时：60 秒。
+ *
+ * 与备份同一类理由——那是 4.7 MB 的一个 JSON，探测那档 20 秒是按"一次模型列表请求几十 KB"
+ * 定的，套到目录下载上就是"蜂窝网下永远差最后一截"。但也不给到 WebDAV 那么宽：
+ * 这一发是纯下载、没有对端慢启动问题，60 秒足够在普通网络上搬完 4.7 MB，
+ * 而真下不动时早点失败、让用户手动重来，比转一分钟圈更有用。
+ */
+const val CATALOG_SOCKET_TIMEOUT_MS = 60_000L
+
+/** 目录快照的整次调用上限：4 分钟（含连接、重传与读完整个响应体）。 */
+const val CATALOG_CALL_TIMEOUT_MS = 240_000L
+
+/**
+ * 目录快照能接受的最大字节数。上游现在是 4.7 MB。
+ *
+ * 封顶的理由和 WebDAV 那份一样：`bodyAsBytes()` 上游给多少读多少，而这里没有凭据、
+ * 没有中转站配置参与——一旦哪天 DNS 或反代把 `models.dev` 指到一个大文件，
+ * 不设上限就是"打开模型页然后等一次 OOM 闪退"。8 MB 给上游留了继续长模型的余量，
+ * 又远小于任何合理的意外。
+ */
+const val CATALOG_MAX_DOWNLOAD_BYTES = 8 * 1024 * 1024
+
 /** 单调时钟。commonMain 拿不到 `System`，注入（红线 20）。 */
 internal expect fun clockMillis(): Long
 

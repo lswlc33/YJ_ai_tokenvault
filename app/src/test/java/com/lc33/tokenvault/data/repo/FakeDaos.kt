@@ -524,6 +524,17 @@ internal class FakeModelDao : ModelDao {
 
     override suspend fun update(model: ModelEntity) = replace(model.id) { model }
 
+    override suspend fun updateAll(models: List<ModelEntity>) {
+        models.forEach { model -> replace(model.id) { model } }
+    }
+
+    override suspend fun countAll(): Int = store.size
+
+    override suspend fun countMatched(): Int = store.count { it.catalogKey != null }
+
+    override suspend fun findUnkeyedByProviderAndKey(providerId: Long, keyId: Long): List<ModelEntity> =
+        ordered().filter { it.providerId == providerId && it.keyId == keyId && it.catalogKey == null }
+
     override suspend fun delete(id: Long) {
         store.removeAll { it.id == id }
         revision.value++
