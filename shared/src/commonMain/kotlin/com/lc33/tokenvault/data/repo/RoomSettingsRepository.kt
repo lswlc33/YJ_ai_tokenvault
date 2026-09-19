@@ -201,7 +201,7 @@ class RoomSettingsRepository constructor(
     }
 
     override fun observeAutoRefresh(): Flow<Boolean> = dao.observeAll()
-        .map { rows -> rows.firstOrNull { it.key == KEY_AUTO_REFRESH }?.value.toBooleanSafe() }
+        .map { rows -> rows.firstOrNull { it.key == KEY_AUTO_REFRESH }?.value.toBooleanDefaultTrue() }
         .distinctUntilChanged()
 
     override suspend fun setAutoRefresh(enabled: Boolean) {

@@ -2,6 +2,7 @@ package com.lc33.tokenvault.engine
 
 import com.lc33.tokenvault.data.repo.FakeAppSettingDao
 import com.lc33.tokenvault.data.repo.RoomSettingsRepository
+import com.lc33.tokenvault.domain.AutoRefreshPolicy
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -16,7 +17,7 @@ import org.junit.Test
  * 真要跑它就得有网络与解开的金库。所以 [RefreshRound] 换成计数的假实现，而设置用真仓库
  * 加假 DAO：从库里读出"开没开、隔多久"本来就是这条链的一半。
  *
- * 时间用 `runTest` 的虚拟时钟，所以这些用例不会真的等五分钟。
+ * 时间用 `runTest` 的虚拟时钟，所以这些用例不会真的等三十分钟。
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AutoRefresherTest {
@@ -33,37 +34,55 @@ class AutoRefresherTest {
         }
     }
 
+    private val defaultInterval = AutoRefreshPolicy.DEFAULT_MINUTES * 60_000L
     private val fiveMinutes = 5 * 60_000L
 
+    private fun settings() = RoomSettingsRepository(FakeAppSettingDao())
+
     @Test
-    fun `默认关着一轮到点也不发`() = runTest {
+    fun `默认就是开着的，解锁进应用那一刻发一轮`() = runTest {
+        val settings = settings()
         val round = CountingRound()
-        AutoRefresher(
-            RoomSettingsRepository(FakeAppSettingDao()),
-            FakeSession(),
-            round,
-            backgroundScope,
-        ).start()
+        val refresher = AutoRefresher(settings, FakeSession(), round, backgroundScope)
+        refresher.start()
+        refresher.onUnlocked()
         runCurrent()
 
-        advanceTimeBy(100 * fiveMinutes)
+        // 没写过任何设置 = 开 + 默认档。这一条守的是用户那句"打开应用就该看到新数据"：
+        // 默认关的话，绝大多数人一辈子都不会去设置里翻到这一项。
+        assertEquals(1, round.runs)
+
+        advanceTimeBy(defaultInterval)
         runCurrent()
-        // 自动路径要往每一家供应商发真请求，所以"没写过"必须是关：
-        // 一次升级就把这个行为打开是不请自来的。
-        assertEquals(0, round.runs)
+        assertEquals("默认档也要按间隔继续刷", 2, round.runs)
     }
 
     @Test
-    fun `拨到开时立刻刷一轮，之后按间隔继续刷`() = runTest {
-        val settings = RoomSettingsRepository(FakeAppSettingDao())
+    fun `显式关掉之后一轮也不发`() = runTest {
+        val settings = settings()
+        settings.setAutoRefresh(false)
         val round = CountingRound()
         AutoRefresher(settings, FakeSession(), round, backgroundScope).start()
         runCurrent()
 
+        advanceTimeBy(100 * defaultInterval)
+        runCurrent()
+        assertEquals(0, round.runs)
+    }
+
+    @Test
+    fun `从关拨到开时立刻刷一轮，之后按间隔继续刷`() = runTest {
+        val settings = settings()
+        settings.setAutoRefresh(false)
+        val round = CountingRound()
+        AutoRefresher(settings, FakeSession(), round, backgroundScope).start()
+        runCurrent()
+        assertEquals(0, round.runs)
+
         settings.setAutoRefresh(true)
         settings.setAutoRefreshIntervalMinutes(5)
         runCurrent()
-        assertEquals("拨到开的那一刻就该刷一轮", 1, round.runs)
+        assertEquals("拨到开的那一刻就该刷一轮，不等满一个间隔", 1, round.runs)
 
         advanceTimeBy(fiveMinutes)
         runCurrent()
@@ -76,7 +95,7 @@ class AutoRefresherTest {
 
     @Test
     fun `锁定态不发，解锁那一刻补一轮`() = runTest {
-        val settings = RoomSettingsRepository(FakeAppSettingDao())
+        val settings = settings()
         val session = FakeSession(unlocked = false)
         val round = CountingRound()
         val refresher = AutoRefresher(settings, session, round, backgroundScope)
@@ -84,11 +103,11 @@ class AutoRefresherTest {
         refresher.onUnlocked()
         runCurrent()
 
-        settings.setAutoRefresh(true)
         settings.setAutoRefreshIntervalMinutes(5)
         advanceTimeBy(3 * fiveMinutes)
         runCurrent()
-        // 锁定态发这一轮只会得到一轮全失败（探测要 reveal 密钥），还往审计日志里灌错误。
+        // 默认是开的，所以"锁定态一轮都不发"完全靠这道闸：探测要 reveal 密钥，
+        // 锁定时发出去只会得到一轮全失败，还往审计日志里灌错误。
         assertEquals(0, round.runs)
 
         // 用户解锁 = 他意义上的"打开了应用"，这一刷由 AppRoot 那一句补上。
@@ -100,7 +119,8 @@ class AutoRefresherTest {
 
     @Test
     fun `只改间隔不再发一轮`() = runTest {
-        val settings = RoomSettingsRepository(FakeAppSettingDao())
+        val settings = settings()
+        settings.setAutoRefresh(false)
         val round = CountingRound()
         AutoRefresher(settings, FakeSession(), round, backgroundScope).start()
         runCurrent()
@@ -116,17 +136,16 @@ class AutoRefresherTest {
 
         advanceTimeBy(fiveMinutes)
         runCurrent()
-        assertEquals("新间隔要从改完这一刻起算", 2, round.runs)
+        assertEquals("新间隔从改完这一刻起算", 2, round.runs)
     }
 
     @Test
-    fun `关掉开关后定时器停住`() = runTest {
-        val settings = RoomSettingsRepository(FakeAppSettingDao())
+    fun `运行中关掉开关后定时器停住`() = runTest {
+        val settings = settings()
         val round = CountingRound()
         AutoRefresher(settings, FakeSession(), round, backgroundScope).start()
         runCurrent()
 
-        settings.setAutoRefresh(true)
         settings.setAutoRefreshIntervalMinutes(5)
         advanceTimeBy(fiveMinutes)
         runCurrent()
@@ -141,18 +160,17 @@ class AutoRefresherTest {
 
     @Test
     fun `start 重复调用不起第二条定时器`() = runTest {
-        val settings = RoomSettingsRepository(FakeAppSettingDao())
+        val settings = settings()
         val round = CountingRound()
         val refresher = AutoRefresher(settings, FakeSession(), round, backgroundScope)
         refresher.start()
         refresher.start()
         runCurrent()
 
-        settings.setAutoRefresh(true)
         settings.setAutoRefreshIntervalMinutes(5)
         advanceTimeBy(fiveMinutes)
         runCurrent()
-        // 两端入口 + 测试里重复调；起两条循环就等于每个间隔发两轮请求。
+        // 两端入口 + 转屏重来都可能重复调；起两条循环就等于每个间隔发两轮请求。
         assertEquals(2, round.runs)
     }
 }

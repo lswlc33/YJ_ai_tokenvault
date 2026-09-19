@@ -35,6 +35,10 @@ fun interface RefreshRound {
  *
  * 为什么所有分支都先问 [ProbeSession.isUnlocked]：探测要 reveal 密钥、余额要解密字段，
  * 锁定态发这一轮只会得到一轮全失败，还会往审计日志里灌一片没有后果的错误。
+ *
+ * 开关**默认开**（[SettingsRepository.observeAutoRefresh]），所以从"进程起来"到"用户
+ * 第一次解锁"之间一轮都不该发出去——上面那条 isUnlocked 检查不是兜底，是这一条路径的
+ * 主闸。
  */
 class AutoRefresher constructor(
     private val settings: SettingsRepository,

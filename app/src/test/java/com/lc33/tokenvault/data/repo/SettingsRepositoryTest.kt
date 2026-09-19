@@ -358,17 +358,9 @@ class SettingsRepositoryTest {
     // ---------------------------------------------------------------- 自动刷新
 
     @Test
-    fun `自动刷新没写过时默认关`() = runTest {
-        // 与嗅探那一组相反：这一项默认关，因为打开它意味着应用会自己往每一家供应商发请求。
-        repo.observeAutoRefresh().test {
-            assertEquals(false, awaitItem())
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
-
-    @Test
-    fun `自动刷新开了能读回来`() = runTest {
-        repo.setAutoRefresh(true)
+    fun `自动刷新没写过时默认开`() = runTest {
+        // 与"空闲锁定默认关"相反：这一项默认开，因为它要的效果就是"打开应用看到新数据"，
+        // 而默认关等于大多数人never去设置里翻到它。代价被红线 36 兜住——自动路径零成本。
         repo.observeAutoRefresh().test {
             assertEquals(true, awaitItem())
             cancelAndIgnoreRemainingEvents()
@@ -376,9 +368,18 @@ class SettingsRepositoryTest {
     }
 
     @Test
-    fun `自动刷新间隔没写过时默认一小时`() = runTest {
+    fun `自动刷新关了能读回来`() = runTest {
+        repo.setAutoRefresh(false)
+        repo.observeAutoRefresh().test {
+            assertEquals(false, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `自动刷新间隔没写过时默认半小时`() = runTest {
         repo.observeAutoRefreshIntervalMinutes().test {
-            assertEquals(60, awaitItem())
+            assertEquals(30, awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -401,7 +402,7 @@ class SettingsRepositoryTest {
         )
         repo.observeAutoRefreshIntervalMinutes().test {
             // 0 分钟是一个不停发请求的死循环，读方向必须落回默认档。
-            assertEquals(60, awaitItem())
+            assertEquals(30, awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
     }

@@ -55,9 +55,9 @@ class ProbeSettingsViewModel constructor(
     // 起一条进程级订阅（与 AutoLocker 同理——这个 ViewModel 只在用户站在那一页时活着）。
     // 这里只负责把同一条流画成开关与下拉，并写回用户的选择。
 
-    /** 自动刷新开关。默认关，理由见 [SettingsRepository.observeAutoRefresh]。 */
+    /** 自动刷新开关。默认开（[SettingsRepository.observeAutoRefresh] 兜底 true）。 */
     val autoRefresh: StateFlow<Boolean> = settings.observeAutoRefresh()
-        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     /**
      * 间隔档位在下拉里的下标。**从仓库派生而不自己记一份**：真正生效的分钟数由

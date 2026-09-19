@@ -17,8 +17,8 @@ package com.lc33.tokenvault.domain
  */
 object AutoRefreshPolicy {
 
-    /** 默认档：一小时。落在"回应用时数据大体是新的"与"别把上游打烦"之间。 */
-    const val DEFAULT_MINUTES = 60
+    /** 默认档：半小时。用户要的"打开应用就看到新数据"这一句，落在 30 分钟最耐得住。 */
+    const val DEFAULT_MINUTES = 30
 
     /** 与 `probe_auto_refresh_interval_options` 同序：5 分 / 15 分 / 30 分 / 1 小时 / 6 小时。 */
     val OPTIONS: List<Int> = listOf(5, 15, 30, 60, 360)
@@ -34,7 +34,7 @@ object AutoRefreshPolicy {
      * 存储形态 → 分钟数。
      *
      * [stored] 为 null 表示键还没写过，给 [DEFAULT_MINUTES]；解析不出来或不是正数也回默认，
-     * 因为"间隔 0 分钟"意味着一个不停发请求的死循环，宁可退回一小时。
+     * 因为"间隔 0 分钟"意味着一个不停发请求的死循环，宁可退回默认档。
      */
     fun decode(stored: String?): Int =
         stored?.trim()?.toIntOrNull()?.takeIf { it > 0 } ?: DEFAULT_MINUTES
