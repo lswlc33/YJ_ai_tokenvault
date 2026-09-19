@@ -23,6 +23,7 @@ import tokenvault.shared.generated.resources.sync_remote_section
 import tokenvault.shared.generated.resources.sync_section_local
 import tokenvault.shared.generated.resources.sync_section_webdav
 import tokenvault.shared.generated.resources.sync_title
+import tokenvault.shared.generated.resources.sync_webdav_checking
 import tokenvault.shared.generated.resources.sync_webdav_refresh
 import tokenvault.shared.generated.resources.sync_webdav_refresh_summary
 import tokenvault.shared.generated.resources.sync_webdav_restore
@@ -64,6 +65,8 @@ fun SyncScreen(
     backup: BackupStatus,
     webDavConfig: WebDavConfig,
     webDavBusy: Boolean,
+    /** 只读的"检查连接"正在进行，与 [webDavBusy] 分开：上传同样会灰掉那三行。 */
+    webDavChecking: Boolean,
     remoteBackups: List<UiRemoteBackup>?,
     onBack: () -> Unit,
     onExport: () -> Unit,
@@ -123,6 +126,22 @@ fun SyncScreen(
                     text = stringResource(Res.string.sync_webdav_refresh),
                     onClick = onRefreshWebDav,
                     enabled = webDavConfig.isReady && !webDavBusy,
+                )
+            }
+        }
+        // 进页面就自动拉一次列表，那几秒三行动作是灰的。以前灰得没有理由：既不说明
+        // "在等什么"，也不说明"马上就好"（2026-09 反馈：从灰显到可用中间缺一句提示）。
+        if (webDavChecking) {
+            item {
+                AppText(
+                    text = stringResource(Res.string.sync_webdav_checking),
+                    style = AppTextStyle.Footnote,
+                    color = appSecondaryTextColor,
+                    modifier = Modifier.padding(
+                        start = tokens.screenPadding,
+                        end = tokens.screenPadding,
+                        top = tokens.itemSpacing,
+                    ),
                 )
             }
         }

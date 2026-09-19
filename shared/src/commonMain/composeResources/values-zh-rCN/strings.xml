@@ -367,6 +367,7 @@
     <string name="sync_webdav_restore_summary">下载最新的 .yjv 文件后选择合并方式</string>
     <string name="sync_webdav_refresh">刷新远端列表</string>
     <string name="sync_webdav_refresh_summary">只读操作，不会上传或修改数据</string>
+    <string name="sync_webdav_checking">正在检查连接…</string>
     <string name="sync_remote_count">远端备份：%1$d 份</string>
     <string name="sync_remote_section">远端备份</string>
     <string name="sync_remote_empty">那个远端目录里还没有备份包。</string>

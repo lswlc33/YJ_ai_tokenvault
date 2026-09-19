@@ -61,6 +61,14 @@ class SyncViewModel constructor(
     private val _webDavBusy = MutableStateFlow(false)
     val webDavBusy: StateFlow<Boolean> = _webDavBusy.asStateFlow()
 
+    /**
+     * 「检查连接」这件事单独一个状态，而不是让页面用 busy 反推：拉列表是只读的
+     * PROPFIND，灰掉三行的是它，但上传/恢复同样会灰掉那三行——只给一个 busy，
+     * 上传途中就会显示"正在检查连接"，那是句假话。
+     */
+    private val _webDavChecking = MutableStateFlow(false)
+    val webDavChecking: StateFlow<Boolean> = _webDavChecking.asStateFlow()
+
     val webDavConfig: StateFlow<WebDavConfig> = webDavSettings.observeConfig()
         .stateIn(viewModelScope, SharingStarted.Eagerly, WebDavConfig())
 
@@ -140,11 +148,13 @@ class SyncViewModel constructor(
     fun listWebDavBackups() {
         viewModelScope.launch {
             _webDavBusy.value = true
+            _webDavChecking.value = true
             try {
                 _events.send(SyncEvent.WebDavListSucceeded(webDavEngine.listRemoteBackups()))
             } catch (t: Throwable) {
                 _events.send(SyncEvent.WebDavFailed)
             } finally {
+                _webDavChecking.value = false
                 _webDavBusy.value = false
             }
         }

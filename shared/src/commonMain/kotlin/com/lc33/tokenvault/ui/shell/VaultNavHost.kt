@@ -1115,6 +1115,7 @@ private fun SyncRouteContent(
     val backup by vm.backup.collectAsStateWithLifecycle()
     val webDavConfig by vm.webDavConfig.collectAsStateWithLifecycle()
     val webDavBusy by vm.webDavBusy.collectAsStateWithLifecycle()
+    val webDavChecking by vm.webDavChecking.collectAsStateWithLifecycle()
 
     val passphrasePrompt = stringResource(Res.string.sync_passphrase_prompt)
     val passphraseHint = stringResource(Res.string.sync_passphrase_hint)
@@ -1260,6 +1261,7 @@ private fun SyncRouteContent(
         backup = backup,
         webDavConfig = webDavConfig,
         webDavBusy = webDavBusy,
+        webDavChecking = webDavChecking,
         remoteBackups = remoteRows,
         onBack = onBack,
         onExport = { pendingAction = PendingSyncAction.Export },
