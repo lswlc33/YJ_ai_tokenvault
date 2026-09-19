@@ -1,5 +1,6 @@
 package com.lc33.tokenvault.backup
 
+import com.lc33.tokenvault.crypto.CryptoProvider
 import com.lc33.tokenvault.crypto.KdfParams
 import kotlinx.serialization.json.Json
 import kotlin.io.encoding.Base64
@@ -53,6 +54,9 @@ class BackupCodecInteropTest {
         assertEquals(1, payload.apiKeys.size)
         assertEquals(KEY_SECRET, payload.apiKeys.single().secret)
         assertTrue(payload.apiKeys.single().isDefault)
+        // 把本平台真正用到的 provider 打出来：CI 的 ios 日志里出现
+        // `iOS(CryptoKit+Apple)` 才算这条夹具在苹果的原语上跑过，而不是只在 JVM 上绿。
+        println("interop fixture decoded on provider=" + CryptoProvider.provider.name)
     }
 
     @Test
