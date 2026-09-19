@@ -7,6 +7,7 @@ import com.lc33.tokenvault.di.coreModule
 import com.lc33.tokenvault.di.platformModule
 import com.lc33.tokenvault.di.viewModelModule
 import com.lc33.tokenvault.domain.repo.SettingsRepository
+import com.lc33.tokenvault.engine.AutoRefresher
 import com.lc33.tokenvault.platform.AutoLocker
 import com.lc33.tokenvault.platform.SecureClipboard
 import com.lc33.tokenvault.platform.VaultSession
@@ -82,4 +83,8 @@ private fun initIosApp() {
 
     // 内置客户端预设（§8.2）：幂等，只碰公开数据，锁定态也能跑。
     appScope.launch { koin.get<ProfileSeeder>().seed() }
+
+    // 自动刷新（§13.4 探测设置页）：等价 Android 端 TokenVaultApp 那一句。间隔靠应用内
+    // 协程计时，所以 iOS 挂后台被冻结时不会偷偷发请求；回前台解锁后由 AppRoot 补一轮。
+    koin.get<AutoRefresher>().start()
 }

@@ -71,7 +71,8 @@ fun SyncScreen(
     onOpenWebDavSettings: () -> Unit,
     onUploadWebDav: () -> Unit,
     onRestoreWebDav: () -> Unit,
-    onRestoreRemote: (String) -> Unit,
+    /** 点列表里的某一份：弹层里再决定恢复还是删除（动作由 `SyncRouteContent` 承接）。 */
+    onPickRemoteBackup: (UiRemoteBackup) -> Unit,
     onRefreshWebDav: () -> Unit,
 ) {
     val tokens = LocalAppTokens.current
@@ -128,6 +129,8 @@ fun SyncScreen(
         // 拉到的备份逐条列在这里（2026-09 反馈：只有"恢复最新"一个入口，等于只能回到昨天）。
         // null = 还没拉取，这一段不画；空列表照画——"远端确实没有包"和"还没点刷新"
         // 是两件事，都缩成不画就分不出来了。
+        // 点了不直接恢复，而是弹层里再挑恢复还是删除（2026-09 反馈）：清掉某一份传错了的
+        // 包以前在应用里没有入口，而"点一下就开始恢复"又让误触的代价变成整库。
         if (webDavConfig.isReady && remoteBackups != null) {
             item { SectionTitle(text = stringResource(Res.string.sync_remote_section)) }
             if (remoteBackups.isEmpty()) {
@@ -147,7 +150,7 @@ fun SyncScreen(
                                 title = row.label,
                                 summary = row.fileName,
                                 enabled = !webDavBusy,
-                                onClick = { onRestoreRemote(row.fileName) },
+                                onClick = { onPickRemoteBackup(row) },
                             )
                         }
                     }

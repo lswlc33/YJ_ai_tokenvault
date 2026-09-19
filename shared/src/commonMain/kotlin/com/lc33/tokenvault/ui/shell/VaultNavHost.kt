@@ -21,10 +21,9 @@ import com.lc33.tokenvault.platform.nowMillis
 import com.lc33.tokenvault.platform.openAppLocaleSettings
 import com.lc33.tokenvault.platform.openExternalUrl
 import com.lc33.tokenvault.platform.rememberBackupFilePicker
-import com.lc33.tokenvault.screens.dashboard.BalanceBreakdownScreen
-import com.lc33.tokenvault.ui.common.LoadingState
-import com.lc33.tokenvault.ui.common.relativeLabel
 import com.lc33.tokenvault.screens.dashboard.DashboardScreen
+import com.lc33.tokenvault.ui.common.LoadingState
+import com.lc33.tokenvault.ui.common.relativeLabelWithinDay
 import com.lc33.tokenvault.screens.lock.ChangePinScreen
 import com.lc33.tokenvault.screens.manage.GroupsScreen
 import com.lc33.tokenvault.screens.manage.ImportScreen
@@ -52,7 +51,9 @@ import com.lc33.tokenvault.screens.settings.SecurityScreen
 import com.lc33.tokenvault.screens.settings.SettingsScreen
 import com.lc33.tokenvault.screens.settings.SyncScreen
 import com.lc33.tokenvault.screens.settings.UpdateScreen
+import com.lc33.tokenvault.ui.miuix.AppActionRow
 import com.lc33.tokenvault.ui.miuix.AppDialog
+import com.lc33.tokenvault.ui.miuix.AppPreferenceGroup
 import com.lc33.tokenvault.ui.miuix.AppSecretTextField
 import com.lc33.tokenvault.ui.miuix.AppSwitchRow
 import com.lc33.tokenvault.ui.miuix.AppTabRow
@@ -136,10 +137,15 @@ import tokenvault.shared.generated.resources.sync_passphrase_hint
 import tokenvault.shared.generated.resources.sync_passphrase_prompt
 import tokenvault.shared.generated.resources.sync_passphrase_required
 import tokenvault.shared.generated.resources.sync_remote_count
+import tokenvault.shared.generated.resources.sync_remote_delete
+import tokenvault.shared.generated.resources.sync_remote_delete_confirm_summary
+import tokenvault.shared.generated.resources.sync_remote_delete_confirm_title
+import tokenvault.shared.generated.resources.sync_remote_restore
 import tokenvault.shared.generated.resources.sync_restore_failed
 import tokenvault.shared.generated.resources.sync_restore_mode
 import tokenvault.shared.generated.resources.sync_restore_mode_summary
 import tokenvault.shared.generated.resources.sync_result_exported
+import tokenvault.shared.generated.resources.sync_result_remote_deleted
 import tokenvault.shared.generated.resources.sync_result_restored
 import tokenvault.shared.generated.resources.sync_result_webdav_configured
 import tokenvault.shared.generated.resources.sync_result_webdav_uploaded
@@ -215,9 +221,6 @@ fun VaultNavHost(
                 // 三个一级页平级，压在栈上会让返回语义变成"回到总览"。
                 onOpenManage = { pager.animateToPage(topLevelIndexOf(ManageRoute)) },
                 onOpenProbeDetail = { navigate(ProbeRunRoute) },
-                // 余额明细页只有这一个入口：没有它 BalanceBreakdownRoute 是一座孤岛，
-                // 那一页写了失败分组与成功分组，却没人跳得进去。
-                onOpenBalanceBreakdown = { navigate(BalanceBreakdownRoute) },
                 onRefreshBalance = {
                     vm.refreshBalance()
                     feedback?.post(AppFeedback(balanceRefreshed))
@@ -699,14 +702,20 @@ fun VaultNavHost(
             val defaultProbeBalance by vm.defaultProbeBalance.collectAsStateWithLifecycle()
             val defaultProbeModels by vm.defaultProbeModels.collectAsStateWithLifecycle()
             val defaultProbeModelReachability by vm.defaultProbeModelReachability.collectAsStateWithLifecycle()
+            val autoRefresh by vm.autoRefresh.collectAsStateWithLifecycle()
+            val autoRefreshIntervalIndex by vm.autoRefreshIntervalIndex.collectAsStateWithLifecycle()
             ProbeSettingsScreen(
                 sniffClientProfile = sniffClientProfile,
+                autoRefresh = autoRefresh,
+                autoRefreshIntervalIndex = autoRefreshIntervalIndex,
                 defaultProbeReachability = defaultProbeReachability,
                 defaultProbeKeys = defaultProbeKeys,
                 defaultProbeBalance = defaultProbeBalance,
                 defaultProbeModels = defaultProbeModels,
                 defaultProbeModelReachability = defaultProbeModelReachability,
                 onSniffClientProfileChange = vm::onSniffClientProfileChange,
+                onAutoRefreshChange = vm::onAutoRefreshChange,
+                onAutoRefreshIntervalIndexChange = vm::onAutoRefreshIntervalIndexChange,
                 onDefaultProbeReachabilityChange = vm::onDefaultProbeReachabilityChange,
                 onDefaultProbeKeysChange = vm::onDefaultProbeKeysChange,
                 onDefaultProbeBalanceChange = vm::onDefaultProbeBalanceChange,
@@ -1050,19 +1059,6 @@ fun VaultNavHost(
                 onOpenProvider = { id -> navigate(ProviderDetailRoute(id)) },
             )
         }
-            is BalanceBreakdownRoute -> {
-            val vm: DashboardViewModel = koinViewModel()
-            val rows by vm.providerRows.collectAsStateWithLifecycle()
-            BalanceBreakdownScreen(
-                // 失败与成功分两组，而“压根没配置余额查询”的一组都不进（§9.3 的三种状态）。
-                // 用 balanceFailed 而不是 `balance == null`：后者把“没查过”也归进了失败，
-                // 于是一个刚建好的供应商会被报成“没能读到余额”
-                providers = rows.filter { it.balance != null },
-                failedProviders = rows.filter { it.balanceFailed },
-                onBack = back,
-                onOpenProvider = { id -> navigate(ProviderDetailRoute(id)) },
-            )
-        }
         }
     }
 
@@ -1145,6 +1141,10 @@ private fun SyncRouteContent(
     var remoteListRequested by remember { mutableStateOf(false) }
     // 走列表点进来的那一份。null = 走的是「从 WebDAV 恢复」那条老路（恢复最新）。
     var pendingWebDavRestoreFile by remember { mutableStateOf<String?>(null) }
+    // 列表里被点开的那一份，以及「删除」二次确认盯着的那一份。两个是分开的状态：
+    // 确认框取消要退回动作弹层，而不是把整个流程一起关掉。
+    var pendingRemoteBackup by remember { mutableStateOf<UiRemoteBackup?>(null) }
+    var pendingRemoteDelete by remember { mutableStateOf<UiRemoteBackup?>(null) }
     val webDavUrlState = rememberAppTextFieldState()
     val webDavDirectoryState = rememberAppTextFieldState()
     val webDavUsernameState = rememberSecretTextFieldState()
@@ -1155,7 +1155,9 @@ private fun SyncRouteContent(
     val remoteRows = remoteBackups?.sortedDescending()?.map { name ->
         UiRemoteBackup(
             fileName = name,
-            label = WebDavEngine.backupEpochMillis(name)?.let { relativeLabel(nowMillis(), it) } ?: name,
+            // 跨天的备份写完整日期而不是"N 天前"：一屏十几份时，"3 天前"认不出是哪一次，
+            // 而挑备份要回答的正是"这是哪一天的那份"。
+            label = WebDavEngine.backupEpochMillis(name)?.let { relativeLabelWithinDay(nowMillis(), it) } ?: name,
         )
     }
 
@@ -1214,6 +1216,8 @@ private fun SyncRouteContent(
                             ),
                         ),
                     )
+                SyncEvent.WebDavDeleted ->
+                    feedback?.post(AppFeedback(getString(Res.string.sync_result_remote_deleted)))
                 SyncEvent.WebDavFailed ->
                     feedback?.post(AppFeedback(getString(Res.string.sync_webdav_failed)))
             }
@@ -1268,9 +1272,10 @@ private fun SyncRouteContent(
             pendingWebDavRestoreFile = null
             pendingAction = PendingSyncAction.WebDavRestore
         },
-        onRestoreRemote = { fileName ->
-            pendingWebDavRestoreFile = fileName
-            pendingAction = PendingSyncAction.WebDavRestore
+        onPickRemoteBackup = { row ->
+            // 点了不直接恢复：先弹层问"恢复还是删除"。误触一整行的代价不该是开始改库。
+            pendingRemoteBackup = row
+            pendingRemoteDelete = null
         },
         onRefreshWebDav = {
             remoteListRequested = true
@@ -1400,6 +1405,55 @@ private fun SyncRouteContent(
             summary = stringResource(Res.string.sync_insecure_http_warning),
         )
     }
+
+    // 列表里某一份被点开：恢复与删除两个动作放这一层（2026-09 反馈）。标题用那一份的
+    // 日期、副文案用文件名——用户点的是哪一行，弹层就说哪一行，不需要再复述一遍"远端备份"。
+    AppDialog(
+        show = pendingRemoteBackup != null && pendingRemoteDelete == null,
+        onDismissRequest = { pendingRemoteBackup = null },
+        title = pendingRemoteBackup?.label.orEmpty(),
+        summary = pendingRemoteBackup?.fileName.orEmpty(),
+        dismissText = stringResource(Res.string.sync_cancel),
+        onDismiss = { pendingRemoteBackup = null },
+    ) {
+        AppPreferenceGroup(inset = false) {
+            AppActionRow(
+                text = stringResource(Res.string.sync_remote_restore),
+                enabled = !webDavBusy,
+                onClick = {
+                    val fileName = pendingRemoteBackup?.fileName ?: return@AppActionRow
+                    pendingRemoteBackup = null
+                    // 之后与老入口同一条路：要口令 → 选合并方式，只是恢复的是被点的那一份。
+                    pendingWebDavRestoreFile = fileName
+                    pendingAction = PendingSyncAction.WebDavRestore
+                },
+            )
+            AppActionRow(
+                text = stringResource(Res.string.sync_remote_delete),
+                enabled = !webDavBusy,
+                onClick = { pendingRemoteDelete = pendingRemoteBackup },
+            )
+        }
+    }
+
+    // 删除单独再确认一次：远端只留最新 10 份，删掉的那一份要是恰好是唯一没坏的一份，
+    // 就没有下一次"从 WebDAV 恢复最新"可走了。
+    AppDialog(
+        show = pendingRemoteDelete != null,
+        onDismissRequest = { pendingRemoteDelete = null },
+        title = stringResource(Res.string.sync_remote_delete_confirm_title),
+        summary = pendingRemoteDelete?.let { row ->
+            stringResource(Res.string.sync_remote_delete_confirm_summary, row.fileName)
+        }.orEmpty(),
+        confirmText = stringResource(Res.string.sync_remote_delete),
+        onConfirm = {
+            pendingRemoteDelete?.let { vm.deleteWebDavBackup(it.fileName) }
+            pendingRemoteDelete = null
+            pendingRemoteBackup = null
+        },
+        dismissText = stringResource(Res.string.sync_cancel),
+        onDismiss = { pendingRemoteDelete = null },
+    )
 
     RestoreModePicker(
         show = restoreModePicker,

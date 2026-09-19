@@ -73,7 +73,7 @@ data class UiProviderRow(
      * - **根本没配置 / 从未查过**——`balance == null && !balanceFailed`。
      *
      * 把后两种归成一类的表现很具体：一个刚建好、压根没开余额查询的供应商，
-     * 会在余额明细里被列到“查询失败”下面，于是用户去查一个不存在的故障。
+     * 会在供应商详情页被列到“查询失败”下面，于是用户去查一个不存在的故障。
      */
     val balanceFailed: Boolean = false,
     /**

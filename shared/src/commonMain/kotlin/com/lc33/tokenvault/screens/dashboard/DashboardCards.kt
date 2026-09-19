@@ -14,7 +14,6 @@ import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.count_keys
 import tokenvault.shared.generated.resources.count_models
 import tokenvault.shared.generated.resources.count_providers
-import tokenvault.shared.generated.resources.dashboard_balance_detail
 import tokenvault.shared.generated.resources.dashboard_balance_failed
 import tokenvault.shared.generated.resources.dashboard_balance_no_fx
 import tokenvault.shared.generated.resources.dashboard_balance_none
@@ -65,8 +64,6 @@ internal fun BalanceCard(
     balance: BalanceSummary,
     nowMs: Long,
     onRefresh: () -> Unit,
-    /** 跳到余额明细页（`BalanceBreakdownRoute`）。 */
-    onOpenDetail: () -> Unit,
 ) {
     val tokens = LocalAppTokens.current
     // 实色主色底。曾经试过玻璃材质（背景模糊 + vibrancy + 动态光斑）来"彰显高级感"，
@@ -135,17 +132,8 @@ internal fun BalanceCard(
             )
         }
     }
-    // 「查看明细」画在主题色卡**外面**：整张 accent 卡看着像一个整体，把行入口塞进去
-    // 会读成"点卡的任何一处都进明细"。什么都没查到时明细页是空的，入口也就不出现。
-    if (balance.perCurrency.isNotEmpty() || balance.failedProviderCount > 0) {
-        AppPreferenceGroup(modifier = cardModifier(), inset = false) {
-            AppActionRow(
-                text = stringResource(Res.string.dashboard_balance_detail),
-                onClick = onOpenDetail,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-    }
+    // 这里不再有「查看余额明细」入口（2026-09 决策）：明细页只是把卡上那几个数按供应商
+    // 摊开，逐家的余额与失败原因在供应商详情页看得更全，多一座二级页反而像数据丢了。
 }
 
 @Composable

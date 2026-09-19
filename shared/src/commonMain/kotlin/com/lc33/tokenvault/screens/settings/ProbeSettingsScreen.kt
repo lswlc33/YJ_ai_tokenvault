@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import org.jetbrains.compose.resources.stringArrayResource
 import org.jetbrains.compose.resources.stringResource
 import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.editor_probe_balance
@@ -14,10 +15,16 @@ import tokenvault.shared.generated.resources.editor_probe_model_reachability
 import tokenvault.shared.generated.resources.editor_probe_model_reachability_summary
 import tokenvault.shared.generated.resources.editor_probe_models_summary
 import tokenvault.shared.generated.resources.editor_probe_reachability
+import tokenvault.shared.generated.resources.probe_auto_refresh
+import tokenvault.shared.generated.resources.probe_auto_refresh_interval
+import tokenvault.shared.generated.resources.probe_auto_refresh_interval_summary
+import tokenvault.shared.generated.resources.probe_auto_refresh_interval_options
+import tokenvault.shared.generated.resources.probe_auto_refresh_summary
 import tokenvault.shared.generated.resources.probe_defaults_goto_manage
 import tokenvault.shared.generated.resources.probe_defaults_notice
 import tokenvault.shared.generated.resources.probe_keywords
 import tokenvault.shared.generated.resources.probe_keywords_summary
+import tokenvault.shared.generated.resources.probe_section_auto_refresh
 import tokenvault.shared.generated.resources.probe_section_client
 import tokenvault.shared.generated.resources.probe_section_cost
 import tokenvault.shared.generated.resources.probe_section_defaults
@@ -28,6 +35,7 @@ import tokenvault.shared.generated.resources.probe_thresholds
 import tokenvault.shared.generated.resources.probe_thresholds_summary
 import com.lc33.tokenvault.ui.miuix.AppArrowRow
 import com.lc33.tokenvault.ui.miuix.AppCard
+import com.lc33.tokenvault.ui.miuix.AppDropdownRow
 import com.lc33.tokenvault.ui.miuix.AppPreferenceGroup
 import com.lc33.tokenvault.ui.miuix.AppSwitchRow
 import com.lc33.tokenvault.ui.miuix.AppText
@@ -44,6 +52,9 @@ import com.lc33.tokenvault.ui.theme.LocalAppTokens
  * 都不一样——有的按 ToS 不允许自动化探测，有的三个请求就限流——所以权威在每个供应商
  * 自己身上。这件事必须用一整句话在页面最上面说清，不能塞在某个开关的副文案里。
  *
+ * 唯一的例外是「自动刷新」那一节：它**是**总开关，而且管的是"什么时候刷"不是"刷什么"——
+ * 发出去的仍然是各把 Key 自己那套零成本请求。默认关。
+ *
  * 另外两处文案是 M0.5 实测之后改的，别退回去：
  * - host 最小间隔不是可选优化：挂 Cloudflare 的站同 host 2.4 秒内第 3 个请求就撞
  *   `error code: 1015`（红线 29）。
@@ -53,12 +64,16 @@ import com.lc33.tokenvault.ui.theme.LocalAppTokens
 @Composable
 fun ProbeSettingsScreen(
     sniffClientProfile: Boolean,
+    autoRefresh: Boolean,
+    autoRefreshIntervalIndex: Int,
     defaultProbeReachability: Boolean,
     defaultProbeKeys: Boolean,
     defaultProbeBalance: Boolean,
     defaultProbeModels: Boolean,
     defaultProbeModelReachability: Boolean,
     onSniffClientProfileChange: (Boolean) -> Unit,
+    onAutoRefreshChange: (Boolean) -> Unit,
+    onAutoRefreshIntervalIndexChange: (Int) -> Unit,
     onDefaultProbeReachabilityChange: (Boolean) -> Unit,
     onDefaultProbeKeysChange: (Boolean) -> Unit,
     onDefaultProbeBalanceChange: (Boolean) -> Unit,
@@ -105,6 +120,29 @@ fun ProbeSettingsScreen(
                     checked = defaultProbeModelReachability,
                     onCheckedChange = onDefaultProbeModelReachabilityChange,
                 )
+            }
+        }
+
+        item { SectionTitle(text = stringResource(Res.string.probe_section_auto_refresh)) }
+        item {
+            AppPreferenceGroup {
+                AppSwitchRow(
+                    title = stringResource(Res.string.probe_auto_refresh),
+                    summary = stringResource(Res.string.probe_auto_refresh_summary),
+                    checked = autoRefresh,
+                    onCheckedChange = onAutoRefreshChange,
+                )
+                // 间隔只在开关打开时画：关着摆一枚点不动的下拉，用户要先猜"为什么不能点"，
+                // 而在没有定时器的那段状态里这一档本来就没有含义。
+                if (autoRefresh) {
+                    AppDropdownRow(
+                        title = stringResource(Res.string.probe_auto_refresh_interval),
+                        summary = stringResource(Res.string.probe_auto_refresh_interval_summary),
+                        items = stringArrayResource(Res.array.probe_auto_refresh_interval_options).toList(),
+                        selectedIndex = autoRefreshIntervalIndex,
+                        onSelect = onAutoRefreshIntervalIndexChange,
+                    )
+                }
             }
         }
 

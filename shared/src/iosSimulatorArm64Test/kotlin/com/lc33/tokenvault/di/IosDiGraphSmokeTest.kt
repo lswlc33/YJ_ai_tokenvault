@@ -16,10 +16,12 @@ import com.lc33.tokenvault.domain.repo.ProbeRunRepository
 import com.lc33.tokenvault.domain.repo.ProviderRepository
 import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.domain.repo.TransactionRunner
+import com.lc33.tokenvault.engine.AutoRefresher
 import com.lc33.tokenvault.engine.BackupEngine
 import com.lc33.tokenvault.engine.BalanceEngine
 import com.lc33.tokenvault.engine.ProbeEngine
 import com.lc33.tokenvault.engine.ProbeSession
+import com.lc33.tokenvault.engine.RefreshRound
 import com.lc33.tokenvault.engine.UpdateEngine
 import com.lc33.tokenvault.net.HttpEngine
 import com.lc33.tokenvault.platform.AutoLocker
@@ -90,6 +92,8 @@ class IosDiGraphSmokeTest {
             "BackupEngine" to { koin.get<BackupEngine>() },
             "BalanceEngine" to { koin.get<BalanceEngine>() },
             "ProbeEngine" to { koin.get<ProbeEngine>() },
+            "RefreshRound" to { koin.get<RefreshRound>() },
+            "AutoRefresher" to { koin.get<AutoRefresher>() },
             "UpdateEngine" to { koin.get<UpdateEngine>() },
             "Redactor" to { koin.get<Redactor>() },
         )

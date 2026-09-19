@@ -125,6 +125,30 @@ interface SettingsRepository {
     suspend fun setDefaultProbeSettings(settings: DefaultProbeSettings)
 
     /**
+     * 自动刷新总开关（§13.4 探测设置页）。
+     *
+     * 开 = 进入解锁态时刷一轮，之后应用活着就按 [observeAutoRefreshIntervalMinutes] 再刷；
+     * 关 = 只有用户自己按刷新才发请求。**没写过时发 false**：自动路径要往每一家供应商发
+     * 真请求（红线 36），一次升级就把这个行为打开是不请自来的。
+     *
+     * 消费方是 [com.lc33.tokenvault.engine.AutoRefresher]，它是应用单例而不是设置页的
+     * ViewModel——订阅活得比页面长，用户离开设置页定时器不能停。
+     */
+    fun observeAutoRefresh(): Flow<Boolean>
+
+    suspend fun setAutoRefresh(enabled: Boolean)
+
+    /**
+     * 自动刷新的间隔，分钟（§13.4）。存储与档位见 [com.lc33.tokenvault.domain.AutoRefreshPolicy]。
+     *
+     * **没写过时发 [com.lc33.tokenvault.domain.AutoRefreshPolicy.DEFAULT_MINUTES]**。
+     * 存分钟数而不是下拉下标：以后中间插一档时，用户已选的含义不能变。
+     */
+    fun observeAutoRefreshIntervalMinutes(): Flow<Int>
+
+    suspend fun setAutoRefreshIntervalMinutes(minutes: Int)
+
+    /**
      * 底栏模糊（§13.4 外观页）。开 = 底栏对下方内容做背景模糊（`miuix-blur`，要 GPU）；
      * 关 = 底栏用实色背景。
      *

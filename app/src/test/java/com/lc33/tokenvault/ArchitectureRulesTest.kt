@@ -1,6 +1,7 @@
 package com.lc33.tokenvault
 
 import com.lc33.tokenvault.domain.AutoLockPolicy
+import com.lc33.tokenvault.domain.AutoRefreshPolicy
 import com.lc33.tokenvault.domain.ClipboardClearPolicy
 import com.lc33.tokenvault.domain.model.LogRetention
 import com.lc33.tokenvault.domain.model.PredictiveBackExitDirection
@@ -242,6 +243,24 @@ class ArchitectureRulesTest {
         fail(
             "剪贴板清除下拉按下标取值，两边数量必须一致（§7.5）：",
             arrayItemCountMismatches("clipboard_clear_options", ClipboardClearPolicy.OPTIONS.size, "ClipboardClearPolicy.OPTIONS"),
+        )
+    }
+
+    /**
+     * 自动刷新间隔那一枚下拉（§13.4 探测设置页）。
+     *
+     * 与「自动锁定」同一条风险：按下标取值，错位一格就是「选每 15 分钟得到 6 小时」，
+     * 而这一项的后果是数据一直不新，用户只会觉得"这个自动刷新根本没生效"。
+     */
+    @Test
+    fun `自动刷新间隔下拉的选项数与策略表一致`() {
+        fail(
+            "自动刷新间隔下拉按下标取值，两边数量必须一致（§13.4）：",
+            arrayItemCountMismatches(
+                "probe_auto_refresh_interval_options",
+                AutoRefreshPolicy.OPTIONS.size,
+                "AutoRefreshPolicy.OPTIONS",
+            ),
         )
     }
 

@@ -28,6 +28,19 @@ class WebDavEngine constructor(
         withConnection { config, credentials -> client.listBackups(config, credentials) }
     }
 
+    /**
+     * 删掉远端目录里的**指定那一份**备份。
+     *
+     * 轮转（[upload] 里那一段）只会淘汰超出保留份数的最旧文件，用户想单独清掉某一份
+     * ——比如那次是拿错口令做出来的——以前只能整个目录手工去清。这里删的是传进来的
+     * 那一条，不做"顺手删旧的"这类扩展：界面上点了哪一份，就该少哪一份。
+     */
+    suspend fun delete(fileName: String) {
+        withAudit("delete") {
+            withConnection { config, credentials -> client.delete(config, credentials, fileName) }
+        }
+    }
+
     suspend fun upload(password: CharArray, keepCount: Int = DEFAULT_KEEP_COUNT): WebDavUploadResult =
         withAudit("upload") {
             val fileName = backupFileName(now())

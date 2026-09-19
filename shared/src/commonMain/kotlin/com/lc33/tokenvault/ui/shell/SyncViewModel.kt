@@ -209,6 +209,29 @@ class SyncViewModel constructor(
     }
 
     /**
+     * 删掉远端那一份备份，成功后立刻重新拉一次列表。
+     *
+     * 刷列表失败不外抛、也不报"同步失败"：包已经删掉了，这时候提示失败会让用户以为
+     * 没删成而去点第二次。列表停在旧的那一条上，下一次进页面或手动刷新时自然纠正。
+     */
+    fun deleteWebDavBackup(fileName: String) {
+        viewModelScope.launch {
+            _webDavBusy.value = true
+            try {
+                runCatching { webDavEngine.delete(fileName) }
+                    .onSuccess {
+                        _events.send(SyncEvent.WebDavDeleted)
+                        runCatching { webDavEngine.listRemoteBackups() }
+                            .onSuccess { names -> _events.send(SyncEvent.WebDavListSucceeded(names)) }
+                    }
+                    .onFailure { _events.send(SyncEvent.WebDavFailed) }
+            } finally {
+                _webDavBusy.value = false
+            }
+        }
+    }
+
+    /**
      * 解出已存的 WebDAV 凭据，给设置弹层回填（2026-09 反馈：改一次配置要重输一遍，
      * 忘了密码在应用里根本看不到）。**调用方负责用完 zeroize**——这里不擦是因为
      * 拷进输入框之前擦掉就没有意义了。
@@ -247,5 +270,7 @@ sealed interface SyncEvent {
     data object WebDavConfigSaved : SyncEvent
     data class WebDavListSucceeded(val names: List<String>) : SyncEvent
     data class WebDavUploadSucceeded(val fileName: String, val prunedCount: Int) : SyncEvent
+    /** 远端某一份已删除。不带文件名：提示只说"已删除"，文件名在列表里自己会消失。 */
+    data object WebDavDeleted : SyncEvent
     data object WebDavFailed : SyncEvent
 }

@@ -4,6 +4,7 @@ import com.lc33.tokenvault.data.dao.AppSettingDao
 import com.lc33.tokenvault.data.entity.AppSettingEntity
 import com.lc33.tokenvault.domain.AutoLockPolicy
 import com.lc33.tokenvault.domain.AutoLockTimeout
+import com.lc33.tokenvault.domain.AutoRefreshPolicy
 import com.lc33.tokenvault.domain.ClipboardClearPolicy
 import com.lc33.tokenvault.domain.DefaultProbeSettings
 import com.lc33.tokenvault.domain.model.BalanceSnapshot
@@ -199,6 +200,31 @@ class RoomSettingsRepository constructor(
         auditChange(KEY_PREDICTIVE_BACK_EXIT_DIRECTION)
     }
 
+    override fun observeAutoRefresh(): Flow<Boolean> = dao.observeAll()
+        .map { rows -> rows.firstOrNull { it.key == KEY_AUTO_REFRESH }?.value.toBooleanSafe() }
+        .distinctUntilChanged()
+
+    override suspend fun setAutoRefresh(enabled: Boolean) {
+        dao.put(AppSettingEntity(key = KEY_AUTO_REFRESH, value = enabled.toString()))
+        auditChange(KEY_AUTO_REFRESH)
+    }
+
+    override fun observeAutoRefreshIntervalMinutes(): Flow<Int> = dao.observeAll()
+        .map { rows ->
+            AutoRefreshPolicy.decode(rows.firstOrNull { it.key == KEY_AUTO_REFRESH_INTERVAL }?.value)
+        }
+        .distinctUntilChanged()
+
+    override suspend fun setAutoRefreshIntervalMinutes(minutes: Int) {
+        dao.put(
+            AppSettingEntity(
+                key = KEY_AUTO_REFRESH_INTERVAL,
+                value = AutoRefreshPolicy.encode(minutes),
+            ),
+        )
+        auditChange(KEY_AUTO_REFRESH_INTERVAL)
+    }
+
     private suspend fun auditChange(key: String) {
         audit.recordSafe(LogLevel.INFO, LogCategory.VAULT, "setting changed", "key=$key")
     }
@@ -266,6 +292,11 @@ class RoomSettingsRepository constructor(
         const val KEY_UPDATE_CHANNEL = "updateChannel"
 
         const val KEY_DEFAULT_PROBE = "defaultProbe"
+
+        /** 自动刷新开关，以及它的间隔（分钟，见 [AutoRefreshPolicy]）。 */
+        const val KEY_AUTO_REFRESH = "autoRefresh"
+
+        const val KEY_AUTO_REFRESH_INTERVAL = "autoRefreshIntervalMinutes"
 
         const val KEY_LOG_LEVEL_FILTER = "logLevelFilter"
 

@@ -74,6 +74,17 @@ fun relativeTimeLabel(bucket: RelativeBucket, absoluteLabel: String = ""): Strin
 }
 
 /**
+ * 「跨天就换完整日期」那一档的分档。备份列表用它（[relativeLabelWithinDay]）。
+ *
+ * 纯函数，理由与 [relativeBucketOf] 相同：分档要能在 JVM 单测里钉住。
+ */
+fun relativeBucketWithinDay(nowMillis: Long, thenMillis: Long): RelativeBucket =
+    when (val bucket = relativeBucketOf(nowMillis, thenMillis)) {
+        is RelativeBucket.Days -> RelativeBucket.Absolute
+        else -> bucket
+    }
+
+/**
  * 两个时间戳 → 一句现成的话。**每一个要显示相对时间的地方都该调这一个。**
  *
  * 它存在的理由是 `Absolute` 那一档：[relativeTimeLabel] 的 `absoluteLabel` 默认是空串，
@@ -86,6 +97,17 @@ fun relativeLabel(nowMillis: Long, thenMillis: Long): String {
     val absolute = if (bucket == RelativeBucket.Absolute) absoluteDateLabel(thenMillis) else ""
     return relativeTimeLabel(bucket, absolute)
 }
+
+/**
+ * 同一天内给相对时间，跨过一天就给完整日期。远端备份列表用它。
+ *
+ * 与 [relativeLabel] 分档不同是有意的：一屏列着十几份备份时，"3 天前"要用户在脑子里
+ * 换算成日期才认得出是哪一次，而挑备份的人真正要回答的就是"这是哪一天的那份"。
+ * 当天之内的（几分钟、几小时前）仍然给相对时间——那一档里"刚刚"比日期更有用。
+ */
+@Composable
+fun relativeLabelWithinDay(nowMillis: Long, thenMillis: Long): String =
+    relativeTimeLabel(relativeBucketWithinDay(nowMillis, thenMillis), absoluteDateLabel(thenMillis))
 
 /**
  * 一段耗时（毫秒）→ 向上取整到秒的整数。

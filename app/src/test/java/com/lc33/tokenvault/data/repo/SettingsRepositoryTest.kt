@@ -355,6 +355,71 @@ class SettingsRepositoryTest {
         }
     }
 
+    // ---------------------------------------------------------------- 自动刷新
+
+    @Test
+    fun `自动刷新没写过时默认关`() = runTest {
+        // 与嗅探那一组相反：这一项默认关，因为打开它意味着应用会自己往每一家供应商发请求。
+        repo.observeAutoRefresh().test {
+            assertEquals(false, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `自动刷新开了能读回来`() = runTest {
+        repo.setAutoRefresh(true)
+        repo.observeAutoRefresh().test {
+            assertEquals(true, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `自动刷新间隔没写过时默认一小时`() = runTest {
+        repo.observeAutoRefreshIntervalMinutes().test {
+            assertEquals(60, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `自动刷新间隔存的是分钟数不是下标`() = runTest {
+        // 存下标的话，以后在中间插一档就会让所有已存的设置悄悄改变含义。
+        repo.setAutoRefreshIntervalMinutes(15)
+        repo.observeAutoRefreshIntervalMinutes().test {
+            assertEquals(15, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertEquals("15", dao.rows.first { it.key == "autoRefreshIntervalMinutes" }.value)
+    }
+
+    @Test
+    fun `自动刷新间隔坏值落回默认而不是零`() = runTest {
+        dao.put(
+            com.lc33.tokenvault.data.entity.AppSettingEntity(key = "autoRefreshIntervalMinutes", value = "0"),
+        )
+        repo.observeAutoRefreshIntervalMinutes().test {
+            // 0 分钟是一个不停发请求的死循环，读方向必须落回默认档。
+            assertEquals(60, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `自动刷新两项只在自己的流上出声`() = runTest {
+        // 订阅的是整张表：写别的键会把这条流再吵醒一次，没跟 distinctUntilChanged 的话
+        // AutoRefresher 会被反复重启，间隔永远等不满。
+        repo.setAutoRefresh(true)
+        repo.observeAutoRefresh().test {
+            assertEquals(true, awaitItem())
+            repo.setClipboardClearSeconds(30)
+            repo.setAutoRefreshIntervalMinutes(5)
+            expectNoEvents()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
     // ---------------------------------------------------------------- 底栏模糊
 
     @Test

@@ -27,7 +27,6 @@
     <string name="dashboard_balance_updated">更新于 %1$s</string>
     <string name="dashboard_balance_failed">%1$d 个供应商的余额查询失败</string>
     <string name="dashboard_balance_none">还没有配置余额查询</string>
-    <string name="dashboard_balance_detail">查看余额明细</string>
     <string name="dashboard_counts_title">内容</string>
     <string name="common_loading">加载中…</string>
     <string name="count_providers">供应商</string>
@@ -268,6 +267,19 @@
     <string name="probe_thresholds_cny">人民币（CNY）</string>
     <string name="probe_thresholds_invalid">请输入不小于 0 的数字</string>
     <string name="probe_thresholds_save">保存</string>
+    <!-- 自动刷新（探测设置页）：开关与间隔档位。 -->
+    <string name="probe_section_auto_refresh">自动刷新</string>
+    <string name="probe_auto_refresh">自动刷新数据</string>
+    <string name="probe_auto_refresh_summary">每次解锁进入应用时刷一轮，应用保持运行期间再按下面的间隔继续刷。自动路径只发零成本请求：端点与密钥连通性，以及你已开启的余额查询，不会触发消耗额度的探测。</string>
+    <string name="probe_auto_refresh_interval">刷新间隔</string>
+    <string name="probe_auto_refresh_interval_summary">只在应用运行时计时：后台不会把它叫醒，锁定时也一律不发请求。</string>
+    <string-array name="probe_auto_refresh_interval_options">
+        <item>每 5 分钟</item>
+        <item>每 15 分钟</item>
+        <item>每 30 分钟</item>
+        <item>每 1 小时</item>
+        <item>每 6 小时</item>
+    </string-array>
     <string name="probe_section_client">客户端伪装</string>
     <string name="probe_sniff">自动匹配客户端预设</string>
     <string name="probe_sniff_summary">仅在手动探测时执行，遇到限流立即停止。</string>
@@ -358,6 +370,12 @@
     <string name="sync_remote_count">远端备份：%1$d 份</string>
     <string name="sync_remote_section">远端备份</string>
     <string name="sync_remote_empty">那个远端目录里还没有备份包。</string>
+    <!-- 远端列表里点开某一份之后的两个动作，以及删除的二次确认。 -->
+    <string name="sync_remote_restore">恢复此备份</string>
+    <string name="sync_remote_delete">删除此备份</string>
+    <string name="sync_remote_delete_confirm_title">删除这份远端备份？</string>
+    <string name="sync_remote_delete_confirm_summary">只从远端目录移除 %1$s，本机数据不受影响；删掉的备份在应用里找不回来。</string>
+    <string name="sync_result_remote_deleted">远端备份已删除</string>
     <string name="sync_result_webdav_configured">WebDAV 设置已保存</string>
     <string name="sync_result_webdav_uploaded">已上传 %1$s，清理 %2$d 份旧备份</string>
     <string name="sync_export">导出加密备份</string>
@@ -626,10 +644,8 @@
     <string name="probe_level_model">模型可达性</string>
     <string name="probe_level_balance">余额查询</string>
 
-    <!-- Balance breakdown -->
+    <!-- Balance: the "query failed" wording, used on the provider detail page. -->
     <string name="balance_failed_section">查询失败</string>
-    <string name="balance_empty_desc">余额查询按供应商单独配置，请在供应商编辑页设置。</string>
-    <string name="balance_failed_hint">无法读取余额，与余额为 0 不同</string>
     <!-- Per-provider probe switches (invariant 36) -->
     <string name="editor_section_probe">探测设置</string>
     <string name="editor_probe_enabled">允许探测这一家</string>

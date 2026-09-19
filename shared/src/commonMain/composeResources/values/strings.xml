@@ -27,8 +27,6 @@
     <string name="dashboard_balance_updated">Updated %1$s</string>
     <string name="dashboard_balance_failed">%1$d provider(s) failed the balance query</string>
     <string name="dashboard_balance_none">No balance query configured yet</string>
-    <!-- 总览余额卡下方那一行入口：整张卡不着色，只这一行可点（见 DashboardCards）。 -->
-    <string name="dashboard_balance_detail">View balance breakdown</string>
     <string name="dashboard_counts_title">Content</string>
     <string name="common_loading">Loading…</string>
     <string name="count_providers">Providers</string>
@@ -273,6 +271,19 @@
     <string name="probe_thresholds_cny">Chinese Yuan (CNY)</string>
     <string name="probe_thresholds_invalid">Enter a number of 0 or more</string>
     <string name="probe_thresholds_save">Save</string>
+    <!-- 自动刷新（探测设置页）：开关与间隔档位。 -->
+    <string name="probe_section_auto_refresh">Auto refresh</string>
+    <string name="probe_auto_refresh">Refresh data automatically</string>
+    <string name="probe_auto_refresh_summary">Runs once each time you unlock the app, then again on the interval below while the app stays running. The automatic path only sends zero-cost requests: endpoint and key reachability, plus the balances you opted into. Nothing that spends quota.</string>
+    <string name="probe_auto_refresh_interval">Refresh interval</string>
+    <string name="probe_auto_refresh_interval_summary">Counted only while the app is running. It does not wake up in the background and never probes while the vault is locked.</string>
+    <string-array name="probe_auto_refresh_interval_options">
+        <item>Every 5 minutes</item>
+        <item>Every 15 minutes</item>
+        <item>Every 30 minutes</item>
+        <item>Every hour</item>
+        <item>Every 6 hours</item>
+    </string-array>
     <string name="probe_section_client">Client disguise</string>
     <string name="probe_sniff">Match a client profile automatically</string>
     <string name="probe_sniff_summary">Manual probes only. Stops immediately when the host rate-limits.</string>
@@ -363,6 +374,12 @@
     <string name="sync_remote_count">Remote backups: %1$d</string>
     <string name="sync_remote_section">Remote backups</string>
     <string name="sync_remote_empty">No backup package in that remote directory yet.</string>
+    <!-- 远端列表里点开某一份之后的两个动作，以及删除的二次确认。 -->
+    <string name="sync_remote_restore">Restore this backup</string>
+    <string name="sync_remote_delete">Delete this backup</string>
+    <string name="sync_remote_delete_confirm_title">Delete this remote backup?</string>
+    <string name="sync_remote_delete_confirm_summary">Only %1$s is removed from the remote directory; this device stays as it is. A deleted backup cannot be brought back from inside the app.</string>
+    <string name="sync_result_remote_deleted">Remote backup deleted</string>
     <string name="sync_result_webdav_configured">WebDAV settings saved</string>
     <string name="sync_result_webdav_uploaded">Uploaded %1$s and pruned %2$d old backups</string>
     <string name="sync_export">Export an encrypted backup</string>
@@ -636,10 +653,8 @@
     <string name="probe_level_model">Model reachability</string>
     <string name="probe_level_balance">Balance query</string>
 
-    <!-- Balance breakdown -->
+    <!-- Balance: the "query failed" wording, used on the provider detail page. -->
     <string name="balance_failed_section">Query failed</string>
-    <string name="balance_empty_desc">A balance query is set per provider, in the provider editor.</string>
-    <string name="balance_failed_hint">Could not read the balance; this is not the same as a balance of zero.</string>
     <!-- Per-provider probe switches (invariant 36) -->
     <string name="editor_section_probe">Probe settings</string>
     <string name="editor_probe_enabled">Allow probing this provider</string>

@@ -61,9 +61,6 @@ data object GroupsRoute : VaultRoute
 @Serializable
 data object ProbeRunRoute : VaultRoute
 
-@Serializable
-data object BalanceBreakdownRoute : VaultRoute
-
 // ---------------------------------------------------------------- 设置下的二级页
 
 @Serializable

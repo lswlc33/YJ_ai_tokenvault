@@ -11,6 +11,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
+import com.lc33.tokenvault.engine.AutoRefresher
 import com.lc33.tokenvault.platform.BiometricPromptText
 import com.lc33.tokenvault.screens.lock.LockCallbacks
 import com.lc33.tokenvault.ui.miuix.AppTheme
@@ -39,6 +40,7 @@ fun AppRoot() {
 
     val appearance: AppearanceViewModel = koinViewModel()
     val logMaintenance: com.lc33.tokenvault.engine.LogMaintenance = koinInject()
+    val autoRefresher: AutoRefresher = koinInject()
 
     LaunchedEffect(logMaintenance) {
         runCatching { logMaintenance.run() }
@@ -87,6 +89,10 @@ fun AppRoot() {
             callbacks = callbacks,
             biometricAvailable = biometricAvailable,
         ) {
+            // 解锁完成就是用户意义上的"打开了应用"。自动刷新要在这里补一轮：应用是先起来、
+            // 后解锁的（§6.1），解锁前发请求只会得到一轮全失败。这一棵子树只在 Unlocked
+            // 时组合，所以每一次"锁 → 解"都会重新走这一句；间隔那一档由 AutoRefresher 自己管。
+            LaunchedEffect(autoRefresher) { autoRefresher.onUnlocked() }
             VaultShell(
                 initialTabPage = topLevelPage,
                 onTabPageChange = { topLevelPage = it },

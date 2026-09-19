@@ -58,6 +58,25 @@ class RelativeTimeTest {
         assertEquals(RelativeBucket.JustNow, relativeBucketOf(now, now + 30_000))
     }
 
+    /**
+     * 备份列表那一档：跨天就不给"N 天前"。
+     *
+     * 与 [relativeBucketOf] 的差别只在这里——挑备份的人要回答的是"这是哪一天的那份"，
+     * "3 天前"得先在脑子里换算一次。天档整体改成 Absolute，由界面换成完整日期。
+     */
+    @Test
+    fun `跨天档在备份列表里改用绝对日期`() {
+        assertEquals(RelativeBucket.JustNow, relativeBucketWithinDay(now, now))
+        assertEquals(RelativeBucket.Minutes(30), relativeBucketWithinDay(now, now - 30 * minute))
+        assertEquals(RelativeBucket.Hours(23), relativeBucketWithinDay(now, now - 23 * hour))
+        // 恰好一天与更久都是 Absolute；连"超过 30 天"那一档也仍然是 Absolute。
+        assertEquals(RelativeBucket.Absolute, relativeBucketWithinDay(now, now - day))
+        assertEquals(RelativeBucket.Absolute, relativeBucketWithinDay(now, now - 3 * day))
+        assertEquals(RelativeBucket.Absolute, relativeBucketWithinDay(now, now - 400 * day))
+        // 未来那一档不被吞掉：来自另一台设备的备份仍然要写"时间不可信"。
+        assertEquals(RelativeBucket.Future, relativeBucketWithinDay(now, now + hour))
+    }
+
     @Test
     fun `耗时不向下取整`() {
         // 0.4 秒的探测若向下取整会显示"0 秒"，等于说"没花时间"——那是在说谎。

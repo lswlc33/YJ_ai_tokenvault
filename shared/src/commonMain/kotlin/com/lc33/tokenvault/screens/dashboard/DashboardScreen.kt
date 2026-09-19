@@ -33,8 +33,6 @@ fun DashboardScreen(
     state: DashboardUiState,
     onOpenManage: () -> Unit,
     onOpenProbeDetail: () -> Unit,
-    /** 余额明细页（`BalanceBreakdownRoute`）的唯一入口。 */
-    onOpenBalanceBreakdown: () -> Unit,
     onRefreshBalance: () -> Unit,
     onRefreshStatus: () -> Unit,
 ) {
@@ -73,7 +71,6 @@ fun DashboardScreen(
                     balance = state.balance,
                     nowMs = state.nowMs,
                     onRefresh = onRefreshBalance,
-                    onOpenDetail = onOpenBalanceBreakdown,
                 )
             }
             item { CountsCard(state.counts, onOpenManage) }

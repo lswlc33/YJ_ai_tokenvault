@@ -10,6 +10,7 @@ import com.lc33.tokenvault.di.coreModule
 import com.lc33.tokenvault.di.platformModule
 import com.lc33.tokenvault.di.viewModelModule
 import com.lc33.tokenvault.domain.repo.SettingsRepository
+import com.lc33.tokenvault.engine.AutoRefresher
 import com.lc33.tokenvault.platform.AutoLocker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -32,6 +33,7 @@ import org.koin.core.qualifier.named
 class TokenVaultApp : Application() {
 
     private val autoLocker: AutoLocker by inject()
+    private val autoRefresher: AutoRefresher by inject()
     private val settings: SettingsRepository by inject()
     private val profileSeeder: ProfileSeeder by inject()
     private val appScope: CoroutineScope by inject(named(Qualifiers.APP_SCOPE))
@@ -67,5 +69,8 @@ class TokenVaultApp : Application() {
         // 内置客户端预设（§8.2）。幂等，只碰公开数据，锁定态也能跑；启动时种一次，
         // 既覆盖新装用户，也随版本刷新"没改过"的条目。
         appScope.launch { profileSeeder.seed() }
+        // 自动刷新（§13.4 探测设置页）：进程级起一次，开关与间隔由它自己订阅，
+        // 所以用户改设置不需要回到这一页重开。解锁后那一刷在 AppRoot 里接。
+        autoRefresher.start()
     }
 }

@@ -34,13 +34,16 @@ import com.lc33.tokenvault.domain.repo.ProviderRepository
 import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.domain.repo.WebDavSettingsRepository
 import com.lc33.tokenvault.domain.repo.TransactionRunner
+import com.lc33.tokenvault.engine.AutoRefresher
 import com.lc33.tokenvault.engine.BackupEngine
 import com.lc33.tokenvault.engine.BalanceEngine
 import com.lc33.tokenvault.engine.IdleLockSuspender
 import com.lc33.tokenvault.engine.LogMaintenance
 import com.lc33.tokenvault.engine.ProbeEngine
 import com.lc33.tokenvault.engine.ProbeSession
+import com.lc33.tokenvault.engine.RefreshRound
 import com.lc33.tokenvault.engine.UpdateEngine
+import com.lc33.tokenvault.engine.VaultRefreshRound
 import com.lc33.tokenvault.engine.WebDavEngine
 import com.lc33.tokenvault.net.HostGate
 import com.lc33.tokenvault.net.HttpEngine
@@ -212,6 +215,18 @@ val coreModule = module {
             session = get(), engine = get(), audit = get(), settings = get(), autoLocker = get(),
             redactor = get(), knownSecrets = get(), now = get(named(Qualifiers.NOW)),
             placeholders = get(named(Qualifiers.PLACEHOLDERS)),
+        )
+    }
+    // 自动刷新（§13.4 探测设置页）。"一轮刷什么"与"什么时候刷"分两个定义：前者是
+    // ProbeEngine + BalanceEngine 的薄包装，后者是应用单例。RefreshRound 要显式写类型，
+    // Koin 按精确类型解析（同上面那两个接口包装的理由）。
+    single<RefreshRound> { VaultRefreshRound(probeEngine = get(), balanceEngine = get()) }
+    single {
+        AutoRefresher(
+            settings = get(),
+            session = get(),
+            round = get(),
+            scope = get(named(Qualifiers.APP_SCOPE)),
         )
     }
     single { WebDavClient(get(), audit = get()) }

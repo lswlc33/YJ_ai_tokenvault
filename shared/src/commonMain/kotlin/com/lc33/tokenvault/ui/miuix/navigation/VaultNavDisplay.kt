@@ -33,7 +33,6 @@ import com.lc33.tokenvault.domain.model.PredictiveBackExitDirection
 import com.lc33.tokenvault.domain.model.PredictiveBackStyle
 import com.lc33.tokenvault.ui.shell.AboutRoute
 import com.lc33.tokenvault.ui.shell.AppearanceRoute
-import com.lc33.tokenvault.ui.shell.BalanceBreakdownRoute
 import com.lc33.tokenvault.ui.shell.BalanceThresholdsRoute
 import com.lc33.tokenvault.ui.shell.ChangePinRoute
 import com.lc33.tokenvault.ui.shell.ClientKeywordsRoute
@@ -79,7 +78,6 @@ fun rememberVaultBackStack(): MutableList<VaultRoute> {
                                         subclass(ImportRoute::class)
                     subclass(GroupsRoute::class)
                     subclass(ProbeRunRoute::class)
-                    subclass(BalanceBreakdownRoute::class)
                     subclass(AppearanceRoute::class)
                     subclass(SecurityRoute::class)
                     subclass(ChangePinRoute::class)

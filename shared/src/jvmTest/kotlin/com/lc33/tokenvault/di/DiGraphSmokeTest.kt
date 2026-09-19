@@ -15,10 +15,12 @@ import com.lc33.tokenvault.domain.repo.ProbeRunRepository
 import com.lc33.tokenvault.domain.repo.ProviderRepository
 import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.domain.repo.TransactionRunner
+import com.lc33.tokenvault.engine.AutoRefresher
 import com.lc33.tokenvault.engine.BackupEngine
 import com.lc33.tokenvault.engine.BalanceEngine
 import com.lc33.tokenvault.engine.ProbeEngine
 import com.lc33.tokenvault.engine.ProbeSession
+import com.lc33.tokenvault.engine.RefreshRound
 import com.lc33.tokenvault.engine.UpdateEngine
 import com.lc33.tokenvault.net.HttpEngine
 import com.lc33.tokenvault.platform.AutoLocker
@@ -124,6 +126,10 @@ class DiGraphSmokeTest {
         assertNotNull(koin.get<BackupEngine>())
         assertNotNull(koin.get<BalanceEngine>())
         assertNotNull(koin.get<ProbeEngine>())
+        // 自动刷新：`RefreshRound` 是按接口注册的，Koin 只按精确类型解析，
+        // 少了那一行显式类型就会在这里而不是在设备上炸。
+        assertNotNull(koin.get<RefreshRound>())
+        assertNotNull(koin.get<AutoRefresher>())
         assertNotNull(koin.get<UpdateEngine>())
         assertNotNull(koin.get<Redactor>())
     }

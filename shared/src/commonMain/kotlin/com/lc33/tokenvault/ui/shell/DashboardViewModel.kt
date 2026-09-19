@@ -14,12 +14,10 @@ import com.lc33.tokenvault.platform.nowMillis
 import com.lc33.tokenvault.probe.ProbeProgress
 import com.lc33.tokenvault.screens.model.DashboardUiState
 import com.lc33.tokenvault.screens.model.ProbeRunSummary
-import com.lc33.tokenvault.screens.model.UiProviderRow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -72,16 +70,6 @@ class DashboardViewModel constructor(
         )
     }.stateIn(viewModelScope, SharingStarted.Lazily, DashboardUiState(loading = true))
 
-    /**
-     * 余额明细那个二级页要的行。
-     *
-     * 从**同一条** [snapshot] 派生而不是让那一页自己去查：余额卡上的合计与明细页的每一行
-     * 必须出自同一批数据，否则"点进去发现加起来不等于卡上那个数"。
-     */
-    val providerRows: StateFlow<List<UiProviderRow>> = snapshot
-        .map { snap -> snap.rows() }
-        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
-
     /** 仪表盘“开始探测”。结果与进度由 ProbeEngine 的状态流回 UI。 */
     fun startProbe(): Boolean = probeEngine.start()
 
@@ -116,20 +104,6 @@ class DashboardViewModel constructor(
         summaries.associate { summary ->
             summary.provider.id to aggregateBalanceOf(keys.filter { it.providerId == summary.provider.id })
         }
-
-    private fun Snapshot.rows(): List<UiProviderRow> {
-        val healths = keys.groupBy({ it.providerId }, { it.effectiveHealth() })
-        val balances = balanceByProvider()
-        return summaries.map { summary ->
-            val providerKeys = keys.filter { it.providerId == summary.provider.id }
-            summary.toRow(
-                health = aggregateHealth(healths[summary.provider.id].orEmpty()),
-                balance = balances[summary.provider.id],
-                host = providerHostOf(providerKeys),
-                balanceConfigured = balanceConfiguredOf(providerKeys),
-            )
-        }
-    }
 
     private fun Snapshot.toUiState(
         thresholds: Map<String, Double>,
