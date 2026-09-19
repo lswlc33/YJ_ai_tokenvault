@@ -143,9 +143,11 @@ import tokenvault.shared.generated.resources.sync_remote_delete
 import tokenvault.shared.generated.resources.sync_remote_delete_confirm_summary
 import tokenvault.shared.generated.resources.sync_remote_delete_confirm_title
 import tokenvault.shared.generated.resources.sync_remote_restore
+import tokenvault.shared.generated.resources.sync_restore_bad_passphrase
 import tokenvault.shared.generated.resources.sync_restore_failed
 import tokenvault.shared.generated.resources.sync_restore_mode
 import tokenvault.shared.generated.resources.sync_restore_mode_summary
+import tokenvault.shared.generated.resources.sync_restore_too_new
 import tokenvault.shared.generated.resources.sync_result_exported
 import tokenvault.shared.generated.resources.sync_result_remote_deleted
 import tokenvault.shared.generated.resources.sync_result_restored
@@ -1195,15 +1197,26 @@ private fun SyncRouteContent(
         vm.events.collect { event ->
             when (event) {
                 is SyncEvent.ExportSucceeded -> feedback?.post(AppFeedback(exported))
-                // 三条失败提示都不带异常原文（原文里有 WebDAV 地址、文件名甚至凭据片段，
+                // 失败提示都不带异常原文（原文里有 WebDAV 地址、文件名甚至凭据片段，
                 // 摊在屏幕上等于把日志公开，还可能被截图）。原因由引擎写进 audit_log，
-                // 这里只说"失败了 + 下一步去哪看"。
+                // 这里只说"失败了 + 下一步去哪看"；恢复失败按 `RestoreFailure` 分档说，
+                // 因为"换个口令再来"和"去查 WebDAV 设置"是两个完全不同的下一步。
                 SyncEvent.ExportFailed ->
                     feedback?.post(AppFeedback(getString(Res.string.sync_export_failed)))
                 is SyncEvent.RestoreSucceeded ->
                     feedback?.post(AppFeedback(getString(Res.string.sync_result_restored, event.importedProviders)))
-                SyncEvent.RestoreFailed ->
-                    feedback?.post(AppFeedback(getString(Res.string.sync_restore_failed)))
+                is SyncEvent.RestoreFailed -> feedback?.post(
+                    AppFeedback(
+                        getString(
+                            when (event.reason) {
+                                RestoreFailure.BadPassphrase -> Res.string.sync_restore_bad_passphrase
+                                RestoreFailure.TooNew -> Res.string.sync_restore_too_new
+                                RestoreFailure.Transfer -> Res.string.sync_webdav_failed
+                                RestoreFailure.Write -> Res.string.sync_restore_failed
+                            },
+                        ),
+                    ),
+                )
                 SyncEvent.WebDavConfigSaved -> {
                     remoteBackups = null
                     feedback?.post(AppFeedback(getString(Res.string.sync_result_webdav_configured)))

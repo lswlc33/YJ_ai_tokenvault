@@ -2,6 +2,9 @@ package com.lc33.tokenvault.ui.shell
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lc33.tokenvault.backup.BackupCorruptException
+import com.lc33.tokenvault.backup.BackupTooNewException
+import com.lc33.tokenvault.crypto.InvalidKdfParamsException
 import com.lc33.tokenvault.crypto.zeroize
 import com.lc33.tokenvault.domain.model.BackupTarget
 import com.lc33.tokenvault.domain.model.LastBackup
@@ -12,6 +15,10 @@ import com.lc33.tokenvault.domain.repo.WebDavSettingsRepository
 import com.lc33.tokenvault.engine.BackupEngine
 import com.lc33.tokenvault.engine.RestoreMode
 import com.lc33.tokenvault.engine.WebDavEngine
+import com.lc33.tokenvault.engine.WebDavNotConfiguredException
+import com.lc33.tokenvault.net.WebDavHttpException
+import com.lc33.tokenvault.net.WebDavNotFoundException
+import com.lc33.tokenvault.net.WebDavUnauthorizedException
 import com.lc33.tokenvault.platform.VaultSession
 import com.lc33.tokenvault.platform.nowMillis
 import com.lc33.tokenvault.screens.model.BackupStatus
@@ -105,7 +112,7 @@ class SyncViewModel constructor(
             try {
                 runCatching { engine.restore(bytes, owned, mode) }
                     .onSuccess { result -> _events.send(SyncEvent.RestoreSucceeded(result.importedProviders)) }
-                    .onFailure { _events.send(SyncEvent.RestoreFailed) }
+                    .onFailure { _events.send(SyncEvent.RestoreFailed(it.toRestoreFailure())) }
             } finally {
                 owned.zeroize()
             }
@@ -187,7 +194,7 @@ class SyncViewModel constructor(
                 val result = webDavEngine.restoreLatest(owned, mode)
                 _events.send(SyncEvent.RestoreSucceeded(result.importedProviders))
             } catch (t: Throwable) {
-                _events.send(SyncEvent.RestoreFailed)
+                _events.send(SyncEvent.RestoreFailed(t.toRestoreFailure()))
             } finally {
                 owned.zeroize()
                 _webDavBusy.value = false
@@ -210,7 +217,7 @@ class SyncViewModel constructor(
                 val result = webDavEngine.restore(fileName, owned, mode)
                 _events.send(SyncEvent.RestoreSucceeded(result.importedProviders))
             } catch (t: Throwable) {
-                _events.send(SyncEvent.RestoreFailed)
+                _events.send(SyncEvent.RestoreFailed(t.toRestoreFailure()))
             } finally {
                 owned.zeroize()
                 _webDavBusy.value = false
@@ -270,17 +277,53 @@ class SyncViewModel constructor(
  *
  * **失败事件不带异常原文**：原文里常有 WebDAV 地址、文件名甚至凭据片段，投到 Snackbar
  * 等于把日志内容摊在屏幕上（还可能被截图）。失败原因由引擎自己写进 audit_log，
- * 提示只说"失败了，去看日志"。
+ * 提示只说"失败了 + 去看日志"——但恢复失败额外带一个 [RestoreFailure]：那是分类，
+ * 不是原文，而它恰好是用户下一步能不能自己修好的分水岭。
  */
 sealed interface SyncEvent {
     data object ExportSucceeded : SyncEvent
     data object ExportFailed : SyncEvent
     data class RestoreSucceeded(val importedProviders: Int) : SyncEvent
-    data object RestoreFailed : SyncEvent
+    data class RestoreFailed(val reason: RestoreFailure) : SyncEvent
     data object WebDavConfigSaved : SyncEvent
     data class WebDavListSucceeded(val names: List<String>) : SyncEvent
     data class WebDavUploadSucceeded(val fileName: String, val prunedCount: Int) : SyncEvent
     /** 远端某一份已删除。不带文件名：提示只说"已删除"，文件名在列表里自己会消失。 */
     data object WebDavDeleted : SyncEvent
     data object WebDavFailed : SyncEvent
+}
+
+/**
+ * 恢复失败的四类原因，按"用户下一步做什么"切分，而不是按抛出的类名切分。
+ *
+ * 为什么值得单独一档：换口令与换网络是两件完全不同的事，而界面上以前只有同一句
+ * "恢复失败，原因详见日志"。口令不对这一类尤其冤——它是恢复失败最常见的原因
+ * （备份口令默认沿用 PIN，换设备时两台 PIN 不一样就必然撞上），却要被报成
+ * 像是应用写坏了库，用户只能去翻日志猜。
+ */
+enum class RestoreFailure {
+    /** 口令不对，或这个包压根不是用这个口令做的（AEAD 校验不过）。 */
+    BadPassphrase,
+
+    /** 包比当前应用新，或它的 KDF 迭代数超出可读封顶：先升级再恢复。 */
+    TooNew,
+
+    /** 远端那一段没成：列目录、取包、认证失败，或这台设备还没配凭据。 */
+    Transfer,
+
+    /** 包能解开，往库里写这一步失败。兜底档，具体原因只在日志里。 */
+    Write,
+}
+
+/** 按异常类型归类。类型是各层自己声明的公开契约，比消息字符串可靠（消息可能被改措辞）。 */
+private fun Throwable.toRestoreFailure(): RestoreFailure = when (this) {
+    is BackupCorruptException -> RestoreFailure.BadPassphrase
+    is BackupTooNewException, is InvalidKdfParamsException -> RestoreFailure.TooNew
+    is WebDavHttpException,
+    is WebDavUnauthorizedException,
+    is WebDavNotFoundException,
+    is WebDavNotConfiguredException,
+    -> RestoreFailure.Transfer
+
+    else -> RestoreFailure.Write
 }

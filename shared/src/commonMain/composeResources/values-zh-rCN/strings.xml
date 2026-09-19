@@ -392,6 +392,8 @@
     <string name="sync_result_restored">已恢复 %1$d 家供应商</string>
     <string name="sync_export_failed">备份失败，原因详见日志。</string>
     <string name="sync_restore_failed">恢复失败，原因详见日志。</string>
+    <string name="sync_restore_bad_passphrase">恢复失败：口令与这个包对不上（或包已损坏）。</string>
+    <string name="sync_restore_too_new">恢复失败：这个备份包比当前应用还新，请先升级应用。</string>
     <string name="sync_webdav_failed">同步失败，请检查 WebDAV 设置后重试，原因详见日志。</string>
     <string name="sync_restore_mode">合并方式</string>
     <string name="sync_restore_mode_summary">「合并」会去掉本机已有的重复项，「仅新增」只写入本机没有的，「覆盖」会先清空本机再写入。</string>

@@ -398,6 +398,10 @@
          等于把日志摊出来（还可能被截图）。原因进 audit_log，这里只说下一步做什么。 -->
     <string name="sync_export_failed">Backup failed. See the log for the reason.</string>
     <string name="sync_restore_failed">Restore failed. See the log for the reason.</string>
+    <!-- 恢复失败按"下一步做什么"分档（见 RestoreFailure）：换口令与换网络是两件事，
+         合成一句"去看日志"就会让最常见的那种失败（两台设备 PIN 不一样）也去翻日志。 -->
+    <string name="sync_restore_bad_passphrase">Restore failed: passphrase does not match this backup (or the package is corrupt).</string>
+    <string name="sync_restore_too_new">Restore failed: this backup is newer than the app. Update the app first.</string>
     <string name="sync_webdav_failed">Sync failed. Check the WebDAV settings and try again; the reason is in the log.</string>
     <string name="sync_restore_mode">How to merge</string>
     <string name="sync_restore_mode_summary">Merge deduplicates what is already here, add-only imports only what is missing, overwrite clears this vault first.</string>

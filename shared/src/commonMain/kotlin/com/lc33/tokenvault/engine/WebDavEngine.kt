@@ -96,7 +96,7 @@ class WebDavEngine constructor(
         block: suspend (WebDavConfig, WebDavCredentials) -> T,
     ): T {
         val config = settings.observeConfig().first()
-        if (!config.isReady) throw IllegalStateException("WebDAV is not configured")
+        if (!config.isReady) throw WebDavNotConfiguredException()
         val credentials = settings.credentials()
         try {
             return block(config, credentials)
@@ -158,3 +158,13 @@ data class WebDavUploadResult(
     val fileName: String,
     val prunedCount: Int,
 )
+
+/**
+ * 没配好就调用了 WebDAV。
+ *
+ * 不用 `IllegalStateException`：调用方（`SyncViewModel`）要靠异常类型判断这次失败是
+ * "远端没连上"还是"库里写坏了"，而 `IllegalStateException` 是 Room 那边也会抛的通用类型，
+ * 混在一起就会把"其实只差一份凭据"报成"恢复把库弄坏了"。消息与原来保持一致，
+ * 日志里历史条目和新条目才认得出是同一件事。
+ */
+class WebDavNotConfiguredException : Exception("WebDAV is not configured")
