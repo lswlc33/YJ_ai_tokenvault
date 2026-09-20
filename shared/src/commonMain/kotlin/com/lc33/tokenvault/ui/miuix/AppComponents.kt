@@ -294,12 +294,16 @@ fun AppValueRow(
             null
         } else {
             {
+                // 这里是裸 MIUIX `Text`，拿不到 [AppText] 的默认省略号，而它自己的默认值是
+                // `Clip`：长 Base URL、长模型 id 会被齐边切掉，看着就像值本来这么长。
+                // 本文件里另外几处 `maxLines = 1` 同理，都显式给了 Ellipsis。
                 Text(
                     text = value,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     style = MiuixTheme.textStyles.body2,
                     fontFamily = valueFamily,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         },
@@ -706,6 +710,7 @@ fun AppTabRow(
                     style = MiuixTheme.textStyles.body2,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -726,6 +731,7 @@ fun AppChip(text: String, modifier: Modifier = Modifier) {
             color = appChipTextColor,
             style = MiuixTheme.textStyles.footnote1,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -768,6 +774,7 @@ fun AppFilterChip(
                 },
                 style = MiuixTheme.textStyles.body2,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             if (trailingText != null) {
                 Text(
@@ -775,6 +782,7 @@ fun AppFilterChip(
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     style = MiuixTheme.textStyles.footnote1,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
