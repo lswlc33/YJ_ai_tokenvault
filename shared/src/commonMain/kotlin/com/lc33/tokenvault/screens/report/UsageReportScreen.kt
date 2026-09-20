@@ -263,11 +263,13 @@ private fun ProviderLegendRow(
     } else {
         stringResource(Res.string.usage_report_net_change)
     }
-    val value = if (usage) {
-        FormatMoney.format(series.totalConsumed, series.currency)
-    } else {
-        signedMoney(series.netBalanceChange, series.currency)
-    }
+    val delta = if (usage) series.totalConsumed else series.netBalanceChange
+    // 只有一个读数时那一栏是 null，宁可留一个破折号：把它印成 `¥0.00` 是在断言"这个区间
+    // 一分没动"，而真相是"只查到过一次，趋势无从知道"。余额历史从 v10 才开始攒，所以
+    // 报告上线的头几天几乎每一家都是这个形状——这不是边角情况。
+    val value = delta?.let {
+        if (usage) FormatMoney.format(it, series.currency) else signedMoney(it, series.currency)
+    } ?: "—"
     val points: List<ChartPoint> = if (usage) series.usagePoints else series.balancePoints
 
     Row(

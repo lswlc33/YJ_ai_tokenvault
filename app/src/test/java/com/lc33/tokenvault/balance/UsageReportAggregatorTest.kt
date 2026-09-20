@@ -7,6 +7,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.minus
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -36,6 +37,27 @@ class UsageReportAggregatorTest {
     }
 
     @Test
+    fun `只有一个读数时不报变化`() {
+        // 余额历史是从 v10 才开始攒的，报告上线的头几天每家基本都只有这一条。
+        // 一个点算不出"净变化 / 总消耗"，而 0.0 会被界面印成 `¥0.00`——那是在断言
+        // "这个区间一分没动"，与真相（只查到过一次）正好相反。所以必须是 null。
+        val s = aggregate(
+            listOf(
+                BalanceSample(
+                    providerId = 1,
+                    keyId = 1,
+                    amount = 100.0,
+                    currency = "USD",
+                    capturedAt = at(0),
+                ),
+            ),
+        ).single()
+        assertEquals(1, s.balancePoints.size)
+        assertNull(s.netBalanceChange)
+        assertNull(s.totalConsumed)
+    }
+
+    @Test
     fun `单把 Key 的余额按天前推，缺的那几天沿用上一次的值`() {
         val samples = listOf(
             BalanceSample(providerId = 1, keyId = 1, amount = 100.0, currency = "USD", capturedAt = at(6)),
@@ -52,7 +74,7 @@ class UsageReportAggregatorTest {
         assertEquals(100.0, s.balancePoints.first().y, EPS)   // 前几天前推 100
         assertEquals(60.0, s.balancePoints.last().y, EPS)     // 最后前推 60
         // 净变化 = 末 − 首 = 60 − 100。
-        assertEquals(-40.0, s.netBalanceChange, EPS)
+        assertEquals(-40.0, (s.netBalanceChange ?: Double.NaN), EPS)
         // x 落在当天 UTC 零点。
         assertEquals(dayStart(today), s.balancePoints.last().x)
     }
@@ -66,10 +88,10 @@ class UsageReportAggregatorTest {
         )
         val s = aggregate(samples).single()
         // 只有 100→80 那一跌算 20 消耗；80→120 是充值，记 0，不冲抵。
-        assertEquals(20.0, s.totalConsumed, EPS)
+        assertEquals(20.0, (s.totalConsumed ?: Double.NaN), EPS)
         assertEquals(20.0, s.usagePoints.last().y, EPS)
         // 净变化则体现充值：120 − 100 = +20。
-        assertEquals(20.0, s.netBalanceChange, EPS)
+        assertEquals(20.0, (s.netBalanceChange ?: Double.NaN), EPS)
     }
 
     @Test
@@ -80,7 +102,7 @@ class UsageReportAggregatorTest {
         )
         val s = aggregate(samples).single()
         // 已用 10→25 = 15，而余额跌幅是 90−70 = 20；优先已用增量。
-        assertEquals(15.0, s.totalConsumed, EPS)
+        assertEquals(15.0, (s.totalConsumed ?: Double.NaN), EPS)
     }
 
     @Test

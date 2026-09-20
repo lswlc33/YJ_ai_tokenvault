@@ -11,6 +11,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -76,8 +77,19 @@ fun LineChart(
     val rawYMax = max(0.0, ys.max())
     val (yMin, yMax) = niceBounds(rawYMin, rawYMax)
 
+    // 左槽按**实际最宽的那条刻度**算，不是写死 46dp。
+    //
+    // 为什么：`¥12,345.00` 这种四位数的刻度比 46dp 宽，画的时候横坐标被
+    // `coerceAtLeast(0f)` 顶到 0，于是整条轴文字压在网格与折线上面——余额越大越糊，
+    // 最后完全读不出。先量五条刻度再定槽宽，并且给它一个上限，免得极端长串把画布吃掉。
+    val labelGap = with(LocalDensity.current) { 6.dp.toPx() }
+    val widestLabelPx = (0..4).maxOf { i ->
+        measurer.measure(yLabelOf(yMin + (yMax - yMin) * i / 4), labelStyle).size.width.toFloat()
+    }
+
     Canvas(modifier = modifier.fillMaxWidth().height(chartHeight)) {
-        val leftGutter = 46.dp.toPx()
+        val leftGutter = (widestLabelPx + labelGap).coerceAtLeast(46.dp.toPx())
+            .coerceAtMost(size.width * 0.4f)
         val bottomGutter = 18.dp.toPx()
         val topPad = 8.dp.toPx()
         val rightPad = 10.dp.toPx()
@@ -154,8 +166,20 @@ fun MiniSparkline(
     modifier: Modifier = Modifier,
     lineHeight: Dp = 32.dp,
 ) {
-    if (points.size < 2) {
+    if (points.isEmpty()) {
         Box(modifier = modifier.height(lineHeight))
+        return
+    }
+    if (points.size == 1) {
+        // 只有一个读数时画一个点，而不是留一个空框：空框看着像渲染坏了，而这个点
+        // 是真实存在的一条记录（余额历史刚开始攒的时候每家都是这个形状）。
+        Canvas(modifier = modifier.height(lineHeight)) {
+            drawCircle(
+                color = color,
+                radius = 2.5.dp.toPx(),
+                center = Offset(size.width / 2f, size.height / 2f),
+            )
+        }
         return
     }
     val xs = points.map { it.x }

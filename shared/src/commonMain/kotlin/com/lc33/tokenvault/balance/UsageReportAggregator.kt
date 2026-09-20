@@ -27,13 +27,19 @@ data class UsageReportSeries(
     /** 自窗口起点的累计消耗。单调不减。 */
     val usagePoints: List<ChartPoint>,
 ) {
-    /** 区间净变化 = 末值 − 首值。正=净充值，负=净消耗。 */
-    val netBalanceChange: Double
-        get() = if (balancePoints.isEmpty()) 0.0 else balancePoints.last().y - balancePoints.first().y
+    /**
+     * 区间净变化 = 末值 − 首值。正=净充值，负=净消耗。
+     *
+     * **少于两个点返回 null，而不是 0.0**：一个读数算不出任何"变化"，而 0.0 会被读成
+     * "这个区间不增不减"——一句听着可信的假话。余额历史是从 v10 才开始攒的，所以报告
+     * 刚上线的那几天几乎每家都只有一个点，这一档不是边角情况。
+     */
+    val netBalanceChange: Double?
+        get() = if (balancePoints.size < 2) null else balancePoints.last().y - balancePoints.first().y
 
-    /** 区间总消耗 = 累计线的末值。 */
-    val totalConsumed: Double
-        get() = usagePoints.lastOrNull()?.y ?: 0.0
+    /** 区间总消耗 = 累计线的末值。同样要两个以上点才说得出"消耗了多少"。 */
+    val totalConsumed: Double?
+        get() = if (usagePoints.size < 2) null else usagePoints.last().y
 }
 
 /**

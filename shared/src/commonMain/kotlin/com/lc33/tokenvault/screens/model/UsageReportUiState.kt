@@ -43,8 +43,11 @@ data class UsageReportProviderSeries(
     val colorIndex: Int,
     val balancePoints: List<ChartPoint>,
     val usagePoints: List<ChartPoint>,
-    /** 区间净变化（末−首）。正=净充值，负=净消耗。 */
-    val netBalanceChange: Double,
-    /** 区间总消耗。 */
-    val totalConsumed: Double,
+    /**
+     * 区间净变化（末−首）。正=净充值，负=净消耗。
+     * null = 这个区间只有一个（或零个）读数，变化**算不出来**——页面不许把它印成 `¥0.00`。
+     */
+    val netBalanceChange: Double?,
+    /** 区间总消耗。null 同上。 */
+    val totalConsumed: Double?,
 )
