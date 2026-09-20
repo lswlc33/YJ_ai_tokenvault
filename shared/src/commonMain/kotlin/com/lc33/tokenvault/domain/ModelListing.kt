@@ -45,11 +45,13 @@ enum class ModelFilter {
  * 一页模型列表的派生结果。
  *
  * @param groupCount 分组数（不含被筛掉的），给"共 N 个 · M 类"那句摘要用。
+ * @param visibleModels 通过筛选与搜索的行数。与 [totalModels] 不相等时说明有行被筛掉。
  */
 data class ModelListing(
     val groups: List<ModelGroup>,
     val totalModels: Int,
     val matchedModels: Int,
+    val visibleModels: Int,
 )
 
 data class ModelGroup(
@@ -120,6 +122,7 @@ fun listModels(
         groups = groups,
         totalModels = paired.size,
         matchedModels = paired.count { it.catalog != null },
+        visibleModels = kept.size,
     )
 }
 

@@ -37,6 +37,7 @@ import com.lc33.tokenvault.ui.shell.DataViewModel
 import com.lc33.tokenvault.ui.shell.ImportViewModel
 import com.lc33.tokenvault.ui.shell.KeyDetailViewModel
 import com.lc33.tokenvault.ui.shell.KeyEditorViewModel
+import com.lc33.tokenvault.ui.shell.KeyModelsViewModel
 import com.lc33.tokenvault.ui.shell.LockViewModel
 import com.lc33.tokenvault.ui.shell.LogEntryViewModel
 import com.lc33.tokenvault.ui.shell.LogViewModel
@@ -188,6 +189,7 @@ class DiGraphSmokeTest {
         assertNotNull(koin.get<ImportViewModel> { parametersOf(1L) })
         assertNotNull(koin.get<KeyDetailViewModel> { parametersOf(1L, 2L) })
         assertNotNull(koin.get<KeyEditorViewModel> { parametersOf(1L, 2L, labelTemplate) })
+        assertNotNull(koin.get<KeyModelsViewModel> { parametersOf(1L, 2L) })
         assertNotNull(koin.get<LogEntryViewModel> { parametersOf(1L) })
         assertNotNull(koin.get<ProfileEditorViewModel> { parametersOf(1L) })
         assertNotNull(koin.get<ProviderDetailViewModel> { parametersOf(1L) })

@@ -65,6 +65,7 @@ import com.lc33.tokenvault.ui.shell.DataViewModel
 import com.lc33.tokenvault.ui.shell.ImportViewModel
 import com.lc33.tokenvault.ui.shell.KeyDetailViewModel
 import com.lc33.tokenvault.ui.shell.KeyEditorViewModel
+import com.lc33.tokenvault.ui.shell.KeyModelsViewModel
 import com.lc33.tokenvault.ui.shell.LockViewModel
 import com.lc33.tokenvault.ui.shell.LogViewModel
 import com.lc33.tokenvault.ui.shell.LogEntryViewModel
@@ -326,6 +327,7 @@ val viewModelModule = module {
     viewModelOf(::ImportViewModel)
     viewModelOf(::KeyDetailViewModel)
     viewModelOf(::KeyEditorViewModel)
+    viewModelOf(::KeyModelsViewModel)
     viewModelOf(::LockViewModel)
     viewModelOf(::LogViewModel)
     viewModelOf(::LogEntryViewModel)

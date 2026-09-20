@@ -24,11 +24,13 @@ import com.lc33.tokenvault.platform.rememberBackupFilePicker
 import com.lc33.tokenvault.screens.dashboard.DashboardScreen
 import com.lc33.tokenvault.ui.common.LoadingState
 import com.lc33.tokenvault.ui.common.relativeLabelWithinDay
+import com.lc33.tokenvault.domain.repo.UndoableDeletion
 import com.lc33.tokenvault.screens.lock.ChangePinScreen
 import com.lc33.tokenvault.screens.manage.GroupsScreen
 import com.lc33.tokenvault.screens.manage.ImportScreen
 import com.lc33.tokenvault.screens.manage.KeyDetailScreen
 import com.lc33.tokenvault.screens.manage.KeyEditorScreen
+import com.lc33.tokenvault.screens.manage.KeyModelsScreen
 import com.lc33.tokenvault.screens.manage.ManageScreen
 import com.lc33.tokenvault.screens.manage.ProviderDetailScreen
 import com.lc33.tokenvault.screens.manage.ProviderEditorScreen
@@ -123,6 +125,7 @@ import tokenvault.shared.generated.resources.group_all
 import tokenvault.shared.generated.resources.groups_add_failed
 import tokenvault.shared.generated.resources.groups_delete_failed
 import tokenvault.shared.generated.resources.groups_rename_failed
+import tokenvault.shared.generated.resources.keymodels_catalog_failed
 import tokenvault.shared.generated.resources.manage_write_failed
 import tokenvault.shared.generated.resources.profile_name_default
 import tokenvault.shared.generated.resources.Res
@@ -443,6 +446,72 @@ fun VaultNavHost(
                         )
                     }
                 }
+            }
+
+            is KeyModelsRoute -> {
+                val vm: KeyModelsViewModel = koinViewModel(
+                    parameters = { parametersOf(route.providerId, route.keyId) },
+                )
+                val state by vm.state.collectAsStateWithLifecycle()
+                val feedback = LocalAppFeedback.current
+                val modelClipboardLabel = stringResource(Res.string.clipboard_label_model_id)
+                val copied = stringResource(Res.string.feedback_copied)
+                val modelDeleted = stringResource(Res.string.feedback_model_deleted)
+                val modelDuplicate = stringResource(Res.string.feedback_model_duplicate)
+                val modelProbed = stringResource(Res.string.feedback_model_probed)
+                val catalogFailed = stringResource(Res.string.keymodels_catalog_failed)
+                val writeFailed = stringResource(Res.string.manage_write_failed)
+                val undoLabel = stringResource(Res.string.common_undo)
+                val undone = stringResource(Res.string.feedback_undone)
+                val undoFailed = stringResource(Res.string.feedback_undo_failed)
+                LaunchedEffect(vm) {
+                    vm.events.collect { event ->
+                        when (event) {
+                            // 删除不再返回上一页：这一页是"某一把 Key 的模型"，删掉一行
+                            // 页面还该留在原地（与详情页同一条）。撤销句柄随提示挂出去，
+                            // 提示消失前用户能把它写回来。
+                            is KeyModelsViewModel.Event.Deleted -> feedback?.post(
+                                AppFeedback(
+                                    message = modelDeleted,
+                                    undo = event.undo?.let { deletion ->
+                                        AppUndoFeedback(
+                                            actionLabel = undoLabel,
+                                            undoneMessage = undone,
+                                            failedMessage = undoFailed,
+                                            action = { deletion.undo() },
+                                        )
+                                    },
+                                ),
+                            )
+                            KeyModelsViewModel.Event.Copied -> feedback?.post(AppFeedback(copied))
+                            KeyModelsViewModel.Event.Duplicate -> feedback?.post(AppFeedback(modelDuplicate))
+                            KeyModelsViewModel.Event.Probed -> feedback?.post(AppFeedback(modelProbed))
+                            // 目录同步只在失败时出声：成功是背景维护，念一句"已更新"会在
+                            // 用户正翻列表时弹出来，而它没有需要用户做的事。
+                            is KeyModelsViewModel.Event.CatalogSynced -> {
+                                if (event.failure != null) feedback?.post(AppFeedback(catalogFailed))
+                            }
+                            KeyModelsViewModel.Event.WriteFailed -> feedback?.post(AppFeedback(writeFailed))
+                        }
+                    }
+                }
+                KeyModelsScreen(
+                    state = state,
+                    onBack = back,
+                    onQueryChange = vm::onQueryChange,
+                    onGroupBy = vm::onGroupBy,
+                    onSort = { sort -> vm.onSort(sort.ordinal) },
+                    onFilter = vm::onFilter,
+                    onToggleGroup = vm::toggleGroup,
+                    onToggleExpand = vm::toggleExpand,
+                    onCopyModelId = { modelId -> vm.copyModelId(modelClipboardLabel, modelId) },
+                    onProbeModel = { modelId -> vm.probeModel(modelId) },
+                    onRefreshModels = { vm.refreshModels() },
+                    onSyncCatalog = vm::syncCatalog,
+                    onAddModel = vm::addModel,
+                    onUpdateModel = vm::updateModel,
+                    onDeleteModel = vm::deleteModel,
+                )
             }
 
             is KeyDetailRoute -> {

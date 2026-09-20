@@ -50,6 +50,12 @@ data class KeyEditorRoute(
 ) : VaultRoute
 
 @Serializable
+data class KeyModelsRoute(
+    val providerId: Long,
+    val keyId: Long,
+) : VaultRoute
+
+@Serializable
 data class ImportRoute(val providerId: Long) : VaultRoute
 
 @Serializable
