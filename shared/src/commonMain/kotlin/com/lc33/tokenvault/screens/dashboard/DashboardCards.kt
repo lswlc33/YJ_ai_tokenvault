@@ -18,6 +18,7 @@ import tokenvault.shared.generated.resources.dashboard_balance_failed
 import tokenvault.shared.generated.resources.dashboard_balance_no_fx
 import tokenvault.shared.generated.resources.dashboard_balance_none
 import tokenvault.shared.generated.resources.dashboard_balance_title
+import tokenvault.shared.generated.resources.dashboard_balance_refreshing
 import tokenvault.shared.generated.resources.dashboard_balance_updated
 import tokenvault.shared.generated.resources.dashboard_counts_title
 import tokenvault.shared.generated.resources.dashboard_probe_counts
@@ -65,6 +66,8 @@ private fun CardTitle(text: String) {
 internal fun BalanceCard(
     balance: BalanceSummary,
     nowMs: Long,
+    /** 这一趟查询在跑：图标置灰，同时在卡上说出为什么——只灰不给理由是让人反复按。 */
+    refreshing: Boolean,
     onRefresh: () -> Unit,
 ) {
     val tokens = LocalAppTokens.current
@@ -95,11 +98,21 @@ internal fun BalanceCard(
                         color = appOnPrimaryColor,
                     )
                 }
+                if (refreshing) {
+                    // 查询要几秒钟，这一句是那段等待里唯一的解释：图标灰了而没说为什么，
+                    // 读起来就像按钮坏了。
+                    AppText(
+                        text = stringResource(Res.string.dashboard_balance_refreshing),
+                        style = AppTextStyle.Footnote,
+                        color = appOnPrimaryColor,
+                    )
+                }
             }
             AppIconButton(
                 icon = AppIcon.Refresh,
                 contentDescription = stringResource(Res.string.refresh_cd),
                 onClick = onRefresh,
+                enabled = !refreshing,
             )
         }
         if (balance.perCurrency.isEmpty()) {

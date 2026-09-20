@@ -25,6 +25,7 @@
     <string name="dashboard_balance_title">余额</string>
     <string name="dashboard_balance_no_fx">按币种分别列出，不做汇率换算，因此不显示合计。</string>
     <string name="dashboard_balance_updated">更新于 %1$s</string>
+    <string name="dashboard_balance_refreshing">正在查询余额…</string>
     <string name="dashboard_balance_failed">%1$d 个供应商的余额查询失败</string>
     <string name="dashboard_balance_none">还没有配置余额查询</string>
     <string name="dashboard_counts_title">内容</string>
@@ -714,6 +715,7 @@
     <string name="feedback_clipboard_empty">剪贴板为空</string>
     <string name="feedback_probe_cancelled">已取消探测</string>
     <string name="feedback_balance_refreshed">余额已刷新</string>
+    <string name="feedback_balance_refresh_failed">余额查询失败</string>
     <string name="feedback_models_refreshed">模型列表已刷新</string>
     <string name="feedback_model_probed">已探测该模型</string>
     <string name="feedback_probe_retried">正在重试失败项</string>

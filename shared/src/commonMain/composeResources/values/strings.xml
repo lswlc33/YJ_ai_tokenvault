@@ -25,6 +25,7 @@
     <string name="dashboard_balance_title">Balance</string>
     <string name="dashboard_balance_no_fx">Listed per currency. No exchange-rate conversion is applied, so the amounts are not a single total.</string>
     <string name="dashboard_balance_updated">Updated %1$s</string>
+    <string name="dashboard_balance_refreshing">Checking balances…</string>
     <string name="dashboard_balance_failed">%1$d provider(s) failed the balance query</string>
     <string name="dashboard_balance_none">No balance query configured yet</string>
     <string name="dashboard_counts_title">Content</string>
@@ -730,6 +731,7 @@
     <string name="feedback_clipboard_empty">Clipboard is empty</string>
     <string name="feedback_probe_cancelled">Probe cancelled</string>
     <string name="feedback_balance_refreshed">Balances refreshed</string>
+    <string name="feedback_balance_refresh_failed">Balance query failed</string>
     <string name="feedback_models_refreshed">Model list refreshed</string>
     <string name="feedback_model_probed">Model probed</string>
     <string name="feedback_probe_retried">Retrying failed items</string>

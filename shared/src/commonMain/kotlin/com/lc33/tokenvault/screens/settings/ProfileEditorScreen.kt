@@ -88,6 +88,8 @@ import com.lc33.tokenvault.ui.theme.LocalStatusPalette
 fun ProfileEditorScreen(
     initial: ClientProfile?,
     loadFailed: Boolean = false,
+    /** 保存/删除还在落库：对勾置灰。这两个动作都驱动页面 back()，连点会多退一级。 */
+    saving: Boolean = false,
     onBack: () -> Unit,
     onSave: (ProfileEditorDraft) -> Unit,
     onDelete: () -> Unit,
@@ -171,6 +173,7 @@ fun ProfileEditorScreen(
                         icon = AppIcon.Ok,
                         contentDescription = stringResource(Res.string.editor_save),
                         onClick = ::submit,
+                        enabled = !saving,
                     )
                 },
             )

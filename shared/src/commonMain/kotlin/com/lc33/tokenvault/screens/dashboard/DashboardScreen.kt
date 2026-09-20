@@ -34,6 +34,8 @@ fun DashboardScreen(
     onOpenManage: () -> Unit,
     onOpenProbeDetail: () -> Unit,
     onOpenReport: () -> Unit,
+    /** 余额那一趟在跑：图标置灰、卡片上说明为什么。 */
+    balanceRefreshing: Boolean,
     onRefreshBalance: () -> Unit,
     onRefreshStatus: () -> Unit,
 ) {
@@ -71,6 +73,7 @@ fun DashboardScreen(
                 BalanceCard(
                     balance = state.balance,
                     nowMs = state.nowMs,
+                    refreshing = balanceRefreshing,
                     onRefresh = onRefreshBalance,
                 )
             }

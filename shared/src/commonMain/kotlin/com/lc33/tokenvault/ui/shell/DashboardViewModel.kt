@@ -14,10 +14,14 @@ import com.lc33.tokenvault.platform.nowMillis
 import com.lc33.tokenvault.probe.ProbeProgress
 import com.lc33.tokenvault.screens.model.DashboardUiState
 import com.lc33.tokenvault.screens.model.ProbeRunSummary
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -70,16 +74,56 @@ class DashboardViewModel constructor(
         )
     }.stateIn(viewModelScope, SharingStarted.Lazily, DashboardUiState(loading = true))
 
-    /** 仪表盘“开始探测”。结果与进度由 ProbeEngine 的状态流回 UI。 */
+    /** 仪表盘”开始探测”。结果与进度由 ProbeEngine 的状态流回 UI。 */
     fun startProbe(): Boolean = probeEngine.start()
 
     /**
+     * 一次性事件：余额刷新的结果。文案由 Shell 用资源解析。
+     *
+     * 为什么要有这一条：以前 `refreshBalance()` 是发出去就不管，而提示在**发出的那一刻**
+     * 就说”余额已刷新”。余额接口全部失败时用户照样看到那句已刷新，而且卡片上的数字
+     * 还是旧的——这句话就成了假话，还是唯一一句让他以为”钱查过了”的话。
+     */
+    sealed interface Event {
+        /** 跑完了。[refreshed] 是查到余额的密钥数（0 不等于失败，可能是压根没配余额查询）。 */
+        data class BalancesRefreshed(val refreshed: Int) : Event
+
+        data object BalanceRefreshFailed : Event
+    }
+
+    private val _events = Channel<Event>(Channel.BUFFERED)
+    val events: Flow<Event> = _events.receiveAsFlow()
+
+    /**
+     * 这一趟余额刷新在跑。
+     *
+     * 挡的是**重复花钱**：每一趟都会把开了余额查询的密钥逐个打一遍上游接口，连点五下
+     * 就是五遍全量请求。页面据此把刷新图标置灰，并在卡片上说出”正在查询余额”，
+     * 不让人对着一个没反应的图标反复按。
+     */
+    private val _refreshingBalance = MutableStateFlow(false)
+    val refreshingBalance: StateFlow<Boolean> = _refreshingBalance.asStateFlow()
+
+    /**
      * 刷新所有已配置余额查询的供应商（§9.3 的刷新图标）。逐家查、逐家落库，
-     * 结果经 [providers.observeSummaries] 那条订阅自然流回 UI——不用手动通知（红线 10）。
+     * 结果经 [providers.observeSummaries] 那条订阅自然流回 UI——不用手动通知（红线 10）；
+     * 但”这一趟成没成”要由 [Event] 说，见上面的理由。
      */
     fun refreshBalance() {
+        if (_refreshingBalance.value) return
+        _refreshingBalance.value = true
         viewModelScope.launch {
-            runCatching { balanceEngine.refreshAll() }
+            try {
+                _events.send(Event.BalancesRefreshed(balanceEngine.refreshAll()))
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                // 不能当成”刷新失败”：ViewModel 清理时这条会一路走到 else 分支，
+                // 于是用户看到一句没发生过的失败。
+                throw cancelled
+            } catch (_: Exception) {
+                _events.send(Event.BalanceRefreshFailed)
+            } finally {
+                _refreshingBalance.value = false
+            }
         }
     }
 

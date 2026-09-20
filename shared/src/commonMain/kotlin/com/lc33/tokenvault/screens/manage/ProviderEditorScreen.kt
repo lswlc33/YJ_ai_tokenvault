@@ -69,6 +69,8 @@ fun ProviderEditorScreen(
     groupNames: List<String>,
     nameMissing: Boolean,
     loadFailed: Boolean = false,
+    /** 这一趟保存还在落库：顶栏对勾置灰，防止连点两下插入两家同名供应商（VM 里同源闸）。 */
+    saving: Boolean = false,
     onChange: (ProviderDraft) -> Unit,
     onBack: () -> Unit,
     onSave: (ProviderDraft) -> Unit,
@@ -109,7 +111,7 @@ fun ProviderEditorScreen(
         )
     }
 
-    PlatformBackHandler(enabled = dirty) { showDiscard = true }
+    PlatformBackHandler(enabled = dirty && !saving) { showDiscard = true }
 
     AppScaffold(
         topBar = {
@@ -128,6 +130,7 @@ fun ProviderEditorScreen(
                         icon = AppIcon.Ok,
                         contentDescription = stringResource(Res.string.editor_save),
                         onClick = ::submit,
+                        enabled = !saving,
                     )
                 },
             )

@@ -94,6 +94,7 @@ import tokenvault.shared.generated.resources.feedback_model_saved
 import tokenvault.shared.generated.resources.feedback_providers_deleted
 import tokenvault.shared.generated.resources.feedback_providers_deleted_partial
 import tokenvault.shared.generated.resources.feedback_account_saved
+import tokenvault.shared.generated.resources.feedback_balance_refresh_failed
 import tokenvault.shared.generated.resources.feedback_balance_refreshed
 import tokenvault.shared.generated.resources.feedback_clipboard_empty
 import tokenvault.shared.generated.resources.feedback_clipboard_filled
@@ -224,6 +225,20 @@ fun VaultNavHost(
             val feedback = LocalAppFeedback.current
             val probeStartedText = stringResource(Res.string.feedback_probe_started)
             val balanceRefreshed = stringResource(Res.string.feedback_balance_refreshed)
+            val balanceRefreshFailed = stringResource(Res.string.feedback_balance_refresh_failed)
+            val refreshingBalance by vm.refreshingBalance.collectAsStateWithLifecycle()
+            // "已刷新"由这一趟**跑完**的那一刻说。以前是点下去就说，而余额接口全挂时
+            // 用户照样看到那句已刷新、卡上的数字还是旧的。
+            LaunchedEffect(vm) {
+                vm.events.collect { event ->
+                    when (event) {
+                        is DashboardViewModel.Event.BalancesRefreshed ->
+                            feedback?.post(AppFeedback(balanceRefreshed))
+                        DashboardViewModel.Event.BalanceRefreshFailed ->
+                            feedback?.post(AppFeedback(balanceRefreshFailed))
+                    }
+                }
+            }
             DashboardScreen(
                 state = dashboard,
                 // 总览与管理的入口是「切到管理的某一页」，不是往栈上压一条管理路由：
@@ -231,10 +246,8 @@ fun VaultNavHost(
                 onOpenManage = { pager.animateToPage(topLevelIndexOf(ManageRoute)) },
                 onOpenProbeDetail = { navigate(ProbeRunRoute) },
                 onOpenReport = { navigate(UsageReportRoute) },
-                onRefreshBalance = {
-                    vm.refreshBalance()
-                    feedback?.post(AppFeedback(balanceRefreshed))
-                },
+                balanceRefreshing = refreshingBalance,
+                onRefreshBalance = { vm.refreshBalance() },
                 onRefreshStatus = {
                     // 重复点击不叠加：引擎正在跑就不发起第二轮（探测要花钱），
                     // 但余额刷新可以继续，用户按它通常是"再试一次"。
@@ -852,6 +865,7 @@ fun VaultNavHost(
             val loaded by vm.loaded.collectAsStateWithLifecycle()
             val profile by vm.profile.collectAsStateWithLifecycle()
             val loadFailed by vm.loadError.collectAsStateWithLifecycle()
+            val saving by vm.saving.collectAsStateWithLifecycle()
             val feedback = LocalAppFeedback.current
             val profileSaved = stringResource(Res.string.feedback_profile_saved)
             val writeFailed = stringResource(Res.string.manage_write_failed)
@@ -873,6 +887,7 @@ fun VaultNavHost(
                 ProfileEditorScreen(
                     initial = profile,
                     loadFailed = loadFailed,
+                    saving = saving,
                     onBack = back,
                     onSave = vm::save,
                     onDelete = vm::delete,
@@ -989,6 +1004,7 @@ fun VaultNavHost(
             val loaded by vm.loaded.collectAsStateWithLifecycle()
             val nameMissing by vm.nameMissing.collectAsStateWithLifecycle()
             val loadFailed by vm.loadError.collectAsStateWithLifecycle()
+            val saving by vm.saving.collectAsStateWithLifecycle()
             val feedback = LocalAppFeedback.current
             val providerSaved = stringResource(Res.string.feedback_provider_saved)
             val writeFailed = stringResource(Res.string.manage_write_failed)
@@ -1012,6 +1028,7 @@ fun VaultNavHost(
                     groupNames = listOf(ungrouped) + groups.map { it.name },
                     nameMissing = nameMissing,
                     loadFailed = loadFailed,
+                    saving = saving,
                     onChange = vm::onChange,
                     onBack = back,
                     onSave = vm::onSave,

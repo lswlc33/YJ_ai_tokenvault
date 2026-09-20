@@ -49,6 +49,15 @@ class ProviderEditorViewModel constructor(
     )
     val saved: SharedFlow<Unit> = _saved.asSharedFlow()
 
+    /**
+     * 这一趟保存正在落库。页面据此把顶栏那枚对勾置灰（[onSave] 里还有一道同源的闸）。
+     *
+     * 与 [com.lc33.tokenvault.ui.shell.KeyEditorViewModel.saving] 同一个理由：
+     * 从点下去到插入返回有几十到几百毫秒，够按第二下了。
+     */
+    private val _saving = MutableStateFlow(false)
+    val saving: StateFlow<Boolean> = _saving.asStateFlow()
+
     /** 名称必填的校验结果。true 时页面在名称框下给错误说明。 */
     private val _nameMissing = MutableStateFlow(false)
     val nameMissing: StateFlow<Boolean> = _nameMissing.asStateFlow()
@@ -111,21 +120,31 @@ class ProviderEditorViewModel constructor(
         }
         // 读不到原行时不放行：走下去就是在库里凭空造一家供应商。
         if (_loadError.value) return
+        // 一次只允许一趟保存。**检查与置位之间不能有挂起点**：连点两下按到的是同一个
+        // 函数、同一个主线程，先把位翻过去，第二下就进不来。没有这道闸时两下连点会
+        // 真的插入两家同名供应商（providers 上没有名字唯一索引），而且 [_saved] 发两次、
+        // 页面 back() 两次，第二下会把用户多退一级（从"管理"退到"总览"）。
+        if (_saving.value) return
+        _saving.value = true
         _nameMissing.value = false
         viewModelScope.launch {
-            // 先落库、成功才发"已保存"并退回；失败留在这一页，用户填的东西还在框里。
-            val savedId = runCatching { providers.save(draft.toProvider(loadedProvider, groups.value)) }
-                .getOrElse {
-                    _failed.tryEmit(Unit)
-                    return@launch
+            try {
+                // 先落库、成功才发"已保存"并退回；失败留在这一页，用户填的东西还在框里。
+                val savedId = runCatching { providers.save(draft.toProvider(loadedProvider, groups.value)) }
+                    .getOrElse {
+                        _failed.tryEmit(Unit)
+                        return@launch
+                    }
+                // 刚打开「允许检查官网连通性」的话，立刻去查一次——不然用户拨了开关、
+                // 页面上却是空的，要等下一次全量刷新才看得到结果，很像没生效。
+                // 关掉时不查（那正是关它的意思），已有结果保留着也不算错。
+                if (draft.checkWebsite) {
+                    probeEngine.refreshReachability(savedId)
                 }
-            // 刚打开「允许检查官网连通性」的话，立刻去查一次——不然用户拨了开关、
-            // 页面上却是空的，要等下一次全量刷新才看得到结果，很像没生效。
-            // 关掉时不查（那正是关它的意思），已有结果保留着也不算错。
-            if (draft.checkWebsite) {
-                probeEngine.refreshReachability(savedId)
+                _saved.tryEmit(Unit)
+            } finally {
+                _saving.value = false
             }
-            _saved.tryEmit(Unit)
         }
     }
 
