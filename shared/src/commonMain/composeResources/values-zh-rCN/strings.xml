@@ -952,4 +952,19 @@
     <string name="keymodels_probed_ago">%1$s探测过</string>
     <string name="keymodels_probed_ago_with_latency">%1$s探测过 · %2$d 毫秒</string>
 
+    <!-- 用量变化报告 -->
+    <string name="usage_report_title">用量变化</string>
+    <string name="usage_report_metric_balance">余额</string>
+    <string name="usage_report_metric_usage">用量</string>
+    <string name="usage_report_range_7">近 7 天</string>
+    <string name="usage_report_range_30">近 30 天</string>
+    <string name="usage_report_range_90">近 90 天</string>
+    <string name="usage_report_chart_empty">还没有余额历史。下次余额探测后开始记录。</string>
+    <string name="usage_report_net_change">区间净变化</string>
+    <string name="usage_report_consumed">区间消耗</string>
+    <string name="usage_report_unknown_provider">已删除的供应商</string>
+    <string name="dashboard_report_title">用量变化</string>
+    <string name="dashboard_report_summary">查看余额增长与消耗趋势，逐供应商折线。</string>
+    <string name="settings_report">用量变化报告</string>
+    <string name="settings_report_summary">余额增长与消耗趋势，逐供应商折线。</string>
 </resources>

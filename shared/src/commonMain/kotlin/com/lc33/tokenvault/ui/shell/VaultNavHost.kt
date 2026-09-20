@@ -37,6 +37,7 @@ import com.lc33.tokenvault.screens.manage.ProviderEditorScreen
 import com.lc33.tokenvault.screens.model.BackupStatus
 import com.lc33.tokenvault.screens.model.UiRemoteBackup
 import com.lc33.tokenvault.screens.probe.ProbeRunScreen
+import com.lc33.tokenvault.screens.report.UsageReportScreen
 import com.lc33.tokenvault.screens.settings.AboutScreen
 import com.lc33.tokenvault.screens.settings.AppearanceScreen
 import com.lc33.tokenvault.screens.settings.BalanceThresholdsScreen
@@ -229,6 +230,7 @@ fun VaultNavHost(
                 // 三个一级页平级，压在栈上会让返回语义变成"回到总览"。
                 onOpenManage = { pager.animateToPage(topLevelIndexOf(ManageRoute)) },
                 onOpenProbeDetail = { navigate(ProbeRunRoute) },
+                onOpenReport = { navigate(UsageReportRoute) },
                 onRefreshBalance = {
                     vm.refreshBalance()
                     feedback?.post(AppFeedback(balanceRefreshed))
@@ -325,6 +327,7 @@ fun VaultNavHost(
                 onOpenSecurity = { navigate(SecurityRoute) },
                 onOpenProbeSettings = { navigate(ProbeSettingsRoute) },
                 onOpenProfiles = { navigate(ProfileListRoute) },
+                onOpenReport = { navigate(UsageReportRoute) },
                 onOpenData = { navigate(DataRoute) },
                 onOpenLog = { navigate(LogRoute) },
                 onOpenSync = { navigate(SyncRoute) },
@@ -1140,6 +1143,17 @@ fun VaultNavHost(
                     feedback?.post(AppFeedback(probeStopped))
                 },
                 onOpenProvider = { id -> navigate(ProviderDetailRoute(id)) },
+            )
+        }
+
+            is UsageReportRoute -> {
+            val vm: UsageReportViewModel = koinViewModel()
+            val report by vm.state.collectAsStateWithLifecycle()
+            UsageReportScreen(
+                state = report,
+                onBack = back,
+                onSelectMetric = vm::setMetric,
+                onSelectRange = vm::setRange,
             )
         }
         }

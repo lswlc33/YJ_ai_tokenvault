@@ -67,6 +67,10 @@ data object GroupsRoute : VaultRoute
 @Serializable
 data object ProbeRunRoute : VaultRoute
 
+/** 用量变化报告：余额增长与消耗趋势，逐供应商折线。不主动展开在仪表盘，点击进入。 */
+@Serializable
+data object UsageReportRoute : VaultRoute
+
 // ---------------------------------------------------------------- 设置下的二级页
 
 @Serializable

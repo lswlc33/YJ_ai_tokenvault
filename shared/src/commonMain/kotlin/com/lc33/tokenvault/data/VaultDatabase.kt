@@ -10,6 +10,7 @@ import androidx.sqlite.execSQL
 import com.lc33.tokenvault.data.dao.ApiKeyDao
 import com.lc33.tokenvault.data.dao.AppSettingDao
 import com.lc33.tokenvault.data.dao.AuditLogDao
+import com.lc33.tokenvault.data.dao.BalanceHistoryDao
 import com.lc33.tokenvault.data.dao.ClientProfileDao
 import com.lc33.tokenvault.data.dao.GroupDao
 import com.lc33.tokenvault.data.dao.KeySettingsDao
@@ -22,6 +23,7 @@ import com.lc33.tokenvault.data.dao.ProviderDao
 import com.lc33.tokenvault.data.entity.ApiKeyEntity
 import com.lc33.tokenvault.data.entity.AppSettingEntity
 import com.lc33.tokenvault.data.entity.AuditLogEntity
+import com.lc33.tokenvault.data.entity.BalanceHistoryEntity
 import com.lc33.tokenvault.data.entity.ClientProfileEntity
 import com.lc33.tokenvault.data.entity.GroupEntity
 import com.lc33.tokenvault.data.entity.KeySettingsEntity
@@ -46,6 +48,7 @@ import com.lc33.tokenvault.data.entity.ProviderEntity
         ProbeRunEntity::class,
         AuditLogEntity::class,
         AppSettingEntity::class,
+        BalanceHistoryEntity::class,
     ],
     version = VaultDatabase.VERSION,
     exportSchema = true,
@@ -65,9 +68,10 @@ abstract class VaultDatabase : RoomDatabase() {
     abstract fun probeRunDao(): ProbeRunDao
     abstract fun auditLogDao(): AuditLogDao
     abstract fun appSettingDao(): AppSettingDao
+    abstract fun balanceHistoryDao(): BalanceHistoryDao
 
     companion object {
-        const val VERSION = 9
+        const val VERSION = 10
         const val FILE_NAME = "vault.db"
 
         val MIGRATION_1_2: Migration = object : Migration(1, 2) {
@@ -681,6 +685,45 @@ abstract class VaultDatabase : RoomDatabase() {
                 connection.execSQL(
                     "CREATE INDEX IF NOT EXISTS `index_model_catalog_qualifiedId` " +
                         "ON `model_catalog` (`qualifiedId`)",
+                )
+            }
+        }
+
+        /**
+         * v10：新增 `balance_history` —— 用量变化报告的数据源。
+         *
+         * **纯建表 + 两个索引，没有一列被删或改类型，也没有回填**：这是一张全新的表，
+         * 老库里不存在，升级时自然是空的，之后每次成功刷余额（去重后）追加一行。
+         *
+         * 建表 DDL 与索引名必须与 Room 在全新 v10 库上生成的一致（`index_<表>_<列...>`），
+         * 否则新建库与升级库的 schema 会分叉，`MigrationV9ToV10Test` 里 Room 的比对会抛异常。
+         * `providerId` 挂 CASCADE 外键（删供应商连带清历史），`keyId` 只建索引不挂外键
+         * （Key 轮换不该抹掉这家的历史，见实体注释）。
+         */
+        val MIGRATION_9_10: Migration = object : Migration(9, 10) {
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `balance_history` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `providerId` INTEGER NOT NULL,
+                        `keyId` INTEGER NOT NULL,
+                        `amount` REAL,
+                        `used` REAL,
+                        `currency` TEXT,
+                        `capturedAt` INTEGER NOT NULL,
+                        FOREIGN KEY(`providerId`) REFERENCES `providers`(`id`)
+                            ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                connection.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_balance_history_providerId_capturedAt` " +
+                        "ON `balance_history` (`providerId`, `capturedAt`)",
+                )
+                connection.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_balance_history_keyId_capturedAt` " +
+                        "ON `balance_history` (`keyId`, `capturedAt`)",
                 )
             }
         }

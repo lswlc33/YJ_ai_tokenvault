@@ -56,6 +56,7 @@ import com.lc33.tokenvault.ui.shell.SecurityRoute
 import com.lc33.tokenvault.ui.shell.SettingsRoute
 import com.lc33.tokenvault.ui.shell.SyncRoute
 import com.lc33.tokenvault.ui.shell.UpdateRoute
+import com.lc33.tokenvault.ui.shell.UsageReportRoute
 import com.lc33.tokenvault.ui.shell.VaultRoute
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
@@ -78,6 +79,7 @@ fun rememberVaultBackStack(): MutableList<VaultRoute> {
                                         subclass(ImportRoute::class)
                     subclass(GroupsRoute::class)
                     subclass(ProbeRunRoute::class)
+                    subclass(UsageReportRoute::class)
                     subclass(AppearanceRoute::class)
                     subclass(SecurityRoute::class)
                     subclass(ChangePinRoute::class)

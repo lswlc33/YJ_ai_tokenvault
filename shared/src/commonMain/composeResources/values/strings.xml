@@ -979,4 +979,19 @@
     <string name="keymodels_probed_ago">Probed %1$s</string>
     <string name="keymodels_probed_ago_with_latency">Probed %1$s · %2$d ms</string>
 
+    <!-- Usage change report -->
+    <string name="usage_report_title">Usage trends</string>
+    <string name="usage_report_metric_balance">Balance</string>
+    <string name="usage_report_metric_usage">Usage</string>
+    <string name="usage_report_range_7">7 days</string>
+    <string name="usage_report_range_30">30 days</string>
+    <string name="usage_report_range_90">90 days</string>
+    <string name="usage_report_chart_empty">No balance history yet. Recording starts after the next balance check.</string>
+    <string name="usage_report_net_change">Net change</string>
+    <string name="usage_report_consumed">Consumed</string>
+    <string name="usage_report_unknown_provider">Deleted provider</string>
+    <string name="dashboard_report_title">Usage trends</string>
+    <string name="dashboard_report_summary">See balance growth and consumption trends per provider.</string>
+    <string name="settings_report">Usage report</string>
+    <string name="settings_report_summary">Balance growth and consumption trends, one line per provider.</string>
 </resources>

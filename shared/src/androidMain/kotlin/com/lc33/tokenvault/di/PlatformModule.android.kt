@@ -47,6 +47,7 @@ actual val platformModule: Module = module {
                 VaultDatabase.MIGRATION_6_7,
                 VaultDatabase.MIGRATION_7_8,
                 VaultDatabase.MIGRATION_8_9,
+                VaultDatabase.MIGRATION_9_10,
             )
             .build()
     }

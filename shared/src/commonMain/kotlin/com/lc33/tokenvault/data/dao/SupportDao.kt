@@ -9,6 +9,7 @@ import androidx.room.Update
 import androidx.room.Upsert
 import com.lc33.tokenvault.data.entity.AppSettingEntity
 import com.lc33.tokenvault.data.entity.AuditLogEntity
+import com.lc33.tokenvault.data.entity.BalanceHistoryEntity
 import com.lc33.tokenvault.data.entity.ClientProfileEntity
 import com.lc33.tokenvault.data.entity.ModelCatalogEntity
 import com.lc33.tokenvault.data.entity.ModelEntity
@@ -370,6 +371,47 @@ interface ProbeRunDao {
 
     /** 清空（备份"覆盖恢复"用——红线 28：探测结果不搬，恢复后一律未探测）。 */
     @Query("DELETE FROM probe_runs")
+    suspend fun clear()
+}
+
+/**
+ * 余额历史（`balance_history`）。用量变化报告的唯一数据源。
+ *
+ * 写路径只有 [insert]，且发生在 `RoomBalanceHistoryRepository.record` 去重之后
+ * （同一把 Key 与上一条金额相同就不写）。[latestForKey] 就是那次去重要比对的上一条。
+ *
+ * 读路径 [observeAll] 按时间升序整表推给报告 ViewModel——聚合（按天分桶、跨 Key 求和）
+ * 是纯函数的活，放在 `balance/UsageReportAggregator`，DAO 只管把行取全、别在 SQL 里算。
+ * 表按「变化点」增长（去重）再加 [trimOlderThan] 的天数上限，量级远小于日志，整表读没有压力。
+ */
+@Dao
+interface BalanceHistoryDao {
+
+    @Insert
+    suspend fun insert(row: BalanceHistoryEntity): Long
+
+    /** 这把 Key 最近一条历史，供 [record] 去重比对；从没记过则为 null。 */
+    @Query("SELECT * FROM balance_history WHERE keyId = :keyId ORDER BY capturedAt DESC, id DESC LIMIT 1")
+    suspend fun latestForKey(keyId: Long): BalanceHistoryEntity?
+
+    /** 整表按时间升序（报告按此重建每把 Key 的序列，再前推、分桶、求和）。 */
+    @Query("SELECT * FROM balance_history ORDER BY capturedAt, id")
+    fun observeAll(): Flow<List<BalanceHistoryEntity>>
+
+    @Query("SELECT COUNT(*) FROM balance_history")
+    suspend fun count(): Int
+
+    /**
+     * 按天数上限裁剪：删掉 [cutoff] 之前的样本。
+     *
+     * 与 `audit_log` / `probe_runs` 的条数上限不同，这里按**时间**裁：报告本来就只看
+     * 近 N 天，更早的点画不进任何时间范围。天数上限的口径在 `LogMaintenance` 里给。
+     */
+    @Query("DELETE FROM balance_history WHERE capturedAt < :cutoff")
+    suspend fun trimOlderThan(cutoff: Long)
+
+    /** 清空（备份"覆盖恢复"用——与探测结果同类，恢复后历史从零重记）。 */
+    @Query("DELETE FROM balance_history")
     suspend fun clear()
 }
 

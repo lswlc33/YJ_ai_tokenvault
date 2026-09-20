@@ -14,6 +14,7 @@ import com.lc33.tokenvault.domain.model.LogCategory
 import com.lc33.tokenvault.domain.model.LogLevel
 import com.lc33.tokenvault.domain.repo.ApiKeyRepository
 import com.lc33.tokenvault.domain.repo.AuditLogRepository
+import com.lc33.tokenvault.domain.repo.BalanceHistoryRepository
 import com.lc33.tokenvault.domain.repo.ClientProfileRepository
 import com.lc33.tokenvault.domain.repo.ProviderRepository
 import com.lc33.tokenvault.endpoint.HeaderAssembler
@@ -33,6 +34,8 @@ class BalanceEngine constructor(
     private val clientProfiles: ClientProfileRepository,
     private val engine: HttpEngine,
     private val audit: AuditLogRepository,
+    /** 余额历史。每次成功刷到金额后（去重）追加一条，喂用量变化报告。 */
+    private val history: BalanceHistoryRepository,
     /**
      * 登记这一轮 reveal 出来的明文，供 [Redactor] 的第一道使用。
      *
@@ -154,6 +157,9 @@ class BalanceEngine constructor(
                 }
 
                 keys.updateBalance(key.id, snapshot)
+                // 历史只记「成功且金额变了」的点：record 内部去重，失败快照（amount == null）
+                // 会被挡掉，所以这里无条件调用即可，不必再判一次 error。
+                history.record(key.providerId, key.id, snapshot)
                 auditBalance(key.providerId, key.id, snapshot)
                 return snapshot
             } finally {

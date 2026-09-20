@@ -33,6 +33,7 @@ fun DashboardScreen(
     state: DashboardUiState,
     onOpenManage: () -> Unit,
     onOpenProbeDetail: () -> Unit,
+    onOpenReport: () -> Unit,
     onRefreshBalance: () -> Unit,
     onRefreshStatus: () -> Unit,
 ) {
@@ -75,6 +76,8 @@ fun DashboardScreen(
             }
             item { CountsCard(state.counts, onOpenManage) }
             item { ProbeCard(state, onOpenProbeDetail) }
+            // 用量变化报告入口：只放一张可点卡片，趋势内容不主动展开在总览（点进去才看）。
+            item { ReportEntryCard(onOpenReport) }
             // 滑到底的呼吸空间：内容画到窗口底部（透出玻璃底栏），不垫就会贴边。
             item { Spacer(modifier = Modifier.height(tokens.sectionSpacing)) }
         }

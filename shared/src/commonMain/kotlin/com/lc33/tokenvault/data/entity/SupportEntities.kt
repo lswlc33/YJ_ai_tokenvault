@@ -274,6 +274,47 @@ data class ModelVendorEntity(
     val docUrl: String? = null,
 )
 
+/**
+ * 余额历史样本：一把 Key 每次余额发生变化就追加一行，喂给「用量变化报告」画折线。
+ *
+ * 与 `api_keys` 上那份「最新快照」列分工不同——那份只有当前值、每次探测覆盖写，
+ * 画不出趋势；这张表按时间累积，是报告的唯一数据源。
+ *
+ * **[keyId] 不设外键**（与 [providerId] 的 CASCADE 不同）：Key 轮换（删旧换新）很常见，
+ * 若挂外键，删一把 Key 就把它此前对这家供应商的历史一起级联删掉，趋势线会凭空缺一段。
+ * 而删掉整个供应商是明确、少见的动作，那时连同它的历史一起清掉才合理，所以 [providerId]
+ * 保留 CASCADE。落库只在 `RoomBalanceHistoryRepository.record` 里去重后发生（同一把 Key
+ * 与上一条 amount/used/currency 都相同就不写），所以表按「变化点」增长，不会每探测一次长一行。
+ */
+@Entity(
+    tableName = "balance_history",
+    foreignKeys = [
+        ForeignKey(
+            entity = ProviderEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["providerId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [
+        Index(value = ["providerId", "capturedAt"]),
+        Index(value = ["keyId", "capturedAt"]),
+    ],
+)
+data class BalanceHistoryEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val providerId: Long,
+
+    /** 属于哪把 Key。普通索引列，**刻意不挂外键**（见类注释）。 */
+    val keyId: Long,
+
+    /** 可用余额。null 表示这次查询没拿到金额（失败），去重时不会为它落库。 */
+    val amount: Double? = null,
+    val used: Double? = null,
+    val currency: String? = null,
+    val capturedAt: Long,
+)
+
 @Entity(tableName = "probe_runs")
 data class ProbeRunEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,

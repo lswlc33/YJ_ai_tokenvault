@@ -29,6 +29,8 @@ import tokenvault.shared.generated.resources.dashboard_probe_never
 import tokenvault.shared.generated.resources.dashboard_probe_no_autolock
 import tokenvault.shared.generated.resources.dashboard_probe_running
 import tokenvault.shared.generated.resources.dashboard_probe_title
+import tokenvault.shared.generated.resources.dashboard_report_summary
+import tokenvault.shared.generated.resources.dashboard_report_title
 import tokenvault.shared.generated.resources.refresh_cd
 import com.lc33.tokenvault.screens.model.BalanceSummary
 import com.lc33.tokenvault.screens.model.ContentCounts
@@ -134,6 +136,26 @@ internal fun BalanceCard(
     }
     // 这里不再有「查看余额明细」入口（2026-09 决策）：明细页只是把卡上那几个数按供应商
     // 摊开，逐家的余额与失败原因在供应商详情页看得更全，多一座二级页反而像数据丢了。
+}
+
+/**
+ * 用量变化报告入口卡。整张卡可点，点进去看逐供应商的余额增长与消耗折线。
+ *
+ * 只放一个入口、不在总览里摊开趋势：仪表盘是只读概览，折线图属于"想看才看"的分析内容，
+ * 塞进首页会喧宾夺主（与探测明细"查看明细"同一条克制）。
+ */
+@Composable
+internal fun ReportEntryCard(onOpenReport: () -> Unit) {
+    val tokens = LocalAppTokens.current
+    AppCard(modifier = cardModifier(), onClick = onOpenReport) {
+        CardTitle(stringResource(Res.string.dashboard_report_title))
+        AppText(
+            text = stringResource(Res.string.dashboard_report_summary),
+            style = AppTextStyle.Secondary,
+            color = appSecondaryTextColor,
+            modifier = Modifier.padding(top = tokens.itemSpacing),
+        )
+    }
 }
 
 @Composable

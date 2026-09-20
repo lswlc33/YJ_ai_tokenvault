@@ -10,6 +10,7 @@ import com.lc33.tokenvault.data.repo.FieldCipher
 import com.lc33.tokenvault.data.repo.RoomApiKeyRepository
 import com.lc33.tokenvault.data.repo.RoomAuditLogRepository
 import com.lc33.tokenvault.data.repo.RoomBackupStore
+import com.lc33.tokenvault.data.repo.RoomBalanceHistoryRepository
 import com.lc33.tokenvault.data.repo.RoomClientProfileRepository
 import com.lc33.tokenvault.data.repo.RoomGroupRepository
 import com.lc33.tokenvault.data.repo.RoomModelCatalogRepository
@@ -25,6 +26,7 @@ import com.lc33.tokenvault.data.seed.ProfileSeeder
 import com.lc33.tokenvault.backup.BackupStore
 import com.lc33.tokenvault.domain.repo.ApiKeyRepository
 import com.lc33.tokenvault.domain.repo.AuditLogRepository
+import com.lc33.tokenvault.domain.repo.BalanceHistoryRepository
 import com.lc33.tokenvault.domain.repo.ClientProfileRepository
 import com.lc33.tokenvault.domain.repo.GroupRepository
 import com.lc33.tokenvault.domain.repo.ImportWriter
@@ -80,6 +82,7 @@ import com.lc33.tokenvault.ui.shell.ProviderEditorViewModel
 import com.lc33.tokenvault.ui.shell.SecurityViewModel
 import com.lc33.tokenvault.ui.shell.SyncViewModel
 import com.lc33.tokenvault.ui.shell.UpdateViewModel
+import com.lc33.tokenvault.ui.shell.UsageReportViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -161,6 +164,7 @@ val coreModule = module {
     single { get<VaultDatabase>().probeRunDao() }
     single { get<VaultDatabase>().auditLogDao() }
     single { get<VaultDatabase>().appSettingDao() }
+    single { get<VaultDatabase>().balanceHistoryDao() }
 
     // ------------------------------------------------------------------ 仓库
 
@@ -198,8 +202,14 @@ val coreModule = module {
     }
     single<ClientProfileRepository> { RoomClientProfileRepository(get(), get()) }
     single<AuditLogRepository> { RoomAuditLogRepository(get(), get(), get(named(Qualifiers.NOW))) }
-    single { LogMaintenance(settings = get(), audit = get(), probeRuns = get(), now = get(named(Qualifiers.NOW))) }
     single<ProbeRunRepository> { RoomProbeRunRepository(get()) }
+    single<BalanceHistoryRepository> { RoomBalanceHistoryRepository(get(), get(named(Qualifiers.NOW))) }
+    single {
+        LogMaintenance(
+            settings = get(), audit = get(), probeRuns = get(),
+            balanceHistory = get(), now = get(named(Qualifiers.NOW)),
+        )
+    }
 
     // ------------------------------------------------------------------ 网络与引擎
 
@@ -237,7 +247,8 @@ val coreModule = module {
             autoLocker = get(), now = get(named(Qualifiers.NOW)),
         )
     }
-    single { BalanceEngine(get(), get(), get(), get(), get(), get(), get(named(Qualifiers.NOW)), get(named(Qualifiers.PLACEHOLDERS))) }
+    // 参数序：providers, keys, clientProfiles, engine, audit, history, knownSecrets, now, placeholders。
+    single { BalanceEngine(get(), get(), get(), get(), get(), get(), get(), get(named(Qualifiers.NOW)), get(named(Qualifiers.PLACEHOLDERS))) }
     single {
         ProbeEngine(
             providers = get(), keys = get(), models = get(), clientProfiles = get(), runRepository = get(),
@@ -342,4 +353,5 @@ val viewModelModule = module {
     viewModelOf(::SecurityViewModel)
     viewModelOf(::SyncViewModel)
     viewModelOf(::UpdateViewModel)
+    viewModelOf(::UsageReportViewModel)
 }

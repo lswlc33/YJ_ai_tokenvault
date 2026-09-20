@@ -7,6 +7,7 @@ import com.lc33.tokenvault.data.dao.ApiKeyWithSettingsRow
 import com.lc33.tokenvault.data.dao.AppSettingDao
 import com.lc33.tokenvault.data.dao.AuditLogDao
 import com.lc33.tokenvault.data.dao.AuditLogSummary
+import com.lc33.tokenvault.data.dao.BalanceHistoryDao
 import com.lc33.tokenvault.data.dao.ClientProfileDao
 import com.lc33.tokenvault.data.dao.GroupDao
 import com.lc33.tokenvault.data.dao.KeySettingsDao
@@ -18,6 +19,7 @@ import com.lc33.tokenvault.data.dao.ProviderSummaryRow
 import com.lc33.tokenvault.data.entity.ApiKeyEntity
 import com.lc33.tokenvault.data.entity.AppSettingEntity
 import com.lc33.tokenvault.data.entity.AuditLogEntity
+import com.lc33.tokenvault.data.entity.BalanceHistoryEntity
 import com.lc33.tokenvault.data.entity.ClientProfileEntity
 import com.lc33.tokenvault.data.entity.GroupEntity
 import com.lc33.tokenvault.data.entity.KeySettingsEntity
@@ -771,6 +773,41 @@ internal class FakeAuditLogDao : AuditLogDao {
 
     override suspend fun trimOlderThan(before: Long) {
         store.removeAll { it.at < before }
+        revision.value++
+    }
+}
+
+internal class FakeBalanceHistoryDao : BalanceHistoryDao {
+    private val store = mutableListOf<BalanceHistoryEntity>()
+    private val revision = MutableStateFlow(0)
+    private var nextId = 1L
+
+    val rows: List<BalanceHistoryEntity> get() = store.toList()
+
+    override suspend fun insert(row: BalanceHistoryEntity): Long {
+        val id = nextId++
+        store += row.copy(id = id)
+        revision.value++
+        return id
+    }
+
+    override suspend fun latestForKey(keyId: Long): BalanceHistoryEntity? = store
+        .filter { it.keyId == keyId }
+        .maxWithOrNull(compareBy<BalanceHistoryEntity> { it.capturedAt }.thenBy { it.id })
+
+    override fun observeAll(): Flow<List<BalanceHistoryEntity>> = revision.map {
+        store.sortedWith(compareBy({ it.capturedAt }, { it.id }))
+    }
+
+    override suspend fun count(): Int = store.size
+
+    override suspend fun trimOlderThan(cutoff: Long) {
+        store.removeAll { it.capturedAt < cutoff }
+        revision.value++
+    }
+
+    override suspend fun clear() {
+        store.clear()
         revision.value++
     }
 }

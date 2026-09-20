@@ -4,8 +4,10 @@ import com.lc33.tokenvault.crypto.Redactor
 import com.lc33.tokenvault.data.entity.AuditLogEntity
 import com.lc33.tokenvault.data.repo.FakeAppSettingDao
 import com.lc33.tokenvault.data.repo.FakeAuditLogDao
+import com.lc33.tokenvault.data.repo.FakeBalanceHistoryDao
 import com.lc33.tokenvault.data.repo.FakeProbeRunDao
 import com.lc33.tokenvault.data.repo.RoomAuditLogRepository
+import com.lc33.tokenvault.data.repo.RoomBalanceHistoryRepository
 import com.lc33.tokenvault.data.repo.RoomProbeRunRepository
 import com.lc33.tokenvault.data.repo.RoomSettingsRepository
 import com.lc33.tokenvault.domain.model.LogRetention
@@ -46,6 +48,7 @@ class LogMaintenanceTest {
             RoomSettingsRepository(FakeAppSettingDao()),
             repo,
             RoomProbeRunRepository(FakeProbeRunDao()),
+            RoomBalanceHistoryRepository(FakeBalanceHistoryDao()) { now },
             { now },
         ).run()
 
@@ -61,7 +64,10 @@ class LogMaintenanceTest {
         settings.setLogRetention(LogRetention.FOREVER)
 
         // probeRuns 用真仓库 + 假 DAO：条数上限那条路径也要被这条链走一遍。
-        LogMaintenance(settings, repo, RoomProbeRunRepository(FakeProbeRunDao()), { now }).run()
+        LogMaintenance(
+            settings, repo, RoomProbeRunRepository(FakeProbeRunDao()),
+            RoomBalanceHistoryRepository(FakeBalanceHistoryDao()) { now }, { now },
+        ).run()
 
         assertEquals(listOf("very old"), messages(repo))
     }
@@ -76,7 +82,10 @@ class LogMaintenanceTest {
         settings.setLogRetention(LogRetention.THIRTY_DAYS)
 
         // probeRuns 用真仓库 + 假 DAO：条数上限那条路径也要被这条链走一遍。
-        LogMaintenance(settings, repo, RoomProbeRunRepository(FakeProbeRunDao()), { now }).run()
+        LogMaintenance(
+            settings, repo, RoomProbeRunRepository(FakeProbeRunDao()),
+            RoomBalanceHistoryRepository(FakeBalanceHistoryDao()) { now }, { now },
+        ).run()
 
         assertEquals(listOf("twenty days"), messages(repo))
     }

@@ -20,6 +20,8 @@ import tokenvault.shared.generated.resources.settings_appearance
 import tokenvault.shared.generated.resources.settings_appearance_summary
 import tokenvault.shared.generated.resources.settings_data
 import tokenvault.shared.generated.resources.settings_data_summary
+import tokenvault.shared.generated.resources.settings_report
+import tokenvault.shared.generated.resources.settings_report_summary
 import tokenvault.shared.generated.resources.settings_log
 import tokenvault.shared.generated.resources.settings_log_summary
 import tokenvault.shared.generated.resources.settings_member_expiry
@@ -72,6 +74,7 @@ fun SettingsScreen(
     onOpenSecurity: () -> Unit,
     onOpenProbeSettings: () -> Unit,
     onOpenProfiles: () -> Unit,
+    onOpenReport: () -> Unit,
     onOpenData: () -> Unit,
     onOpenLog: () -> Unit,
     onOpenSync: () -> Unit,
@@ -156,6 +159,11 @@ fun SettingsScreen(
                         title = stringResource(Res.string.settings_profiles),
                         summary = stringResource(Res.string.settings_profiles_summary),
                         onClick = onOpenProfiles,
+                    )
+                    AppArrowRow(
+                        title = stringResource(Res.string.settings_report),
+                        summary = stringResource(Res.string.settings_report_summary),
+                        onClick = onOpenReport,
                     )
                     AppArrowRow(
                         title = stringResource(Res.string.settings_data),
