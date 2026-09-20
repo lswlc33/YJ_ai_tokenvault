@@ -243,7 +243,11 @@ fun ProviderDetailScreen(
                 // 像"点进去还有下一页"，实际只是弹同一个添加弹层。
                 item { HintText(stringResource(Res.string.detail_keys_empty_placeholder)) }
             } else {
-                items(state.keys.size) { index ->
+                // 必须给 key：KeyCard 的模型区展开状态是 `remember(row.id)`，而按位置排的
+                // item 没有 key 时 remember 也是按位置存的。删掉一把密钥，后面每一张卡
+                // 都会继承前一张的展开/收起——某张不相干的卡突然摊开一屏模型。
+                // 同一条理由见 ProfileListScreen 的列表注释。
+                items(count = state.keys.size, key = { state.keys[it].id }) { index ->
                     val row = state.keys[index]
                     KeyCard(
                         row = row,
@@ -941,7 +945,8 @@ private fun InfoCard(state: ProviderDetailUiState) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = tokens.screenPadding),
-    ) {        Row(
+    ) {
+        Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
