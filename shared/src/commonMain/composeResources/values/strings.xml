@@ -360,6 +360,7 @@
     <string name="sync_webdav_restore">Restore latest WebDAV backup</string>
     <string name="sync_webdav_refresh">Refresh remote list</string>
     <string name="sync_webdav_checking">Checking the connection…</string>
+    <string name="sync_webdav_busy">Syncing with WebDAV, please wait…</string>
     <string name="sync_remote_count">Remote backups: %1$d</string>
     <string name="sync_remote_section">Remote backups</string>
     <string name="sync_remote_empty">No backup package in that remote directory yet.</string>

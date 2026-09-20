@@ -23,6 +23,7 @@ import tokenvault.shared.generated.resources.sync_remote_section
 import tokenvault.shared.generated.resources.sync_section_local
 import tokenvault.shared.generated.resources.sync_section_webdav
 import tokenvault.shared.generated.resources.sync_title
+import tokenvault.shared.generated.resources.sync_webdav_busy
 import tokenvault.shared.generated.resources.sync_webdav_checking
 import tokenvault.shared.generated.resources.sync_webdav_refresh
 import tokenvault.shared.generated.resources.sync_webdav_restore
@@ -77,7 +78,7 @@ fun SyncScreen(
 ) {
     val tokens = LocalAppTokens.current
     SettingsSubPage(titleRes = Res.string.sync_title, onBack = onBack) {
-        item { StatusCard(backup, webDavConfig.isReady, onExport, onUploadWebDav) }
+        item { StatusCard(backup, webDavConfig.isReady, webDavBusy, onExport, onUploadWebDav) }
 
         item { SectionTitle(text = stringResource(Res.string.sync_section_local)) }
         item {
@@ -86,6 +87,9 @@ fun SyncScreen(
                     title = stringResource(Res.string.sync_export),
                     summary = stringResource(Res.string.sync_export_summary),
                     onClick = onExport,
+                    // 与「立即备份」同一条理由：恢复是"先清库再写回"，中途导出的是一份
+                    // 半成品备份，而提示只会说"已导出"。
+                    enabled = !webDavBusy,
                 )
                 AppArrowRow(
                     title = stringResource(Res.string.sync_import),
@@ -128,10 +132,18 @@ fun SyncScreen(
         }
         // 进页面就自动拉一次列表，那几秒三行动作是灰的。以前灰得没有理由：既不说明
         // "在等什么"，也不说明"马上就好"（2026-09 反馈：从灰显到可用中间缺一句提示）。
-        if (webDavChecking) {
+        // 那句话当时只挂在"检查连接"这一档上，而灰掉这三行的是**六个**动作
+        // （上传、恢复、删除远端、存配置、拉列表、以及恢复期间的导出）——拉列表之外的
+        // 任何一发跑起来时，页面照样是一片灰而没有一句解释，读起来像坏了。
+        // 检查那一档单独留着：它已经有精确文案，其余共用这一句中性说法。
+        if (webDavChecking || webDavBusy) {
             item {
                 AppText(
-                    text = stringResource(Res.string.sync_webdav_checking),
+                    text = if (webDavChecking) {
+                        stringResource(Res.string.sync_webdav_checking)
+                    } else {
+                        stringResource(Res.string.sync_webdav_busy)
+                    },
                     style = AppTextStyle.Footnote,
                     color = appSecondaryTextColor,
                     modifier = Modifier.padding(
@@ -203,6 +215,8 @@ fun SyncScreen(
 private fun StatusCard(
     backup: BackupStatus,
     webDavReady: Boolean,
+    /** 有一发 WebDAV 动作在跑（尤其是恢复）：这时不许多导出一份库。 */
+    busy: Boolean,
     onExport: () -> Unit,
     onUploadWebDav: () -> Unit,
 ) {
@@ -251,7 +265,12 @@ private fun StatusCard(
             text = stringResource(Res.string.dashboard_backup_now),
             // 配置好 WebDAV 就上传到远端，否则导出成本地文件：用户按的是"把库备份一份"，
             // 落点跟着配置走，而不是让他在两个入口里猜。
+            //
+            // 恢复进行中必须挡住这一发：OVERWRITE 那一种恢复是"先清库、再写回"，中间
+            // 读一次快照导出的就是一份写了一半的库，而提示照样会说"已导出"——这份备份
+            // 看着是安全的，真拿去恢复时才发现有半数数据不在里面。
             onClick = if (webDavReady) onUploadWebDav else onExport,
+            enabled = !busy,
             modifier = Modifier.fillMaxWidth(),
         )
     }

@@ -234,7 +234,10 @@ fun KeyEditorScreen(
         secretError = missingSecret
         nameError = missingName
         timeoutError = badTimeout
-        if (missingSecret || missingName || badTimeout || draft.protocols.isEmpty()) return
+        // 协议不在这里挡：ViewModel 里有同一条判断，并且会把它报成 `NoProtocols` 显示在
+        // 页面上。这一早退把它挡在调用之前，于是"协议一个都没选"变成按了没反应——而老备份
+        // 恢复回来的 Key 恰好可能带一个空协议集（引擎按 supportedProtocols 原样搬）。
+        if (missingSecret || missingName || badTimeout) return
         val next = currentDraft.copy(
             label = label.text.trim(),
             note = note.text.trim(),
