@@ -52,7 +52,6 @@ import tokenvault.shared.generated.resources.log_level_debug
 import tokenvault.shared.generated.resources.log_level_error
 import tokenvault.shared.generated.resources.log_level_info
 import tokenvault.shared.generated.resources.log_level_warn
-import tokenvault.shared.generated.resources.log_retention
 import tokenvault.shared.generated.resources.log_retention_options
 import tokenvault.shared.generated.resources.log_settings_cd
 import tokenvault.shared.generated.resources.log_title

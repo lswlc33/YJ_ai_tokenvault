@@ -19,7 +19,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.manage_context
-import tokenvault.shared.generated.resources.detail_key_models_refresh
 import tokenvault.shared.generated.resources.detail_account_password
 import tokenvault.shared.generated.resources.manage_keys_ratio
 import tokenvault.shared.generated.resources.manage_latency

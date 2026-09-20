@@ -25,14 +25,11 @@ import tokenvault.shared.generated.resources.sync_section_webdav
 import tokenvault.shared.generated.resources.sync_title
 import tokenvault.shared.generated.resources.sync_webdav_checking
 import tokenvault.shared.generated.resources.sync_webdav_refresh
-import tokenvault.shared.generated.resources.sync_webdav_refresh_summary
 import tokenvault.shared.generated.resources.sync_webdav_restore
-import tokenvault.shared.generated.resources.sync_webdav_restore_summary
 import tokenvault.shared.generated.resources.sync_webdav_settings
 import tokenvault.shared.generated.resources.sync_webdav_settings_configured
 import tokenvault.shared.generated.resources.sync_webdav_settings_summary
 import tokenvault.shared.generated.resources.sync_webdav_upload
-import tokenvault.shared.generated.resources.sync_webdav_upload_summary
 import com.lc33.tokenvault.domain.model.WebDavConfig
 import com.lc33.tokenvault.platform.nowMillis
 import com.lc33.tokenvault.screens.model.BackupStatus

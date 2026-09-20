@@ -6,7 +6,6 @@
     <string name="back_cd">Back</string>
     <string name="refresh_cd">Refresh</string>
     <string name="add_cd">Add</string>
-    <string name="search_hint">Search</string>
 
     <!-- Bottom navigation -->
     <string name="nav_dashboard">Dashboard</string>
@@ -18,7 +17,6 @@
     <string name="health_warn">Needs attention</string>
     <string name="health_error">Not usable</string>
     <string name="health_unknown">Not probed</string>
-    <string name="health_stale_this_round">Not verified this round</string>
 
     <!-- Dashboard -->
     <string name="dashboard_title">Dashboard</string>
@@ -34,16 +32,10 @@
     <string name="count_providers">Providers</string>
     <string name="count_keys">Keys</string>
     <string name="count_models">Models</string>
-    <string name="count_accounts">Accounts</string>
-    <string name="dashboard_health_title">Key health</string>
     <plurals name="dashboard_health_all_ok">
         <item quantity="one">The only key is available</item>
         <item quantity="other">All %1$d keys available</item>
     </plurals>
-    <string name="dashboard_health_empty">No keys yet</string>
-    <string name="dashboard_attention_title">Needs attention</string>
-    <string name="dashboard_attention_none">Nothing needs attention</string>
-    <string name="dashboard_attention_fix_client">Switch client profile</string>
     <!-- One wording per attention kind, app wide (invariant 17). Each says what to do next. -->
     <string name="attention_key_rejected">The upstream rejected this key. Replace the key or check the endpoint.</string>
     <string name="attention_client_blocked">Blocked by a client check; a different User-Agent may get through</string>
@@ -66,19 +58,11 @@
     <string name="backup_target_local">Local file</string>
     <string name="backup_target_webdav">WebDAV</string>
     <string name="dashboard_backup_now">Back up now</string>
-    <string name="dashboard_empty_title">Nothing here yet</string>
-    <string name="dashboard_empty_desc">Add a provider manually, or paste text to import keys, endpoints, models and balance settings in bulk.</string>
-    <string name="dashboard_empty_import">Paste to import</string>
     <string name="dashboard_empty_new">Add provider</string>
 
     <!-- Manage -->
     <string name="manage_title">Manage</string>
-    <string name="manage_tab_providers">Providers</string>
-    <string name="manage_tab_keys">Keys</string>
-    <string name="manage_tab_models">Models</string>
-    <string name="manage_tab_accounts">Accounts</string>
     <string name="manage_pinned">Pinned</string>
-    <string name="manage_default_key">Default</string>
     <string name="manage_keys_ratio">%1$d / %2$d keys</string>
     <string name="manage_models_count">%1$d models</string>
     <string name="manage_latency">%1$d ms</string>
@@ -86,12 +70,6 @@
     <string name="manage_context">Context %1$s</string>
     <string name="manage_empty_providers_title">No providers yet</string>
     <string name="manage_empty_providers_desc">Add one manually, or paste text to import in bulk.</string>
-    <string name="manage_empty_keys_title">No keys yet</string>
-    <string name="manage_empty_keys_desc">Keys belong to a provider. Create a provider first, then add keys to it.</string>
-    <string name="manage_empty_models_title">No models yet</string>
-    <string name="manage_empty_models_desc">Add model IDs manually, or fetch the list from the provider endpoint.</string>
-    <string name="manage_empty_accounts_title">No platform accounts</string>
-    <string name="manage_empty_accounts_desc">A platform account is the login for the provider website. It is stored locally and is never filled in for you.</string>
 
     <!-- Settings hub -->
     <string name="settings_title">Settings</string>
@@ -150,7 +128,6 @@
     <string name="sync_title">Sync</string>
     <string name="update_title">Update</string>
     <string name="probe_run_title">Probe details</string>
-    <string name="provider_detail_title">Provider</string>
 
     <!-- About -->
     <string name="about_title">About</string>
@@ -193,10 +170,8 @@
     <string name="provider_editor_title">Edit provider</string>
     <string name="detail_edit_cd">Edit</string>
     <string name="detail_section_keys">Keys</string>
-    <string name="detail_section_models">Models</string>
     <string name="detail_section_accounts">Platform accounts</string>
     <string name="detail_models_refresh">Refresh models</string>
-    <string name="detail_key_models_refresh">Refresh models for this key</string>
     <string name="detail_accounts_empty">No platform account for this provider. Stored locally and never filled in for you.</string>
     <string name="detail_accounts_empty_placeholder">No account added yet</string>
     <!-- Appearance -->
@@ -330,7 +305,6 @@
     <string name="log_clear_cd">Clear logs</string>
     <string name="log_filter_summary">Shows entries at the selected level and above.</string>
     <string name="log_recent_limit_note">Showing only the most recent %1$d entries.</string>
-    <string name="log_retention">Retention</string>
     <string-array name="log_retention_options">
         <item>7 days</item>
         <item>30 days</item>
@@ -383,11 +357,8 @@
     <string name="sync_webdav_insecure_required">Allow insecure HTTP</string>
     <string name="sync_insecure_http_warning">Basic credentials and the backup file would be sent in the clear. Enable only on a trusted self-hosted network.</string>
     <string name="sync_webdav_upload">Upload backup</string>
-    <string name="sync_webdav_upload_summary">Encrypts first and keeps the latest 10 remote copies</string>
     <string name="sync_webdav_restore">Restore latest WebDAV backup</string>
-    <string name="sync_webdav_restore_summary">Downloads the newest .yjv file, then asks how to merge</string>
     <string name="sync_webdav_refresh">Refresh remote list</string>
-    <string name="sync_webdav_refresh_summary">Read-only; nothing is uploaded or modified</string>
     <string name="sync_webdav_checking">Checking the connection…</string>
     <string name="sync_remote_count">Remote backups: %1$d</string>
     <string name="sync_remote_section">Remote backups</string>
@@ -482,12 +453,10 @@
     <string name="profile_editor_save_empty_name">Name cannot be empty</string>
     <string name="profile_editor_save_empty_ua">User-Agent cannot be empty</string>
     <string name="profile_editor_curl_failed">Could not parse this cURL</string>
-    <string name="profile_editor_builtin_note">Built-in profiles can be edited but not deleted. Edits are kept across upgrades.</string>
     <!-- Secret reveal / relative time -->
     <string name="secret_reveal_cd">Reveal</string>
     <string name="secret_conceal_cd">Hide</string>
     <string name="secret_copy_cd">Copy</string>
-    <string name="secret_auto_conceal">Hidden again after %1$d s</string>
     <string name="time_just_now">just now</string>
     <string name="time_minutes_ago">%1$d min ago</string>
     <string name="time_hours_ago">%1$d h ago</string>
@@ -503,23 +472,15 @@
     <string name="editor_check_website_summary">When on, the app pings this website to see whether it is reachable. Off by default: it sends a request to that site.</string>
     <string name="editor_base_url">API base URL</string>
     <string name="editor_base_url_hint">Path only, with no query string. Paste the "base URL" given by the provider.</string>
-    <string name="editor_preview_title">Generated endpoints</string>
-    <string name="editor_preview_chat">Chat Completions</string>
-    <string name="editor_preview_responses">Responses</string>
-    <string name="editor_preview_anthropic">Anthropic Messages</string>
-    <string name="editor_preview_models">Model list</string>
-    <string name="editor_preview_balance">Balance base</string>
     <string name="editor_url_err_empty">Fill in the API base URL</string>
     <string name="editor_url_err_scheme">Only http and https are supported</string>
     <string name="editor_url_err_query">Remove the ? or # part and keep the path only. Ignoring the query string would produce an endpoint that looks correct but always returns 401.</string>
     <string name="editor_url_err_host">No host in that address</string>
-    <string name="editor_insecure_warning">This uses plain HTTP. The key will be sent in the clear.</string>
     <string name="editor_allow_insecure">Allow plain HTTP anyway</string>
     <string name="editor_section_look">Appearance</string>
     <string name="editor_group">Group</string>
     <string name="editor_color">Colour</string>
     <string name="editor_pinned">Pin to the top</string>
-    <string name="editor_section_protocols">Protocols</string>
     <string name="editor_section_endpoint">Endpoint and protocols</string>
     <string name="editor_models_auto">Auto fetch</string>
     <string name="editor_models_auto_summary">When enabled, the manual model editor is hidden.</string>
@@ -552,8 +513,6 @@
     <string name="editor_balance_access_key_id">AccessKey ID</string>
     <string name="editor_balance_secret_access_key">SecretAccessKey</string>
     <string name="editor_balance_secret_access_key_hint">Created under API Key Management in the Volcengine console. Only used to sign balance requests</string>
-    <string name="editor_balance_none_hint">No balance query for this provider.</string>
-    <string name="editor_balance_default_key_hint">Uses this provider's default key; no extra fields required.</string>
     <string name="editor_section_client">Client profile</string>
     <string name="editor_section_advanced">Advanced</string>
     <string name="editor_advanced_expand">Show advanced</string>
@@ -634,11 +593,7 @@
     <string name="import_paste_hint">Paste a cURL command. Recognition extracts the base URL, auth key, models and endpoint protocols.</string>
     <string name="import_from_clipboard">Fill from clipboard</string>
     <string name="import_parse">Recognize</string>
-    <string name="import_no_preview">Nothing recognized yet. Paste a cURL command and press Recognize.</string>
     <string name="import_section_preview">Preview</string>
-    <string name="import_selected">Will import</string>
-    <string name="import_skipped">Skipped</string>
-    <string name="import_counts">%1$d keys · %2$d models · %3$d accounts</string>
     <plurals name="import_parse_errors">
         <item quantity="one">%1$d cURL command could not be parsed and was skipped — usually a missing URL or auth key.</item>
         <item quantity="other">%1$d cURL commands could not be parsed and were skipped — usually missing a URL or auth key.</item>
@@ -648,15 +603,6 @@
         <item quantity="other">Import %1$d providers</item>
     </plurals>
     <!-- Import preview issues (invariant 17: one wording per state) -->
-    <string name="import_issue_missing_name">Missing a provider name</string>
-    <string name="import_issue_bad_endpoint">The request address contains a query string or fragment. It will be kept as-is; fix it in the editor.</string>
-    <string name="import_issue_insecure_endpoint">This address uses http://. Enable "allow insecure" in the editor to use it.</string>
-    <string name="import_issue_model_name">A model ID looks like a display name; confirm it before importing.</string>
-    <string name="import_issue_protocol_added">A model uses a protocol this provider does not list; it has been added</string>
-    <string name="import_issue_balance_credential">NewAPI balance requires an access token and user ID; you can add them after importing.</string>
-    <string name="import_issue_client_profile">No matching client profile was found; the setting was ignored.</string>
-    <string name="import_issue_account_incomplete">A platform account is missing its username or password; the available fields will still be imported.</string>
-    <string name="import_issue_account_duplicate">A duplicate platform account was skipped</string>
 
     <!-- Probe run -->
     <string name="probe_run_failed">Failed</string>
@@ -682,7 +628,6 @@
     <string name="editor_section_probe">Probe settings</string>
     <string name="editor_probe_enabled">Allow probing this provider</string>
     <string name="editor_probe_enabled_summary">Turn this off for providers whose terms forbid automated checks</string>
-    <string name="editor_probe_disabled_note">This provider will not receive any probe requests, including manual probes, scheduled probes and "retry failed items".</string>
     <string name="editor_probe_reachability">Reachability check</string>
     <string name="editor_probe_reachability_summary">Fetches the model list once. Costs nothing.</string>
     <string name="editor_probe_keys">Key validity</string>
@@ -729,7 +674,6 @@
     <string name="feedback_imported">Key imported</string>
     <string name="feedback_clipboard_filled">Pasted from clipboard</string>
     <string name="feedback_clipboard_empty">Clipboard is empty</string>
-    <string name="feedback_probe_cancelled">Probe cancelled</string>
     <string name="feedback_balance_refreshed">Balances refreshed</string>
     <string name="feedback_balance_refresh_failed">Balance query failed</string>
     <string name="feedback_models_refreshed">Model list refreshed</string>
@@ -800,9 +744,7 @@
 
     <!-- Onboarding -->
     <string name="onboarding_step_of">Step %1$d of %2$d</string>
-    <string name="onboarding_next">Continue</string>
     <string name="onboarding_start">Set up</string>
-    <string name="onboarding_finish">Done</string>
     <string name="onboarding_welcome_title">Before you set a PIN</string>
     <string name="onboarding_welcome_subtitle">Three things to know; each affects what you should store here.</string>
     <string name="onboarding_welcome_what">API keys, platform account passwords and access tokens are encrypted field by field with AES-256-GCM. Provider names, endpoints, model ids and balances are stored in the clear.</string>
@@ -824,18 +766,9 @@
     <string name="detail_keys_empty_placeholder">No key added yet</string>
     <string name="detail_keys_empty">No key yet. A provider without a key cannot be probed and its balance cannot be read.</string>
     <string name="detail_add_key">Add key</string>
-    <string name="detail_key_label">Label</string>
-    <string name="detail_key_label_hint">Distinguishes multiple keys of the same provider. Can be left empty.</string>
     <string name="detail_key_secret">Key</string>
-    <string name="detail_key_secret_hint">Paste it in; it is encrypted before being written to the database.</string>
-    <string name="detail_key_set_default">Set as default</string>
-    <string name="detail_key_delete_title">Delete this key?</string>
-    <string name="detail_key_delete_body">Deletion cannot be undone. If it is the default key, the first enabled key in order takes over automatically.</string>
-    <string name="detail_key_reveal_hint">Copying places it on the clipboard and clears it after a while. Leaving this sheet clears the plain text.</string>
     <string name="detail_account_username">Username</string>
     <string name="detail_account_password">Password</string>
-    <string name="detail_balance_refresh">Check balance</string>
-    <string name="detail_probe_provider">Probe this provider</string>
     <string name="detail_key_view">View key</string>
     <string name="detail_key_connection_base_url">Base URL</string>
     <string name="detail_key_connection_protocol">Protocols</string>
@@ -850,7 +783,6 @@
     <string name="detail_key_connection">Connection</string>
     <string name="detail_key_more_cd">More actions</string>
     <string name="detail_probe_key">Probe this key</string>
-    <string name="detail_probe_model_cd">Probe this model</string>
     <string name="detail_provider_balance_total">Total balance</string>
     <string name="detail_key_balance_value">%1$s %2$s</string>
     <string name="protocol_chat">Chat</string>
@@ -878,7 +810,6 @@
     <string name="detail_model_protocol">Protocol</string>
     <string name="detail_model_delete">Delete this model?</string>
     <string name="detail_model_delete_action">Delete model</string>
-    <string name="detail_models_quick_hint">Long-press a model to send one short request.</string>
     <string name="detail_models_count_auto">%1$d models (auto-synced)</string>
     <string name="detail_models_count_manual">%1$d models</string>
     <string name="detail_reachability_latency">%1$d ms</string>
@@ -902,9 +833,6 @@
     <!-- Probe defaults. -->
     <string name="editor_probe_model_reachability">Model reachability probe (quick)</string>
     <string name="editor_probe_model_reachability_summary">Off by default, manual only (long-press a model). Sends one short paid request: tries Chat first, falls back to Anthropic; only when both fail is the model unreachable.</string>
-    <string name="editor_probe_models_confirm_title">Clear saved models?</string>
-    <string name="editor_probe_models_confirm_action">Turn on</string>
-    <string name="editor_probe_models_confirm_body">Enabling model list detection clears this provider's saved model lists. Lists are then fetched per key during each probe.</string>
 
     <!-- About page. -->
     <string name="about_summary_title">About YuanJi</string>
@@ -952,7 +880,6 @@
     <string name="keymodels_catalog_never">Catalog not downloaded yet — model capabilities are unavailable.</string>
     <string name="keymodels_catalog_update">Update catalog</string>
     <string name="keymodels_catalog_failed">Catalog update failed. See the log for the reason.</string>
-    <string name="keymodels_catalog_synced">Catalog updated</string>
     <string name="keymodels_source_manual">Manual</string>
     <string name="keymodels_source_discovered">Auto-discovered</string>
     <string name="keymodels_unmatched">Not in catalog</string>
@@ -973,9 +900,7 @@
     <string name="keymodels_meta_status">Status</string>
     <string name="keymodels_meta_vendor">Vendor</string>
     <string name="keymodels_group_other">Other</string>
-    <string name="keymodels_latency">%1$d ms</string>
     <string name="keymodels_probed_never">Not probed</string>
-    <string name="keymodels_probe_cd">Probe this model</string>
     <string name="keymodels_more_cd">More actions</string>
     <string name="keymodels_delete_title">Delete this model?</string>
     <string name="keymodels_delete_summary">The model row is removed from this key. The catalog entry is kept.</string>

@@ -6,7 +6,6 @@
     <string name="back_cd">返回</string>
     <string name="refresh_cd">刷新</string>
     <string name="add_cd">新建</string>
-    <string name="search_hint">搜索</string>
 
     <!-- Bottom navigation -->
     <string name="nav_dashboard">仪表盘</string>
@@ -18,7 +17,6 @@
     <string name="health_warn">需处理</string>
     <string name="health_error">不可用</string>
     <string name="health_unknown">未探测</string>
-    <string name="health_stale_this_round">本轮未验证</string>
 
     <!-- Dashboard -->
     <string name="dashboard_title">仪表盘</string>
@@ -34,15 +32,9 @@
     <string name="count_providers">供应商</string>
     <string name="count_keys">密钥</string>
     <string name="count_models">模型</string>
-    <string name="count_accounts">平台账号</string>
-    <string name="dashboard_health_title">密钥健康</string>
     <plurals name="dashboard_health_all_ok">
         <item quantity="other">%1$d 张全部可用</item>
     </plurals>
-    <string name="dashboard_health_empty">还没有密钥</string>
-    <string name="dashboard_attention_title">需要处理</string>
-    <string name="dashboard_attention_none">暂无需要处理的项</string>
-    <string name="dashboard_attention_fix_client">更换客户端预设</string>
     <!-- One wording per attention kind, app wide (invariant 17). Each says what to do next. -->
     <string name="attention_key_rejected">上游拒绝了该密钥，请更换密钥或检查端点地址。</string>
     <string name="attention_client_blocked">被客户端校验拦截，更换 User-Agent 后可恢复</string>
@@ -65,19 +57,11 @@
     <string name="backup_target_local">本地文件</string>
     <string name="backup_target_webdav">WebDAV</string>
     <string name="dashboard_backup_now">立即备份</string>
-    <string name="dashboard_empty_title">还没有内容</string>
-    <string name="dashboard_empty_desc">可手动添加，或粘贴文本批量导入密钥、端点、模型与余额配置。</string>
-    <string name="dashboard_empty_import">粘贴导入</string>
     <string name="dashboard_empty_new">添加供应商</string>
 
     <!-- Manage -->
     <string name="manage_title">管理</string>
-    <string name="manage_tab_providers">供应商</string>
-    <string name="manage_tab_keys">密钥</string>
-    <string name="manage_tab_models">模型</string>
-    <string name="manage_tab_accounts">账号</string>
     <string name="manage_pinned">置顶</string>
-    <string name="manage_default_key">默认</string>
     <string name="manage_keys_ratio">%1$d / %2$d 张可用</string>
     <string name="manage_models_count">%1$d 个模型</string>
     <string name="manage_latency">%1$d 毫秒</string>
@@ -85,12 +69,6 @@
     <string name="manage_context">上下文 %1$s</string>
     <string name="manage_empty_providers_title">还没有供应商</string>
     <string name="manage_empty_providers_desc">可手动添加，或粘贴文本批量导入。</string>
-    <string name="manage_empty_keys_title">还没有密钥</string>
-    <string name="manage_empty_keys_desc">密钥归属于供应商，请先创建供应商，再添加密钥。</string>
-    <string name="manage_empty_models_title">还没有模型</string>
-    <string name="manage_empty_models_desc">可手动填写模型 ID，或从供应商接口获取模型列表。</string>
-    <string name="manage_empty_accounts_title">还没有平台账号</string>
-    <string name="manage_empty_accounts_desc">平台账号是供应商官网的登录凭据，仅保存在本地，应用不会代为填写。</string>
 
     <!-- Settings hub -->
     <string name="settings_title">设置</string>
@@ -149,7 +127,6 @@
     <string name="sync_title">同步</string>
     <string name="update_title">更新</string>
     <string name="probe_run_title">探测明细</string>
-    <string name="provider_detail_title">供应商</string>
 
     <!-- About -->
     <string name="about_title">关于</string>
@@ -191,10 +168,8 @@
     <string name="provider_editor_title">编辑供应商</string>
     <string name="detail_edit_cd">编辑</string>
     <string name="detail_section_keys">密钥</string>
-    <string name="detail_section_models">模型</string>
     <string name="detail_section_accounts">平台账号</string>
     <string name="detail_models_refresh">刷新模型</string>
-    <string name="detail_key_models_refresh">刷新这把密钥的模型</string>
     <string name="detail_accounts_empty">该供应商还没有平台账号。仅保存在本地，应用不会代为填写。</string>
     <string name="detail_accounts_empty_placeholder">还未添加账号</string>
     <!-- Appearance -->
@@ -321,7 +296,6 @@
     <string name="log_clear_cd">清空日志</string>
     <string name="log_filter_summary">显示所选等级及以上的日志。</string>
     <string name="log_recent_limit_note">仅显示最近 %1$d 条日志。</string>
-    <string name="log_retention">保留时间</string>
     <string-array name="log_retention_options">
         <item>7 天</item>
         <item>30 天</item>
@@ -374,11 +348,8 @@
     <string name="sync_webdav_insecure_required">允许明文 HTTP</string>
     <string name="sync_insecure_http_warning">Basic 凭据与备份文件将以明文传输，仅在可信的自建网络中启用</string>
     <string name="sync_webdav_upload">上传备份</string>
-    <string name="sync_webdav_upload_summary">加密后上传，远端最多保留 10 份</string>
     <string name="sync_webdav_restore">从 WebDAV 恢复最新备份</string>
-    <string name="sync_webdav_restore_summary">下载最新的 .yjv 文件后选择合并方式</string>
     <string name="sync_webdav_refresh">刷新远端列表</string>
-    <string name="sync_webdav_refresh_summary">只读操作，不会上传或修改数据</string>
     <string name="sync_webdav_checking">正在检查连接…</string>
     <string name="sync_remote_count">远端备份：%1$d 份</string>
     <string name="sync_remote_section">远端备份</string>
@@ -468,12 +439,10 @@
     <string name="profile_editor_save_empty_name">名称不能为空</string>
     <string name="profile_editor_save_empty_ua">User-Agent 不能为空</string>
     <string name="profile_editor_curl_failed">无法解析这段 cURL</string>
-    <string name="profile_editor_builtin_note">内置预设可编辑但不可删除，修改会在升级后保留。</string>
     <!-- Secret reveal / relative time -->
     <string name="secret_reveal_cd">展开</string>
     <string name="secret_conceal_cd">遮蔽</string>
     <string name="secret_copy_cd">复制</string>
-    <string name="secret_auto_conceal">%1$d 秒后自动隐藏</string>
     <string name="time_just_now">刚刚</string>
     <string name="time_minutes_ago">%1$d 分钟前</string>
     <string name="time_hours_ago">%1$d 小时前</string>
@@ -489,23 +458,15 @@
     <string name="editor_check_website_summary">打开后才会访问这个官网，检测它是否可用。默认关闭：这会向该网站发出一次请求。</string>
     <string name="editor_base_url">API 请求地址</string>
     <string name="editor_base_url_hint">只填到路径，不要包含问号后的参数，粘贴供应商提供的 Base URL 即可。</string>
-    <string name="editor_preview_title">将生成以下地址</string>
-    <string name="editor_preview_chat">Chat Completions</string>
-    <string name="editor_preview_responses">Responses</string>
-    <string name="editor_preview_anthropic">Anthropic Messages</string>
-    <string name="editor_preview_models">模型列表</string>
-    <string name="editor_preview_balance">余额默认地址</string>
     <string name="editor_url_err_empty">请填写 API 请求地址</string>
     <string name="editor_url_err_scheme">只支持 http 与 https</string>
     <string name="editor_url_err_query">请去掉 ? 或 # 及其后的部分，只保留路径。忽略查询参数会得到一个看似正确、实际始终返回 401 的端点。</string>
     <string name="editor_url_err_host">这个地址里没有主机名</string>
-    <string name="editor_insecure_warning">当前使用明文 HTTP，密钥将以明文传输。</string>
     <string name="editor_allow_insecure">仍然允许使用明文 HTTP</string>
     <string name="editor_section_look">外观</string>
     <string name="editor_group">分组</string>
     <string name="editor_color">色块</string>
     <string name="editor_pinned">置顶</string>
-    <string name="editor_section_protocols">协议</string>
     <string name="editor_section_endpoint">端点与协议</string>
     <string name="editor_models_auto">自动获取</string>
     <string name="editor_models_auto_summary">开启后隐藏手动模型编辑区。</string>
@@ -538,8 +499,6 @@
     <string name="editor_balance_access_key_id">AccessKey ID</string>
     <string name="editor_balance_secret_access_key">SecretAccessKey</string>
     <string name="editor_balance_secret_access_key_hint">在火山引擎控制台「API 访问密钥」中创建，仅用于给余额查询请求签名</string>
-    <string name="editor_balance_none_hint">该供应商不查询余额。</string>
-    <string name="editor_balance_default_key_hint">使用该供应商的默认密钥查询，无需填写额外字段。</string>
     <string name="editor_section_client">客户端预设</string>
     <string name="editor_section_advanced">高级</string>
     <string name="editor_advanced_expand">展开高级</string>
@@ -620,11 +579,7 @@
     <string name="import_paste_hint">粘贴一条 cURL 命令，识别后将提取请求地址、鉴权 Key、模型与端点协议。</string>
     <string name="import_from_clipboard">从剪贴板填充</string>
     <string name="import_parse">识别</string>
-    <string name="import_no_preview">尚无识别结果，请粘贴 cURL 命令后点击「识别」。</string>
     <string name="import_section_preview">预览</string>
-    <string name="import_selected">将导入</string>
-    <string name="import_skipped">跳过</string>
-    <string name="import_counts">%1$d 张密钥 · %2$d 个模型 · %3$d 个账号</string>
     <plurals name="import_parse_errors">
         <item quantity="other">%1$d 条 cURL 命令解析失败已跳过，通常是缺少 URL 或鉴权 Key。</item>
     </plurals>
@@ -632,15 +587,6 @@
         <item quantity="other">导入 %1$d 家</item>
     </plurals>
     <!-- Import preview issues (invariant 17: one wording per state) -->
-    <string name="import_issue_missing_name">缺供应商名称</string>
-    <string name="import_issue_bad_endpoint">请求地址包含查询参数或片段，将原样保留，请在编辑页修改</string>
-    <string name="import_issue_insecure_endpoint">该地址为 http://，需在编辑页启用「允许不安全连接」后才能使用</string>
-    <string name="import_issue_model_name">有模型 ID 疑似显示名，请在导入前确认</string>
-    <string name="import_issue_protocol_added">有模型使用了该供应商未列出的协议，已自动补充</string>
-    <string name="import_issue_balance_credential">NewAPI 余额查询需要访问令牌与用户 ID，可先导入后再补充</string>
-    <string name="import_issue_client_profile">未匹配到客户端预设，已忽略</string>
-    <string name="import_issue_account_incomplete">有平台账号缺少用户名或密码，将按现有字段导入</string>
-    <string name="import_issue_account_duplicate">重复的平台账号已跳过</string>
 
     <!-- Probe run -->
     <string name="probe_run_failed">失败</string>
@@ -666,7 +612,6 @@
     <string name="editor_section_probe">探测设置</string>
     <string name="editor_probe_enabled">允许探测这一家</string>
     <string name="editor_probe_enabled_summary">若服务条款不允许自动化检测，请关闭此项</string>
-    <string name="editor_probe_disabled_note">该供应商不会收到任何探测请求，包括手动探测、定时探测与「重试失败项」。</string>
     <string name="editor_probe_reachability">可达性检测</string>
     <string name="editor_probe_reachability_summary">获取一次模型列表，不产生费用。</string>
     <string name="editor_probe_keys">密钥有效性</string>
@@ -713,7 +658,6 @@
     <string name="feedback_imported">密钥已导入</string>
     <string name="feedback_clipboard_filled">已从剪贴板填充</string>
     <string name="feedback_clipboard_empty">剪贴板为空</string>
-    <string name="feedback_probe_cancelled">已取消探测</string>
     <string name="feedback_balance_refreshed">余额已刷新</string>
     <string name="feedback_balance_refresh_failed">余额查询失败</string>
     <string name="feedback_models_refreshed">模型列表已刷新</string>
@@ -777,9 +721,7 @@
 
     <!-- 引导 -->
     <string name="onboarding_step_of">第 %1$d 步，共 %2$d 步</string>
-    <string name="onboarding_next">继续</string>
     <string name="onboarding_start">开始设置</string>
-    <string name="onboarding_finish">完成</string>
     <string name="onboarding_welcome_title">设置 PIN 前的三点说明</string>
     <string name="onboarding_welcome_subtitle">以下三点会影响你应在此保存的内容。</string>
     <string name="onboarding_welcome_what">API 密钥、平台账号密码与访问令牌按字段使用 AES-256-GCM 加密；供应商名称、端点、模型 ID 与余额为明文存储。</string>
@@ -798,18 +740,9 @@
     <string name="detail_keys_empty_placeholder">还未添加密钥</string>
     <string name="detail_keys_empty">该供应商还没有密钥。没有密钥无法探测，也无法查询余额。</string>
     <string name="detail_add_key">添加密钥</string>
-    <string name="detail_key_label">标签</string>
-    <string name="detail_key_label_hint">用于区分同一供应商的多把密钥，可留空。</string>
     <string name="detail_key_secret">密钥</string>
-    <string name="detail_key_secret_hint">粘贴即可，写入数据库前会先加密。</string>
-    <string name="detail_key_set_default">设为默认</string>
-    <string name="detail_key_delete_title">删除这把密钥？</string>
-    <string name="detail_key_delete_body">删除后无法恢复。若为默认密钥，排序最前的已启用密钥将自动接替。</string>
-    <string name="detail_key_reveal_hint">复制后内容会进入剪贴板并在一段时间后自动清除，离开此面板将清除明文。</string>
     <string name="detail_account_username">账号</string>
     <string name="detail_account_password">密码</string>
-    <string name="detail_balance_refresh">查余额</string>
-    <string name="detail_probe_provider">探测这一家</string>
     <string name="detail_key_view">查看密钥</string>
     <string name="detail_key_connection_base_url">Base URL</string>
     <string name="detail_key_connection_protocol">协议</string>
@@ -824,7 +757,6 @@
     <string name="detail_key_connection">连接设置</string>
     <string name="detail_key_more_cd">更多操作</string>
     <string name="detail_probe_key">探测这把密钥</string>
-    <string name="detail_probe_model_cd">探测这个模型</string>
     <string name="detail_provider_balance_total">余额合计</string>
     <string name="detail_key_balance_value">%1$s %2$s</string>
     <string name="protocol_chat">Chat</string>
@@ -852,7 +784,6 @@
     <string name="detail_model_protocol">协议</string>
     <string name="detail_model_delete">删掉这个模型？</string>
     <string name="detail_model_delete_action">删除模型</string>
-    <string name="detail_models_quick_hint">长按模型可发送一次简短请求。</string>
     <string name="detail_models_count_auto">共 %1$d 个（自动获取）</string>
     <string name="detail_models_count_manual">共 %1$d 个</string>
     <string name="detail_reachability_latency">%1$d 毫秒</string>
@@ -876,9 +807,6 @@
     <!-- 探测默认值。 -->
     <string name="editor_probe_model_reachability">模型可达性探测（快捷）</string>
     <string name="editor_probe_model_reachability_summary">默认关闭。只能手动长按模型触发一次简短的付费请求：先试 Chat 协议，失败自动回落 Anthropic，两个都失败才算不可达。</string>
-    <string name="editor_probe_models_confirm_title">清除已保存的模型？</string>
-    <string name="editor_probe_models_confirm_action">开启</string>
-    <string name="editor_probe_models_confirm_body">开启模型列表检测会清除该供应商已保存的模型列表，之后每轮探测会按密钥重新获取。</string>
 
     <!-- 关于页。 -->
     <string name="about_summary_title">关于元记</string>
@@ -925,7 +853,6 @@
     <string name="keymodels_catalog_never">模型目录还没下载过，能力信息暂不可用。</string>
     <string name="keymodels_catalog_update">更新目录</string>
     <string name="keymodels_catalog_failed">目录更新失败，原因见日志。</string>
-    <string name="keymodels_catalog_synced">目录已更新</string>
     <string name="keymodels_source_manual">手动</string>
     <string name="keymodels_source_discovered">自动发现</string>
     <string name="keymodels_unmatched">目录里没有</string>
@@ -946,9 +873,7 @@
     <string name="keymodels_meta_status">状态</string>
     <string name="keymodels_meta_vendor">厂商</string>
     <string name="keymodels_group_other">其他</string>
-    <string name="keymodels_latency">%1$d 毫秒</string>
     <string name="keymodels_probed_never">还没探测过</string>
-    <string name="keymodels_probe_cd">探测这个模型</string>
     <string name="keymodels_more_cd">更多操作</string>
     <string name="keymodels_delete_title">删除这个模型？</string>
     <string name="keymodels_delete_summary">只从这把 Key 移除模型行，目录条目保留。</string>
