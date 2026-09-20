@@ -192,7 +192,7 @@ val coreModule = module {
     single<ProviderRepository> { RoomProviderRepository(get(), get(named(Qualifiers.NOW)), get(), get()) }
     single<ApiKeyRepository> { RoomApiKeyRepository(get(), get(), get(), get(), get(named(Qualifiers.NOW)), get(), get()) }
     single<SettingsRepository> { RoomSettingsRepository(get(), get()) }
-    single<WebDavSettingsRepository> { RoomWebDavSettingsRepository(get(), get(), get()) }
+    single<WebDavSettingsRepository> { RoomWebDavSettingsRepository(get(), get(), get(), get()) }
     single<ProviderAccountRepository> { RoomProviderAccountRepository(get(), get(), get(), get(named(Qualifiers.NOW)), get(), get()) }
     single<ModelRepository> {
         RoomModelRepository(

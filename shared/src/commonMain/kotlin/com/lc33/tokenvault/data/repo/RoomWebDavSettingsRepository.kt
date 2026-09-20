@@ -11,6 +11,7 @@ import com.lc33.tokenvault.domain.model.LogLevel
 import com.lc33.tokenvault.domain.model.WebDavConfig
 import com.lc33.tokenvault.domain.model.WebDavCredentials
 import com.lc33.tokenvault.domain.repo.AuditLogRepository
+import com.lc33.tokenvault.domain.repo.TransactionRunner
 import com.lc33.tokenvault.domain.repo.WebDavSettingsRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -26,6 +27,7 @@ class RoomWebDavSettingsRepository constructor(
     private val dao: AppSettingDao,
     private val cipher: FieldCipher,
     private val audit: AuditLogRepository? = null,
+    private val transactions: TransactionRunner,
 ) : WebDavSettingsRepository {
 
     override fun observeConfig(): Flow<WebDavConfig> = dao.observeAll()
@@ -46,12 +48,27 @@ class RoomWebDavSettingsRepository constructor(
         username: CharArray?,
         password: CharArray?,
     ) {
-        dao.put(AppSettingEntity(key = KEY_URL, value = config.url.trim()))
-        dao.put(AppSettingEntity(key = KEY_DIRECTORY, value = normalizeDirectory(config.remoteDirectory)))
-        dao.put(AppSettingEntity(key = KEY_ALLOW_INSECURE, value = config.allowInsecure.toString()))
-
-        username?.let { saveCredential(KEY_USERNAME, it) }
-        password?.let { saveCredential(KEY_PASSWORD, it) }
+        // 五处写入必须在同一个事务里。分开写时中途失败（并发探测占着写锁、磁盘满）会留下
+        // "地址已经换了、密码没换"这种半份配置：`hasCredentials` 于是 false，同步页那三行
+        // 一起变灰而说不出为什么，`withConnection` 抛的是"没配置"，报出来的是一条通用失败。
+        transactions.inTransaction {
+            dao.put(AppSettingEntity(key = KEY_URL, value = config.url.trim()))
+            dao.put(
+                AppSettingEntity(
+                    key = KEY_DIRECTORY,
+                    value = normalizeDirectory(config.remoteDirectory),
+                ),
+            )
+            dao.put(
+                AppSettingEntity(
+                    key = KEY_ALLOW_INSECURE,
+                    value = config.allowInsecure.toString(),
+                ),
+            )
+            username?.let { saveCredential(KEY_USERNAME, it) }
+            password?.let { saveCredential(KEY_PASSWORD, it) }
+        }
+        // 审计写在事务外：日志那一行写不进去不该把用户刚填好的配置回滚掉。
         audit.recordSafe(
             LogLevel.INFO,
             LogCategory.BACKUP,
