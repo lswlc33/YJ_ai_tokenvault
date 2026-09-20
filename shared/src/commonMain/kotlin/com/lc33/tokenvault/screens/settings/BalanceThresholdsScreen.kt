@@ -8,9 +8,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.flow.drop
 import org.jetbrains.compose.resources.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.lc33.tokenvault.ui.common.LoadingState
 import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.probe_thresholds
 import tokenvault.shared.generated.resources.probe_thresholds_cny
@@ -46,16 +49,46 @@ fun BalanceThresholdsScreen(
 ) {
     val thresholds by viewModel.thresholds.collectAsStateWithLifecycle()
 
-    // 阈值还没读到（Room 首帧是异步的）时不建输入框：`remember` 的初值只在首次组合算一次，
-    // 拿默认 5/30 建框之后真实值到了也不会更新，等于把已保存的值悄悄吞掉。
-    val loaded = thresholds ?: return
+    // 阈值还没读到（Room 首帧是异步的）时也要把外壳画出来：以前这里是 `?: return`，
+    // 于是点进这一页先是一片纯白，没有顶栏也没有返回箭头，看起来像卡死了。
+    val loaded = thresholds
+    if (loaded == null) {
+        SettingsSubPage(titleRes = Res.string.probe_thresholds, onBack = onBack) {
+            item { LoadingState() }
+        }
+    } else {
+        ThresholdsEditor(loaded = loaded, viewModel = viewModel, onBack = onBack)
+    }
+}
 
+/**
+ * 读到阈值之后的编辑区。拆出来只为了 [loaded] 非空——两个输入框的初值只在首次组合
+ * 取一次，必须在真实值到手之后才建立。
+ */
+@Composable
+private fun ThresholdsEditor(
+    loaded: Map<String, Double>,
+    viewModel: BalanceThresholdsViewModel,
+    onBack: () -> Unit,
+) {
     val tokens = LocalAppTokens.current
 
     // 初值只在首次组合时取一次：之后用户自己改的内容不能被库里推上来的旧值覆盖。
     val usdState = rememberAppTextFieldState(trimZero(loaded["USD"] ?: BalanceSnapshot.DEFAULT_THRESHOLDS["USD"]!!))
     val cnyState = rememberAppTextFieldState(trimZero(loaded["CNY"] ?: BalanceSnapshot.DEFAULT_THRESHOLDS["CNY"]!!))
     var showError by remember { mutableStateOf(false) }
+
+    // 动过任何一个框就把错误收回。以前 `showError` 只会被置 true、永远不会回 false，
+    // 于是一次点错之后两个格子一路标红到退出这一页——包括那个本来就填对的。
+    LaunchedEffect(usdState, cnyState) {
+        snapshotFlow { usdState.text to cnyState.text }
+            .drop(1)
+            .collect { showError = false }
+    }
+
+    // 红只给真正填错的那一格：两个框一起红是在说"这一页有错"，而不是"哪一格有错"。
+    val usdInvalid = showError && viewModel.parse(usdState.text) == null
+    val cnyInvalid = showError && viewModel.parse(cnyState.text) == null
 
     // 退出这一页等的是"落库成功"事件，而不是 save() 的返回值：
     // 先退再写会让写失败发生在用户已经离开之后。
@@ -85,7 +118,7 @@ fun BalanceThresholdsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = tokens.screenPadding, vertical = tokens.itemSpacing),
-                errorText = if (showError) stringResource(Res.string.probe_thresholds_invalid) else null,
+                errorText = if (usdInvalid) stringResource(Res.string.probe_thresholds_invalid) else null,
             )
         }
 
@@ -96,7 +129,7 @@ fun BalanceThresholdsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = tokens.screenPadding, vertical = tokens.itemSpacing),
-                errorText = if (showError) stringResource(Res.string.probe_thresholds_invalid) else null,
+                errorText = if (cnyInvalid) stringResource(Res.string.probe_thresholds_invalid) else null,
             )
         }
 

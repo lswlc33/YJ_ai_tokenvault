@@ -423,14 +423,12 @@ private fun ProviderList(
                 )
             }
         }
-        // 多选态有删除 FAB，末尾要让出药丸；普通态只留呼吸空间（内容画到窗口底部
-        // 透出玻璃底栏，不垫就会贴边）。
+        // 末尾一律让出药丸的位置：这一页**两种状态下都有 FAB**（普通态是「新建」，
+        // 多选态是「删除」），而 FAB 不是系统 inset——不垫高，普通态最后一张供应商卡的
+        // 右列（余额、状态点、延迟）就永远压在加号底下，怎么滚都滚不出来。
+        // 分组页同一条留白就是无条件给的（GroupsScreen 的列表末尾）。
         item {
-            Spacer(
-                modifier = Modifier.height(
-                    if (selecting) tokens.fabListBottomSpace else tokens.sectionSpacing,
-                ),
-            )
+            Spacer(modifier = Modifier.height(tokens.fabListBottomSpace))
         }
     }
 }

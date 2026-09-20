@@ -50,17 +50,22 @@ class BalanceThresholdsViewModel constructor(
     val saved: SharedFlow<Unit> = _saved.asSharedFlow()
 
     /**
-     * 保存。解析两个输入框 → 校验（非负数字）→ 写库。
+     * 解析并校验一个输入框（规则见 [parseBalanceThreshold]）。
+     *
+     * 单独暴露给页面，是为了让"哪一格填错了"由页面自己逐格问——校验规则只在这里说一次，
+     * 页面不会另算出一份和保存时不一致的判断。
+     */
+    fun parse(text: String): Double? = parseBalanceThreshold(text)
+
+    /**
+     * 保存。解析两个输入框 → 校验（非负的有限数）→ 写库。
      *
      * 校验失败返回 [SaveResult.Invalid]，调用方据此在对应输入框下提示，而不是弹窗。
      * 校验通过返回 [SaveResult.Accepted]：**这只表示写入已发起**，退出这一页要等 [saved]。
      */
     fun save(usdText: String, cnyText: String): SaveResult {
-        val usd = usdText.trim().toDoubleOrNull()
-        val cny = cnyText.trim().toDoubleOrNull()
-        if (usd == null || usd < 0.0 || cny == null || cny < 0.0) {
-            return SaveResult.Invalid
-        }
+        val usd = parse(usdText) ?: return SaveResult.Invalid
+        val cny = parse(cnyText) ?: return SaveResult.Invalid
         viewModelScope.launch {
             runCatching { settings.setBalanceThresholds(mapOf("USD" to usd, "CNY" to cny)) }
                 .onSuccess { _saved.tryEmit(Unit) }
@@ -77,3 +82,14 @@ class BalanceThresholdsViewModel constructor(
         data object Invalid : SaveResult
     }
 }
+
+/**
+ * 一个阈值输入：非负的**有限**数，非法返回 null。
+ *
+ * `isFinite()` 不是多余的：`"Infinity"` 与 `"NaN"` 都能被 `toDoubleOrNull()` 解析成功，
+ * 而只判 `< 0.0` 会把两个都放行。存成 NaN 之后每一次「余额 < 阈值」都是 false，这一档
+ * 就永久不再判低额；存成 Infinity 更糟——任何余额都低于它，全都判低额。两个方向都是
+ * 悄悄错，所以当场拒绝，而不是等到比较的时候才发现。
+ */
+fun parseBalanceThreshold(text: String): Double? =
+    text.trim().toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0.0 }

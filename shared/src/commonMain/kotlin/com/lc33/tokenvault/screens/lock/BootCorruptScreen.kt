@@ -101,7 +101,10 @@ fun BootCorruptScreen(
                 onClick = { askWipe = true },
                 modifier = Modifier.fillMaxWidth(),
             )
-            AppCard {
+            // fillMaxWidth 不能省：AppCard 自己没有默认宽度，不填就缩成文字宽度、
+            // 还左对齐，跟上面两条 fillMaxWidth 的行入口明显不是一块（全应用只有这一处
+            // 这么调，正因为漏了才单独说一句）。
+            AppCard(modifier = Modifier.fillMaxWidth()) {
                 AppText(
                     text = stringResource(Res.string.boot_corrupt_diagnostic),
                     style = AppTextStyle.Footnote,

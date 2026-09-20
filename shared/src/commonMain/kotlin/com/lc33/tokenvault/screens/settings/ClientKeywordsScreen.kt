@@ -1,11 +1,11 @@
 package com.lc33.tokenvault.screens.settings
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.lc33.tokenvault.ui.common.LoadingState
 import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.probe_keywords
 import tokenvault.shared.generated.resources.probe_keywords_add
@@ -22,12 +23,12 @@ import tokenvault.shared.generated.resources.probe_keywords_delete
 import tokenvault.shared.generated.resources.probe_keywords_empty
 import tokenvault.shared.generated.resources.probe_keywords_hint
 import tokenvault.shared.generated.resources.probe_thresholds_save
+import com.lc33.tokenvault.ui.miuix.AppActionButton
 import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppIconButton
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppTextField
-import com.lc33.tokenvault.ui.miuix.AppActionRow
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.SectionTitle
 import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
@@ -48,14 +49,42 @@ fun ClientKeywordsScreen(
 ) {
     val loaded by viewModel.keywords.collectAsStateWithLifecycle()
 
-    // 与 BalanceThresholdsScreen 同一套规则：Room 首帧异步，没读到前不建列表状态。
-    val initial = loaded ?: return
+    // Room 首帧是异步的。以前这里是 `loaded ?: return`，于是这一页在读到数据之前
+    // 什么都不画——连顶栏和返回箭头都没有，看起来像点进去之后白屏卡住了。
+    // 外壳必须无条件画出来，只在内容区放"加载中"。
+    val initial = loaded
+    if (initial == null) {
+        SettingsSubPage(titleRes = Res.string.probe_keywords, onBack = onBack) {
+            item { LoadingState() }
+        }
+    } else {
+        KeywordsEditor(initial = initial, viewModel = viewModel, onBack = onBack)
+    }
+}
 
+/**
+ * 读到数据之后的编辑区。
+ *
+ * 单独一个函数是为了让 [initial] 非空：输入框的初值只在首次组合取一次，
+ * 所以它必须在"已经有真实值"之后才建立（与阈值页同一个理由）。
+ */
+@Composable
+private fun KeywordsEditor(
+    initial: List<String>,
+    viewModel: ClientKeywordsViewModel,
+    onBack: () -> Unit,
+) {
     // 可编辑副本。初值取已存列表（可能为空 = 用默认）。
     var items by remember(initial) { mutableStateOf(initial.toList()) }
     val input = rememberAppTextFieldState("")
     val tokens = LocalAppTokens.current
     val deleteDesc = stringResource(Res.string.probe_keywords_delete)
+
+    // 退出等的是"落库成功"事件，而不是点保存的那一刻：先退再写会让写失败发生在用户
+    // 已经离开之后，而关键词表还是旧的——这一页跟阈值页共用同一条规矩。
+    LaunchedEffect(viewModel) {
+        viewModel.saved.collect { onBack() }
+    }
 
     SettingsSubPage(titleRes = Res.string.probe_keywords, onBack = onBack) {
         item {
@@ -95,6 +124,7 @@ fun ClientKeywordsScreen(
                             AppText(
                                 text = keyword,
                                 style = AppTextStyle.Body,
+                                maxLines = 1,
                                 modifier = Modifier.weight(1f),
                             )
                             AppIconButton(
@@ -119,13 +149,17 @@ fun ClientKeywordsScreen(
         }
 
         item {
+            // 两个动作等重，用按钮而不是行入口：行入口是一条 56dp 的 preference 行，
+            // 并排放两条时第一条先按整行宽度量走，第二条（保存）直接被挤出屏幕外，
+            // 于是这一页只看得见「添加」、关键词永远存不下来。
+            // 同一个坑的成因与出处见 AppActionButton 的注释、ImportScreen 的按钮行。
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = tokens.screenPadding, vertical = tokens.itemSpacing),
-                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
             ) {
-                AppActionRow(
+                AppActionButton(
                     text = stringResource(Res.string.probe_keywords_add),
                     onClick = {
                         val kw = input.text.trim()
@@ -134,14 +168,13 @@ fun ClientKeywordsScreen(
                             input.clear()
                         }
                     },
+                    modifier = Modifier.weight(1f),
                 )
-                Spacer(Modifier.width(12.dp))
-                AppActionRow(
+                AppActionButton(
                     text = stringResource(Res.string.probe_thresholds_save),
-                    onClick = {
-                        viewModel.save(items)
-                        onBack()
-                    },
+                    onClick = { viewModel.save(items) },
+                    modifier = Modifier.weight(1f),
+                    primary = true,
                 )
             }
         }
