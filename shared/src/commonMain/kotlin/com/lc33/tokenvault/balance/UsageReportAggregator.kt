@@ -100,13 +100,15 @@ object UsageReportAggregator {
                 val current = locfByDay[day]
                 if (current?.amount != null) {
                     val bucket = current.providerId to (current.currency ?: UNKNOWN)
-                    balanceByBucket.getOrPut(bucket) { LinkedHashMap() }
-                        .merge(day, current.amount, Double::plus)
+                    // 自己累加而不用 `Map.merge`：后者是 java.util 的成员，JVM 目标（含
+                    // 跑单测的 jvm 与 Android）能解析，Kotlin/Native 的 iOS 目标没有它，
+                    // 于是本地全绿而 CI 的 ios job 才报 unresolved。commonMain 里累加
+                    // 一律走这个写法。
+                    balanceByBucket.getOrPut(bucket) { LinkedHashMap() }.accumulate(day, current.amount)
 
                     val consumed = consumedBetween(previous, current)
                     if (consumed > 0.0) {
-                        consumeByBucket.getOrPut(bucket) { LinkedHashMap() }
-                            .merge(day, consumed, Double::plus)
+                        consumeByBucket.getOrPut(bucket) { LinkedHashMap() }.accumulate(day, consumed)
                     }
                 }
                 // 前推：这一天没有样本时保持昨天的值，好让下一天的消耗仍以真值为基线。
@@ -158,6 +160,17 @@ object UsageReportAggregator {
 
     private fun dayStartMillis(day: LocalDate, zone: TimeZone): Long =
         day.atStartOfDayIn(zone).toEpochMilliseconds()
+
+    /**
+     * 按天累加金额，等价于 JVM 上的 `Map.merge(day, amount, Double::plus)`。
+     *
+     * 单独写一个而不直接调 merge：`merge` 是 `java.util.Map` 的成员，Android 与 jvm
+     * 目标（跑单测的就是它）都能解析，Kotlin/Native 的 iOS 目标根本没这个函数，
+     * 于是本地测试全绿、CI 的 ios job 才报 unresolved reference。
+     */
+    private fun MutableMap<LocalDate, Double>.accumulate(day: LocalDate, amount: Double) {
+        this[day] = (this[day] ?: 0.0) + amount
+    }
 
     private const val UNKNOWN = "UNKNOWN"
 }
