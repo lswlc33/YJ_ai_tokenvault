@@ -29,6 +29,7 @@
     <string name="dashboard_balance_none">还没有配置余额查询</string>
     <string name="dashboard_counts_title">内容</string>
     <string name="common_loading">加载中…</string>
+    <string name="common_row_gone">这一条已经不在库里了，请返回上一页，从列表里重新打开。</string>
     <string name="count_providers">供应商</string>
     <string name="count_keys">密钥</string>
     <string name="count_models">模型</string>

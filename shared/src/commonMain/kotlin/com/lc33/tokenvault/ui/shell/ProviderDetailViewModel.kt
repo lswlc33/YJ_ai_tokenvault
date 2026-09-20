@@ -36,6 +36,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -194,6 +195,17 @@ class ProviderDetailViewModel constructor(
             )
         }
     }.stateIn(viewModelScope, SharingStarted.Lazily, null)
+
+    /**
+     * 库已经读过、但这一行不在。
+     *
+     * [state] 为 null 其实有两种意思：还没读到，和读到了但没有这条。页面只看 null 就会
+     * 把后者也当成前者，于是删掉一家供应商之后从探测明细点它的行，就永远停在"加载中"
+     * （从备份恢复会把所有 id 重排，是同一个洞的另一个入口）。这一条把后者单独说出来。
+     */
+    val rowGone: StateFlow<Boolean> = providers.observeProvider(providerId)
+        .map { it == null }
+        .stateIn(viewModelScope, SharingStarted.Lazily, false)
 
     init {
         // 订阅而不是提供一个 refresh()：新增、删除、换明文都会让这条 Flow 再发一次，

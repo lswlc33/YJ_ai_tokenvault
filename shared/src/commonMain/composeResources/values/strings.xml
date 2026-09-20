@@ -29,6 +29,7 @@
     <string name="dashboard_balance_none">No balance query configured yet</string>
     <string name="dashboard_counts_title">Content</string>
     <string name="common_loading">Loading…</string>
+    <string name="common_row_gone">This entry is no longer in the vault. Go back and open it from the list again.</string>
     <string name="count_providers">Providers</string>
     <string name="count_keys">Keys</string>
     <string name="count_models">Models</string>

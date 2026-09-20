@@ -22,7 +22,7 @@ import com.lc33.tokenvault.platform.openAppLocaleSettings
 import com.lc33.tokenvault.platform.openExternalUrl
 import com.lc33.tokenvault.platform.rememberBackupFilePicker
 import com.lc33.tokenvault.screens.dashboard.DashboardScreen
-import com.lc33.tokenvault.ui.common.LoadingState
+import com.lc33.tokenvault.ui.common.PagePlaceholder
 import com.lc33.tokenvault.ui.common.relativeLabelWithinDay
 import com.lc33.tokenvault.domain.repo.UndoableDeletion
 import com.lc33.tokenvault.screens.lock.ChangePinScreen
@@ -362,6 +362,7 @@ fun VaultNavHost(
                 val vm: ProviderDetailViewModel = koinViewModel(parameters = { parametersOf(route.id) })
                 val detail by vm.state.collectAsStateWithLifecycle()
                 val detailState = detail
+                val providerRowGone by vm.rowGone.collectAsStateWithLifecycle()
                 val revealedAccount by vm.revealedAccount.collectAsStateWithLifecycle()
                 val accountClipboardLabel = stringResource(Res.string.clipboard_label_account)
                 val feedback = LocalAppFeedback.current
@@ -417,7 +418,7 @@ fun VaultNavHost(
                     }
                 }
                 if (detailState == null) {
-                    LoadingState(Modifier.fillMaxSize())
+                    PagePlaceholder(onBack = back, gone = providerRowGone)
                 } else {
                     detailState.let { state ->
                         ProviderDetailScreen(
@@ -523,6 +524,7 @@ fun VaultNavHost(
                 )
                 val state by vm.state.collectAsStateWithLifecycle()
                 val keyState = state
+                val keyRowGone by vm.rowGone.collectAsStateWithLifecycle()
                 val revealed by vm.revealed.collectAsStateWithLifecycle()
                 val feedback = LocalAppFeedback.current
                 val keyClipboardLabel = stringResource(Res.string.clipboard_label_api_key)
@@ -571,7 +573,7 @@ fun VaultNavHost(
                     }
                 }
                 if (keyState == null) {
-                    LoadingState(Modifier.fillMaxSize())
+                    PagePlaceholder(onBack = back, gone = keyRowGone)
                 } else {
                     keyState.let { stateValue ->
                         KeyDetailScreen(
@@ -667,7 +669,7 @@ fun VaultNavHost(
                     EndpointError.NoHost -> stringResource(Res.string.editor_url_err_host)
                 }
                 if (!loaded) {
-                    LoadingState(Modifier.fillMaxSize())
+                    PagePlaceholder(onBack = back, gone = false)
                 } else {
                     KeyEditorScreen(
                         draft = draft,
@@ -866,7 +868,7 @@ fun VaultNavHost(
             LaunchedEffect(vm) { vm.deleted.collect { back() } }
             // 同 ProviderEditorRoute：载入前给占位，否则推入动画期间这一页是空的。
             if (!loaded) {
-                LoadingState(Modifier.fillMaxSize())
+                PagePlaceholder(onBack = back, gone = false)
             } else {
                 ProfileEditorScreen(
                     initial = profile,
@@ -1003,7 +1005,7 @@ fun VaultNavHost(
             // 载入前必须占位，不能什么都不画：推入动画期间这一页是**空的**，
             // 于是动画看起来"丢了"——上一页滑走、下一页内容直接跳出来。
             if (!loaded) {
-                LoadingState(Modifier.fillMaxSize())
+                PagePlaceholder(onBack = back, gone = false)
             } else {
                 ProviderEditorScreen(
                     draft = draft,

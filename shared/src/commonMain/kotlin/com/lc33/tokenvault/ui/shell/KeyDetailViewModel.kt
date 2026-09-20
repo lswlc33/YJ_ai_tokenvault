@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -101,6 +102,15 @@ class KeyDetailViewModel constructor(
             canMoveDown = position >= 0 && position < order.lastIndex,
         )
     }.stateIn(viewModelScope, SharingStarted.Lazily, null)
+
+    /**
+     * 库已经读过、但这把密钥不在（整家被删也算）。理由同 ProviderDetailViewModel.rowGone：
+     * [state] 的 null 同时表示"还没读到"和"读到了没这条"，只按 null 处理就是删掉之后
+     * 这一页永远转圈。
+     */
+    val rowGone: StateFlow<Boolean> = keys.observeByProvider(providerId)
+        .map { list -> list.none { it.id == keyId } }
+        .stateIn(viewModelScope, SharingStarted.Lazily, false)
 
     init {
         viewModelScope.launch { recomputeMask() }

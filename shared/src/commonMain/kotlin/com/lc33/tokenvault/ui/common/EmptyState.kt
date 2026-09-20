@@ -26,7 +26,7 @@ import tokenvault.shared.generated.resources.common_loading
 @Composable
 fun EmptyState(
     title: String,
-    description: String,
+    description: String? = null,
     modifier: Modifier = Modifier,
     actionText: String? = null,
     onAction: (() -> Unit)? = null,
@@ -40,12 +40,16 @@ fun EmptyState(
         verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
     ) {
         AppText(text = title, style = AppTextStyle.Title, textAlign = TextAlign.Center)
-        AppText(
-            text = description,
-            style = AppTextStyle.Secondary,
-            color = appSecondaryTextColor,
-            textAlign = TextAlign.Center,
-        )
+        // 没有副标题就别传空串：那会照样画一个空 AppText，再加一条 itemSpacing，
+        // 标题底下凭空多出一截空白。
+        if (description != null) {
+            AppText(
+                text = description,
+                style = AppTextStyle.Secondary,
+                color = appSecondaryTextColor,
+                textAlign = TextAlign.Center,
+            )
+        }
         if (actionText != null && onAction != null) {
             AppTextButton(text = actionText, onClick = onAction)
         }
