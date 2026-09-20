@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -561,10 +559,10 @@ private fun AccountEditorSheet(
             ?: stringResource(Res.string.detail_add_account),
     ) {
         if (target == null) return@AppBottomSheet
+        // 不再自己 verticalScroll：AppBottomSheet 的内容块已经可滚，这里再套一层只是
+        // 空转（外层给了无限高度，内层永远不触发滚动），以前这段是为了绕开包装层不滚。
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState()),
+            modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
         ) {
             // 名称与备注同卡两条输入框：以前各包一张 AppCard，两张 16dp 内边距 +

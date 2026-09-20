@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.KeyboardActionHandler
@@ -28,6 +29,7 @@ import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.clearText
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
@@ -573,7 +575,20 @@ fun AppDialog(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            content()
+            // 内容区自己滚，「取消/确定」钉在弹层底部。
+            //
+            // 以前整块不滚：WebDAV 设置那弹层有四个输入框加一条开关行，小屏或大字号下
+            // 内容高度超过窗口，按钮被顶到弹层甚至屏幕外面——用户看得见输入框，却既提交
+            // 不了也关不掉，只能杀应用。fill = false 让矮弹层照旧按内容收高度，不硬撑。
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                content = content,
+            )
             if (confirmText != null || dismissText != null) {
                 Row(
                     modifier = Modifier
@@ -613,6 +628,10 @@ fun AppDialog(
  * 底部还要垫一段导航条 inset：MIUIX 的 `defaultWindowInsetsPadding` 只加 `imePadding`，
  * 完全不处理 systemBars——不补这一条，弹层收尾的按钮会压在手势小白条上（全应用弹层同病，
  * 所以在包装层一次修掉，而不是每个页面各自加）。
+ *
+ * 整块内容自己可滚动：分组选择器按分组数长行（实测能到 15 组），账号编辑弹层有两张卡加
+ * 若干输入框，许可证正文更是整段文字。不滚的话超出屏幕的那部分就是够不着——比页面里
+ * 滚不动更糟，因为弹层外面没有别的地方可滚。
  */
 @Composable
 fun AppBottomSheet(
@@ -634,7 +653,8 @@ fun AppBottomSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom))
-                .padding(vertical = tokens.itemSpacing),
+                .padding(vertical = tokens.itemSpacing)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
             content = content,
         )
