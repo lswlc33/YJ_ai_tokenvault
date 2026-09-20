@@ -158,6 +158,17 @@ class ProbeEngine constructor(
     val lastRound: StateFlow<List<ProbeItemResult>> = _lastRound.asStateFlow()
 
     /**
+     * 丢掉内存里这一轮的累计结果。数据页「清空探测结果」必须连它一起清。
+     *
+     * 那一发清的是库（`probe_runs` 与密钥上的探测字段），而明细页读的是这份内存快照：
+     * 不一起清就会"已清空"之后进明细页还看得到全部旧行，而同一时刻总览那张卡已经变成
+     * 「还没探测过」。两个屏幕对同一件事各说一套。
+     */
+    fun clearLastRound() {
+        _lastRound.value = emptyList()
+    }
+
+    /**
      * 本轮撞过 429 的 host 记在 [engine]（HostGate）那里，不在这里再存一份。
      *
      * 原来这是一个裸 `mutableSetOf`：编排器的工作线程往里写、这里的 `trySniff` 读，

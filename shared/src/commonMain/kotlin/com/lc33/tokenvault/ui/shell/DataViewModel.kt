@@ -8,6 +8,7 @@ import com.lc33.tokenvault.domain.repo.ApiKeyRepository
 import com.lc33.tokenvault.domain.repo.AuditLogRepository
 import com.lc33.tokenvault.domain.repo.ProbeRunRepository
 import com.lc33.tokenvault.domain.repo.TransactionRunner
+import com.lc33.tokenvault.engine.ProbeEngine
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -28,6 +29,8 @@ class DataViewModel constructor(
     private val probeRuns: ProbeRunRepository,
     private val audit: AuditLogRepository,
     private val transactions: TransactionRunner,
+    /** 只为了清空时把引擎内存里那一轮一起丢掉——明细页读的是它，不是 `probe_runs`。 */
+    private val probeEngine: ProbeEngine,
 ) : ViewModel() {
 
     /** 一次性事件：只带语义，文案在资源里（红线 19）。 */
@@ -50,6 +53,9 @@ class DataViewModel constructor(
                     keys.resetProbeResults()
                     probeRuns.clear()
                 }
+                // 库清完才丢内存快照：反过来会让"清空失败"这一支把已经跑完的一轮结果
+                // 白白抹掉。探测还在跑时这一句也无害——下一轮照常往里填。
+                probeEngine.clearLastRound()
                 audit.record(
                     level = LogLevel.INFO,
                     category = LogCategory.PROBE,
