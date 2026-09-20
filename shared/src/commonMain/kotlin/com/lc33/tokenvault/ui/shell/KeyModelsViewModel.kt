@@ -115,6 +115,14 @@ class KeyModelsViewModel constructor(
         val editable: Boolean = false,
         /** 长按/按钮能不能真发一次模型可达性探测——沿用详情页那条"两档都开"的判定。 */
         val quickProbe: Boolean = false,
+        /**
+         * 模型那条流**已经发过第一帧**。
+         *
+         * 没这一位就分不开"还没读到"和"读到了、这把 Key 确实没有模型"：两者都是空列表，
+         * 于是进页面的第一帧会闪一句"该密钥没有模型"，紧接着整屏列表才跳出来。
+         * 放在 Header 里搭同一趟 combine，是为了不再为单独一个布尔加第六条来源流。
+         */
+        val rowsLoaded: Boolean = false,
     )
 
     init {
@@ -141,7 +149,13 @@ class KeyModelsViewModel constructor(
             models.observeByProvider(providerId).collect { all ->
                 val forThisKey = all.filter { it.keyId == keyId }
                 rows.value = forThisKey
-                metaByKey.value = catalog.findByKeys(forThisKey.mapNotNull { it.catalogKey }.distinct())
+                // 目录那一趟捞不到只影响"能力"面板，不该把整屏模型带走：这里必须收住
+                // 异常，否则它从 collect 里冒出去，ViewModel 协程没有父级接，整页没了。
+                val meta = runCatching {
+                    catalog.findByKeys(forThisKey.mapNotNull { it.catalogKey }.distinct())
+                }.getOrDefault(emptyMap())
+                metaByKey.value = meta
+                header.value = header.value.copy(rowsLoaded = true)
             }
         }
         // 厂商展示名只在分组标题里用，但它要按**族键**查：族键来自模型 id 前缀，
@@ -220,6 +234,7 @@ class KeyModelsViewModel constructor(
             providerName = h.providerName,
             editable = h.editable,
             quickProbe = h.quickProbe,
+            loading = !h.rowsLoaded,
             totalModels = listing.totalModels,
             matchedModels = listing.matchedModels,
             visibleModels = listing.visibleModels,

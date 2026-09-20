@@ -33,6 +33,7 @@ import com.lc33.tokenvault.screens.model.UiModelMeta
 import com.lc33.tokenvault.screens.model.UiModelRow
 import com.lc33.tokenvault.screens.model.UiModelSource
 import com.lc33.tokenvault.ui.common.EmptyState
+import com.lc33.tokenvault.ui.common.LoadingState
 import com.lc33.tokenvault.ui.common.StatusDot
 import com.lc33.tokenvault.ui.common.colorOf
 import com.lc33.tokenvault.ui.common.labelOf
@@ -264,10 +265,13 @@ fun KeyModelsScreen(
 
             if (state.groups.isEmpty()) {
                 item {
-                    EmptyState(
-                        title = stringResource(Res.string.keymodels_empty),
-                        description = "",
-                    )
+                    // 还没读到第一帧时只能说"加载中"：那一帧 groups 也是空的，与"这把
+                    // Key 确实没有模型"一模一样，直接画空态就会闪一句假话。
+                    if (state.loading) {
+                        LoadingState()
+                    } else {
+                        EmptyState(title = stringResource(Res.string.keymodels_empty))
+                    }
                 }
             } else {
                 state.groups.forEach { group ->
@@ -517,6 +521,9 @@ private fun GroupCard(
                 AppText(
                     text = groupTitle(group),
                     style = AppTextStyle.Subtitle,
+                    // 族名可能是整个模型 id 前缀，长起来没边；不给 maxLines 就会把
+                    // 组头撑成两行，与右边那个数字和箭头不在一条基线上。
+                    maxLines = 1,
                     modifier = Modifier.weight(1f),
                 )
                 AppText(
@@ -609,8 +616,14 @@ private fun ModelRow(
         }
 
         // 第二行常驻"来源 + 最近探测"：这两条是每行都有的事实，不展开也该看得见。
+        //
+        // 三条都要 maxLines=1：这一行没有换行容器，任一条变两行就把整行撑高一倍。
+        // 中间那句（探测摘要）最长、也最可以截，所以给它 weight(fill=false)——
+        // 左右两条先按自身宽度量，剩下的都给它的 ellipsize，而不是让尾巴被顶出去。
         Row(
-            modifier = Modifier.padding(top = 4.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
@@ -624,11 +637,14 @@ private fun ModelRow(
                 ),
                 style = AppTextStyle.Footnote,
                 color = appSecondaryTextColor,
+                maxLines = 1,
             )
             AppText(
                 text = probeSummary(row, nowMs),
                 style = AppTextStyle.Footnote,
                 color = appSecondaryTextColor,
+                maxLines = 1,
+                modifier = Modifier.weight(1f, fill = false),
             )
             // 未挂目录的行给一句轻提示：它是"这份目录还缺多少"的诊断入口，
             // 也是唯一能一眼看出上游改名的地方。
@@ -637,6 +653,7 @@ private fun ModelRow(
                     text = stringResource(Res.string.keymodels_unmatched),
                     style = AppTextStyle.Footnote,
                     color = appSecondaryTextColor,
+                    maxLines = 1,
                 )
             }
         }

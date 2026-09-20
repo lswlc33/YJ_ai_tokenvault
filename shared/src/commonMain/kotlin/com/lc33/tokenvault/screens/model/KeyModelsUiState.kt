@@ -22,6 +22,14 @@ data class KeyModelsUiState(
     /** 长按一行能不能真发一次模型可达性探测——两档开关都开才算，与详情页同一条判定。 */
     val quickProbe: Boolean,
 
+    /**
+     * 模型那条流还没发过第一帧。
+     *
+     * true 时不许说"该密钥没有模型"：那一帧 `groups` 也是空的，与"真的没有"长得一样，
+     * 于是进页面会先闪一句空态、整屏列表才跳出来。
+     */
+    val loading: Boolean,
+
     val groups: List<UiModelGroup>,
 
     /** 库里这一把 Key 的模型总数（不受筛选影响，摘要那句要说的是真相而不是筛完的残影）。 */
