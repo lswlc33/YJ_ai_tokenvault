@@ -83,6 +83,42 @@ class BalanceAdapterTest {
         assertTrue(e is BalanceParseException)
     }
 
+    @Test
+    fun `newapi quota_per_unit 回 0 时按默认换算比而不是除零`() {
+        // 站点真的会回 0（字段在、是数字、值没填）。0 不是换算比：`quota / 0` 得到
+        // Infinity，一路存进余额列，首页把它夹成 `92233720368547758.07` 显示成一笔
+        // 看起来真实的余额。所以 0 / 负数一律视同"没带这个字段"。
+        val snapshot = NewApiAdapter().parse(
+            200,
+            """{"data":{"quota":226870,"used_quota":0,"quota_per_unit":0}}""",
+        )
+        assertEquals(226870.0 / 500000.0, snapshot.amount!!, 1e-9)
+        assertNull(snapshot.error)
+    }
+
+    @Test
+    fun `newapi 校准值也要挡零`() {
+        // 校准走的是另一个入口，同样不能把 0 当有效比值。
+        val snapshot = NewApiAdapter(calibratedQuotaPerUnit = 0.0).parse(
+            200,
+            """{"data":{"quota":100000,"used_quota":0,"quota_per_unit":-1}}""",
+        )
+        assertEquals(100000.0 / 500000.0, snapshot.amount!!, 1e-9)
+    }
+
+    @Test
+    fun `newapi 商溢出成无穷时报失败而不是存一个假余额`() {
+        // 换算比是正数了仍然可能溢出：quota 顶到 Long.MAX、比值极小。
+        val e = runCatching {
+            NewApiAdapter().parse(
+                200,
+                """{"data":{"quota":9223372036854775807,"used_quota":0,"quota_per_unit":1e-320}}""",
+            )
+        }.exceptionOrNull()
+        assertTrue(e is BalanceParseException)
+        assertTrue(e!!.message!!.contains("non_finite_amount"))
+    }
+
     // ------------------------------------------------------------------ deepseek
 
     @Test

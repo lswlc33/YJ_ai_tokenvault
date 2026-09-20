@@ -160,15 +160,28 @@ private fun ApiKeyEntity.balanceSnapshot(): BalanceSnapshot? {
     ) {
         return null
     }
+    // 读到一个不能显示的数额，就当这一次查询没成功。
+    //
+    // 为什么在读取这一层挡：Infinity 是能原样存进 REAL 列的（老数据里就可能有——
+    // new-api 站点回 `quota_per_unit: 0` 那一版算出来就是它，见 NewApiAdapter）。
+    // 放到界面上，FormatMoney 会把它夹到 Long.MAX_VALUE 再印成
+    // `92233720368547758.07`，看着像一笔真实余额；两个这样的值再相加还会溢出成负数。
+    // 与其在每个显示点各挡一次，不如在唯一的解码点收口：失败有失败的样子（红色 ERROR、
+    // 不计入合计、计入失败家数）。
+    val amount = balanceAmount?.takeIf { it.isFinite() }
+    val used = balanceUsed?.takeIf { it.isFinite() }
+    val corrupted = balanceAmount != null && amount == null
     return BalanceSnapshot(
-        amount = balanceAmount,
-        used = balanceUsed,
+        amount = amount,
+        used = used,
         currency = balanceCurrency ?: BalanceSnapshot.UNKNOWN_CURRENCY,
         raw = balanceRaw,
         checkedAt = balanceCheckedAt,
-        error = balanceError,
+        error = balanceError ?: BALANCE_NON_FINITE.takeIf { corrupted },
     )
 }
+
+private const val BALANCE_NON_FINITE = "non_finite_amount"
 
 fun ApiKeyWithSettingsRow.toDomain(): ApiKey {
     val settingsEntity = settings

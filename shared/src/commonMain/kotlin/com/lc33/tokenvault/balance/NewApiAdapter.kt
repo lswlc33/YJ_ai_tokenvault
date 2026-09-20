@@ -71,6 +71,9 @@ class NewApiAdapter(
         // [calibrateQuotaPerUnit] 校准，别在别处再写一遍 500000。
         val amount = quota.toDouble() / quotaPerUnit
         val used = usedQuota.toDouble() / quotaPerUnit
+        // 换算比已经是正数了，仍然挡一道：quota 大到除以极小的比值还是会溢出成 Infinity，
+        // 而这一份快照接下来要落库、要在首页参加求和。宁可报这次查询失败。
+        if (!amount.isFinite() || !used.isFinite()) throw BalanceParseException(kind, "non_finite_amount")
         val currency = (data["quota_display_type"] as? JsonPrimitive)?.contentOrNull
             ?.takeIf { it.isNotBlank() } ?: "USD"
 
@@ -95,7 +98,10 @@ class NewApiAdapter(
 
     /** 从 `/api/user/self` 的 data 里读 `quota_per_unit`（部分站会带，没带用默认）。 */
     private fun providerQuotaPerUnit(data: kotlinx.serialization.json.JsonObject): Double =
-        (data["quota_per_unit"] as? JsonPrimitive)?.doubleOrNull
+        // `takeIf { it > 0 }` 不能省：站点把这个字段回成 0（或负数、NaN）时它"存在且是数字"，
+        // 但 0 不是换算比而是除零——下面 `quota / quotaPerUnit` 直接得到 Infinity，
+        // 一路存进余额列。这种站要么用校准值、要么用默认 500000，不能照收。
+        (data["quota_per_unit"] as? JsonPrimitive)?.doubleOrNull?.takeIf { it > 0.0 }
             ?: calibratedQuotaPerUnit?.takeIf { it > 0.0 }
             ?: BalanceKind.NEWAPI_DEFAULT_QUOTA_PER_UNIT
 
