@@ -838,8 +838,8 @@
     <string name="keymodels_filter_reasoning">推理</string>
     <string name="keymodels_filter_tool_call">工具调用</string>
     <string name="keymodels_filter_vision">看图</string>
-    <string name="keymodels_filter_matched">目录里有</string>
-    <string name="keymodels_filter_unmatched">目录里没有</string>
+    <string name="keymodels_filter_matched">已知模型</string>
+    <string name="keymodels_filter_unmatched">未知模型</string>
     <string name="keymodels_group_by_none">不分组</string>
     <string name="keymodels_group_by_family">按家族</string>
     <string name="keymodels_group_by_source">按来源</string>
@@ -851,14 +851,14 @@
     <string name="keymodels_summary">显示 %1$d / %2$d</string>
     <string name="keymodels_summary_all">共 %1$d 个</string>
     <string name="keymodels_summary_empty">没有符合当前筛选的模型</string>
-    <string name="keymodels_matched">%1$d 个已挂目录</string>
+    <string name="keymodels_matched">%1$d 个已知模型</string>
     <string name="keymodels_catalog_sync">正在更新模型目录…</string>
     <string name="keymodels_catalog_never">模型目录还没下载过，能力信息暂不可用。</string>
     <string name="keymodels_catalog_update">更新目录</string>
     <string name="keymodels_catalog_failed">目录更新失败，原因见日志。</string>
     <string name="keymodels_source_manual">手动</string>
     <string name="keymodels_source_discovered">自动发现</string>
-    <string name="keymodels_unmatched">目录里没有</string>
+    <string name="keymodels_unmatched">未知模型</string>
     <string name="keymodels_meta_context">上下文</string>
     <string name="keymodels_meta_output">最大输出</string>
     <string name="keymodels_meta_capabilities">能力</string>
@@ -876,7 +876,6 @@
     <string name="keymodels_meta_status">状态</string>
     <string name="keymodels_meta_vendor">厂商</string>
     <string name="keymodels_group_other">其他</string>
-    <string name="keymodels_probed_never">还没探测过</string>
     <string name="keymodels_more_cd">更多操作</string>
     <string name="keymodels_delete_title">删除这个模型？</string>
     <string name="keymodels_delete_summary">只从这把 Key 移除模型行，目录条目保留。</string>

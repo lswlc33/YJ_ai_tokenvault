@@ -1,6 +1,12 @@
 package com.lc33.tokenvault.screens.manage
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,13 +37,11 @@ import com.lc33.tokenvault.screens.model.UiModelCardRow
 import com.lc33.tokenvault.screens.model.UiModelGroup
 import com.lc33.tokenvault.screens.model.UiModelMeta
 import com.lc33.tokenvault.screens.model.UiModelRow
-import com.lc33.tokenvault.screens.model.UiModelSource
 import com.lc33.tokenvault.ui.common.EmptyState
 import com.lc33.tokenvault.ui.common.LoadingState
 import com.lc33.tokenvault.ui.common.StatusDot
 import com.lc33.tokenvault.ui.common.colorOf
 import com.lc33.tokenvault.ui.common.labelOf
-import com.lc33.tokenvault.ui.common.protocolLabel
 import com.lc33.tokenvault.ui.common.relativeLabel
 import com.lc33.tokenvault.ui.miuix.AppActionRow
 import com.lc33.tokenvault.ui.miuix.AppCard
@@ -113,7 +117,6 @@ import tokenvault.shared.generated.resources.keymodels_more_cd
 import tokenvault.shared.generated.resources.keymodels_probe
 import tokenvault.shared.generated.resources.keymodels_probed_ago
 import tokenvault.shared.generated.resources.keymodels_probed_ago_with_latency
-import tokenvault.shared.generated.resources.keymodels_probed_never
 import tokenvault.shared.generated.resources.keymodels_refresh
 import tokenvault.shared.generated.resources.keymodels_search
 import tokenvault.shared.generated.resources.keymodels_sort_added
@@ -592,7 +595,12 @@ private fun ModelRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onToggleExpand),
+                .combinedClickable(
+                    onClick = onToggleExpand,
+                    // 长按沿用 Key 详情页那行的口径：开了快速探测就探测这一行，否则复制
+                    // id。菜单撤掉之后，这是自动发现列表上唯一一行动作入口。
+                    onLongClick = if (row.quickProbe) onProbe else onCopy,
+                ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -603,77 +611,80 @@ private fun ModelRow(
                 maxLines = 1,
                 modifier = Modifier.weight(1f),
             )
-            AppChip(text = protocolLabel(row.protocol))
+            // 协议 chip 不画：这一页的主语是模型 id，而一把 Key 的协议几乎全一样
+            // （同一家的模型都走那一个端点），它占的宽度正是 id 被截的地方。
             StatusDot(color = colorOf(row.health), label = labelOf(row.health))
-            ModelMenu(
-                row = row,
-                editable = editable,
-                onCopy = onCopy,
-                onProbe = onProbe,
-                onEdit = onEdit,
-                onDelete = onDelete,
-            )
-        }
-
-        // 第二行常驻"来源 + 最近探测"：这两条是每行都有的事实，不展开也该看得见。
-        //
-        // 三条都要 maxLines=1：这一行没有换行容器，任一条变两行就把整行撑高一倍。
-        // 中间那句（探测摘要）最长、也最可以截，所以给它 weight(fill=false)——
-        // 左右两条先按自身宽度量，剩下的都给它的 ellipsize，而不是让尾巴被顶出去。
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            AppText(
-                text = stringResource(
-                    if (row.source == UiModelSource.Manual) {
-                        Res.string.keymodels_source_manual
-                    } else {
-                        Res.string.keymodels_source_discovered
-                    },
-                ),
-                style = AppTextStyle.Footnote,
-                color = appSecondaryTextColor,
-                maxLines = 1,
-            )
-            AppText(
-                text = probeSummary(row, nowMs),
-                style = AppTextStyle.Footnote,
-                color = appSecondaryTextColor,
-                maxLines = 1,
-                modifier = Modifier.weight(1f, fill = false),
-            )
-            // 未挂目录的行给一句轻提示：它是"这份目录还缺多少"的诊断入口，
-            // 也是唯一能一眼看出上游改名的地方。
-            if (row.unmatched) {
-                AppText(
-                    text = stringResource(Res.string.keymodels_unmatched),
-                    style = AppTextStyle.Footnote,
-                    color = appSecondaryTextColor,
-                    maxLines = 1,
+            // 三个点只在手动列表给：自动发现的行没有可编辑的东西（改一个下次同步就覆盖），
+            // 复制与探测收到长按上，一行里就不再常驻一个图标。
+            if (editable) {
+                ModelMenu(
+                    row = row,
+                    editable = editable,
+                    onCopy = onCopy,
+                    onProbe = onProbe,
+                    onEdit = onEdit,
+                    onDelete = onDelete,
                 )
             }
         }
 
-        if (row.expanded) {
-            Spacer(modifier = Modifier.height(tokens.itemSpacing))
-            ModelMetaPanel(meta = row.meta, modelId = row.modelId)
+        // 第二行只在真有事要说时画。来源不再逐行标：整页都是同一个来源，要按来源看
+        // 用「按来源」分组；「还没探测过」也不再标——那是没有结果，不是一个结果。
+        val summary = probeSummary(row, nowMs)
+        if (summary != null || row.unmatched) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                if (summary != null) {
+                    AppText(
+                        text = summary,
+                        style = AppTextStyle.Footnote,
+                        color = appSecondaryTextColor,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                }
+                // 没挂上目录的行给一句轻提示：它是"这份目录还缺多少"的诊断入口，
+                // 也是唯一能一眼看出上游改名的地方。
+                if (row.unmatched) {
+                    AppText(
+                        text = stringResource(Res.string.keymodels_unmatched),
+                        style = AppTextStyle.Footnote,
+                        color = appSecondaryTextColor,
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
+
+        // 展开要有动画：面板凭空出现、凭空消失，读起来像整页被换过，而不是这一行摊开了。
+        AnimatedVisibility(
+            visible = row.expanded,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut(),
+        ) {
+            Column {
+                Spacer(modifier = Modifier.height(tokens.itemSpacing))
+                ModelMetaPanel(meta = row.meta, modelId = row.modelId)
+            }
         }
     }
 }
 
 /**
- * 最近探测那一句。
+ * 最近探测那一句。**没探测过返回 null**，由调用方把这一整行省掉——"还没探测过"是
+ * 没有结果，不是一个结果，给每行都挂一句反而盖住了真正探测过的那几条。
  *
- * 没探测过就说没探测过；探测过给相对时间，有耗时就一起带上。耗时缺了不补 0——
- * "0 毫秒"看起来像一次极快的成功，而真相是那一发没记到耗时。
+ * 探测过给相对时间，有耗时就一起带上。耗时缺了不补 0——"0 毫秒"看起来像一次极快的
+ * 成功，而真相是那一发没记到耗时。
  */
 @Composable
-private fun probeSummary(row: UiModelCardRow, nowMs: Long): String {
-    val probedAt = row.probedAt ?: return stringResource(Res.string.keymodels_probed_never)
+private fun probeSummary(row: UiModelCardRow, nowMs: Long): String? {
+    val probedAt = row.probedAt ?: return null
     val whenText = relativeLabel(nowMs, probedAt)
     val latency = row.latencyMs
     return if (latency == null) {
@@ -769,7 +780,8 @@ private fun CapabilityChips(meta: UiModelMeta) {
  * 一行的操作菜单。
  *
  * 用图标菜单而不是把动作铺成按钮：一行里塞四五个按钮会把模型 id 挤没，而这一页的
- * 主语就是 id。复制与探测在开关允许时始终可用，编辑与删除只在手动模式下给。
+ * 主语就是 id。自动发现的列表压根不画这个菜单（那三项里没有一项能改，图标却常年占着
+ * id 的宽度），复制与探测挂在行的长按上；手动列表才给编辑与删除。
  */
 @Composable
 private fun ModelMenu(

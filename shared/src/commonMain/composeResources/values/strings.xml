@@ -864,8 +864,8 @@
     <string name="keymodels_filter_reasoning">Reasoning</string>
     <string name="keymodels_filter_tool_call">Tools</string>
     <string name="keymodels_filter_vision">Vision</string>
-    <string name="keymodels_filter_matched">In catalog</string>
-    <string name="keymodels_filter_unmatched">Not in catalog</string>
+    <string name="keymodels_filter_matched">Known model</string>
+    <string name="keymodels_filter_unmatched">Unknown model</string>
     <string name="keymodels_group_by_none">None</string>
     <string name="keymodels_group_by_family">Family</string>
     <string name="keymodels_group_by_source">Source</string>
@@ -878,14 +878,14 @@
     <string name="keymodels_summary">Showing %1$d of %2$d</string>
     <string name="keymodels_summary_all">%1$d models</string>
     <string name="keymodels_summary_empty">No model matches the current filter</string>
-    <string name="keymodels_matched">%1$d matched in catalog</string>
+    <string name="keymodels_matched">%1$d known models</string>
     <string name="keymodels_catalog_sync">Updating catalog…</string>
     <string name="keymodels_catalog_never">Catalog not downloaded yet — model capabilities are unavailable.</string>
     <string name="keymodels_catalog_update">Update catalog</string>
     <string name="keymodels_catalog_failed">Catalog update failed. See the log for the reason.</string>
     <string name="keymodels_source_manual">Manual</string>
     <string name="keymodels_source_discovered">Auto-discovered</string>
-    <string name="keymodels_unmatched">Not in catalog</string>
+    <string name="keymodels_unmatched">Unknown model</string>
     <string name="keymodels_meta_context">Context</string>
     <string name="keymodels_meta_output">Max output</string>
     <string name="keymodels_meta_capabilities">Capabilities</string>
@@ -903,7 +903,6 @@
     <string name="keymodels_meta_status">Status</string>
     <string name="keymodels_meta_vendor">Vendor</string>
     <string name="keymodels_group_other">Other</string>
-    <string name="keymodels_probed_never">Not probed</string>
     <string name="keymodels_more_cd">More actions</string>
     <string name="keymodels_delete_title">Delete this model?</string>
     <string name="keymodels_delete_summary">The model row is removed from this key. The catalog entry is kept.</string>
