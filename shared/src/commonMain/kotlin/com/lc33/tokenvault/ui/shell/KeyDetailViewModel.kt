@@ -10,6 +10,7 @@ import com.lc33.tokenvault.domain.repo.ClientProfileRepository
 import com.lc33.tokenvault.domain.repo.ModelRepository
 import com.lc33.tokenvault.domain.repo.UndoableDeletion
 import com.lc33.tokenvault.engine.BalanceEngine
+import com.lc33.tokenvault.engine.BalanceRefreshOutcome
 import com.lc33.tokenvault.engine.ProbeEngine
 import com.lc33.tokenvault.platform.SecureClipboard
 import com.lc33.tokenvault.platform.nowMillis
@@ -68,6 +69,15 @@ class KeyDetailViewModel constructor(
          * 必然走到这一支（密文在、DEK 不是那一把）。
          */
         data object RevealFailed : Event
+
+        /**
+         * 这一轮余额刷完了。[outcome] 带的是"跑了几把、成了几把、第一个失败的原因码与
+         * 上游原话"，说什么由 Shell 决定（见 `ui/common/balanceRoundMessage`）。
+         *
+         * 以前这一发是 `runCatching { balanceEngine.refresh(...) }` 发出去就不管：全部
+         * 失败与成功在界面上长得一样，而用户点它就是因为怀疑钱不对。
+         */
+        data class BalanceRan(val outcome: BalanceRefreshOutcome) : Event
     }
 
     private val _events = Channel<Event>(Channel.BUFFERED)
@@ -125,7 +135,12 @@ class KeyDetailViewModel constructor(
      * 不另外再调一次 [ProbeEngine.refreshModels]——那是同一份列表发两遍请求。
      */
     fun probeKey() {
-        viewModelScope.launch { runCatching { balanceEngine.refresh(providerId, keyId) } }
+        viewModelScope.launch {
+            val outcome = runBalanceRefresh { balanceEngine.refresh(providerId, keyId) }
+            // 探测那一轮由 Shell 统一播报，这里只报余额：全成功时它没有要用户做的事
+            // （卡上的数字自己会动），失败/部分失败才是这一轮唯一探测不出来的那件事。
+            if (outcome.needsAttention) _events.trySend(Event.BalanceRan(outcome))
+        }
         // 提示在动作发出的这一刻给（"正在探测该密钥…"）；这一轮的结果由 Shell 层统一播报。
         if (probeEngine.probeKey(keyId)) _events.trySend(Event.Probed)
     }
@@ -138,10 +153,14 @@ class KeyDetailViewModel constructor(
      */
     fun refreshModels(): Boolean = probeEngine.refreshModels(providerId, keyId)
 
-    /** 手动触发模型可达性探测。协议由引擎按 Chat → Anthropic 自己试，这里不需要知道。 */
-    fun probeModel(modelId: String) {
-        probeEngine.probeModel(providerId, keyId, modelId)
-    }
+    /**
+     * 手动触发模型可达性探测。协议由引擎按 Chat → Anthropic 自己试，这里不需要知道。
+     *
+     * 返回值是"**这一发有没有真的发出去**"：引擎已经有一发在跑、或者库正锁着的时候
+     * 它是 false，那一发压根没出去。页面拿它决定要不要念"已探测该模型"——上一版是无条件
+     * 念的，于是点了没反应的时候用户听到的是一句成功。与 KeyModels 页同一口径。
+     */
+    fun probeModel(modelId: String): Boolean = probeEngine.probeModel(providerId, keyId, modelId)
 
     fun reveal() {
         viewModelScope.launch {
@@ -177,7 +196,12 @@ class KeyDetailViewModel constructor(
         viewModelScope.launch {
             val plain = withContext(Dispatchers.Default) {
                 runCatching { keys.reveal(keyId) }.getOrNull()
-            } ?: return@launch
+            } ?: run {
+                // 长按复制与「查看密钥」解不开的是同一件事，要说同一句话。以前这里
+                // 直接 `return@launch`：点下去什么都没发生，也没有任何一句解释。
+                _events.trySend(Event.RevealFailed)
+                return@launch
+            }
             try {
                 knownSecrets.add(plain)
                 clipboard.copy(label, plain)

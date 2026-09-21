@@ -54,3 +54,23 @@ class BalanceParseException(
     val kind: BalanceKind,
     val reason: String,
 ) : Exception("$kind: $reason")
+
+/**
+ * [BalanceSnapshot.error] 里那几个**本机自己造的**原因码。
+ *
+ * 上游侧的原因统一长成 `http <状态码>` / `no_json` / `missing_<字段>`（各适配器抛的
+ * [BalanceParseException.reason]），界面按前缀翻文案。这三个不是上游给的，是本地在
+ * **请求还没发出去**那一步就得出的结论（见 `engine/BalanceEngine.recordLocalFailure`），
+ * 所以给独立的名字：别让界面把它们和 401 混成同一句"上游拒绝"——那时上游压根没被问到，
+ * 而用户能做的事完全相反（一个是去中转站重签令牌，一个是重新导入备份）。
+ */
+object BalanceErrorReason {
+    /** 配过访问令牌，但本机那把 DEK 解不开它（换过设备、恢复过库、清过密钥）。 */
+    const val TOKEN_UNDECRYPTABLE = "token_undecryptable"
+
+    /** 选了需要独立令牌的查询类型，却压根没填令牌。 */
+    const val TOKEN_MISSING = "token_missing"
+
+    /** 用 API 密钥本身查余额，但那把密钥的密文在本机解不开。 */
+    const val KEY_UNDECRYPTABLE = "key_undecryptable"
+}

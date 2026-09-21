@@ -627,6 +627,31 @@
 
     <!-- Balance: the "query failed" wording, used on the provider detail page. -->
     <string name="balance_failed_section">Query failed</string>
+    <!-- Why a balance query failed. The engine stores a machine code in
+         `api_keys.balanceError`; these are the localized readings of it. Before
+         this existed the app said "Query failed" and stopped there, which left the
+         user guessing between an expired token, a wrong path and a dead site. -->
+    <string name="balance_err_unauthorized">The provider rejected these credentials (%1$d) — the access token may have expired</string>
+    <string name="balance_err_not_found">Address not found (%1$d), the balance endpoint path is probably wrong</string>
+    <string name="balance_err_rate_limited">Rate limited by the provider (%1$d), try again later</string>
+    <string name="balance_err_server">The provider itself failed (%1$d)</string>
+    <string name="balance_err_http">The provider returned %1$d</string>
+    <string name="balance_err_not_json">The reply was not JSON — likely a login page or an HTML error page</string>
+    <string name="balance_err_missing_field">The reply has no %1$s field</string>
+    <string name="balance_err_not_a_number">The balance field is not a usable number</string>
+    <string name="balance_err_empty_list">The provider returned an empty balance list</string>
+    <string name="balance_err_bad_headers">The custom balance request headers are malformed</string>
+    <string name="balance_err_token_missing">No access token filled in for this query type</string>
+    <string name="balance_err_token_undecryptable">This device cannot decrypt the stored access token — refill it or restore a backup</string>
+    <string name="balance_err_key_undecryptable">This device cannot decrypt the stored API key</string>
+    <string name="balance_err_unknown">Query failed (%1$s)</string>
+    <!-- %1$s is the localized reason above, %2$s the provider's own words, taken from
+         the redacted response body and shown verbatim. -->
+    <string name="balance_upstream_said">%1$s (the provider said: %2$s)</string>
+    <string name="upstream_said">The provider said: %1$s</string>
+    <!-- A provider whose balance is a sum of several keys: some of them failed. -->
+    <string name="balance_failed_keys_note">%1$d of its keys could not be read: %2$s</string>
+    <string name="dashboard_balance_failed_keys">%1$d key(s) failed the balance query</string>
     <!-- Per-provider probe switches (invariant 36) -->
     <string name="editor_section_probe">Probe settings</string>
     <string name="editor_probe_enabled">Allow probing this provider</string>
@@ -679,6 +704,11 @@
     <string name="feedback_clipboard_empty">Clipboard is empty</string>
     <string name="feedback_balance_refreshed">Balances refreshed</string>
     <string name="feedback_balance_refresh_failed">Balance query failed</string>
+    <!-- A balance round now reports what actually happened instead of always saying
+         "refreshed": 0 succeeded with 10 failed used to be counted as a success. -->
+    <string name="feedback_balance_all_failed">No balance could be read: %1$s</string>
+    <string name="feedback_balance_partial">%1$d key(s) read, %2$d failed</string>
+    <string name="feedback_balance_nothing">No key has balance queries turned on</string>
     <string name="feedback_models_refreshed">Model list refreshed</string>
     <string name="feedback_model_probed">Model probed</string>
     <string name="feedback_probe_retried">Retrying failed items</string>

@@ -112,6 +112,15 @@ class KeyEditorViewModel constructor(
 
         /** 这一行本来就有（撞唯一索引，什么都没插）：不能说"已保存"，那是一句假话。 */
         data object ModelDuplicate : Event
+
+        /**
+         * 模型那三发改库的写没成功。
+         *
+         * 以前只有 `onSuccess`：添加/编辑抛出去就没人说话，弹层收了、列表没变，用户只能
+         * 反复点；删除更糟——`getOrNull()` 之后无条件发 `ModelDeleted`，于是**删失败也念
+         * "已删除"**，那一行还好好地留在列表里，看起来像界面坏了。与 KeyModels 页同一口径。
+         */
+        data object WriteFailed : Event
     }
 
     private val _events = Channel<Event>(Channel.BUFFERED)
@@ -316,7 +325,7 @@ class KeyEditorViewModel constructor(
                 // 撞上唯一索引时仓库返回 -1，那一行根本没进库。以前一律发 ModelSaved，
                 // 于是"已保存"的提示弹出来、列表里却没有那一条——用户只能反复点。
                 _events.trySend(if (id <= 0L) Event.ModelDuplicate else Event.ModelSaved)
-            }
+            }.onFailure { _events.trySend(Event.WriteFailed) }
         }
     }
 
@@ -328,9 +337,13 @@ class KeyEditorViewModel constructor(
     ) {
         val key = currentKey ?: return
         viewModelScope.launch {
-            val existing = modelsRepository.observeByProvider(key.providerId).first()
-                .firstOrNull { it.id == id } ?: return@launch
-            runCatching {
+            // 读那一行也在闸内：以前它是裸的 `observeByProvider(...).first()`，读库一抛
+            // 异常就从协程里冒出去（崩应用），而 `?: return@launch` 那一支又是彻底的沉默
+            // ——同一个动作在这里只有一种结局会说话。与 ProviderDetailViewModel 里
+            // 删模型那一段同一口径。
+            val result = runCatching {
+                val existing = modelsRepository.observeByProvider(key.providerId).first()
+                    .firstOrNull { it.id == id } ?: return@runCatching false
                 modelsRepository.update(
                     existing.copy(
                         modelId = modelId.trim(),
@@ -338,14 +351,23 @@ class KeyEditorViewModel constructor(
                         displayName = displayName?.trim()?.ifEmpty { null },
                     ),
                 )
-            }.onSuccess { _events.trySend(Event.ModelSaved) }
+                true
+            }
+            // 两种结局都要说：读不到那一行（false）与真的写失败（异常）都不该让弹层
+            // 收下去、列表却一动不动。
+            _events.trySend(
+                if (result.getOrDefault(false)) Event.ModelSaved else Event.WriteFailed,
+            )
         }
     }
 
     fun deleteModel(id: Long) {
         viewModelScope.launch {
-            val undo = runCatching { modelsRepository.delete(id) }.getOrNull()
-            _events.trySend(Event.ModelDeleted(undo))
+            // `getOrNull()` + 无条件发 ModelDeleted 是一句假话：删失败时也念"已删除"，
+            // 而那一行还在列表里。异常要分开说（与 KeyModelsViewModel 同一条）。
+            runCatching { modelsRepository.delete(id) }
+                .onSuccess { undo -> _events.trySend(Event.ModelDeleted(undo)) }
+                .onFailure { _events.trySend(Event.WriteFailed) }
         }
     }
 

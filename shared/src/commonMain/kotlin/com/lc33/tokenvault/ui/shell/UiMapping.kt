@@ -16,6 +16,7 @@ import com.lc33.tokenvault.domain.model.Group
 import com.lc33.tokenvault.domain.model.Provider
 import com.lc33.tokenvault.domain.model.ProviderAccount
 import com.lc33.tokenvault.domain.model.ProviderSummary
+import com.lc33.tokenvault.endpoint.UpstreamMessage
 import com.lc33.tokenvault.probe.ProbeItemResult
 import com.lc33.tokenvault.screens.model.AttentionItem
 import com.lc33.tokenvault.screens.model.AttentionKind
@@ -135,6 +136,27 @@ fun BalanceSnapshot?.toUiMoney(): UiMoney? {
 }
 
 /**
+ * 失败快照的机器码原因，成功时给 null。
+ *
+ * 单独一个 `failed: Boolean` 不够用：它只说"查过了、没查到"，而用户接着要问的是
+ * "为什么"。`BalanceSnapshot.error` 一直存着那个码（`http 401`、`missing_quota`、
+ * `token_undecryptable`），只是从来没有人读过——界面上"查询失败"就是最有一句。
+ */
+fun BalanceSnapshot?.failureReason(): String? = if (this?.failed == true) error else null
+
+/**
+ * 上游在那次失败里自己写的那句话，抽不出来时给 null（界面回落到 [failureReason] 的文案）。
+ *
+ * 读的是 `BalanceSnapshot.raw`——`balance_raw` 那一列，入库前已经过脱敏与截断，
+ * 所以这里可以直接给界面看（见 [UpstreamMessage] 的那条红线说明）。
+ */
+fun BalanceSnapshot?.failureHint(): String? =
+    if (this?.failed == true) UpstreamMessage.of(raw) else null
+
+/** 探测结论里上游写的那句话，与 [failureHint] 同源不同列（`health_detail`）。 */
+fun probeReasonOf(healthDetail: String?): String? = UpstreamMessage.of(healthDetail)
+
+/**
  * 地址显示成 host。
  *
  * 不用 `java.net.URI`：用户输入的地址在保存前可能过不了 URI 解析，而这一层是**展示**，
@@ -163,6 +185,8 @@ fun ProviderSummary.toRow(
     keys: List<UiKeyRow> = emptyList(),
     lastProbeAt: Long? = null,
     balanceConfigured: Boolean = false,
+    /** 这家有几把 Key 的余额没查到。合计只加了成功的那几把，所以要单独说（见字段说明）。 */
+    balanceFailedKeyCount: Int = 0,
 ): UiProviderRow =
     UiProviderRow(
         id = provider.id,
@@ -182,7 +206,15 @@ fun ProviderSummary.toRow(
         balance = balance.toUiMoney(),
         // “试过但失败”与“压根没查过”必须分开（§9.3），而 toUiMoney 两者都给 null
         balanceFailed = balance?.failed == true,
+        // 整家都挂时聚合快照自己就带着原因；**部分挂**时聚合是成功那几把的和、
+        // `error` 是空的，所以要从 Key 行里捞第一个失败者的——那句"合计 42 USD"底下
+        // 得跟得上"另有 2 把没查到，因为令牌失效了"。
+        balanceErrorReason = balance.failureReason()
+            ?: keys.firstNotNullOfOrNull { it.balanceErrorReason },
+        balanceErrorHint = balance.failureHint()
+            ?: keys.firstNotNullOfOrNull { it.balanceErrorHint },
         balanceConfigured = balanceConfigured,
+        balanceFailedKeyCount = balanceFailedKeyCount,
         balanceCheckedAt = balance?.checkedAt,
         health = health,
         sortOrder = provider.sortOrder,
@@ -222,6 +254,15 @@ fun balanceConfiguredOf(keys: List<ApiKey>): Boolean =
     keys.any { it.settings.balanceKind != BalanceKind.NONE }
 
 /**
+ * 这家有几把 Key 的余额查失败了。
+ *
+ * 单独一个数而不是从聚合快照里读：[aggregateBalanceOf] 明确不把失败当 0 相加，
+ * 所以部分失败时那份快照是"成功那几把的和、error 为空"——失败的数量它答不了。
+ */
+fun failedBalanceKeyCountOf(keys: List<ApiKey>): Int =
+    keys.count { it.balance?.failed == true }
+
+/**
  * 分组筛选条。**第一枚是「全部」那个伪分组**（`id == null`，不入库）。
  *
  * 计数在这里算而不是在 SQL 里：分组筛选是纯 UI 行为（`ManageUiState.visibleProviders`
@@ -253,7 +294,13 @@ fun ApiKey.toRow(masked: String, clientProfileName: String? = null): UiKeyRow = 
     sortOrder = sortOrder,
     balance = balance.toUiMoney(),
     balanceFailed = balance?.failed == true,
+    balanceErrorReason = balance.failureReason(),
+    balanceErrorHint = balance.failureHint(),
     balanceCheckedAt = balance?.checkedAt,
+    // 探测结论只在**没通过**时才说：400 那一种（密钥有效、参数被拒）detail 也是有内容的，
+    // 绿点底下来一句"上游说：xxx"只会让人以为出了什么事。
+    probeDetail = if (effectiveHealth() == UiHealth.Ok) null else probeReasonOf(healthDetail),
+    probeHttpStatus = if (effectiveHealth() == UiHealth.Ok) null else httpStatus,
     settings = UiKeySettingsSummary(
         apiBaseUrl = settings.apiBaseUrl,
         apiRoot = settings.apiRoot,
@@ -417,6 +464,8 @@ fun keyBalanceSummaryOf(keys: List<ApiKey>): BalanceSummary {
             val providerSnapshots = providerKeys.mapNotNull { it.balance }
             providerSnapshots.isNotEmpty() && providerSnapshots.all { it.failed }
         },
+        // 逐把数一遍：只有一把令牌过期时上面那一格是 0，首页看不出任何异样。
+        failedKeyCount = snapshots.count { it.failed },
     )
 }
 

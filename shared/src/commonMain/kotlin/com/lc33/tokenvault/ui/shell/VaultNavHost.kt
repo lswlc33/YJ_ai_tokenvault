@@ -23,6 +23,8 @@ import com.lc33.tokenvault.platform.openExternalUrl
 import com.lc33.tokenvault.platform.rememberBackupFilePicker
 import com.lc33.tokenvault.screens.dashboard.DashboardScreen
 import com.lc33.tokenvault.ui.common.PagePlaceholder
+import com.lc33.tokenvault.ui.common.balanceFailureMessageAsync
+import com.lc33.tokenvault.ui.common.balanceRoundMessageAsync
 import com.lc33.tokenvault.ui.common.relativeLabelWithinDay
 import com.lc33.tokenvault.domain.repo.UndoableDeletion
 import com.lc33.tokenvault.screens.lock.ChangePinScreen
@@ -94,8 +96,6 @@ import tokenvault.shared.generated.resources.feedback_model_saved
 import tokenvault.shared.generated.resources.feedback_providers_deleted
 import tokenvault.shared.generated.resources.feedback_providers_deleted_partial
 import tokenvault.shared.generated.resources.feedback_account_saved
-import tokenvault.shared.generated.resources.feedback_balance_refresh_failed
-import tokenvault.shared.generated.resources.feedback_balance_refreshed
 import tokenvault.shared.generated.resources.catalog_up_to_date
 import tokenvault.shared.generated.resources.catalog_updated
 import tokenvault.shared.generated.resources.feedback_clipboard_empty
@@ -226,18 +226,15 @@ fun VaultNavHost(
             val dashboard by vm.state.collectAsStateWithLifecycle()
             val feedback = LocalAppFeedback.current
             val probeStartedText = stringResource(Res.string.feedback_probe_started)
-            val balanceRefreshed = stringResource(Res.string.feedback_balance_refreshed)
-            val balanceRefreshFailed = stringResource(Res.string.feedback_balance_refresh_failed)
             val refreshingBalance by vm.refreshingBalance.collectAsStateWithLifecycle()
-            // "已刷新"由这一趟**跑完**的那一刻说。以前是点下去就说，而余额接口全挂时
-            // 用户照样看到那句已刷新、卡上的数字还是旧的。
+            // "已刷新"由这一趟**跑完**的那一刻说，而且按结果说：一把都没查到却念
+            // "余额已刷新"是这一屏唯一一句"钱查过了"的假话。
             LaunchedEffect(vm) {
                 vm.events.collect { event ->
                     when (event) {
-                        is DashboardViewModel.Event.BalancesRefreshed ->
-                            feedback?.post(AppFeedback(balanceRefreshed))
-                        DashboardViewModel.Event.BalanceRefreshFailed ->
-                            feedback?.post(AppFeedback(balanceRefreshFailed))
+                        is DashboardViewModel.Event.BalanceRan -> feedback?.post(
+                            AppFeedback(balanceRoundMessageAsync(event.outcome)),
+                        )
                     }
                 }
             }
@@ -307,6 +304,13 @@ fun VaultNavHost(
                         ManageViewModel.Event.GroupDeleted -> feedback?.post(AppFeedback(groupDeleted))
                         // 这一页也会写库（批量改分组），失败不能不出声。
                         ManageViewModel.Event.WriteFailed -> feedback?.post(AppFeedback(writeFailed))
+                        // 顶栏那一轮的余额部分。只在该出声时出：探测结果由引擎另行播报，
+                        // 余额全成功时没必要再叠一条。
+                        is ManageViewModel.Event.BalanceRan -> {
+                            balanceFailureMessageAsync(event.outcome)?.let {
+                                feedback?.post(AppFeedback(it))
+                            }
+                        }
                     }
                 }
             }
@@ -392,6 +396,7 @@ fun VaultNavHost(
                 val probeStarted = stringResource(Res.string.feedback_probe_started)
                 val modelsRefreshing = stringResource(Res.string.feedback_models_refreshing)
                 val writeFailed = stringResource(Res.string.manage_write_failed)
+                val revealFailed = stringResource(Res.string.detail_key_reveal_failed)
                 LaunchedEffect(vm) {
                     vm.events.collect { event ->
                         // 删除留当前页（不像删密钥要退出页面），所以只投提示；
@@ -415,6 +420,16 @@ fun VaultNavHost(
                             }
                             ProviderDetailViewModel.Event.WriteFailed -> {
                                 feedback?.post(AppFeedback(writeFailed)); return@collect
+                            }
+                            ProviderDetailViewModel.Event.RevealFailed -> {
+                                feedback?.post(AppFeedback(revealFailed)); return@collect
+                            }
+                            // 一键探测里的余额那一半：只在有问题时说（理由同管理页那处注释）。
+                            is ProviderDetailViewModel.Event.BalanceRan -> {
+                                balanceFailureMessageAsync(event.outcome)?.let {
+                                    feedback?.post(AppFeedback(it))
+                                }
+                                return@collect
                             }
                         }
                         feedback?.post(
@@ -585,6 +600,12 @@ fun VaultNavHost(
                                 feedback?.post(AppFeedback(writeFailed))
                             KeyDetailViewModel.Event.RevealFailed ->
                                 feedback?.post(AppFeedback(revealFailed))
+                            // 顶栏那一轮的余额部分。只在该出声时出：探测结果由引擎另行播报。
+                            is KeyDetailViewModel.Event.BalanceRan -> {
+                                balanceFailureMessageAsync(event.outcome)?.let {
+                                    feedback?.post(AppFeedback(it))
+                                }
+                            }
                         }
                     }
                 }
@@ -605,8 +626,9 @@ fun VaultNavHost(
                             onCopyModelId = { modelId -> vm.copyModelId(modelClipboardLabel, modelId) },
                             onProbe = vm::probeKey,
                             onProbeModel = { modelId ->
-                                vm.probeModel(modelId)
-                                feedback?.post(AppFeedback(modelProbed))
+                                // 引擎没接这一发（已有一发在跑 / 库锁着 / 那两档开关没开）就
+                                // 不预告"已探测该模型"。与 KeyModelsRoute 同一条规则。
+                                if (vm.probeModel(modelId)) feedback?.post(AppFeedback(modelProbed))
                             },
                             onRefreshModels = {
                                 // 同 ProviderDetailRoute：引擎没接这一发就不预告"正在刷新"。
@@ -653,6 +675,7 @@ fun VaultNavHost(
                 val modelDeleted = stringResource(Res.string.feedback_model_deleted)
                 val modelSaved = stringResource(Res.string.feedback_model_saved)
                 val modelDuplicate = stringResource(Res.string.feedback_model_duplicate)
+                val keyEditorWriteFailed = stringResource(Res.string.manage_write_failed)
                 LaunchedEffect(vm) {
                     vm.events.collect { event ->
                         when (event) {
@@ -673,6 +696,9 @@ fun VaultNavHost(
                                 feedback?.post(AppFeedback(modelSaved))
                             KeyEditorViewModel.Event.ModelDuplicate ->
                                 feedback?.post(AppFeedback(modelDuplicate))
+                            // 弹层收了、列表没变，不给这一句就是"按钮坏了"。
+                            KeyEditorViewModel.Event.WriteFailed ->
+                                feedback?.post(AppFeedback(keyEditorWriteFailed))
                         }
                     }
                 }
@@ -1120,6 +1146,8 @@ fun VaultNavHost(
                     when (event) {
                         // 批量删除只能在管理页发起，这一页删不了供应商，所以不会有这条。
                         is ManageViewModel.Event.ProvidersDeleted -> Unit
+                        // 顶栏刷新也只能在管理页按，分组页这一趟压根不会跑。
+                        is ManageViewModel.Event.BalanceRan -> Unit
                         ManageViewModel.Event.GroupAdded -> feedback?.post(AppFeedback(groupAdded))
                         ManageViewModel.Event.GroupRenamed -> feedback?.post(AppFeedback(groupRenamed))
                         ManageViewModel.Event.GroupDeleted -> feedback?.post(AppFeedback(groupDeleted))

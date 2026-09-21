@@ -9,6 +9,7 @@ import com.lc33.tokenvault.domain.repo.ProviderRepository
 import com.lc33.tokenvault.domain.repo.UndoableDeletion
 import com.lc33.tokenvault.domain.repo.combined
 import com.lc33.tokenvault.engine.BalanceEngine
+import com.lc33.tokenvault.engine.BalanceRefreshOutcome
 import com.lc33.tokenvault.engine.ProbeEngine
 import com.lc33.tokenvault.screens.model.ManageUiState
 import com.lc33.tokenvault.screens.model.ProviderSort
@@ -76,6 +77,15 @@ class ManageViewModel constructor(
      * 一次性事件。只带语义、不带文案（文案解析在 composable 层）。
      */
     sealed interface Event {
+        /**
+         * 顶栏那一轮的余额部分跑完了，带的是"几把成、几把挂、第一个失败的原因与上游原话"。
+         *
+         * 与 [KeyDetailViewModel.Event.BalanceRan] 同一件事、同一个理由：这一发以前是
+         * `runCatching { balanceEngine.refreshAll() }` 发出去就把结果丢掉，于是这一页的
+         * 刷新按钮在余额全线查不到时也只是把行里的旧数字再画一遍。
+         */
+        data class BalanceRan(val outcome: BalanceRefreshOutcome) : Event
+
         /**
          * 批量删除的供应商。[deleted] 是**真的删掉**的家数，[failed] 是删失败的家数
          * （逐家删时某一家可能正被外键引用而失败）；提示按这两个数说真话，
@@ -167,6 +177,7 @@ class ManageViewModel constructor(
                 keys = providerKeys.map { it.toRow(SecretMask.ELLIPSIS) },
                 lastProbeAt = lastProbeByProvider[summary.provider.id],
                 balanceConfigured = balanceConfiguredOf(providerKeys),
+                balanceFailedKeyCount = failedBalanceKeyCountOf(providerKeys),
             )
         }
         // 搜索 → 排序，都发生在内存里（红线 10：数据从 Flow 来，不回数据层重查）。
@@ -195,7 +206,11 @@ class ManageViewModel constructor(
     fun refreshStatus(excludeProbe: Boolean = false) {
         viewModelScope.launch {
             probeEngine.refreshReachability()
-            runCatching { balanceEngine.refreshAll() }
+            val outcome = runBalanceRefresh { balanceEngine.refreshAll() }
+            // 只报余额那一件事，且只报有问题的：探测一轮由 `roundResults` 统一播，
+            // 官网连通性坏了会在行里的延迟位上显示出来，而余额查不到在这一页**什么也不变**
+            // （行里画的是库里的旧数字），不出声就等于没刷。
+            if (outcome.needsAttention) _events.trySend(Event.BalanceRan(outcome))
         }
         if (!excludeProbe) probeEngine.start()
     }

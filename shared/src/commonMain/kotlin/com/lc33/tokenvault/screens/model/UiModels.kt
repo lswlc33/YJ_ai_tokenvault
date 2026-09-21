@@ -111,6 +111,29 @@ data class UiProviderRow(
     val balanceConfigured: Boolean = false,
     /** 余额快照的查询时间。null = 还没查过。 */
     val balanceCheckedAt: Long? = null,
+    /**
+     * 失败原因的**机器码**（`http 401`、`missing_quota`、`token_undecryptable`…）。
+     *
+     * 给的是码不是文案：这一层读不到资源（红线 19），页面用
+     * `ui/common/BalanceFailureText.kt` 的 `balanceFailureLabel` 翻成本地化句子。
+     * 只带第一个失败者的那一份——一家三把 Key 挂了两种原因，合计行说不清楚。
+     */
+    val balanceErrorReason: String? = null,
+    /**
+     * 上游在那次失败里**自己写的那句话**（已脱敏、已压成一行），比如"安全访问令牌已失效"。
+     *
+     * 这是本地码替代不了的信息：`http 401` 只说明被拒了，而这句话说明为什么。
+     * null = 上游没给可读原因，或压根没问到上游。
+     */
+    val balanceErrorHint: String? = null,
+    /**
+     * 这家有几把 Key 的余额**没查到**。
+     *
+     * [balance] 是成功那几把的和（[com.lc33.tokenvault.ui.shell.aggregateBalanceOf] 明确
+     * 不把失败当 0 相加），所以"合计 42 USD"完全可以同时是"另有 2 把没查到"。不写这一格，
+     * 一家里只有一把令牌过期时界面上看不出任何异样——数字对，但少了一部分钱。
+     */
+    val balanceFailedKeyCount: Int = 0,
     val health: UiHealth,
     /**
      * 手动排序的次序（`providers.sortOrder`）。「手动排序」这一档用它排；其它档忽略它。
@@ -152,9 +175,24 @@ data class UiKeyRow(
     val checkedAt: Long?,
     val sortOrder: Int,
     val balance: UiMoney? = null,
+    /** 试过且失败：与"没配置 / 从没查过"必须分开（同 [UiProviderRow.balanceFailed]）。 */
     val balanceFailed: Boolean = false,
+    /** 失败原因的机器码，见 [UiProviderRow.balanceErrorReason]。 */
+    val balanceErrorReason: String? = null,
+    /** 上游自己写的那句话，见 [UiProviderRow.balanceErrorHint]。 */
+    val balanceErrorHint: String? = null,
     /** 余额快照的查询时间。null = 还没查过（与"有金额"是两回事）。 */
     val balanceCheckedAt: Long? = null,
+    /**
+     * 上游在最近一次**探测**里写的那句话（已脱敏、已压成一行）。
+     *
+     * 库里存的是 `health_detail`——整段响应体前 200 字符，直接显示就是一坨带括号的 JSON，
+     * 所以这里给抽过的那一句。它回答的是"密钥为什么被判成未授权"，余额那一行管不着。
+     * null = 没探测过、上游没写原因、或写的原因抽不出来（那就只报状态码）。
+     */
+    val probeDetail: String? = null,
+    /** 最近一次探测拿到的上游状态码。0 / null = 没拿到（网络层就没通）。 */
+    val probeHttpStatus: Int? = null,
     val settings: UiKeySettingsSummary = UiKeySettingsSummary(),
 )
 

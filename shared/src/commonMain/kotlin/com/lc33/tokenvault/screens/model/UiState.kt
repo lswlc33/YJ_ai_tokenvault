@@ -19,7 +19,17 @@ data class BalanceSummary(
      */
     val updatedAt: Long? = null,
 
+    /**
+     * 整家都没查到的供应商数。
+     *
+     * **它盖不住部分失败**：一家三把 Key 里一把令牌过期，聚合快照仍然有金额、
+     * `failed` 仍然是 false，于是这一格是 0，卡上一片祥和。所以还要有
+     * [failedKeyCount]。
+     */
     val failedProviderCount: Int = 0,
+
+    /** 没查到的密钥把数，含"那家里其余几把"。合计只加了查到的那些。 */
+    val failedKeyCount: Int = 0,
 )
 
 data class ContentCounts(

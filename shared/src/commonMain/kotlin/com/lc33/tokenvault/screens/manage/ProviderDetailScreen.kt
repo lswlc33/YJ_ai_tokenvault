@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.back_cd
-import tokenvault.shared.generated.resources.balance_failed_section
+import tokenvault.shared.generated.resources.balance_failed_keys_note
 import tokenvault.shared.generated.resources.detail_account_password
 import tokenvault.shared.generated.resources.detail_account_username
 import tokenvault.shared.generated.resources.detail_account_login_methods
@@ -79,6 +79,7 @@ import com.lc33.tokenvault.screens.model.ProviderDetailUiState
 import com.lc33.tokenvault.screens.model.UiKeyRow
 import com.lc33.tokenvault.screens.model.UiModelRow
 import com.lc33.tokenvault.screens.model.UiProviderRow
+import com.lc33.tokenvault.ui.common.balanceFailureSentence
 import com.lc33.tokenvault.ui.common.loginMethodLabel
 import com.lc33.tokenvault.ui.common.protocolLabel
 import com.lc33.tokenvault.ui.common.relativeLabel
@@ -1015,13 +1016,36 @@ private fun BalanceCard(state: ProviderDetailUiState) {
         AppText(
             text = when {
                 balance != null -> balance.toDisplay()
-                balanceFailed -> stringResource(Res.string.balance_failed_section)
+                // 「查询失败」三个字说过就完了，用户接着想知道的是为什么。库里
+                // `balanceError` 一直存着原因码、`balance_raw` 存着上游那句原话，
+                // 只是从来没有被读出来过。
+                balanceFailed -> balanceFailureSentence(
+                    provider.balanceErrorReason,
+                    provider.balanceErrorHint,
+                )
                 else -> stringResource(Res.string.detail_balance_not_checked)
             },
-            style = if (balanceFailed) AppTextStyle.Secondary else AppTextStyle.Title,
+            style = if (balanceFailed) AppTextStyle.Body else AppTextStyle.Title,
             color = if (balanceFailed) LocalStatusPalette.current.warn else Color.Unspecified,
             modifier = Modifier.padding(top = 4.dp),
         )
+        // 部分失败：合计数字是真的，但它只是**成功那几把**的和。不补这一句，一家里
+        // 只有一把令牌过期时这一屏看不出任何异样，而少掉的那笔钱就在屏幕外面。
+        if (balance != null && provider.balanceFailedKeyCount > 0) {
+            AppText(
+                text = stringResource(
+                    Res.string.balance_failed_keys_note,
+                    provider.balanceFailedKeyCount,
+                    balanceFailureSentence(
+                        provider.balanceErrorReason,
+                        provider.balanceErrorHint,
+                    ),
+                ),
+                style = AppTextStyle.Footnote,
+                color = LocalStatusPalette.current.warn,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
     }
 }
 

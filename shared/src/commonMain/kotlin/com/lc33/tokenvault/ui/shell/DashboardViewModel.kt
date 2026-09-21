@@ -3,6 +3,7 @@ package com.lc33.tokenvault.ui.shell
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lc33.tokenvault.engine.BalanceEngine
+import com.lc33.tokenvault.engine.BalanceRefreshOutcome
 import com.lc33.tokenvault.engine.ProbeEngine
 import com.lc33.tokenvault.domain.model.ApiKey
 import com.lc33.tokenvault.domain.model.ProviderSummary
@@ -85,10 +86,11 @@ class DashboardViewModel constructor(
      * 还是旧的——这句话就成了假话，还是唯一一句让他以为”钱查过了”的话。
      */
     sealed interface Event {
-        /** 跑完了。[refreshed] 是查到余额的密钥数（0 不等于失败，可能是压根没配余额查询）。 */
-        data class BalancesRefreshed(val refreshed: Int) : Event
-
-        data object BalanceRefreshFailed : Event
+        /**
+         * 这一趟跑完了，带的是"几把成、几把挂、第一个失败的原因与上游原话"。
+         * 提示按结果说，见 `ui/common/BalanceFailureText.kt` 的 `balanceRoundMessage`。
+         */
+        data class BalanceRan(val outcome: BalanceRefreshOutcome) : Event
     }
 
     private val _events = Channel<Event>(Channel.BUFFERED)
@@ -114,13 +116,9 @@ class DashboardViewModel constructor(
         _refreshingBalance.value = true
         viewModelScope.launch {
             try {
-                _events.send(Event.BalancesRefreshed(balanceEngine.refreshAll()))
-            } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                // 不能当成”刷新失败”：ViewModel 清理时这条会一路走到 else 分支，
-                // 于是用户看到一句没发生过的失败。
-                throw cancelled
-            } catch (_: Exception) {
-                _events.send(Event.BalanceRefreshFailed)
+                _events.send(
+                    Event.BalanceRan(runBalanceRefresh { balanceEngine.refreshAll() }),
+                )
             } finally {
                 _refreshingBalance.value = false
             }
@@ -139,7 +137,10 @@ class DashboardViewModel constructor(
     fun refreshStatus(excludeProbe: Boolean = false) {
         viewModelScope.launch {
             probeEngine.refreshReachability()
-            runCatching { balanceEngine.refreshAll() }
+            val outcome = runBalanceRefresh { balanceEngine.refreshAll() }
+            // 与管理页同一条：探测一轮由 `roundResults` 统一播，余额查不到在首页不会
+            // 让任何一个数字动起来（失败的快照不参与合计），不出声就等于没刷。
+            if (outcome.needsAttention) _events.trySend(Event.BalanceRan(outcome))
         }
         if (!excludeProbe) probeEngine.start()
     }

@@ -23,6 +23,7 @@ import com.lc33.tokenvault.screens.model.KeyDetailUiState
 import com.lc33.tokenvault.screens.model.KEY_MODEL_PREVIEW_LIMIT
 import com.lc33.tokenvault.screens.model.UiModelRow
 import com.lc33.tokenvault.ui.common.StatusDot
+import com.lc33.tokenvault.ui.common.balanceFailureSentence
 import com.lc33.tokenvault.ui.common.colorOf
 import com.lc33.tokenvault.ui.common.labelOf
 import com.lc33.tokenvault.ui.common.protocolLabel
@@ -49,6 +50,7 @@ import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
 import com.lc33.tokenvault.ui.miuix.appTopBarScroll
 import com.lc33.tokenvault.ui.miuix.rememberAppTopBarScrollState
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
+import com.lc33.tokenvault.ui.theme.LocalStatusPalette
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
 import tokenvault.shared.generated.resources.Res
@@ -88,6 +90,7 @@ import tokenvault.shared.generated.resources.dialog_cancel
 import tokenvault.shared.generated.resources.key_sort_down
 import tokenvault.shared.generated.resources.key_sort_up
 import tokenvault.shared.generated.resources.secret_copy_cd
+import tokenvault.shared.generated.resources.upstream_said
 
 /** Key 展示页：查看一把 Key、它的行为摘要、模型与操作。 */
 @Composable
@@ -255,13 +258,27 @@ fun KeyDetailScreen(
                                     modifier = Modifier.padding(top = 4.dp),
                                 )
                             }
+                            // 上游那句拒绝的原话。右边那个红点说的是"未授权"，而这一行说的
+                            // 才是"为什么未授权"——库里 `health_detail` 一直存着这句话，
+                            // 只是从来没有人显示过（映射在失败时才给值，见 UiMapping）。
+                            key.probeDetail?.let { reason ->
+                                AppText(
+                                    text = stringResource(Res.string.upstream_said, reason),
+                                    style = AppTextStyle.Footnote,
+                                    color = LocalStatusPalette.current.warn,
+                                    modifier = Modifier.padding(top = 4.dp),
+                                )
+                            }
                         }
                         StatusDot(color = colorOf(key.health), label = labelOf(key.health))
                     }
                 }
             }
             // 余额单独一块：这一页只有这一把 Key，数字属于它自己，不跟状态挤一行。
-            key.balance?.let { balance ->
+            // **失败也要画这一张卡**：`toUiMoney()` 对失败快照给 null，以前整块用
+            // `key.balance?.let` 包着，于是"查询失败"在这一页长得和"没配余额查询"一模一样——
+            // 卡片直接不见了，用户连"它试过"都不知道。
+            if (key.balance != null || key.balanceFailed) {
                 item {
                     AppCard(
                         modifier = Modifier
@@ -286,15 +303,30 @@ fun KeyDetailScreen(
                                 )
                             }
                         }
-                        AppText(
-                            text = stringResource(
-                                Res.string.detail_key_balance_value,
-                                balance.currency,
-                                balance.amount,
-                            ),
-                            style = AppTextStyle.Title,
-                            modifier = Modifier.padding(top = 4.dp),
-                        )
+                        val failed = key.balanceFailed && key.balance == null
+                        if (failed) {
+                            AppText(
+                                text = balanceFailureSentence(
+                                    key.balanceErrorReason,
+                                    key.balanceErrorHint,
+                                ),
+                                style = AppTextStyle.Body,
+                                color = LocalStatusPalette.current.warn,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                        } else {
+                            key.balance?.let { balance ->
+                                AppText(
+                                    text = stringResource(
+                                        Res.string.detail_key_balance_value,
+                                        balance.currency,
+                                        balance.amount,
+                                    ),
+                                    style = AppTextStyle.Title,
+                                    modifier = Modifier.padding(top = 4.dp),
+                                )
+                            }
+                        }
                     }
                 }
             }

@@ -611,6 +611,26 @@
 
     <!-- Balance: the "query failed" wording, used on the provider detail page. -->
     <string name="balance_failed_section">查询失败</string>
+    <!-- 余额失败原因的本地化读法。库里 `balanceError` 存的一直是机器码
+         （`http 401`、`missing_quota`），以前没有任何一处翻译过它。 -->
+    <string name="balance_err_unauthorized">上游不认这份凭据（%1$d），访问令牌可能已失效</string>
+    <string name="balance_err_not_found">地址找不到（%1$d），余额接口路径多半写错了</string>
+    <string name="balance_err_rate_limited">被上游限流（%1$d），稍后再试</string>
+    <string name="balance_err_server">上游自身出错（%1$d）</string>
+    <string name="balance_err_http">上游返回 %1$d</string>
+    <string name="balance_err_not_json">回来的不是 JSON，多半是登录页或 HTML 错误页</string>
+    <string name="balance_err_missing_field">响应里没有 %1$s 字段</string>
+    <string name="balance_err_not_a_number">余额字段不是一个可用的数</string>
+    <string name="balance_err_empty_list">上游给的余额列表是空的</string>
+    <string name="balance_err_bad_headers">自定义余额请求的头部配置有问题</string>
+    <string name="balance_err_token_missing">这种查询类型还没填访问令牌</string>
+    <string name="balance_err_token_undecryptable">这台设备解不开已存的访问令牌，重填一次或恢复备份</string>
+    <string name="balance_err_key_undecryptable">这台设备解不开已存的 API 密钥</string>
+    <string name="balance_err_unknown">查询失败（%1$s）</string>
+    <string name="balance_upstream_said">%1$s（上游说：%2$s）</string>
+    <string name="upstream_said">上游说：%1$s</string>
+    <string name="balance_failed_keys_note">它有 %1$d 把密钥没查到：%2$s</string>
+    <string name="dashboard_balance_failed_keys">%1$d 把密钥的余额没查到</string>
     <!-- Per-provider probe switches (invariant 36) -->
     <string name="editor_section_probe">探测设置</string>
     <string name="editor_probe_enabled">允许探测这一家</string>
@@ -663,6 +683,9 @@
     <string name="feedback_clipboard_empty">剪贴板为空</string>
     <string name="feedback_balance_refreshed">余额已刷新</string>
     <string name="feedback_balance_refresh_failed">余额查询失败</string>
+    <string name="feedback_balance_all_failed">一把余额都没查到：%1$s</string>
+    <string name="feedback_balance_partial">%1$d 把查到了，%2$d 把没查到</string>
+    <string name="feedback_balance_nothing">没有开启余额查询的密钥</string>
     <string name="feedback_models_refreshed">模型列表已刷新</string>
     <string name="feedback_model_probed">已探测该模型</string>
     <string name="feedback_probe_retried">正在重试失败项</string>

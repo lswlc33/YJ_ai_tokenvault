@@ -15,6 +15,7 @@ import tokenvault.shared.generated.resources.count_keys
 import tokenvault.shared.generated.resources.count_models
 import tokenvault.shared.generated.resources.count_providers
 import tokenvault.shared.generated.resources.dashboard_balance_failed
+import tokenvault.shared.generated.resources.dashboard_balance_failed_keys
 import tokenvault.shared.generated.resources.dashboard_balance_low
 import tokenvault.shared.generated.resources.dashboard_balance_none
 import tokenvault.shared.generated.resources.dashboard_balance_refreshing
@@ -138,6 +139,16 @@ internal fun BalanceCard(
         if (balance.failedProviderCount > 0) {
             AppText(
                 text = stringResource(Res.string.dashboard_balance_failed, balance.failedProviderCount),
+                style = AppTextStyle.Footnote,
+                color = descColor,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+        // 部分失败单独一句：`failedProviderCount` 只数"整家都没查到"的那些，
+        // 一家三把里过期一把在它那里是 0，首页就一个字都不提。
+        if (balance.failedKeyCount > 0) {
+            AppText(
+                text = stringResource(Res.string.dashboard_balance_failed_keys, balance.failedKeyCount),
                 style = AppTextStyle.Footnote,
                 color = descColor,
                 modifier = Modifier.padding(top = 4.dp),

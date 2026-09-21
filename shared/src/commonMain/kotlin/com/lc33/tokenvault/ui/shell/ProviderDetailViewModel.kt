@@ -20,6 +20,7 @@ import com.lc33.tokenvault.domain.repo.ProviderAccountRepository
 import com.lc33.tokenvault.domain.repo.ProviderRepository
 import com.lc33.tokenvault.domain.repo.UndoableDeletion
 import com.lc33.tokenvault.engine.BalanceEngine
+import com.lc33.tokenvault.engine.BalanceRefreshOutcome
 import com.lc33.tokenvault.engine.ProbeEngine
 import com.lc33.tokenvault.screens.model.ProviderDetailUiState
 import com.lc33.tokenvault.screens.model.UiHealth
@@ -101,6 +102,19 @@ class ProviderDetailViewModel constructor(
 
         /** 一键探测已发出（官网 / 密钥 / 模型列表 / 余额）。结果本身由状态流回填。 */
         data object Probed : Event
+
+        /**
+         * 这一轮的余额刷完了，带的是"几把成、几把挂、第一个失败的原因与上游原话"。
+         * 见 [KeyDetailViewModel.Event.BalanceRan] 上那段同样的理由：这一发以前发出去就丢。
+         */
+        data class BalanceRan(val outcome: BalanceRefreshOutcome) : Event
+
+        /**
+         * 「查看账号明文」解不开。以前这一支是 `?: return@launch`：按钮点下去既不出弹窗、
+         * 也不关弹窗，什么也不发生，而它和密钥那一页的同一件事（[KeyDetailViewModel.Event.RevealFailed]）
+         * 早就有提示了——两个页面同一个动作一个说一个不说。
+         */
+        data object RevealFailed : Event
     }
 
     private val _events = Channel<Event>(Channel.BUFFERED)
@@ -346,9 +360,14 @@ class ProviderDetailViewModel constructor(
 
     fun onDeleteAccount(id: Long) {
         viewModelScope.launch {
-            val undo = runCatching { accounts.delete(id) }.getOrNull()
-            if (_revealedAccount.value?.accountId == id) onCloseAccountSheet()
-            _events.trySend(Event.AccountDeleted(undo))
+            // 删失败也念"账号已删除"是一句假话：那一行还留在列表里，用户只会以为界面坏了。
+            // 同一条 `runCatching` 在 [onDeleteModel] 那里是分两种说的。
+            runCatching { accounts.delete(id) }
+                .onSuccess { undo ->
+                    if (_revealedAccount.value?.accountId == id) onCloseAccountSheet()
+                    _events.trySend(Event.AccountDeleted(undo))
+                }
+                .onFailure { _events.trySend(Event.WriteFailed) }
         }
     }
 
@@ -422,11 +441,22 @@ class ProviderDetailViewModel constructor(
         revealJob?.cancel()
         clearRevealedAccount()
         revealJob = viewModelScope.launch {
+            // 解不开要说（见 [Event.RevealFailed]）。以前是 `?: return@launch`：从别的设备
+            // 恢复来的库必然走到这一支，于是"查看账号明文"点下去什么也不发生，
+            // 而同一页的"查看密钥"是有提示的——同一件事两个说法。
+            var decryptFailed = false
             val plain = withContext(Dispatchers.Default) {
-                val username = runCatching { accounts.revealUsername(accountId) }.getOrNull()
-                val password = runCatching { accounts.revealPassword(accountId) }.getOrNull()
+                val username = runCatching { accounts.revealUsername(accountId) }
+                    .onFailure { decryptFailed = true }
+                    .getOrNull()
+                val password = runCatching { accounts.revealPassword(accountId) }
+                    .onFailure { decryptFailed = true }
+                    .getOrNull()
                 if (username == null && password == null) null else AccountPlain(username, password)
-            } ?: return@launch
+            } ?: run {
+                if (decryptFailed) _events.trySend(Event.RevealFailed)
+                return@launch
+            }
             if (generation != revealGeneration) {
                 plain.zeroize()
                 return@launch
@@ -434,7 +464,10 @@ class ProviderDetailViewModel constructor(
             val account = runCatching { accounts.observeByProvider(providerId).first() }
                 .getOrNull()?.firstOrNull { it.id == accountId }
             if (account == null) {
+                // 明文都在手上却画不出弹窗：要么这一行刚被删掉，要么那次读库坏了。
+                // 都不该让人对着一个没反应的按钮再按三次。
                 plain.zeroize()
+                _events.trySend(Event.RevealFailed)
                 return@launch
             }
             revealedAccountPlain = plain
@@ -489,7 +522,12 @@ class ProviderDetailViewModel constructor(
      */
     fun probeAll() {
         probeEngine.refreshReachability(providerId)
-        viewModelScope.launch { runCatching { balanceEngine.refresh(providerId) } }
+        viewModelScope.launch {
+            val outcome = runBalanceRefresh { balanceEngine.refresh(providerId) }
+            // 只报余额那一件事：探测那一轮的结果由 Shell 从 `roundResults` 统一播，
+            // 全成功的余额没有必要再叠第三条提示，但失败是那一轮报不出来的。
+            if (outcome.needsAttention) _events.trySend(Event.BalanceRan(outcome))
+        }
         // 提示在动作发出的这一刻给（"已开始探测"）；这一轮的结果由 Shell 层统一播报。
         if (probeEngine.probeProvider(providerId)) _events.trySend(Event.Probed)
     }

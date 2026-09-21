@@ -369,12 +369,17 @@ class KeyModelsViewModel constructor(
         val trimmed = modelId.trim()
         if (trimmed.isEmpty()) return
         viewModelScope.launch {
-            val id = withContext(Dispatchers.Default) {
-                runCatching { models.add(providerId, keyId, trimmed, protocol) }.getOrDefault(0L)
-            }
             // -1 = 撞上唯一索引（同一 Key 下同 id 同协议已经有了）。那不是写失败，
             // 但也不该静默：用户会以为自己加上了，列表里却没有。
-            if (id <= 0L) _events.trySend(Event.Duplicate)
+            // 真抛出去的异常原来也走同一条 `getOrDefault(0L)`，于是"写不进去"被报成
+            // "已存在"——两句是相反的诊断，一个让用户别再加，一个让他换个 id 再来。
+            val added = withContext(Dispatchers.Default) {
+                runCatching { models.add(providerId, keyId, trimmed, protocol) }
+            }
+            when {
+                added.isFailure -> _events.trySend(Event.WriteFailed)
+                added.getOrDefault(-1L) <= 0L -> _events.trySend(Event.Duplicate)
+            }
         }
     }
 
@@ -383,7 +388,13 @@ class KeyModelsViewModel constructor(
         val trimmed = modelId.trim()
         if (trimmed.isEmpty()) return
         viewModelScope.launch {
-            val current = rows.value.firstOrNull { it.id == id } ?: return@launch
+            // 那一行已经不在了（在别处被删了）：弹层收了、列表没变，不说一句就是"按钮坏了"。
+            // 不写成 `?: return@launch also { … }`——`return` 先跳走，那个 also 根本不会执行。
+            val current = rows.value.firstOrNull { it.id == id }
+            if (current == null) {
+                _events.trySend(Event.WriteFailed)
+                return@launch
+            }
             val updated = current.copy(
                 modelId = trimmed,
                 protocol = protocol,
