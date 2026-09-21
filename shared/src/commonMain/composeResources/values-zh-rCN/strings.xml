@@ -21,7 +21,6 @@
     <!-- Dashboard -->
     <string name="dashboard_title">仪表盘</string>
     <string name="dashboard_balance_title">余额</string>
-    <string name="dashboard_balance_no_fx">按币种分别列出，不做汇率换算，因此不显示合计。</string>
     <string name="dashboard_balance_updated">更新于 %1$s</string>
     <string name="dashboard_balance_refreshing">正在查询余额…</string>
     <string name="dashboard_balance_failed">%1$d 个供应商的余额查询失败</string>

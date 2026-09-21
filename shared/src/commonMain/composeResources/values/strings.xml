@@ -21,7 +21,6 @@
     <!-- Dashboard -->
     <string name="dashboard_title">Dashboard</string>
     <string name="dashboard_balance_title">Balance</string>
-    <string name="dashboard_balance_no_fx">Listed per currency. No exchange-rate conversion is applied, so the amounts are not a single total.</string>
     <string name="dashboard_balance_updated">Updated %1$s</string>
     <string name="dashboard_balance_refreshing">Checking balances…</string>
     <string name="dashboard_balance_failed">%1$d provider(s) failed the balance query</string>

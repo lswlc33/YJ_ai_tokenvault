@@ -16,9 +16,7 @@ import tokenvault.shared.generated.resources.count_models
 import tokenvault.shared.generated.resources.count_providers
 import tokenvault.shared.generated.resources.dashboard_balance_failed
 import tokenvault.shared.generated.resources.dashboard_balance_low
-import tokenvault.shared.generated.resources.dashboard_balance_no_fx
 import tokenvault.shared.generated.resources.dashboard_balance_none
-import tokenvault.shared.generated.resources.dashboard_balance_title
 import tokenvault.shared.generated.resources.dashboard_balance_refreshing
 import tokenvault.shared.generated.resources.dashboard_balance_updated
 import tokenvault.shared.generated.resources.dashboard_counts_title
@@ -78,37 +76,28 @@ internal fun BalanceCard(
     // 结果是显示异常，已按用户要求回退——这条路上还有一个坑：被采样的背景层若包含
     // 卡片自己，渲染树每帧加深，几秒后 RenderThread 栈溢出闪退。
     AppAccentCard(modifier = cardModifier()) {
+        // 余额数字就是这张卡的标题：这一页要回答的是"我还剩多少"，而「余额」两个字只是
+        // 它自己的标签，占一行不增加任何信息。更新时间与两句提醒都退到数字下面。
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                AppText(
-                    text = stringResource(Res.string.dashboard_balance_title),
-                    style = AppTextStyle.Subtitle,
-                    color = appOnPrimaryColor,
-                )
-                val updatedAt = balance.updatedAt
-                if (updatedAt != null) {
-                    // 分档在纯函数里、文案在资源里（RelativeTime.kt 就是为此拆开的），
-                    // 所以 ViewModel 给的是时间戳而不是一句“12 分钟前”
+                if (balance.perCurrency.isEmpty()) {
                     AppText(
-                        text = stringResource(
-                            Res.string.dashboard_balance_updated,
-                            relativeLabel(nowMs, updatedAt),
-                        ),
-                        style = AppTextStyle.Footnote,
+                        text = stringResource(Res.string.dashboard_balance_none),
+                        style = AppTextStyle.Subtitle,
                         color = appOnPrimaryColor,
                     )
-                }
-                if (refreshing) {
-                    // 查询要几秒钟，这一句是那段等待里唯一的解释：图标灰了而没说为什么，
-                    // 读起来就像按钮坏了。
-                    AppText(
-                        text = stringResource(Res.string.dashboard_balance_refreshing),
-                        style = AppTextStyle.Footnote,
-                        color = appOnPrimaryColor,
-                    )
+                } else {
+                    balance.perCurrency.forEachIndexed { index, money ->
+                        AppText(
+                            text = "${money.currency} ${money.amount}",
+                            // 第一个币种放大，其余小一号：不做汇率换算，所以没有"总额"可以放大
+                            style = if (index == 0) AppTextStyle.Title else AppTextStyle.Body,
+                            modifier = Modifier.padding(top = if (index == 0) 0.dp else 2.dp),
+                        )
+                    }
                 }
             }
             AppIconButton(
@@ -118,34 +107,39 @@ internal fun BalanceCard(
                 enabled = !refreshing,
             )
         }
-        if (balance.perCurrency.isEmpty()) {
+        val updatedAt = balance.updatedAt
+        if (updatedAt != null) {
+            // 分档在纯函数里、文案在资源里（RelativeTime.kt 就是为此拆开的），
+            // 所以 ViewModel 给的是时间戳而不是一句“12 分钟前”
             AppText(
-                text = stringResource(Res.string.dashboard_balance_none),
-                style = AppTextStyle.Secondary,
+                text = stringResource(
+                    Res.string.dashboard_balance_updated,
+                    relativeLabel(nowMs, updatedAt),
+                ),
+                style = AppTextStyle.Footnote,
                 color = appOnPrimaryColor,
                 modifier = Modifier.padding(top = tokens.itemSpacing),
             )
-            return@AppAccentCard
         }
-        balance.perCurrency.forEachIndexed { index, money ->
+        if (refreshing) {
+            // 查询要几秒钟，这一句是那段等待里唯一的解释：图标灰了而没说为什么，
+            // 读起来就像按钮坏了。
             AppText(
-                text = "${money.currency} ${money.amount}",
-                // 第一个币种放大，其余小一号：不做汇率换算，所以没有"总额"可以放大
-                style = if (index == 0) AppTextStyle.Title else AppTextStyle.Body,
-                modifier = Modifier.padding(top = if (index == 0) tokens.itemSpacing else 2.dp),
+                text = stringResource(Res.string.dashboard_balance_refreshing),
+                style = AppTextStyle.Footnote,
+                color = appOnPrimaryColor,
+                modifier = Modifier.padding(top = 4.dp),
             )
         }
-        AppText(
-            text = stringResource(Res.string.dashboard_balance_no_fx),
-            style = AppTextStyle.Footnote,
-            color = appOnPrimaryColor,
-            modifier = Modifier.padding(top = tokens.itemSpacing),
-        )
+        // 两句提醒压成半透明的说明文字：它们说的是"这几家要去看一眼"，不是余额本身，
+        // 与数字同色同量级时会被读成另一笔账。蓝底上没有"次要文字色"可取，用 onPrimary
+        // 的半透明档，与 `ui/miuix/liquid` 那几处同一手法。
+        val descColor = appOnPrimaryColor.copy(alpha = 0.72f)
         if (balance.failedProviderCount > 0) {
             AppText(
                 text = stringResource(Res.string.dashboard_balance_failed, balance.failedProviderCount),
                 style = AppTextStyle.Footnote,
-                color = appOnPrimaryColor,
+                color = descColor,
                 modifier = Modifier.padding(top = 4.dp),
             )
         }
@@ -157,7 +151,7 @@ internal fun BalanceCard(
             AppText(
                 text = stringResource(Res.string.dashboard_balance_low, lowBalanceCount),
                 style = AppTextStyle.Footnote,
-                color = appOnPrimaryColor,
+                color = descColor,
                 modifier = Modifier.padding(top = 4.dp),
             )
         }
