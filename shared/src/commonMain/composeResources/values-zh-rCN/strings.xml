@@ -856,7 +856,7 @@
     <string name="keymodels_catalog_failed">目录更新失败，原因见日志。</string>
     <string name="keymodels_unmatched">未知模型</string>
     <string name="keymodels_meta_output">最大输出</string>
-    <string name="keymodels_meta_capabilities">能力</string>
+    <string name="keymodels_meta_about">简介</string>
     <string name="keymodels_cap_reasoning">推理</string>
     <string name="keymodels_cap_tool_call">工具调用</string>
     <string name="keymodels_cap_vision">看图</string>

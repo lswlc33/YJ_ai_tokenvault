@@ -110,7 +110,7 @@ import tokenvault.shared.generated.resources.keymodels_group_by_family
 import tokenvault.shared.generated.resources.keymodels_group_by_none
 import tokenvault.shared.generated.resources.keymodels_group_other
 import tokenvault.shared.generated.resources.keymodels_matched
-import tokenvault.shared.generated.resources.keymodels_meta_capabilities
+import tokenvault.shared.generated.resources.keymodels_meta_about
 import tokenvault.shared.generated.resources.keymodels_meta_cutoff
 import tokenvault.shared.generated.resources.keymodels_meta_output
 import tokenvault.shared.generated.resources.keymodels_meta_released
@@ -800,8 +800,10 @@ private fun ModelDetailSheet(row: UiModelCardRow?, nowMs: Long, onDismiss: () ->
                 AppValueRow(title = stringResource(Res.string.keymodels_meta_status), value = it)
             }
             meta.description?.let {
+                // 标题是「简介」不是「能力」：上面那排 chip 就是能力，同一弹层里再来一行叫
+                // 能力的，读起来像两处有一处写错了。这段文本本身也只是目录那句一句话介绍。
                 AppValueRow(
-                    title = stringResource(Res.string.keymodels_meta_capabilities),
+                    title = stringResource(Res.string.keymodels_meta_about),
                     value = it,
                     stacked = true,
                 )

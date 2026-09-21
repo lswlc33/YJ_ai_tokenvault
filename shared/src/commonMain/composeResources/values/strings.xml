@@ -883,7 +883,7 @@
     <string name="keymodels_catalog_failed">Catalog update failed. See the log for the reason.</string>
     <string name="keymodels_unmatched">Unknown model</string>
     <string name="keymodels_meta_output">Max output</string>
-    <string name="keymodels_meta_capabilities">Capabilities</string>
+    <string name="keymodels_meta_about">Summary</string>
     <string name="keymodels_cap_reasoning">Reasoning</string>
     <string name="keymodels_cap_tool_call">Tool calling</string>
     <string name="keymodels_cap_vision">Vision</string>
