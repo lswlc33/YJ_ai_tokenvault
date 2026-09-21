@@ -25,6 +25,7 @@
     <string name="dashboard_balance_updated">更新于 %1$s</string>
     <string name="dashboard_balance_refreshing">正在查询余额…</string>
     <string name="dashboard_balance_failed">%1$d 个供应商的余额查询失败</string>
+    <string name="dashboard_balance_low">%1$d 家余额低于提醒阈值</string>
     <string name="dashboard_balance_none">还没有配置余额查询</string>
     <string name="dashboard_counts_title">内容</string>
     <string name="common_loading">加载中…</string>

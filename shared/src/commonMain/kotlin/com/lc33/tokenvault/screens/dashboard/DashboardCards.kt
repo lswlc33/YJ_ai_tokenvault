@@ -15,6 +15,7 @@ import tokenvault.shared.generated.resources.count_keys
 import tokenvault.shared.generated.resources.count_models
 import tokenvault.shared.generated.resources.count_providers
 import tokenvault.shared.generated.resources.dashboard_balance_failed
+import tokenvault.shared.generated.resources.dashboard_balance_low
 import tokenvault.shared.generated.resources.dashboard_balance_no_fx
 import tokenvault.shared.generated.resources.dashboard_balance_none
 import tokenvault.shared.generated.resources.dashboard_balance_title
@@ -68,6 +69,8 @@ internal fun BalanceCard(
     nowMs: Long,
     /** 这一趟查询在跑：图标置灰，同时在卡上说出为什么——只灰不给理由是让人反复按。 */
     refreshing: Boolean,
+    /** 余额低于其币种阈值的供应商数（来自 `attentionItemsOf`，0 时这句不画）。 */
+    lowBalanceCount: Int,
     onRefresh: () -> Unit,
 ) {
     val tokens = LocalAppTokens.current
@@ -141,6 +144,18 @@ internal fun BalanceCard(
         if (balance.failedProviderCount > 0) {
             AppText(
                 text = stringResource(Res.string.dashboard_balance_failed, balance.failedProviderCount),
+                style = AppTextStyle.Footnote,
+                color = appOnPrimaryColor,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+        if (lowBalanceCount > 0) {
+            // 「探测设置 → 余额低额阈值」那一页唯一的出口。以前阈值只喂给
+            // `attentionItemsOf`，算出来的 `DashboardUiState.attention` 全仓没有任何一处
+            // 读取——设了 ¥30、掉到 ¥5，界面上一个字都不会变，那一页等于白填。
+            // 摆在失败那一句旁边：两个数说的都是"这几家要去看一眼"。
+            AppText(
+                text = stringResource(Res.string.dashboard_balance_low, lowBalanceCount),
                 style = AppTextStyle.Footnote,
                 color = appOnPrimaryColor,
                 modifier = Modifier.padding(top = 4.dp),

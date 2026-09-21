@@ -25,6 +25,7 @@
     <string name="dashboard_balance_updated">Updated %1$s</string>
     <string name="dashboard_balance_refreshing">Checking balances…</string>
     <string name="dashboard_balance_failed">%1$d provider(s) failed the balance query</string>
+    <string name="dashboard_balance_low">%1$d provider(s) are below the alert threshold</string>
     <string name="dashboard_balance_none">No balance query configured yet</string>
     <string name="dashboard_counts_title">Content</string>
     <string name="common_loading">Loading…</string>

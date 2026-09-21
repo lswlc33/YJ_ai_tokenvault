@@ -13,6 +13,7 @@ import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.dashboard_title
 import tokenvault.shared.generated.resources.refresh_status_cd
 import com.lc33.tokenvault.screens.model.DashboardUiState
+import com.lc33.tokenvault.screens.model.AttentionKind
 import com.lc33.tokenvault.ui.common.LoadingState
 import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppIconButton
@@ -74,6 +75,7 @@ fun DashboardScreen(
                     balance = state.balance,
                     nowMs = state.nowMs,
                     refreshing = balanceRefreshing,
+                    lowBalanceCount = state.attention.count { it.kind == AttentionKind.LowBalance },
                     onRefresh = onRefreshBalance,
                 )
             }
