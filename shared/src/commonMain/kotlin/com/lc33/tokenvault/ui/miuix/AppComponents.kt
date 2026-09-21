@@ -40,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -49,6 +50,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.BasicComponentDefaults
 import top.yukonga.miuix.kmp.basic.Card
@@ -736,6 +738,17 @@ fun AppTabRow(
 }
 
 /**
+ * chip 的文字样式：在 [MiuixTheme.textStyles.footnote1] 上**钉死行高**。
+ *
+ * `footnote1` 只有 13sp、没有行高，行盒就交给实际命中的字体去算 ascent + descent，而中文字体
+ * 比拉丁字体高一档：同一排 chip 里真机实测 `1.0M` 是 23px、`推理` 是 27px（@240dpi），于是
+ * 强调色那一枚（永远是一串拉丁数字的上下文窗口）看着比旁边矮一截，英文包里反而看不出来。
+ * 钉成固定行高之后，一排 chip 的高低只由字号决定，与文字是汉字还是字母无关。
+ */
+private val chipTextStyle: TextStyle
+    @Composable get() = MiuixTheme.textStyles.footnote1.copy(lineHeight = 18.sp)
+
+/**
  * 小标签。协议、来源、分组这类一眼扫过的元信息用它，不用它去表达状态（状态走 `StatusDot`）。
  *
  * [accent] 只给"这一排里最该先看到的那一枚"用（模型行上的上下文窗口就是），一排放两枚
@@ -752,7 +765,7 @@ fun AppChip(text: String, modifier: Modifier = Modifier, accent: Boolean = false
             text = text,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
             color = if (accent) appChipAccentTextColor else appChipTextColor,
-            style = MiuixTheme.textStyles.footnote1,
+            style = chipTextStyle,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )

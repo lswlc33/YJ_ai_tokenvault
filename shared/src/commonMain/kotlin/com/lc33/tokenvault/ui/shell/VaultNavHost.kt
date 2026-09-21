@@ -96,6 +96,7 @@ import tokenvault.shared.generated.resources.feedback_providers_deleted_partial
 import tokenvault.shared.generated.resources.feedback_account_saved
 import tokenvault.shared.generated.resources.feedback_balance_refresh_failed
 import tokenvault.shared.generated.resources.feedback_balance_refreshed
+import tokenvault.shared.generated.resources.catalog_updated
 import tokenvault.shared.generated.resources.feedback_clipboard_empty
 import tokenvault.shared.generated.resources.feedback_clipboard_filled
 import tokenvault.shared.generated.resources.feedback_imported
@@ -904,6 +905,8 @@ fun VaultNavHost(
             val probeResultsCleared = stringResource(Res.string.feedback_probe_results_cleared)
             val logsCleared = stringResource(Res.string.feedback_logs_cleared)
             val clearFailed = stringResource(Res.string.data_clear_failed)
+            // 目录手动更新成功才出声（失败那一档由行自己的副文案说出来，与模型页同一份文案）。
+            val catalogUpdated = stringResource(Res.string.catalog_updated)
             // 成败都由 ViewModel 报：按下去就投"已清空"是在赌那次事务一定成，
             // 而这两步都是真删数据（`DataViewModel.events` 存在的理由就是这个）。
             LaunchedEffect(vm) {
@@ -915,15 +918,25 @@ fun VaultNavHost(
                             feedback?.post(AppFeedback(logsCleared))
                         DataViewModel.Event.Failed ->
                             feedback?.post(AppFeedback(clearFailed))
+                        DataViewModel.Event.CatalogUpdated ->
+                            feedback?.post(AppFeedback(catalogUpdated))
                     }
                 }
             }
+            val catalogSync by vm.syncState.collectAsStateWithLifecycle()
+            val catalogLastSyncAt by vm.catalogLastSyncAt.collectAsStateWithLifecycle()
+            val catalogAutoUpdate by vm.catalogAutoUpdate.collectAsStateWithLifecycle()
             DataScreen(
                 onBack = back,
                 onOpenGroups = { navigate(GroupsRoute) },
                 onOpenLog = { navigate(LogRoute) },
                 onClearProbeResults = vm::clearProbeResults,
                 onClearLog = vm::clearLog,
+                catalogSync = catalogSync,
+                catalogLastSyncAt = catalogLastSyncAt,
+                catalogAutoUpdate = catalogAutoUpdate,
+                onUpdateCatalog = vm::updateCatalogNow,
+                onCatalogAutoUpdateChange = vm::onCatalogAutoUpdateChange,
             )
         }
             is LicensesRoute -> {

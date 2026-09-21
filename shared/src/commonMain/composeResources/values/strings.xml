@@ -292,6 +292,15 @@
     <string name="data_section_log">Log</string>
     <string name="data_log">Open the log</string>
     <string name="data_log_summary">Redacted before it is written. Kept across restarts, capped by count and age.</string>
+    <string name="data_section_catalog">Model catalog</string>
+    <string name="catalog_last_sync">Last updated</string>
+    <string name="catalog_last_never">Never updated</string>
+    <string name="catalog_update_now">Update now</string>
+    <string name="catalog_update_now_summary">Downloads about 4.7 MB; nothing is downloaded again when upstream has not changed</string>
+    <string name="catalog_updating">Updating the catalog…</string>
+    <string name="catalog_updated">Catalog updated</string>
+    <string name="catalog_auto_update">Update the catalog automatically</string>
+    <string name="catalog_auto_update_summary">Checks every 7 days. When off, capabilities stay at the last sync until you update here</string>
     <string name="data_section_danger">Destructive</string>
     <string name="data_clear_probe">Clear probe results</string>
     <string name="data_clear_probe_summary">All keys return to "not probed". Keys, models and accounts are kept.</string>
