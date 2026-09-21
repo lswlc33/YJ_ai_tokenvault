@@ -495,4 +495,41 @@ class ArchitectureRulesTest {
         }
         return found
     }
+
+    @Test
+    fun `每条二级路由都有入口`() {
+        // 整屏模型页曾经就是这条规则拦下的那个东西：Routes.kt 里声明了、VaultNavHost 里
+        // 把 ViewModel 和回调全接好了、编译与 800 多条测试一起绿，但全仓没有一处
+        // navigate(XRoute(...))，于是用户在界面上永远走不进去——"接了线没装开关"。
+        // 顶栏那三个 tab 由 VaultNavDisplay 按索引切换（navigate 传的是变量），所以它们
+        // 从 TopLevelRoutes 那份表里读出来放行，而不是写死在这。
+        val routesSource = sharedSourceRoot.resolve("ui/shell/Routes.kt")
+        assertTrue("找不到 ${routesSource.relPathOf(sharedSourceRoot)}", routesSource.isFile)
+        val declared = Regex("^data (?:class|object) (\\w+Route)\\b", RegexOption.MULTILINE)
+            .findAll(routesSource.readText())
+            .map { it.groupValues[1] }
+            .toList()
+        assertTrue("Routes.kt 里一条路由都没解析到，先修这条测试的正则", declared.isNotEmpty())
+
+        val tabs = sharedSourceRoot.resolve("ui/shell/TopLevelPagerState.kt").readText()
+            .let { source -> Regex("TopLevelRoutes[^=]*= listOf\\(([^)]*)\\)").find(source) }
+            ?.groupValues?.get(1)
+            ?.split(',')
+            ?.map { it.trim() }
+            ?.filter { it.isNotEmpty() }
+            .orEmpty()
+        assertTrue("TopLevelPagerState.kt 里读不到 TopLevelRoutes，先修这条测试的正则", tabs.isNotEmpty())
+
+        val sources = (allKotlinFiles(appSourceRoot) + allKotlinFiles(sharedSourceRoot))
+            .filter { it.name != "Routes.kt" }
+            .map { it.readText() }
+        val unreachable = declared.filter { name ->
+            name !in tabs && sources.none { text -> text.contains("navigate($name") }
+        }
+        fail(
+            "每条二级路由都要有至少一处 navigate(该Route(...))，否则那个页面是进不去的死代码" +
+                "（顶栏三个 tab 走索引切换，由 TopLevelRoutes 放行）：",
+            unreachable.map { "$it 没有任何 navigate 调用点" },
+        )
+    }
 }

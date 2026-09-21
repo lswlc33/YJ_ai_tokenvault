@@ -75,6 +75,7 @@ import tokenvault.shared.generated.resources.detail_key_full_content
 import tokenvault.shared.generated.resources.detail_models_refresh
 import tokenvault.shared.generated.resources.detail_models_count_auto
 import tokenvault.shared.generated.resources.detail_models_count_manual
+import tokenvault.shared.generated.resources.detail_models_open_all
 import tokenvault.shared.generated.resources.detail_key_balance_value
 import tokenvault.shared.generated.resources.detail_models_section
 import tokenvault.shared.generated.resources.detail_key_more_cd
@@ -105,6 +106,8 @@ fun KeyDetailScreen(
     onProbe: () -> Unit,
     onProbeModel: (String) -> Unit,
     onRefreshModels: () -> Unit,
+    /** 进整屏模型页：分组 / 排序 / 搜索 / 能力面板 / 逐行增删改都在那一页。 */
+    onOpenAllModels: () -> Unit,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
     onDelete: () -> Unit,
@@ -430,6 +433,15 @@ fun KeyDetailScreen(
                                 AppDivider()
                             }
                         }
+                        // 收尾那一行是整屏模型页的唯一入口：分组、排序、搜索、能力面板
+                        // 和逐行增删改都在那一页，详情页这张卡只负责"看得见"。
+                        AppDivider()
+                        AppActionRow(
+                            text = stringResource(Res.string.detail_models_open_all),
+                            onClick = onOpenAllModels,
+                            modifier = Modifier.fillMaxWidth(),
+                            inset = false,
+                        )
                     }
                 }
             }

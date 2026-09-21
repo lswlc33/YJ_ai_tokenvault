@@ -819,6 +819,7 @@
     <string name="detail_models_count_short">%1$d</string>
     <string name="detail_models_expand_cd">Expand models</string>
     <string name="detail_models_collapse_cd">Collapse models</string>
+    <string name="detail_models_open_all">View all models</string>
     <string name="detail_account_login_methods">Login methods</string>
     <string name="detail_add_account">Add account</string>
     <string name="login_method_password">Password login</string>

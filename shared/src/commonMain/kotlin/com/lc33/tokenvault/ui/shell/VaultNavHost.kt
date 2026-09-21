@@ -611,6 +611,7 @@ fun VaultNavHost(
                             },
                             onMoveUp = vm::moveUp,
                             onMoveDown = vm::moveDown,
+                            onOpenAllModels = { navigate(KeyModelsRoute(route.providerId, route.keyId)) },
                             onDelete = vm::delete,
                         )
                     }
