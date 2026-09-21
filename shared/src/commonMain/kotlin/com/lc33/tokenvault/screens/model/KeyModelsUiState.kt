@@ -71,6 +71,13 @@ data class UiModelGroup(
     val title: String,
     val collapsed: Boolean,
     val rows: List<UiModelCardRow>,
+    /**
+     * 这一组还没画出来的行数（分页显示剩下的那部分）。0 = 全画了。
+     *
+     * 一个分组是 `LazyColumn` 的一个 item，整组一次组合就是首帧那一下卡顿的来源，所以
+     * [MODEL_GROUP_ROW_PAGE] 一行一批，剩下的由末尾那行「还有 N 个」按用户意愿放出来。
+     */
+    val hiddenRows: Int = 0,
 )
 
 data class UiModelCardRow(

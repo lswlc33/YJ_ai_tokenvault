@@ -848,6 +848,7 @@
     <string name="keymodels_sort_added">按加入顺序</string>
     <string name="keymodels_summary">显示 %1$d / %2$d</string>
     <string name="keymodels_summary_all">共 %1$d 个</string>
+    <string name="keymodels_show_more">这一组还有 %1$d 个，点开继续显示</string>
     <string name="keymodels_summary_empty">没有符合当前筛选的模型</string>
     <string name="keymodels_matched">%1$d 个已知模型</string>
     <string name="keymodels_catalog_sync">正在更新模型目录…</string>

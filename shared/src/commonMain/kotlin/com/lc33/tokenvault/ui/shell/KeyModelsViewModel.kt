@@ -23,6 +23,7 @@ import com.lc33.tokenvault.engine.CatalogSync
 import com.lc33.tokenvault.engine.ProbeEngine
 import com.lc33.tokenvault.platform.SecureClipboard
 import com.lc33.tokenvault.platform.nowMillis
+import com.lc33.tokenvault.screens.model.MODEL_GROUP_ROW_PAGE
 import com.lc33.tokenvault.screens.model.KeyModelsUiState
 import com.lc33.tokenvault.screens.model.UiHealth
 import com.lc33.tokenvault.screens.model.UiModelCardRow
@@ -97,6 +98,8 @@ class KeyModelsViewModel constructor(
         val filter: ModelFilter = ModelFilter.ALL,
         val query: String = "",
         val collapsed: Set<String> = emptySet(),
+        /** 每组已经放出来多少行（缺省 = [MODEL_GROUP_ROW_PAGE]）。见 `UiModelGroup.hiddenRows`。 */
+        val shownRows: Map<String, Int> = emptyMap(),
     )
 
     private val options = MutableStateFlow(Options())
@@ -251,6 +254,9 @@ class KeyModelsViewModel constructor(
             catalogNeverSynced = empty,
             nowMs = nowMillis(),
             groups = listing.groups.map { group ->
+                // 一组一次只组合这么几行：整组摊在一个 LazyColumn item 里，445 个模型那把
+                // Key 的 OpenAI 组有 91 行，每行还带几枚能力 chip，一帧画完就是卡的地方。
+                val limit = opts.shownRows[group.key] ?: MODEL_GROUP_ROW_PAGE
                 UiModelGroup(
                     key = group.key,
                     title = when (opts.groupBy) {
@@ -258,7 +264,8 @@ class KeyModelsViewModel constructor(
                         ModelGroupBy.FAMILY -> ModelFamily.displayOfKey(group.key, vendors[group.key])
                     },
                     collapsed = group.key in opts.collapsed,
-                    rows = group.rows.map { row -> row.toCardRow(h.quickProbe) },
+                    rows = group.rows.take(limit).map { row -> row.toCardRow(h.quickProbe) },
+                    hiddenRows = (group.rows.size - limit).coerceAtLeast(0),
                 )
             },
         )
@@ -302,6 +309,18 @@ class KeyModelsViewModel constructor(
     fun toggleGroup(key: String) {
         val current = options.value.collapsed
         options.value = options.value.copy(collapsed = if (key in current) current - key else current + key)
+    }
+
+    /**
+     * 放出一组里剩下的模型，每次多 [MODEL_GROUP_ROW_PAGE] 行，而不是一次全展开。
+     *
+     * 一次全展开就是这一页卡的那个原因：那一组的几十行会在同一帧里全组合出来。
+     */
+    fun showMoreRows(key: String) {
+        val current = options.value.shownRows[key] ?: MODEL_GROUP_ROW_PAGE
+        options.value = options.value.copy(
+            shownRows = options.value.shownRows + (key to current + MODEL_GROUP_ROW_PAGE),
+        )
     }
 
     /**

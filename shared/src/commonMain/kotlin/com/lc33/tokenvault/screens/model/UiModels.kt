@@ -11,6 +11,16 @@ package com.lc33.tokenvault.screens.model
  */
 
 /**
+ * 整屏模型页里，一个分组一次画多少行。
+ *
+ * 一个分组是 `LazyColumn` 的一个 item，所以"画多少行"就是"一帧里组合多少行"：openrouter
+ * 那把 Key 有 445 个模型、OpenAI 一组 91 行，每行还摊着 2 到 5 枚能力 chip，整组一次组合
+ * 就是几百个 composable 加几十次 FlowRow 双趟测量——首帧要卡住一下才出来。分页之后每次
+ * 只组合这一档的量，末尾那行「还有 N 个」由用户自己决定要不要继续。
+ */
+const val MODEL_GROUP_ROW_PAGE = 24
+
+/**
  * 供应商详情页那把密钥卡里的模型预览行数。
  *
  * 只给两行：一家有几把 Key 就是几份预览，三行起步就要滚过两屏才能看完"有哪几把 Key"，

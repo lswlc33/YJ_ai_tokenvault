@@ -183,6 +183,19 @@ class ModelCatalogRepositoryTest {
     }
 
     @Test
+    fun `批量查目录一次拿全，不存在的键不占位`() = runBlocking {
+        repository.replace(parsed())
+        val keys = database.modelCatalogDao().findAll().map { it.key }
+        assertTrue(keys.size >= 2, "夹具里至少要有两条目录，否则这条测试没测到批量")
+
+        val found = repository.findByKeys(keys + "no-such-vendor/no-such-model")
+        assertEquals(keys.size, found.size, "查不到的键不该在结果里占一个位置")
+        assertTrue(keys.all { it in found })
+        // 空集合不发查询：Room 展开出来的 `IN ()` 是非法 SQL。
+        assertTrue(repository.findByKeys(emptyList()).isEmpty())
+    }
+
+    @Test
     fun `中转站给的带前缀 id 也挂到原创那条`() = runBlocking {
         val providerId = seedProvider("某中转站")
         database.modelDao().seed("deepseek/deepseek-chat", providerId = providerId)

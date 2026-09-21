@@ -270,6 +270,16 @@ interface ModelCatalogDao {
     suspend fun findByKey(key: String): ModelCatalogEntity?
 
     /**
+     * 一批目录条目一次取。
+     *
+     * 一把 Key 有 445 个模型时，逐条 [findByKey] 就是 445 次 prepared statement 加 445 次
+     * 调度，而模型页要等这轮跑完才画得出能力 chip。这一条 IN 走同一个 `key` 索引，把
+     * 那一下压成一次查询。
+     */
+    @Query("SELECT * FROM model_catalog WHERE `key` IN (:keys)")
+    suspend fun findByKeysIn(keys: List<String>): List<ModelCatalogEntity>
+
+    /**
      * 三级匹配的第一级（升级版）：输入形如 `vendor/model` 时的直达查询。
      *
      * 走 [com.lc33.tokenvault.data.entity.ModelCatalogEntity.qualifiedId] 而不是主键：

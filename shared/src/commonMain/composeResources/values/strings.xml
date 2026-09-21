@@ -875,6 +875,7 @@
     <!-- "%1$d of %2$d" — the second number is the unfiltered total, so it stays the truth. -->
     <string name="keymodels_summary">Showing %1$d of %2$d</string>
     <string name="keymodels_summary_all">%1$d models</string>
+    <string name="keymodels_show_more">%1$d more in this group — tap to show</string>
     <string name="keymodels_summary_empty">No model matches the current filter</string>
     <string name="keymodels_matched">%1$d known models</string>
     <string name="keymodels_catalog_sync">Updating catalog…</string>

@@ -110,8 +110,20 @@ class RoomModelCatalogRepository constructor(
         return hit?.let { entry -> catalogDao.findByKey(entry.key)?.toDomain() }
     }
 
-    override suspend fun findByKeys(keys: Collection<String>): Map<String, CatalogModel> =
-        keys.mapNotNull { key -> catalogDao.findByKey(key)?.let { key to it.toDomain() } }.toMap()
+    /**
+     * 批量取目录条目，一次 IN 一批，而不是每个键一次查询。
+     *
+     * 原来这里是 `keys.mapNotNull { findByKey(it) }`：openrouter 那把 Key 有 445 个模型，
+     * 就是 445 次 prepared statement 加 445 次调度，模型页要等它跑完才画得出能力 chip。
+     * 分批 400 个一批是不赌 SQLite 的绑定变量上限（老一些的版本是 999）。
+     */
+    override suspend fun findByKeys(keys: Collection<String>): Map<String, CatalogModel> {
+        if (keys.isEmpty()) return emptyMap()
+        return keys.distinct()
+            .chunked(400)
+            .flatMap { chunk -> catalogDao.findByKeysIn(chunk) }
+            .associate { it.key to it.toDomain() }
+    }
 
     /**
      * 只补 `catalogKey IS NULL` 的行，且每行走三条索引查询。

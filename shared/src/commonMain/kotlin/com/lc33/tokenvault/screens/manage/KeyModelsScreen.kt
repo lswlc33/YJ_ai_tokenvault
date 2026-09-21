@@ -11,6 +11,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -128,6 +129,7 @@ import tokenvault.shared.generated.resources.keymodels_sort_context
 import tokenvault.shared.generated.resources.keymodels_sort_desc
 import tokenvault.shared.generated.resources.keymodels_sort_probed
 import tokenvault.shared.generated.resources.keymodels_summary
+import tokenvault.shared.generated.resources.keymodels_show_more
 import tokenvault.shared.generated.resources.keymodels_summary_all
 import tokenvault.shared.generated.resources.keymodels_summary_empty
 import tokenvault.shared.generated.resources.keymodels_unmatched
@@ -155,6 +157,8 @@ fun KeyModelsScreen(
     onSort: (ModelSort) -> Unit,
     onFilter: (ModelFilter) -> Unit,
     onToggleGroup: (String) -> Unit,
+    /** 放出一组里剩下的模型（一次一批）。 */
+    onShowMoreRows: (String) -> Unit,
     onCopyModelId: (String) -> Unit,
     onProbeModel: (String) -> Unit,
     onRefreshModels: () -> Unit,
@@ -308,6 +312,7 @@ fun KeyModelsScreen(
                             onProbeModel = onProbeModel,
                             onEdit = { row -> editing = row },
                             onDelete = { row -> pendingDelete = row },
+                            onShowMore = onShowMoreRows,
                             modifier = Modifier.padding(horizontal = tokens.screenPadding),
                         )
                     }
@@ -534,14 +539,22 @@ private fun GroupCard(
     onProbeModel: (String) -> Unit,
     onEdit: (UiModelCardRow) -> Unit,
     onDelete: (UiModelCardRow) -> Unit,
+    /** 放出这一组剩下的模型（每次一批，见 `MODEL_GROUP_ROW_PAGE`）。 */
+    onShowMore: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val tokens = LocalAppTokens.current
-    AppCard(modifier = modifier.fillMaxWidth()) {
+    // 左右内边距交给行自己（下面每行 padding(horizontal)），卡片这层只留上下——这样组里的
+    // 分隔线能一直通到卡片两边，而不是缩在内容盒里、两端各短一截。
+    AppCard(
+        modifier = modifier.fillMaxWidth(),
+        insideMargin = PaddingValues(vertical = tokens.screenPadding),
+    ) {
         if (group.title.isNotEmpty() || group.key.isNotEmpty()) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .padding(horizontal = tokens.screenPadding)
                     .clickable { onToggleGroup(group.key) },
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -592,6 +605,16 @@ private fun GroupCard(
                     AppDivider()
                 }
             }
+            // 剩下的那部分由用户自己放出来：一组一次只组合 MODEL_GROUP_ROW_PAGE 行，
+            // 这一行就是"还要不要继续"的那个开关。
+            if (group.hiddenRows > 0) {
+                AppDivider()
+                AppActionRow(
+                    text = stringResource(Res.string.keymodels_show_more, group.hiddenRows),
+                    onClick = { onShowMore(group.key) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
     }
 }
@@ -624,15 +647,16 @@ private fun ModelRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            // 行间要有呼吸：能力 chip 摊开之后一行两到三行高，不给上下留白时下一行的
-            // 名字直接顶在上一行的 chip 底下，整张卡读起来是一坨而不是一行一行。
-            .padding(vertical = tokens.itemSpacing)
             .combinedClickable(
                 onClick = onOpenDetail,
                 // 长按沿用 Key 详情页那行的口径：开了快速探测就探测这一行，否则复制
                 // id。菜单撤掉之后，这是自动发现列表上唯一一行动作入口。
                 onLongClick = if (row.quickProbe) onProbe else onCopy,
-            ),
+            )
+            // padding 排在 clickable 之后：整块（含左右那 16dp）都是点击区，不会出现
+            // "按行两侧的空白没反应"的空洞；上下留白是行间呼吸（能力 chip 摊开之后一行
+            // 两到三行高，不留白时下一行的名字直接顶在上一行的 chip 底下）。
+            .padding(horizontal = tokens.screenPadding, vertical = tokens.itemSpacing),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Row(
