@@ -521,7 +521,6 @@ fun VaultNavHost(
                     onSort = { sort -> vm.onSort(sort.ordinal) },
                     onFilter = vm::onFilter,
                     onToggleGroup = vm::toggleGroup,
-                    onToggleExpand = vm::toggleExpand,
                     onCopyModelId = { modelId -> vm.copyModelId(modelClipboardLabel, modelId) },
                     onProbeModel = { modelId -> vm.probeModel(modelId) },
                     onRefreshModels = { vm.refreshModels() },

@@ -97,7 +97,6 @@ class KeyModelsViewModel constructor(
         val filter: ModelFilter = ModelFilter.ALL,
         val query: String = "",
         val collapsed: Set<String> = emptySet(),
-        val expanded: Set<Long> = emptySet(),
     )
 
     private val options = MutableStateFlow(Options())
@@ -262,13 +261,13 @@ class KeyModelsViewModel constructor(
                         ModelGroupBy.FAMILY -> ModelFamily.displayOfKey(group.key, vendors[group.key])
                     },
                     collapsed = group.key in opts.collapsed,
-                    rows = group.rows.map { row -> row.toCardRow(opts.expanded, h.quickProbe) },
+                    rows = group.rows.map { row -> row.toCardRow(h.quickProbe) },
                 )
             },
         )
     }
 
-    private fun ListedModel.toCardRow(expanded: Set<Long>, quickProbe: Boolean) = UiModelCardRow(
+    private fun ListedModel.toCardRow(quickProbe: Boolean) = UiModelCardRow(
         id = model.id,
         modelId = model.modelId,
         protocol = model.protocol.wireName,
@@ -279,7 +278,6 @@ class KeyModelsViewModel constructor(
             ModelProbeState.NO_ACCESS, ModelProbeState.ERROR -> UiHealth.Warn
             ModelProbeState.UNKNOWN -> UiHealth.Unknown
         },
-        expanded = model.id in expanded,
         quickProbe = quickProbe,
         probedAt = model.probedAt,
         latencyMs = model.latencyMs,
@@ -307,12 +305,6 @@ class KeyModelsViewModel constructor(
     fun toggleGroup(key: String) {
         val current = options.value.collapsed
         options.value = options.value.copy(collapsed = if (key in current) current - key else current + key)
-    }
-
-    /** 展开 / 收起一行。同屏可以同时展开多行，所以是一集合而不是"当前选中一个"。 */
-    fun toggleExpand(id: Long) {
-        val current = options.value.expanded
-        options.value = options.value.copy(expanded = if (id in current) current - id else current + id)
     }
 
     /**

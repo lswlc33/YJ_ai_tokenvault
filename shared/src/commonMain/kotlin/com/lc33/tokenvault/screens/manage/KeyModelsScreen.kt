@@ -1,14 +1,10 @@
 package com.lc33.tokenvault.screens.manage
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -44,9 +40,11 @@ import com.lc33.tokenvault.ui.common.colorOf
 import com.lc33.tokenvault.ui.common.labelOf
 import com.lc33.tokenvault.ui.common.relativeLabel
 import com.lc33.tokenvault.ui.miuix.AppActionRow
+import com.lc33.tokenvault.ui.miuix.AppBottomSheet
 import com.lc33.tokenvault.ui.miuix.AppCard
 import com.lc33.tokenvault.ui.miuix.AppChip
 import com.lc33.tokenvault.ui.miuix.AppDialog
+import com.lc33.tokenvault.ui.miuix.AppDivider
 import com.lc33.tokenvault.ui.miuix.AppFilterChip
 import com.lc33.tokenvault.ui.miuix.AppIcon
 import com.lc33.tokenvault.ui.miuix.AppIconButton
@@ -71,7 +69,6 @@ import org.jetbrains.compose.resources.stringResource
 import tokenvault.shared.generated.resources.Res
 import tokenvault.shared.generated.resources.back_cd
 import tokenvault.shared.generated.resources.detail_model_display_name
-import tokenvault.shared.generated.resources.detail_model_id
 import tokenvault.shared.generated.resources.detail_models_collapse_cd
 import tokenvault.shared.generated.resources.detail_models_expand_cd
 import tokenvault.shared.generated.resources.dialog_cancel
@@ -132,7 +129,8 @@ import tokenvault.shared.generated.resources.keymodels_summary_empty
 import tokenvault.shared.generated.resources.keymodels_unmatched
 
 /**
- * 整屏模型页：一把 Key 的模型列表，分组 / 排序 / 筛选 / 搜索 / 展开看能力。
+ * 整屏模型页：一把 Key 的模型列表，分组 / 排序 / 筛选 / 搜索，能力 chip 就摊在每行名字
+ * 下面，点一行开底部弹层看这个模型的完整详情。
  *
  * 页面只画不算：分组/排序/筛选的规则都在 `domain/listModels`，由 `KeyModelsViewModel`
  * 喂好状态。这里遵守分层与设计约束（不 import material3、不用裸 `Color`/`.sp`、文案全走
@@ -153,7 +151,6 @@ fun KeyModelsScreen(
     onSort: (ModelSort) -> Unit,
     onFilter: (ModelFilter) -> Unit,
     onToggleGroup: (String) -> Unit,
-    onToggleExpand: (Long) -> Unit,
     onCopyModelId: (String) -> Unit,
     onProbeModel: (String) -> Unit,
     onRefreshModels: () -> Unit,
@@ -168,6 +165,9 @@ fun KeyModelsScreen(
     var editing by remember { mutableStateOf<UiModelCardRow?>(null) }
     var adding by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<UiModelCardRow?>(null) }
+    // 详情弹层选中哪一行是**页面自己的**临时状态：它不进 ViewModel，转屏幕方向不该丢的
+    // 东西里没有它，而弹层关掉之后这个值就没有意义了。
+    var detail by remember { mutableStateOf<UiModelCardRow?>(null) }
 
     AppScaffold(
         topBar = {
@@ -284,7 +284,7 @@ fun KeyModelsScreen(
                             editable = state.editable,
                             nowMs = state.nowMs,
                             onToggleGroup = onToggleGroup,
-                            onToggleExpand = onToggleExpand,
+                            onOpenDetail = { detail = it },
                             onCopyModelId = onCopyModelId,
                             onProbeModel = onProbeModel,
                             onEdit = { row -> editing = row },
@@ -310,6 +310,10 @@ fun KeyModelsScreen(
             item { Spacer(modifier = Modifier.height(tokens.sectionSpacing)) }
         }
     }
+
+    // 详情弹层：点一行开它。选中项是页面本地状态，关掉就置空，所以内容用 `row?.modelId`
+    // 当标题而不需要额外的标题文案。
+    ModelDetailSheet(row = detail, nowMs = state.nowMs, onDismiss = { detail = null })
 
     // 复用供应商/密钥页那个 ModelDialog：三处的手动增删改是同一件事，
     // 各写一个只会让协议下拉、显示名回填这些细节在三处慢慢漂开。
@@ -504,7 +508,8 @@ private fun GroupCard(
     editable: Boolean,
     nowMs: Long,
     onToggleGroup: (String) -> Unit,
-    onToggleExpand: (Long) -> Unit,
+    /** 点开这一行的详情弹层。 */
+    onOpenDetail: (UiModelCardRow) -> Unit,
     onCopyModelId: (String) -> Unit,
     onProbeModel: (String) -> Unit,
     onEdit: (UiModelCardRow) -> Unit,
@@ -548,17 +553,22 @@ private fun GroupCard(
             }
         }
         if (!group.collapsed) {
-            group.rows.forEach { row ->
+            // 行间要有分隔：能力摊到行里之后一行比一行高，没有分隔线时"一坨文字"的
+            // 读感很强，而这张卡是一个整体、每条模型是它的一行。
+            group.rows.forEachIndexed { index, row ->
                 ModelRow(
                     row = row,
                     editable = editable,
                     nowMs = nowMs,
-                    onToggleExpand = { onToggleExpand(row.id) },
+                    onOpenDetail = { onOpenDetail(row) },
                     onCopy = { onCopyModelId(row.modelId) },
                     onProbe = { onProbeModel(row.modelId) },
                     onEdit = { onEdit(row) },
                     onDelete = { onDelete(row) },
                 )
+                if (index != group.rows.lastIndex) {
+                    AppDivider()
+                }
             }
         }
     }
@@ -584,23 +594,28 @@ private fun ModelRow(
     row: UiModelCardRow,
     editable: Boolean,
     nowMs: Long,
-    onToggleExpand: () -> Unit,
+    onOpenDetail: () -> Unit,
     onCopy: () -> Unit,
     onProbe: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val tokens = LocalAppTokens.current
-    Column(modifier = Modifier.fillMaxWidth()) {
+    val summary = probeSummary(row, nowMs)
+    // 点击区是整块（名字 + 能力 + 脚注），不是只有名字那一行：行变高之后，
+    // 只把第一行做成可点区域会出现"按下面没反应"的空洞。
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = onOpenDetail,
+                // 长按沿用 Key 详情页那行的口径：开了快速探测就探测这一行，否则复制
+                // id。菜单撤掉之后，这是自动发现列表上唯一一行动作入口。
+                onLongClick = if (row.quickProbe) onProbe else onCopy,
+            ),
+    ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .combinedClickable(
-                    onClick = onToggleExpand,
-                    // 长按沿用 Key 详情页那行的口径：开了快速探测就探测这一行，否则复制
-                    // id。菜单撤掉之后，这是自动发现列表上唯一一行动作入口。
-                    onLongClick = if (row.quickProbe) onProbe else onCopy,
-                ),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -611,7 +626,7 @@ private fun ModelRow(
                 maxLines = 1,
                 modifier = Modifier.weight(1f),
             )
-            // 协议 chip 不画：这一页的主语是模型 id，而一把 Key 的协议几乎全一样
+            // 协议 chip 不画：这一页的主语是模型 id，而一把 Key 的模型几乎全走同一个端点
             // （同一家的模型都走那一个端点），它占的宽度正是 id 被截的地方。
             StatusDot(color = colorOf(row.health), label = labelOf(row.health))
             // 三个点只在手动列表给：自动发现的行没有可编辑的东西（改一个下次同步就覆盖），
@@ -628,9 +643,13 @@ private fun ModelRow(
             }
         }
 
-        // 第二行只在真有事要说时画。来源不再逐行标：整页都是同一个来源，要按来源看
+        // 能力直接摊在名字下面，允许换行：这一页存在的理由就是"这把 Key 上哪些模型能
+        // 看图、能调工具"。藏进要点开才看得见的地方等于没有——而没挂上目录的行压根没有
+        // 能力可看，那一档下"点开看能力"对它不成立。
+        CapabilityChips(row.meta)
+
+        // 脚注行只在真有事要说时画。来源不再逐行标：整页都是同一个来源，要按来源看
         // 用「按来源」分组；「还没探测过」也不再标——那是没有结果，不是一个结果。
-        val summary = probeSummary(row, nowMs)
         if (summary != null || row.unmatched) {
             Row(
                 modifier = Modifier
@@ -660,18 +679,6 @@ private fun ModelRow(
                 }
             }
         }
-
-        // 展开要有动画：面板凭空出现、凭空消失，读起来像整页被换过，而不是这一行摊开了。
-        AnimatedVisibility(
-            visible = row.expanded,
-            enter = expandVertically() + fadeIn(),
-            exit = shrinkVertically() + fadeOut(),
-        ) {
-            Column {
-                Spacer(modifier = Modifier.height(tokens.itemSpacing))
-                ModelMetaPanel(meta = row.meta, modelId = row.modelId)
-            }
-        }
     }
 }
 
@@ -694,67 +701,89 @@ private fun probeSummary(row: UiModelCardRow, nowMs: Long): String? {
     }
 }
 
-/** 展开后的能力面板。没挂上目录时说清楚"没有数据"而不是画一片空白。 */
+/**
+ * 模型详情弹层。点行开它，取代原来"就地展开一屏属性"：一行下面摊十几行属性会把列表
+ * 拽得忽长忽短，而那些属性是"看这一个模型"时才要的，不是"扫一屏模型"时要的。
+ *
+ * 能力 chip 在列表行上就摊着，这里再给一份完整的，两处读的是同一批开关，不会行上有、
+ * 弹层里没有。模型 id 不再重复一遍——它就是弹层的标题，一行里出现两次反而占位置。
+ */
 @Composable
-private fun ModelMetaPanel(meta: UiModelMeta?, modelId: String) {
-    val tokens = LocalAppTokens.current
-    // 用 group 包住：这几行是"这个模型的一组属性"，摊在卡片里是几行悬空文本，没有容器边界。
-    AppPreferenceGroup(inset = false) {
-        AppValueRow(
-            title = stringResource(Res.string.detail_model_id),
-            value = modelId,
-            stacked = true,
-            mono = true,
-        )
+private fun ModelDetailSheet(row: UiModelCardRow?, nowMs: Long, onDismiss: () -> Unit) {
+    AppBottomSheet(
+        show = row != null,
+        onDismissRequest = onDismiss,
+        title = row?.modelId.orEmpty(),
+    ) {
+        val meta = row?.meta
+        val summary = row?.let { probeSummary(it, nowMs) }
+        // 第一块是"这一把 Key 上它到底怎么样"：状态点 + 最近探测。探测过没有比目录里
+        // 那几项二手资料更要紧，排在厂商与上下文之前。
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            row?.let {
+                StatusDot(color = colorOf(it.health), label = labelOf(it.health))
+            }
+            if (summary != null) {
+                AppText(
+                    text = summary,
+                    style = AppTextStyle.Footnote,
+                    color = appSecondaryTextColor,
+                    maxLines = 1,
+                )
+            }
+        }
+        CapabilityChips(meta)
         if (meta == null) {
+            // 没挂上目录就说清楚"没有数据"，而不是画一片空白让用户以为加载失败。
             AppText(
                 text = stringResource(Res.string.keymodels_cap_none),
                 style = AppTextStyle.Footnote,
                 color = appSecondaryTextColor,
-                modifier = Modifier.padding(
-                    horizontal = tokens.screenPadding,
-                    vertical = tokens.itemSpacing,
-                ),
             )
-            return@AppPreferenceGroup
+            return@AppBottomSheet
         }
-        meta.displayName?.let {
-            AppValueRow(title = stringResource(Res.string.detail_model_display_name), value = it)
+        // 用 group 包住：这几行是"这个模型的一组属性"，摊开是几行悬空文本，没有容器边界。
+        AppPreferenceGroup(inset = false) {
+            meta.displayName?.let {
+                AppValueRow(title = stringResource(Res.string.detail_model_display_name), value = it)
+            }
+            meta.vendorName?.let {
+                AppValueRow(title = stringResource(Res.string.keymodels_meta_vendor), value = it)
+            }
+            meta.context?.let {
+                AppValueRow(title = stringResource(Res.string.keymodels_meta_context), value = it)
+            }
+            meta.output?.let {
+                AppValueRow(title = stringResource(Res.string.keymodels_meta_output), value = it)
+            }
+            meta.releaseDate?.let {
+                AppValueRow(title = stringResource(Res.string.keymodels_meta_released), value = it)
+            }
+            meta.knowledgeCutoff?.let {
+                AppValueRow(title = stringResource(Res.string.keymodels_meta_cutoff), value = it)
+            }
+            meta.status?.let {
+                AppValueRow(title = stringResource(Res.string.keymodels_meta_status), value = it)
+            }
+            meta.description?.let {
+                AppValueRow(
+                    title = stringResource(Res.string.keymodels_meta_capabilities),
+                    value = it,
+                    stacked = true,
+                )
+            }
         }
-        meta.vendorName?.let {
-            AppValueRow(title = stringResource(Res.string.keymodels_meta_vendor), value = it)
-        }
-        meta.context?.let {
-            AppValueRow(title = stringResource(Res.string.keymodels_meta_context), value = it)
-        }
-        meta.output?.let {
-            AppValueRow(title = stringResource(Res.string.keymodels_meta_output), value = it)
-        }
-        meta.releaseDate?.let {
-            AppValueRow(title = stringResource(Res.string.keymodels_meta_released), value = it)
-        }
-        meta.knowledgeCutoff?.let {
-            AppValueRow(title = stringResource(Res.string.keymodels_meta_cutoff), value = it)
-        }
-        meta.status?.let {
-            AppValueRow(title = stringResource(Res.string.keymodels_meta_status), value = it)
-        }
-        meta.description?.let {
-            AppValueRow(
-                title = stringResource(Res.string.keymodels_meta_capabilities),
-                value = it,
-                stacked = true,
-            )
-        }
-        // 能力用 chip 摊开：它是这一页存在的理由（"这把 Key 上哪些模型能看图"），
-        // 折成一行 "reasoning, tool_call, vision" 又要用户自己去分词。
-        CapabilityChips(meta)
     }
 }
 
+/** 能力 chip：列表行与详情弹层共用，两边同一批开关，改一处两处一起变。 */
 @Composable
-private fun CapabilityChips(meta: UiModelMeta) {
-    val tokens = LocalAppTokens.current
+private fun CapabilityChips(meta: UiModelMeta?) {
+    if (meta == null) return
     val caps = buildList {
         if (meta.reasoning) add(Res.string.keymodels_cap_reasoning)
         if (meta.toolCall) add(Res.string.keymodels_cap_tool_call)
@@ -766,13 +795,15 @@ private fun CapabilityChips(meta: UiModelMeta) {
         if (meta.openWeights) add(Res.string.keymodels_cap_open_weights)
     }
     if (caps.isEmpty()) return
-    LazyRow(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = tokens.screenPadding, vertical = tokens.itemSpacing),
+    // FlowRow 而不是横向滚动的 LazyRow：chip 文案本地化后长短不一，滚动能一眼看见的
+    // 只有头两三枚，"这个模型到底会几样"反而要用户横扫才知道。换行多出来的行高换来
+    // 的是这一页真正要给的信息。
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        items(caps) { label -> AppChip(text = stringResource(label)) }
+        caps.forEach { label -> AppChip(text = stringResource(label)) }
     }
 }
 

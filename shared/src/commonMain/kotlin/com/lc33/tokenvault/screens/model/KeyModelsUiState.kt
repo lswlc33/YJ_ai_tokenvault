@@ -79,7 +79,6 @@ data class UiModelCardRow(
     val protocol: String,
     val source: UiModelSource,
     val health: UiHealth,
-    val expanded: Boolean,
     /** 探测这一行需不需要真花钱——只在两档开关都开时给 true，沿用详情页那条判定。 */
     val quickProbe: Boolean,
     val probedAt: Long?,
