@@ -212,8 +212,9 @@ internal fun CountsCard(counts: ContentCounts, onOpenManage: () -> Unit) {
  * 以前三块挤在一张卡里，标签、计数、细进度条一行接一行，读起来分不清哪条属于谁；
  * 拆开之后每张卡只讲一件事，各自有完整的卡片内边距。
  *
- * **这一区没有动作入口**：开始 / 取消探测都由顶栏刷新承担（探测要花钱，入口收敛到
- * 一处反而更明确），这里只讲进度与上一轮结果。
+ * **这一区不放"开始探测"**：发起动作收敛在顶栏刷新那一处（探测要花钱，两个入口更贵）。
+ * 只有一处例外——「查看明细」在轮次进行中也要给：「停止探测」只存在于明细页，
+ * 藏起这个入口就等于没有取消这条路。
  */
 @Composable
 internal fun ProbeCard(
@@ -308,7 +309,12 @@ internal fun ProbeCard(
         }
         // 「查看明细」放探测区最下面：它是回看上一轮结果，摆在进度卡之前会把
         // "看进度"和"看结果"两件事的先后顺序颠倒。从未探测过时没有明细分页可看。
-        if (lastRun != null && progress == null) {
+        //
+        // 但**一轮正在跑的时候这一行必须给**（旧条件是 `lastRun != null && progress == null`，
+        // 等于偏偏在 running 时把它藏起来）：「停止探测」这个按钮只存在于明细页，而顶栏那个
+        // 刷新不会取消正在跑的轮次（running 时它直接不发）。于是从仪表盘发起一轮之后的一百多
+        // 秒里，用户既看不到逐项进展、也没有任何地方能停——想停只能等或者杀进程。
+        if (lastRun != null || progress != null) {
             // 用 AppPreferenceGroup 而不是 AppCard：卡片默认还叠一层 16dp 内边距，
             // 56dp 的行会被撑到 88dp，明显比其它块胖（见 AppPreferenceGroup 注释）。
             AppPreferenceGroup(modifier = cardModifier(), inset = false) {

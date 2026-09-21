@@ -347,7 +347,15 @@ interface ModelVendorDao {
 @Dao
 interface ProbeRunDao {
 
-    @Query("SELECT * FROM probe_runs ORDER BY startedAt DESC LIMIT 1")
+    /**
+     * 最近一条**已经结完**的轮次。
+     *
+     * `finishedAt IS NOT NULL` 不能省：一轮跑到一半进程被杀（或异常从收尾里逃出去）会留下
+     * 一条没有 finishedAt 的行，而调用方是仪表盘与明细页那句「上次探测」——它会把
+     * finishedAt 塌回 startedAt、计数全给 0，于是显示成「上次探测：刚刚 · 共 0 项」，
+     * 一个看着完全合理的"跑完但什么都没测"的轮次。没跑完的轮次不该冒充结论。
+     */
+    @Query("SELECT * FROM probe_runs WHERE finishedAt IS NOT NULL ORDER BY startedAt DESC LIMIT 1")
     fun observeLatest(): Flow<ProbeRunEntity?>
 
     @Query("SELECT * FROM probe_runs WHERE id = :id")

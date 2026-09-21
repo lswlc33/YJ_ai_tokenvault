@@ -45,7 +45,7 @@ interface ProbeRunRepository {
     /** 更新一轮（结束时回填计数与时间）。 */
     suspend fun update(run: ProbeRun)
 
-    /** `probe_runs` 最新一行（"上次探测"摘要），没有跑过则为 null。 */
+    /** 最近一条**已结案**的轮次（"上次探测"摘要），一条都没有则为 null。半截的行不算。 */
     fun observeLatest(): Flow<ProbeRun?>
 
     /** 清空 `probe_runs`（数据页"清空探测结果"）。 */

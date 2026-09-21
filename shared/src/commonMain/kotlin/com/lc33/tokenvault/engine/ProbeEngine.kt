@@ -763,8 +763,19 @@ class ProbeEngine constructor(
 
     /** 取消当前一轮。是真的 [Job.cancel]（§8.5），不是设个标志位。 */
     fun cancel() {
-        currentJob?.cancel()
+        val job = currentJob
         currentJob = null
+        if (job?.isActive == true) {
+            job.cancel()
+            // 不在这里清 `_progress`：正在协程里的收尾跑在 NonCancellable 里，它会写
+            // "这一轮被取消"并把进度摘掉。抢先把进度清了，明细页上那句"上次探测"会
+            // 先跳到旧的那一轮，看着像取消没生效。
+        } else {
+            // 已经没有活着的轮次（跑完被回收、或上一轮是从异常里逃出去的）却还留着进度，
+            // 那这个按钮就是用户唯一的出路——按下去必须真的把「正在请求 N/M」清掉，
+            // 不能只把一句"已停止"报给他而界面照旧。
+            _progress.value = null
+        }
     }
 
     /** 锁定 / 退出时由 [ProbeSession] 的持有方调用：停掉正在跑的探测与模型拉取。 */
@@ -784,6 +795,13 @@ class ProbeEngine constructor(
     /**
      * 跑一轮。@param scope `probe_runs.scope` 的值——全量是 `"all"`，重试是 `"retry"`。
      * @param filter 在 [ProbePlan] 产出的骨架任务上做二级过滤：全量恒 true，重试只留失败项。
+     *
+     * 这一层是**兜底的最后一道**。[runRoundInner] 里那段 collect 有自己的 catch，但 collect
+     * 之外还剩两段没人接：置进度之前那一段（已经插入 `probe_runs`，接着清名单、建计划），
+     * 以及收尾那一段（折模型列表、补发独立 GET）。任何一处抛出后的后果都是界面上的死态——
+     * `_progress` 停在 `running = true`，仪表盘永远显示「正在请求 N/M」，而它那句
+     * "查看明细"的显示条件是 `progress == null`，于是用户连停止按钮都找不到，只能杀进程。
+     * 现在无论从哪里逃出，都把进度摘掉并留一条 ERROR 说明为什么中断。
      */
     private suspend fun runRound(scope: String, filter: (PlannedTask) -> Boolean) {
         // 探测进行中挂起前台空闲锁定（§7.4 / 红线 28）：一轮预算 120 秒，用户不摸屏幕
@@ -791,7 +809,21 @@ class ProbeEngine constructor(
         autoLocker.pauseIdleLock()
         try {
             runRoundInner(scope, filter)
+        } catch (failure: Throwable) {
+            // 不 rethrow：`scope` 那边只有 ScopeCrashGuard（一条空 handler），异常冒过去
+            // 既不杀应用也不留痕迹，而界面已经坏了。写日志这件事本身也可能失败，所以
+            // 再兜一层——这里的任何一句都不许再把上面那个"摘进度"跳过去。
+            runCatching {
+                audit.record(
+                    level = LogLevel.ERROR,
+                    category = LogCategory.PROBE,
+                    message = "probe round crashed",
+                    detail = "${failure::class.simpleName}: ${failure.message}",
+                )
+            }
         } finally {
+            // 正常路径由 [finishRun] 第一句就清掉；这一句只对"没走到 finishRun"的出口负责。
+            if (_progress.value?.running == true) _progress.value = null
             autoLocker.resumeIdleLock()
         }
     }
@@ -1094,22 +1126,41 @@ class ProbeEngine constructor(
             return
         }
 
-        fetchedModels.forEach { (keyId, byProtocol) ->
-            val currentProviderId = providerIdByKey[keyId] ?: return@forEach
-            byProtocol.forEach { (protocol, modelIds) ->
-                models.applyDiscovered(currentProviderId, keyId, protocol, modelIds.toList())
+        // 折模型列表这一段以前写在 finishRun 之前的裸位置上：它一抛（`applyDiscovered` 撞
+        // SQLITE_BUSY、那趟补发的 GET 出错），下面的 finishRun 整个被跳过，于是同时留下两个
+        // 现场——`probe_runs` 一行永远 `finishedAt = null`，以及 `_progress` 永远 running。
+        // 探测结果本身此刻已经全部落库，"把列表折进去"这一步失败不该让这一轮结不了案，
+        // 所以这里报一条 WARN 后继续收尾。
+        runCatching {
+            fetchedModels.forEach { (keyId, byProtocol) ->
+                val currentProviderId = providerIdByKey[keyId] ?: return@forEach
+                byProtocol.forEach { (protocol, modelIds) ->
+                    models.applyDiscovered(currentProviderId, keyId, protocol, modelIds.toList())
+                }
+            }
+
+            // 本轮一条任务都没摊上的 Key（可达性与密钥有效性都关着）在这里补一次独立 GET。
+            // 少了这一趟，"只开模型列表自动更新"的 Key 永远拉不到列表——计划本身只按前两个
+            // 开关铺任务。`buildModelListTasks` 只看 `probe.models`，所以这里确实发得出请求。
+            allKeys
+                .filter { key ->
+                    key.settings.probe.enabled && key.settings.probe.models &&
+                        tasks.none { it.keyId == key.id }
+                }
+                .forEach { key -> refreshModelsInner(key.providerId, key.id) }
+        }.onFailure { failure ->
+            withContext(NonCancellable) {
+                runCatching {
+                    audit.record(
+                        level = LogLevel.WARN,
+                        category = LogCategory.PROBE,
+                        message = "model fold-in failed, round still closed",
+                        detail = "${failure::class.simpleName}: ${failure.message}",
+                        runId = runId,
+                    )
+                }
             }
         }
-
-        // 本轮一条任务都没摊上的 Key（可达性与密钥有效性都关着）在这里补一次独立 GET。
-        // 少了这一趟，"只开模型列表自动更新"的 Key 永远拉不到列表——计划本身只按前两个
-        // 开关铺任务。`buildModelListTasks` 只看 `probe.models`，所以这里确实发得出请求。
-        allKeys
-            .filter { key ->
-                key.settings.probe.enabled && key.settings.probe.models &&
-                    tasks.none { it.keyId == key.id }
-            }
-            .forEach { key -> refreshModelsInner(key.providerId, key.id) }
 
         finishRun(
             runId = runId,
