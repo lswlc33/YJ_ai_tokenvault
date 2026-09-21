@@ -96,6 +96,7 @@ import tokenvault.shared.generated.resources.feedback_providers_deleted_partial
 import tokenvault.shared.generated.resources.feedback_account_saved
 import tokenvault.shared.generated.resources.feedback_balance_refresh_failed
 import tokenvault.shared.generated.resources.feedback_balance_refreshed
+import tokenvault.shared.generated.resources.catalog_up_to_date
 import tokenvault.shared.generated.resources.catalog_updated
 import tokenvault.shared.generated.resources.feedback_clipboard_empty
 import tokenvault.shared.generated.resources.feedback_clipboard_filled
@@ -905,8 +906,10 @@ fun VaultNavHost(
             val probeResultsCleared = stringResource(Res.string.feedback_probe_results_cleared)
             val logsCleared = stringResource(Res.string.feedback_logs_cleared)
             val clearFailed = stringResource(Res.string.data_clear_failed)
-            // 目录手动更新成功才出声（失败那一档由行自己的副文案说出来，与模型页同一份文案）。
+            // 目录手动更新成功才出声（失败那一档由行自己的副文案说出来，与模型页同一份文案）；
+            // 304（上游没变）和真写进去了分开念，别让"已更新"变成一句没发生的事。
             val catalogUpdated = stringResource(Res.string.catalog_updated)
+            val catalogUpToDate = stringResource(Res.string.catalog_up_to_date)
             // 成败都由 ViewModel 报：按下去就投"已清空"是在赌那次事务一定成，
             // 而这两步都是真删数据（`DataViewModel.events` 存在的理由就是这个）。
             LaunchedEffect(vm) {
@@ -918,8 +921,12 @@ fun VaultNavHost(
                             feedback?.post(AppFeedback(logsCleared))
                         DataViewModel.Event.Failed ->
                             feedback?.post(AppFeedback(clearFailed))
-                        DataViewModel.Event.CatalogUpdated ->
-                            feedback?.post(AppFeedback(catalogUpdated))
+                        is DataViewModel.Event.CatalogSynced ->
+                            feedback?.post(
+                                AppFeedback(
+                                    if (event.changed) catalogUpdated else catalogUpToDate,
+                                ),
+                            )
                     }
                 }
             }

@@ -290,6 +290,7 @@
     <string name="catalog_update_now_summary">约下载 4.7 MB；上游没变时不会重新下载</string>
     <string name="catalog_updating">正在更新目录…</string>
     <string name="catalog_updated">目录已更新</string>
+    <string name="catalog_up_to_date">目录已是最新</string>
     <string name="catalog_auto_update">自动更新目录</string>
     <string name="catalog_auto_update_summary">每 7 天检查一次。关掉之后只有在这里手动更新，模型能力停在最后一次同步的那份</string>
     <string name="data_section_danger">危险操作</string>

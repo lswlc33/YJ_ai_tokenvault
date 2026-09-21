@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -38,6 +39,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
@@ -738,15 +740,23 @@ fun AppTabRow(
 }
 
 /**
- * chip 的文字样式：在 [MiuixTheme.textStyles.footnote1] 上**钉死行高**。
+ * chip 内容盒的高度下限：`footnote1` 的字号 × 1.5。
  *
- * `footnote1` 只有 13sp、没有行高，行盒就交给实际命中的字体去算 ascent + descent，而中文字体
- * 比拉丁字体高一档：同一排 chip 里真机实测 `1.0M` 是 23px、`推理` 是 27px（@240dpi），于是
- * 强调色那一枚（永远是一串拉丁数字的上下文窗口）看着比旁边矮一截，英文包里反而看不出来。
- * 钉成固定行高之后，一排 chip 的高低只由字号决定，与文字是汉字还是字母无关。
+ * 一排 chip 的高度会不一致，根子在字体而不在颜色：13sp 下拉丁字母的行盒是 24px、汉字是 28px
+ * （汉字字体的 ascent + descent 天生高一档，真机实测 @240dpi）。强调色那一枚永远是一串拉丁
+ * 数字的上下文窗口，所以它总比旁边矮一截，而英文包里整排都是拉丁字母、反而看不出来。
+ *
+ * 只把 `lineHeight` 钉死不管用（实测钉到 18sp 时拉丁那枚仍是 24px，行盒取的是字体的自然
+ * 高度）。所以给内容盒一个统一下限：由字号推出，经 `Density` 折算成 dp，系统放大字号时
+ * 跟着一起放大——写死一个 dp 会在用户调大字号后把 chip 压出裁切。
  */
-private val chipTextStyle: TextStyle
-    @Composable get() = MiuixTheme.textStyles.footnote1.copy(lineHeight = 18.sp)
+private val chipMinContentHeight: Dp
+    @Composable get() = with(LocalDensity.current) {
+        (MiuixTheme.textStyles.footnote1.fontSize * CHIP_CONTENT_HEIGHT_EM).toDp()
+    }
+
+/** 1.5 取自汉字行盒与字号之比（28px ÷ 19.5px ≈ 1.44）再往上取一点余量。 */
+private const val CHIP_CONTENT_HEIGHT_EM = 1.5f
 
 /**
  * 小标签。协议、来源、分组这类一眼扫过的元信息用它，不用它去表达状态（状态走 `StatusDot`）。
@@ -761,14 +771,22 @@ fun AppChip(text: String, modifier: Modifier = Modifier, accent: Boolean = false
         shape = RoundedCornerShape(6.dp),
         color = if (accent) appChipAccentBackgroundColor else appChipBackgroundColor,
     ) {
-        Text(
-            text = text,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-            color = if (accent) appChipAccentTextColor else appChipTextColor,
-            style = chipTextStyle,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        // padding 在外、高度下限在内：下限只约束内容盒，于是每枚 chip 的总高都是
+        // "下限 + 上下 padding"，一排里高矮一致（下限取到汉字那一档，汉字也不会被压扁）。
+        Box(
+            modifier = Modifier
+                .padding(horizontal = 8.dp, vertical = 3.dp)
+                .heightIn(min = chipMinContentHeight),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = text,
+                color = if (accent) appChipAccentTextColor else appChipTextColor,
+                style = MiuixTheme.textStyles.footnote1,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 

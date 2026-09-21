@@ -55,8 +55,13 @@ class DataViewModel constructor(
         /** 那一次清空没写成，库里还是原样。 */
         data object Failed : Event
 
-        /** 目录这一发跑完了（含 304：上游没变也是一次成功的同步）。 */
-        data object CatalogUpdated : Event
+        /**
+         * 目录这一发跑完了。[changed] = false 表示上游回了 304、本地那份就是最新的。
+         *
+         * 这两种必须分开念：`Synced` 的文档写明 304 时说"已更新"会让人以为刚发生了什么，
+         * 而真相是什么都没变（上次更新时间也不会动）。
+         */
+        data class CatalogSynced(val changed: Boolean) : Event
     }
 
     private val _events = Channel<Event>(Channel.BUFFERED)
@@ -106,14 +111,20 @@ class DataViewModel constructor(
     /**
      * 手动更新模型目录。
      *
-     * **只有引擎返回 true 才报"已更新"**：已有一发在跑时 `syncNow` 直接返回 false、那一发
-     * 自己会把进度发出来，这时候再念一句已更新就是在预告一件没发生的事。失败也不在这里
+     * **只有引擎返回 true 才报结果**：已有一发在跑时 `syncNow` 直接返回 false、那一发
+     * 自己会把进度发出来，这时候再念一句就是在预告一件没发生的事。失败也不在这里
      * 报——引擎会把 `CatalogSyncState.Failed` 推给界面，界面那一行自己会变成"更新失败"。
      */
     fun updateCatalogNow() {
         viewModelScope.launch {
             runCatching { catalog.syncNow() }
-                .onSuccess { ran -> if (ran) _events.send(Event.CatalogUpdated) }
+                .onSuccess { ran ->
+                    if (!ran) return@onSuccess
+                    // 跑完那一刻引擎的状态就是这一发的结果。304 与真写进去了要分开念
+                    // （见 [Event.CatalogSynced]）：上游没变时"已更新"是句假话。
+                    val changed = (catalog.state.value as? CatalogSyncState.Synced)?.changed ?: true
+                    _events.send(Event.CatalogSynced(changed))
+                }
         }
     }
 
