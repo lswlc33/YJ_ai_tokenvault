@@ -19,7 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.lc33.tokenvault.screens.model.KeyDetailUiState
-import com.lc33.tokenvault.screens.model.MODEL_PREVIEW_LIMIT
+import com.lc33.tokenvault.screens.model.KEY_MODEL_PREVIEW_LIMIT
 import com.lc33.tokenvault.screens.model.UiModelRow
 import com.lc33.tokenvault.ui.common.StatusDot
 import com.lc33.tokenvault.ui.common.colorOf
@@ -406,7 +406,7 @@ fun KeyDetailScreen(
                         )
                     } else {
                         // 外面这一卡只作名称预览：最多三行，四行以上都去整屏模型页看。
-                        val preview = state.models.take(MODEL_PREVIEW_LIMIT)
+                        val preview = state.models.take(KEY_MODEL_PREVIEW_LIMIT)
                         preview.forEachIndexed { index, model ->
                             // 自动获取的列表不给编辑入口（同供应商详情页）：点开一个
                             // 下次同步就会被覆盖的字段没有意义。
@@ -419,7 +419,11 @@ fun KeyDetailScreen(
                                 key.settings.probeModelReachability && key.settings.probeQuickModel
                             ModelRow(
                                 row = model,
-                                showProbe = key.settings.probeModelReachability,
+                                // 与供应商页那卡同一套样式：协议 chip 与状态点都不画，只剩
+                                // 名字和它下面那行展示名。这一卡是名称参考，状态与能力去
+                                // 整屏模型页看；长按仍然能探测这一行（手势不在样式里）。
+                                showProbe = false,
+                                showProtocol = false,
                                 onClick = if (editable) ({ selectedModel = model }) else null,
                                 // 长按有两种用途，同一时刻只取一种：
                                 // - 开了长按探测（模型可达性 + 快速探测都开）→ 发一次真花钱的探测；

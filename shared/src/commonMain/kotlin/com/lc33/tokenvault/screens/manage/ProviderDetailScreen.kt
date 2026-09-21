@@ -74,7 +74,7 @@ import tokenvault.shared.generated.resources.secret_reveal_cd
 import com.lc33.tokenvault.domain.LoginMethod
 import com.lc33.tokenvault.platform.openExternalUrl
 import com.lc33.tokenvault.domain.Protocol
-import com.lc33.tokenvault.screens.model.MODEL_PREVIEW_LIMIT
+import com.lc33.tokenvault.screens.model.PROVIDER_MODEL_PREVIEW_LIMIT
 import com.lc33.tokenvault.screens.model.ProviderDetailUiState
 import com.lc33.tokenvault.screens.model.UiKeyRow
 import com.lc33.tokenvault.screens.model.UiModelRow
@@ -873,7 +873,7 @@ private fun KeyCard(
         } else {
             // 预览三行，默认就摊开：这一卡只作名称参考，要看全的进整屏模型页。
             // 这家有几把 Key 就是几份预览，封顶三行才不会把页面拉到好几屏。
-            val preview = models.take(MODEL_PREVIEW_LIMIT)
+            val preview = models.take(PROVIDER_MODEL_PREVIEW_LIMIT)
             Column {
                 preview.forEachIndexed { index, model ->
                     ModelRow(

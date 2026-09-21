@@ -47,6 +47,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.BasicComponentDefaults
@@ -147,6 +148,23 @@ val appChipBackgroundColor: Color
 
 val appChipTextColor: Color
     @Composable get() = MiuixTheme.colorScheme.onSecondaryContainer
+
+/** 强调档小标签的底色与字色：与 [appChipBackgroundColor] 同一套容器色，只是换了主色。 */
+val appChipAccentBackgroundColor: Color
+    @Composable get() = MiuixTheme.colorScheme.primaryContainer
+
+val appChipAccentTextColor: Color
+    @Composable get() = MiuixTheme.colorScheme.onPrimaryContainer
+
+/**
+ * preference 行内容相对容器左缘的那道缩进。
+ *
+ * 自定义内容（chip 一类的非行组件）要和同一容器里的 [AppValueRow] / [AppBasicRow] 对齐
+ * 时用它，而不是再抄一个字面量 16dp——MIUIX 那些行的内边距来自
+ * [BasicComponentDefaults.InsideMargin]，抄的字面量哪天改主题就错开了。
+ */
+val appRowInset: Dp
+    @Composable get() = BasicComponentDefaults.InsideMargin.calculateLeftPadding(LayoutDirection.Ltr)
 
 val appTrackColor: Color
     @Composable get() = MiuixTheme.colorScheme.surfaceContainerHigh
@@ -717,18 +735,23 @@ fun AppTabRow(
     }
 }
 
-/** 小标签。协议、来源、分组这类一眼扫过的元信息用它，不用它去表达状态（状态走 `StatusDot`）。 */
+/**
+ * 小标签。协议、来源、分组这类一眼扫过的元信息用它，不用它去表达状态（状态走 `StatusDot`）。
+ *
+ * [accent] 只给"这一排里最该先看到的那一枚"用（模型行上的上下文窗口就是），一排放两枚
+ * 强调色就等于没有强调。
+ */
 @Composable
-fun AppChip(text: String, modifier: Modifier = Modifier) {
+fun AppChip(text: String, modifier: Modifier = Modifier, accent: Boolean = false) {
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(6.dp),
-        color = appChipBackgroundColor,
+        color = if (accent) appChipAccentBackgroundColor else appChipBackgroundColor,
     ) {
         Text(
             text = text,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-            color = appChipTextColor,
+            color = if (accent) appChipAccentTextColor else appChipTextColor,
             style = MiuixTheme.textStyles.footnote1,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

@@ -60,6 +60,7 @@ import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.AppTopBar
 import com.lc33.tokenvault.ui.miuix.AppValueRow
+import com.lc33.tokenvault.ui.miuix.appRowInset
 import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
 import com.lc33.tokenvault.ui.miuix.appTopBarScroll
 import com.lc33.tokenvault.ui.miuix.rememberAppTextFieldState
@@ -103,7 +104,6 @@ import tokenvault.shared.generated.resources.keymodels_group_by_none
 import tokenvault.shared.generated.resources.keymodels_group_other
 import tokenvault.shared.generated.resources.keymodels_matched
 import tokenvault.shared.generated.resources.keymodels_meta_capabilities
-import tokenvault.shared.generated.resources.keymodels_meta_context
 import tokenvault.shared.generated.resources.keymodels_meta_cutoff
 import tokenvault.shared.generated.resources.keymodels_meta_output
 import tokenvault.shared.generated.resources.keymodels_meta_released
@@ -526,7 +526,9 @@ private fun GroupCard(
             ) {
                 AppText(
                     text = groupTitle(group),
-                    style = AppTextStyle.Subtitle,
+                    // 组头要比模型名大：它是"这一组"的名字，而模型名只是组里的条目。
+                    // Subtitle 在 Miuix 的字号表里比 Body 还小，用它就等于组头比条目还轻。
+                    style = AppTextStyle.Title,
                     // 族名可能是整个模型 id 前缀，长起来没边；不给 maxLines 就会把
                     // 组头撑成两行，与右边那个数字和箭头不在一条基线上。
                     maxLines = 1,
@@ -717,25 +719,33 @@ private fun ModelDetailSheet(row: UiModelCardRow?, nowMs: Long, onDismiss: () ->
         val meta = row?.meta
         val summary = row?.let { probeSummary(it, nowMs) }
         // 第一块是"这一把 Key 上它到底怎么样"：状态点 + 最近探测。探测过没有比目录里
-        // 那几项二手资料更要紧，排在厂商与上下文之前。
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            row?.let {
-                StatusDot(color = colorOf(it.health), label = labelOf(it.health))
-            }
-            if (summary != null) {
-                AppText(
-                    text = summary,
-                    style = AppTextStyle.Footnote,
-                    color = appSecondaryTextColor,
-                    maxLines = 1,
-                )
+        // 那几项二手资料更要紧，排在厂商与描述之前。没探测过又没有摘要时整块不画——
+        // 弹层顶上悬一句「未探测」，跟列表行里刚撤掉的那个标志是同一个东西。
+        val probed = row != null && row.health != UiHealth.Unknown
+        if (probed || summary != null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = appRowInset),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (probed && row != null) {
+                    StatusDot(color = colorOf(row.health), label = labelOf(row.health))
+                }
+                if (summary != null) {
+                    AppText(
+                        text = summary,
+                        style = AppTextStyle.Footnote,
+                        color = appSecondaryTextColor,
+                        maxLines = 1,
+                    )
+                }
             }
         }
-        CapabilityChips(meta)
+        // chip 与下面的属性行左缘对齐：那些行自带 BasicComponent 的 16dp 内缩，弹层又已经
+        // 给过一次 screenPadding，chip 不缩就比属性行整段往左凸一截。
+        CapabilityChips(meta, modifier = Modifier.padding(start = appRowInset))
         if (meta == null) {
             // 没挂上目录就说清楚"没有数据"，而不是画一片空白让用户以为加载失败。
             AppText(
@@ -753,9 +763,8 @@ private fun ModelDetailSheet(row: UiModelCardRow?, nowMs: Long, onDismiss: () ->
             meta.vendorName?.let {
                 AppValueRow(title = stringResource(Res.string.keymodels_meta_vendor), value = it)
             }
-            meta.context?.let {
-                AppValueRow(title = stringResource(Res.string.keymodels_meta_context), value = it)
-            }
+            // 上下文不在这里重复：它已经是能力 chip 那一排的第一枚（强调色），一行里给两次
+            // 同一个数，第二次还排在厂商下面，读起来像两个不同的东西。
             meta.output?.let {
                 AppValueRow(title = stringResource(Res.string.keymodels_meta_output), value = it)
             }
@@ -779,9 +788,14 @@ private fun ModelDetailSheet(row: UiModelCardRow?, nowMs: Long, onDismiss: () ->
     }
 }
 
-/** 能力 chip：列表行与详情弹层共用，两边同一批开关，改一处两处一起变。 */
+/**
+ * 能力 chip：列表行与详情弹层共用，两边同一批开关，改一处两处一起变。
+ *
+ * 上下文那枚排在最前并且用强调色——它是配客户端时第一个要看的数（"这一轮塞不塞得下"），
+ * 而推理/看图那些是"能不能"。一排里只强调这一枚，两枚强调色就等于没有强调。
+ */
 @Composable
-private fun CapabilityChips(meta: UiModelMeta?) {
+private fun CapabilityChips(meta: UiModelMeta?, modifier: Modifier = Modifier) {
     if (meta == null) return
     val caps = buildList {
         if (meta.reasoning) add(Res.string.keymodels_cap_reasoning)
@@ -793,15 +807,16 @@ private fun CapabilityChips(meta: UiModelMeta?) {
         if (meta.structuredOutput) add(Res.string.keymodels_cap_structured)
         if (meta.openWeights) add(Res.string.keymodels_cap_open_weights)
     }
-    if (caps.isEmpty()) return
+    if (caps.isEmpty() && meta.context == null) return
     // FlowRow 而不是横向滚动的 LazyRow：chip 文案本地化后长短不一，滚动能一眼看见的
     // 只有头两三枚，"这个模型到底会几样"反而要用户横扫才知道。换行多出来的行高换来
     // 的是这一页真正要给的信息。
     FlowRow(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
+        meta.context?.let { AppChip(text = it, accent = true) }
         caps.forEach { label -> AppChip(text = stringResource(label)) }
     }
 }
