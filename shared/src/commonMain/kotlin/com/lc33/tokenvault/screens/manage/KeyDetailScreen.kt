@@ -2,6 +2,7 @@ package com.lc33.tokenvault.screens.manage
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -365,9 +366,15 @@ fun KeyDetailScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = tokens.screenPadding),
+                    // 左右内边距交给行自己（preference 行本来就带 16dp 内缩），卡片这层只留
+                    // 上下：不然按下某一行时那块高亮比文字宽出一截，分隔线也两端各短一段。
+                    // 与整屏模型页那张卡同一个做法。
+                    insideMargin = PaddingValues(vertical = tokens.screenPadding),
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = tokens.screenPadding),
                         horizontalArrangement = Arrangement.spacedBy(tokens.itemSpacing),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -402,7 +409,10 @@ fun KeyDetailScreen(
                             ),
                             style = AppTextStyle.Secondary,
                             color = appSecondaryTextColor,
-                            modifier = Modifier.padding(top = tokens.itemSpacing),
+                            modifier = Modifier.padding(
+                                horizontal = tokens.screenPadding,
+                                vertical = tokens.itemSpacing,
+                            ),
                         )
                     } else {
                         // 外面这一卡只作名称预览：最多三行，四行以上都去整屏模型页看。
