@@ -1,5 +1,11 @@
 package com.lc33.tokenvault.screens.manage
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -14,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -157,6 +164,12 @@ fun KeyModelsScreen(
     onDeleteModel: (Long) -> Unit,
 ) {
     val scrollState = rememberAppTopBarScrollState()
+    val listState = rememberLazyListState()
+    // 搜索框跟着滚动收放：往下滚（顶栏同时折叠）就收，回到顶部就回来。信号取"列表还能
+    // 不能往上滚"而不是顶栏的折叠比例——同一个手势驱动，而页面不必去碰 MIUIX 的
+    // scrollBehavior（那道 import 边界是刻意留的）。用 AnimatedVisibility 而不是直接
+    // 不画：一帧之间少掉 50dp，读起来像列表跳了一下。
+    val searchVisible = !listState.canScrollBackward
     val tokens = LocalAppTokens.current
     val searchState = rememberAppTextFieldState(state.query)
     var editing by remember { mutableStateOf<UiModelCardRow?>(null) }
@@ -190,6 +203,7 @@ fun KeyModelsScreen(
         },
     ) { padding ->
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .appTopBarScroll(scrollState),
@@ -199,14 +213,22 @@ fun KeyModelsScreen(
             item { Spacer(modifier = Modifier.height(tokens.itemSpacing)) }
 
             item {
-                AppSearchField(
-                    state = searchState,
-                    hint = stringResource(Res.string.keymodels_search),
-                    onValueChange = onQueryChange,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = tokens.screenPadding),
-                )
+                AnimatedVisibility(
+                    visible = searchVisible,
+                    // 回来比收起稍慢一点：收是"让位给列表"，快一点不挡路；放是"东西又
+                    // 出现了"，突然弹出来最刺眼。
+                    enter = expandVertically(tween(220)) + fadeIn(tween(220)),
+                    exit = shrinkVertically(tween(180)) + fadeOut(tween(120)),
+                ) {
+                    AppSearchField(
+                        state = searchState,
+                        hint = stringResource(Res.string.keymodels_search),
+                        onValueChange = onQueryChange,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = tokens.screenPadding),
+                    )
+                }
             }
 
             item {
