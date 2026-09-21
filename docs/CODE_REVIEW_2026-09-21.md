@@ -1,10 +1,13 @@
 # 全面复查报告 · 2026-09-21
 
 范围：`master` 全仓（483 个跟踪文件，约 10.4 万行 Kotlin），起点 `44244a6`。
-本轮 14 个提交（`0a66305`…`24a2470`），41 个文件、+719/−294。
+本轮 16 个提交（`0a66305`…`cb8e3b7`），45 个文件。
 
 四个维度分开看：**UI 布局**、**代码逻辑**、**整洁性 / 一致性**、**用户操作路径**（模拟真实点击序列找没兜住的地方）。
 凡是能自己判定对错的都直接改了；需要真机目测、需要产品决策、或改动面大于本轮可验证范围的，列在第三节，逐条写了触发路径与建议。
+
+> 报告初稿写完之后又补了两个（原本列在第三节）：**探测轮次卡在「正在请求 N/M」** = `cb8e3b7`，
+> **低额阈值没有出口** = `99ad87a`。第三节里对应两条已标注。
 
 ---
 
@@ -37,6 +40,8 @@
 | `168c752` | WebDAV `saveConfig` 五项写入分开提交：中途失败留下"地址换了、密码没换"的半份配置 → `hasCredentials` false、同步页三行一起变灰说不出原因、报出来的是一条通用失败。收进一个事务（审计留在事务外，日志写不进去不该回滚用户刚填的配置） |
 | `e533825` | 同步页：灰掉那三行的是**六个**动作共用的一个 busy 位，而解释那句只挂在"检查连接"一档（2026-09 那条反馈只补了拉列表）→ 上传/恢复/删除远端跑起来时照样一片灰、一个字不说。补中性提示。<br>「立即备份」与本地「导出」在恢复进行中没有任何闸：OVERWRITE 恢复是"先清库再写回"，中途导出的是一份**写了一半的库**，而提示只会说"已导出"。两处按 busy 置灰<br>Key 编辑页提交的早退里带了 `protocols.isEmpty()`，把 VM 里同一条判断和它已经渲染的报错挡在调用之前 → 老备份恢复出来的空协议 Key 改个名字按 ✓ 什么都不发生 |
 | `0a66305` | 阈值校验放过 `Infinity` / `NaN`（`toDoubleOrNull` 认这两个，老代码只判 `< 0.0`）：存成 NaN 后每次低额比较恒为 false，这一档永不报警；存成 Infinity 则全都报警。补 `isFinite`；报错也不再一路红到退页——逐格判断、改动输入即收回 |
+| `cb8e3b7` | 探测轮次：`_progress` 从此在任何出口都被摘掉（不再永久「正在请求 N/M」），收尾那一段失败也一定 `finishRun`，进行中给「查看明细」入口（停止按钮只在那一页），`cancel()` 对已死轮次也清进度；`observeLatest` 不再把半截行显示成「上次探测：刚刚 · 共 0 项」 |
+| `99ad87a` | 「余额低额阈值」补上唯一的出口：余额卡上那句「N 家余额低于提醒阈值」（数据早就在 `DashboardUiState.attention` 里，只是没有任何界面读它） |
 | `dd04de0` | 供应商详情页 `items(state.keys.size)` 没给 key，而 `KeyCard` 的展开态是 `remember(row.id)` → 删一把密钥后每张卡继承前一张的展开/收起，某张不相干的卡突然摊开一屏模型 |
 
 ### 整洁性 / 一致性
@@ -79,12 +84,12 @@
 - 为什么没动：要给 `BalanceHistoryDao` 加一个按 provider 取行的查询，并在同一个撤销事务里重插（涉及主键与 dedup 语义）。可以测，但属于"再一轮独立改动"。
 - 建议：快照集合必须与级联集合对齐——这条值得写成一条测试固定住。
 
-**4. 探测轮次在已兜底的块之外抛异常 → 永久"正在请求 N/M"，还留一条假的完成记录**
+**4. ~~探测轮次在已兜底的块之外抛异常 → 永久"正在请求 N/M"，还留一条假的完成记录~~ 已修 `cb8e3b7`**
 - 位置：`ProbeEngine.kt:788-909`（`_progress` 置位之后、`try` 之前）与 `:1086-1121`（收尾之后的 `applyDiscovered` / `refreshModelsInner`）都在 `catch (Throwable)` 之外；`cancel()`（`:754-757`）根本不碰 `_progress`。引擎 scope 的 `ScopeCrashGuard` 会把冒出来的人吞掉（空 handler），所以现场是"界面停在进度上，日志安静"。
 - 后果 A：`_progress` 永远非空 → 仪表盘一直显示「正在请求 N/M · host」，而且"查看明细"在 `lastRun != null && progress == null` 条件下被隐藏，用户连停止按钮都点不到；只有杀进程能清。
 - 后果 B：抛在 `runRepository.insert` 之前 → `probe_runs` 留一条 `finishedAt = null`，`ProbeRun.toSummary()`（`UiMapping.kt:581-583`）把它映射成 `finishedAt = startedAt`、总数 0/成功 0/失败 0 →「上次探测：刚刚 · 共 0 项」，一轮从没跑过的"已完成"。
-- 为什么没动：`ProbeEngine` 1390 行、本轮唯一能证伪它的 `:shared:jvmTest` 路径又依赖模拟器/真机时序（已知 deferred：`ProbeEngine` 没有单测）。这一改要同时动 `runRound` 结构与 cancel 语义。
-- 建议：把整个 `runRoundInner` 包进同一层 `try/catch(Throwable) { NonCancellable finishRun }`；`cancel()` 在 `currentJob` 已不活时把 `_progress` 清成 null；`toSummary()` 对 `finishedAt == null` 要说"中断"而不是"刚刚完成"。
+- 补一句当时没写全的：**这个死态不止在异常时才有**。「停止探测」这个按钮只在明细页里，而仪表盘进行中的那一轮恰恰不给进入口，顶栏刷新又不会取消正在跑的轮次——所以每一轮跑起来的一百多秒里用户都没有停止这条路。
+- 修法：`runRound` 兜住所有出口（摘进度 + 记 ERROR），收尾那一段单独 `runCatching` 保证 `finishRun` 一定执行，进行中也给「查看明细」，`cancel()` 在没有活轮次时清进度，`observeLatest` 只回已结案的行。仍需真机验证：跑一轮中途强杀进程，看下次进来「上次探测」是不是上一轮而不是"刚刚 0 项"。
 
 **5. `BootCorrupt` 唯一的出路仍是「清空重来」**
 - 现状：`AppRoot.kt:74` 仍传 `onRestoreFromBackup = {}`、`LockCallbacks.restoreFromBackupEnabled` 默认 false，所以那一行是灰的——但已经会说明为什么灰（`boot_corrupt_restore_unavailable`），清空也有二次确认。
@@ -93,10 +98,10 @@
 
 ### P2 · 会误导用户，但不毁数据
 
-**6. 「余额低额阈值」这一整页设置目前没有任何可见效果**
-- `attentionItemsOf(...)` 是唯一读 `observeBalanceThresholds()` 的地方，结果落在 `DashboardUiState.attention`，而**没有任何 composable 读 `.attention`**（`ui/common/HealthVisuals.kt:55-58` 那个 `AttentionKind` 标签函数也没人用）。设了 ¥30、余额掉到 ¥5，界面上不会有任何一处提到它。
-- 上一轮删掉总览"需要处理"那块卡时，留下了入口和数据、拿走了出口。本轮 `0a66305` 只把这一页本身的错修了（校验 + 报错残留），没决定它该不该存在。
-- 建议：要么把"需要处理"接回总览（数据都还在），要么撤掉这一页 + `attentionItemsOf` 那条链，别留半条。
+**6. ~~「余额低额阈值」这一整页设置目前没有任何可见效果~~ 已修 `99ad87a`**
+- `attentionItemsOf(...)` 是唯一读 `observeBalanceThresholds()` 的地方，结果落在 `DashboardUiState.attention`，而**没有任何 composable 读 `.attention`**（`ui/common/HealthVisuals.kt:53-58` 那个 `messageOf` 四档文案也没人用）。设了 ¥30、余额掉到 ¥5，界面上不会有任何一处提到它。
+- 上一轮删掉总览"需要处理"那块卡时，留下了入口和数据、拿走了出口。本轮 `0a66305` 先修了这一页本身的错（校验 + 报错残留），随后 `99ad87a` 补上出口：余额卡上多一句「N 家余额低于提醒阈值」，摆在已有的「N 个供应商的余额查询失败」旁边。不新开卡也不新开页。
+- 仍然待定的两半：另外三档（密钥被拒 / 客户端被拦 / 配置错）现在还是没有出口，`messageOf` 也没人用；这一句只报数不报名，"是哪几家"要去管理页对着数字看。要不要把"需要处理"整块接回来，归他定。
 
 **7. `https://user:pass@host/v1` 会被接受，口令进明文列**
 - `EndpointNormalizer.kt:106-108`：`hostPort = afterScheme.substringBefore('/')` 会带上 `userinfo@` 前缀，而校验只查空/查询/fragment。
@@ -158,5 +163,7 @@
 
 - 每个提交都独立过了 `:app:compileDebugKotlin :app:testDebugUnitTest`（pre-commit 钩子），本轮另跑 `:shared:jvmTest`（`DiGraphSmokeTest` 能抓 Koin 图问题，新增的 `ProbeEngine` 构造参数就是靠它兜的）、`:app:lint`（通过）、`:shared:compileCommonMainKotlinMetadata`（iOS 缺口的本地代理，只剩已知的 Room `VaultDatabaseConstructor` 那一条，说明新代码没有再引入 JVM-only API）。
 - 新增单测 7 条：阈值 `Infinity`/`NaN` 校验 3 条（`BalanceThresholdParseTest`）、new-api 换算比与商溢出 3 条（`BalanceAdapterTest`）、报告单点不报变化 1 条（`UsageReportAggregatorTest`）。
+- CI（GitHub Actions）在报告提交 `dd4fd45` 上三个 job 全绿：`build`、`ios`、`release`。这一条尤其有意义，因为它是 `compileCommonMainKotlinMetadata` 那个本地代理的确认——本轮新增的 commonMain 代码在 iOS 目标上真编得过。最后两个提交（`cb8e3b7`、`99ad87a`）的 CI 在写这份报告时还在跑。
 - **没有做的验证**：真机/模拟器目测。所以第三节的 P2-10（LogScreen 底栏发黑）、P3-11（进模型页的实际卡顿程度）都只到"读代码可判定"这一步；上面所有布局类修复的视觉效果同样需要他上手看一眼——尤其是关键词页那两个并排按钮、弹层可滚之后的矮弹层外观、以及对话框按钮从"被顶出屏幕"变成"钉在底部"。
+- `cb8e3b7` 特别需要一次真机验证：跑一轮探测，中途强杀进程，再进来对一眼「上次探测」是不是上一轮而不是"刚刚 · 共 0 项"；以及进行中点「查看明细」→「停止探测」是不是真能把那一行字清掉。`ProbeEngine` 依然没有单测（第三节 P3 那条已知欠账），这四处改动是靠读代码 + 全绿回归推出来的，不是被测出来的。
 - 上一轮的两条有意保留项仍然有效（本轮不动）：自动轮次每把 Key 仍发 protocols+1 个 GET；v8 迁移仍按最小 `id` 选存活行。
