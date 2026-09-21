@@ -3,13 +3,10 @@ package com.lc33.tokenvault.domain
 import com.lc33.tokenvault.domain.model.AiModel
 import com.lc33.tokenvault.domain.model.CatalogModel
 
-/** 分组方式。每一项都要在 `string-array` 里有同序的一条，见 `ArchitectureRulesTest`。 */
+/** 分组方式。每一项都要在页面的分组 tab 里有同序的一条，见 `GroupByTabs`。 */
 enum class ModelGroupBy {
     /** 按模型名前缀归族（[ModelFamily]）。默认。 */
     FAMILY,
-
-    /** 按来源：手动录入 / 自动发现。 */
-    SOURCE,
 
     /** 不分组，一整列。 */
     NONE,
@@ -93,12 +90,6 @@ fun listModels(
     val groups = when (groupBy) {
         ModelGroupBy.NONE ->
             listOf(ModelGroup(key = "", titleKey = "", rows = sorted(kept, sort)))
-
-        ModelGroupBy.SOURCE -> kept
-            // 组头按"手动在前"排：这一档下用户多半是来找自己填的那几个的。
-            .groupBy { if (it.model.source == ModelSource.MANUAL) "manual" else "discovered" }
-            .map { (key, rows) -> ModelGroup(key = key, titleKey = key, rows = sorted(rows, sort)) }
-            .sortedBy { it.key }
 
         ModelGroupBy.FAMILY -> kept
             .groupBy { ModelFamily.keyOf(it.model.modelId) }

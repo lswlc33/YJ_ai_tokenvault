@@ -100,7 +100,6 @@ import tokenvault.shared.generated.resources.keymodels_filter_unmatched
 import tokenvault.shared.generated.resources.keymodels_filter_vision
 import tokenvault.shared.generated.resources.keymodels_group_by_family
 import tokenvault.shared.generated.resources.keymodels_group_by_none
-import tokenvault.shared.generated.resources.keymodels_group_by_source
 import tokenvault.shared.generated.resources.keymodels_group_other
 import tokenvault.shared.generated.resources.keymodels_matched
 import tokenvault.shared.generated.resources.keymodels_meta_capabilities
@@ -121,8 +120,6 @@ import tokenvault.shared.generated.resources.keymodels_sort_asc
 import tokenvault.shared.generated.resources.keymodels_sort_context
 import tokenvault.shared.generated.resources.keymodels_sort_desc
 import tokenvault.shared.generated.resources.keymodels_sort_probed
-import tokenvault.shared.generated.resources.keymodels_source_discovered
-import tokenvault.shared.generated.resources.keymodels_source_manual
 import tokenvault.shared.generated.resources.keymodels_summary
 import tokenvault.shared.generated.resources.keymodels_summary_all
 import tokenvault.shared.generated.resources.keymodels_summary_empty
@@ -425,10 +422,11 @@ private fun GroupByTabs(
     onGroupBy: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // Tab 顺序与 ModelGroupBy 声明序一致（FAMILY / SOURCE / NONE）——onGroupBy 按下标取值。
+    // Tab 顺序与 ModelGroupBy 声明序一致（FAMILY / NONE）——onGroupBy 按下标取值。
+    // 没有"按来源"那一档：一把 Key 的模型来源是同一个（自动获取是个开关，不是逐行的
+    // 属性），按来源分组最多分出两堆，那一堆里还是同一种行。
     val tabs = listOf(
         stringResource(Res.string.keymodels_group_by_family),
-        stringResource(Res.string.keymodels_group_by_source),
         stringResource(Res.string.keymodels_group_by_none),
     )
     AppTabRow(tabs = tabs, selectedIndex = groupBy.ordinal, onSelect = onGroupBy, modifier = modifier)
@@ -575,16 +573,11 @@ private fun GroupCard(
 }
 
 /**
- * 组标题。
- *
- * 来源分组的键是语义键（`manual`/`discovered`），要翻成资源串；族分组的标题是
- * ViewModel 已经算好的展示名（目录厂商名，或首字母大写的族键），原样画。
- * 族键为 `other` 时用那句"其他"——空 id、纯符号的兜底组。
+ * 组标题。族分组的标题是 ViewModel 已经算好的展示名（目录厂商名，或首字母大写的族键），
+ * 原样画；族键为 `other` 时用那句"其他"——空 id、纯符号的兜底组。
  */
 @Composable
 private fun groupTitle(group: UiModelGroup): String = when (group.key) {
-    "manual" -> stringResource(Res.string.keymodels_source_manual)
-    "discovered" -> stringResource(Res.string.keymodels_source_discovered)
     "other" -> stringResource(Res.string.keymodels_group_other)
     else -> group.title
 }
@@ -607,12 +600,16 @@ private fun ModelRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            // 行间要有呼吸：能力 chip 摊开之后一行两到三行高，不给上下留白时下一行的
+            // 名字直接顶在上一行的 chip 底下，整张卡读起来是一坨而不是一行一行。
+            .padding(vertical = tokens.itemSpacing)
             .combinedClickable(
                 onClick = onOpenDetail,
                 // 长按沿用 Key 详情页那行的口径：开了快速探测就探测这一行，否则复制
                 // id。菜单撤掉之后，这是自动发现列表上唯一一行动作入口。
                 onLongClick = if (row.quickProbe) onProbe else onCopy,
             ),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -628,7 +625,11 @@ private fun ModelRow(
             )
             // 协议 chip 不画：这一页的主语是模型 id，而一把 Key 的模型几乎全走同一个端点
             // （同一家的模型都走那一个端点），它占的宽度正是 id 被截的地方。
-            StatusDot(color = colorOf(row.health), label = labelOf(row.health))
+            // 探测过才画状态点：「未探测」不是这一行的属性，是"还没有这一项"，而每行都
+            // 挂一句就把右边那条边常年占住——模型名正是被这里挤没的。
+            if (row.health != UiHealth.Unknown) {
+                StatusDot(color = colorOf(row.health), label = labelOf(row.health))
+            }
             // 三个点只在手动列表给：自动发现的行没有可编辑的东西（改一个下次同步就覆盖），
             // 复制与探测收到长按上，一行里就不再常驻一个图标。
             if (editable) {
@@ -648,13 +649,11 @@ private fun ModelRow(
         // 能力可看，那一档下"点开看能力"对它不成立。
         CapabilityChips(row.meta)
 
-        // 脚注行只在真有事要说时画。来源不再逐行标：整页都是同一个来源，要按来源看
-        // 用「按来源」分组；「还没探测过」也不再标——那是没有结果，不是一个结果。
+        // 脚注行只在真有事要说时画。来源不逐行标：自动获取是 Key 级开关，一整页都是同一个
+        // 来源；「还没探测过」也不标（探测过没有由上面那个状态点代表）——那是没有结果。
         if (summary != null || row.unmatched) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 4.dp),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {

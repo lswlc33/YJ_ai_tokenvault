@@ -255,9 +255,6 @@ class KeyModelsViewModel constructor(
                     key = group.key,
                     title = when (opts.groupBy) {
                         ModelGroupBy.NONE -> ""
-                        // 来源分组的组键是 "manual"/"discovered"，是**语义键**不是文案：
-                        // 页面拿它去资源里取那一句，所以这里原样传下去。
-                        ModelGroupBy.SOURCE -> group.key
                         ModelGroupBy.FAMILY -> ModelFamily.displayOfKey(group.key, vendors[group.key])
                     },
                     collapsed = group.key in opts.collapsed,

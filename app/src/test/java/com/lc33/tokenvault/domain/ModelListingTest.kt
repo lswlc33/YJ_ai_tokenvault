@@ -135,21 +135,6 @@ class ModelListingTest {
     }
 
     @Test
-    fun `按来源分组时手动那一组在前`() {
-        val withManual = models + model(8, "hand-typed-one", source = ModelSource.MANUAL)
-        val groups = listModels(
-            models = withManual,
-            catalogByKey = catalogByKey,
-            groupBy = ModelGroupBy.SOURCE,
-            sort = ModelSort.NAME_ASC,
-            filter = ModelFilter.ALL,
-            query = "",
-        ).groups
-        assertEquals(listOf("discovered", "manual"), groups.map { it.key })
-        assertEquals(listOf("hand-typed-one"), groups.last().rows.map { it.model.modelId })
-    }
-
-    @Test
     fun `不分组时是一整列`() {
         val groups = listing(groupBy = ModelGroupBy.NONE).groups
         assertEquals(1, groups.size)

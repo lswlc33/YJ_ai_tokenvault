@@ -842,7 +842,6 @@
     <string name="keymodels_filter_unmatched">未知模型</string>
     <string name="keymodels_group_by_none">不分组</string>
     <string name="keymodels_group_by_family">按家族</string>
-    <string name="keymodels_group_by_source">按来源</string>
     <string name="keymodels_sort_asc">名称 ↑</string>
     <string name="keymodels_sort_desc">名称 ↓</string>
     <string name="keymodels_sort_context">按上下文</string>
@@ -856,8 +855,6 @@
     <string name="keymodels_catalog_never">模型目录还没下载过，能力信息暂不可用。</string>
     <string name="keymodels_catalog_update">更新目录</string>
     <string name="keymodels_catalog_failed">目录更新失败，原因见日志。</string>
-    <string name="keymodels_source_manual">手动</string>
-    <string name="keymodels_source_discovered">自动发现</string>
     <string name="keymodels_unmatched">未知模型</string>
     <string name="keymodels_meta_context">上下文</string>
     <string name="keymodels_meta_output">最大输出</string>
