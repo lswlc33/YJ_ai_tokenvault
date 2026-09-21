@@ -1,10 +1,5 @@
 package com.lc33.tokenvault.screens.manage
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -43,8 +38,7 @@ import tokenvault.shared.generated.resources.detail_model_id
 import tokenvault.shared.generated.resources.detail_model_protocol
 import tokenvault.shared.generated.resources.detail_models_empty_auto
 import tokenvault.shared.generated.resources.detail_models_empty_manual
-import tokenvault.shared.generated.resources.detail_models_expand_cd
-import tokenvault.shared.generated.resources.detail_models_collapse_cd
+import tokenvault.shared.generated.resources.detail_models_open_all
 import tokenvault.shared.generated.resources.detail_models_count_short
 import tokenvault.shared.generated.resources.detail_models_section
 import tokenvault.shared.generated.resources.detail_provider_balance_total
@@ -80,6 +74,7 @@ import tokenvault.shared.generated.resources.secret_reveal_cd
 import com.lc33.tokenvault.domain.LoginMethod
 import com.lc33.tokenvault.platform.openExternalUrl
 import com.lc33.tokenvault.domain.Protocol
+import com.lc33.tokenvault.screens.model.MODEL_PREVIEW_LIMIT
 import com.lc33.tokenvault.screens.model.ProviderDetailUiState
 import com.lc33.tokenvault.screens.model.UiKeyRow
 import com.lc33.tokenvault.screens.model.UiModelRow
@@ -137,6 +132,8 @@ fun ProviderDetailScreen(
     onCurlImport: () -> Unit,
     onManualAddKey: () -> Unit,
     onOpenKey: (Long) -> Unit,
+    /** 某一把 Key 的整屏模型页。外面那三行只是名称预览。 */
+    onOpenKeyModels: (Long) -> Unit,
     onProbeAll: () -> Unit,
     onRefreshKeyModels: (Long) -> Unit,
     onAddModel: (Long, String, Protocol) -> Unit,
@@ -254,6 +251,7 @@ fun ProviderDetailScreen(
                         models = state.models.filter { it.keyId == row.id },
                         nowMs = state.nowMs,
                         onOpen = { onOpenKey(row.id) },
+                        onOpenAllModels = { onOpenKeyModels(row.id) },
                         onRefreshModels = { onRefreshKeyModels(row.id) },
                         onAddModel = { addModelKeyId = row.id },
                         onEditModel = { editingModel = it },
@@ -802,6 +800,8 @@ private fun KeyCard(
     models: List<UiModelRow>,
     nowMs: Long,
     onOpen: () -> Unit,
+    /** 进这一把 Key 的整屏模型页（分组、搜索、能力、逐行增删改都在那一页）。 */
+    onOpenAllModels: () -> Unit,
     onRefreshModels: () -> Unit,
     onAddModel: () -> Unit,
     onEditModel: (UiModelRow) -> Unit,
@@ -809,9 +809,6 @@ private fun KeyCard(
     val tokens = LocalAppTokens.current
     // 自动获取：列表由探测/同步维护，不给编辑入口；手动列表才可点进编辑。
     val autoModels = row.settings.probeModels
-    // 模型列表默认收起。这家有几把 Key 就是几份列表，全展开会把页面拉到好几屏，
-    // 而"有哪些模型"在多数时候不是打开这一页要办的事。收起态给出数量，知道里面有多少。
-    var modelsExpanded by remember(row.id) { mutableStateOf(false) }
     AppCard(
         modifier = Modifier
             .fillMaxWidth()
@@ -837,7 +834,8 @@ private fun KeyCard(
                 text = stringResource(Res.string.detail_models_section),
                 style = AppTextStyle.Subtitle,
             )
-            if (models.isNotEmpty() && !modelsExpanded) {
+            // 总数一直在：这一卡只预览前三行，不报总数的话"看到三行"会被当成"只有三个"。
+            if (models.isNotEmpty()) {
                 AppText(
                     text = stringResource(Res.string.detail_models_count_short, models.size),
                     style = AppTextStyle.Footnote,
@@ -853,19 +851,7 @@ private fun KeyCard(
                 ),
                 onClick = if (autoModels) onRefreshModels else onAddModel,
             )
-            if (models.isNotEmpty()) {
-                AppIconButton(
-                    icon = if (modelsExpanded) AppIcon.Collapse else AppIcon.Expand,
-                    contentDescription = stringResource(
-                        if (modelsExpanded) {
-                            Res.string.detail_models_collapse_cd
-                        } else {
-                            Res.string.detail_models_expand_cd
-                        },
-                    ),
-                    onClick = { modelsExpanded = !modelsExpanded },
-                )
-            }
+            // 没有展开/收起按钮：预览封顶三行，多出来的都在整屏模型页，收起来也还是看不见。
         }
 
         if (models.isEmpty()) {
@@ -885,30 +871,31 @@ private fun KeyCard(
                 ),
             )
         } else {
-            // 展开/收起给高度过渡：列表可能有几十行，一帧跳开会让人分不清是"展开了"
-            // 还是"页面被替换了"。同时淡入淡出——只滑高度的话，收起时文字会被裁着走。
-            AnimatedVisibility(
-                visible = modelsExpanded,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut(),
-            ) {
-                Column {
-                    models.forEachIndexed { index, model ->
-                        ModelRow(
-                            row = model,
-                            // 这一页不重复模型的可达性与协议：协议同一家的模型几乎全一样，
-                            // 可达性没有 Key 页的探测入口，摆在这里都是只看不动的字。
-                            showProbe = false,
-                            showProtocol = false,
-                            onClick = if (autoModels) null else ({ onEditModel(model) }),
-                        )
-                        if (index != models.lastIndex) {
-                            AppDivider()
-                        }
+            // 预览三行，默认就摊开：这一卡只作名称参考，要看全的进整屏模型页。
+            // 这家有几把 Key 就是几份预览，封顶三行才不会把页面拉到好几屏。
+            val preview = models.take(MODEL_PREVIEW_LIMIT)
+            Column {
+                preview.forEachIndexed { index, model ->
+                    ModelRow(
+                        row = model,
+                        // 这一页不重复模型的可达性与协议：协议同一家的模型几乎全一样，
+                        // 可达性没有 Key 页的探测入口，摆在这里都是只看不动的字。
+                        showProbe = false,
+                        showProtocol = false,
+                        onClick = if (autoModels) null else ({ onEditModel(model) }),
+                    )
+                    if (index != preview.lastIndex) {
+                        AppDivider()
                     }
                 }
             }
         }
+        AppDivider()
+        AppActionRow(
+            text = stringResource(Res.string.detail_models_open_all),
+            onClick = onOpenAllModels,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 

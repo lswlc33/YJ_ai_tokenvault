@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.lc33.tokenvault.screens.model.KeyDetailUiState
+import com.lc33.tokenvault.screens.model.MODEL_PREVIEW_LIMIT
 import com.lc33.tokenvault.screens.model.UiModelRow
 import com.lc33.tokenvault.ui.common.StatusDot
 import com.lc33.tokenvault.ui.common.colorOf
@@ -404,7 +405,9 @@ fun KeyDetailScreen(
                             modifier = Modifier.padding(top = tokens.itemSpacing),
                         )
                     } else {
-                        state.models.forEachIndexed { index, model ->
+                        // 外面这一卡只作名称预览：最多三行，四行以上都去整屏模型页看。
+                        val preview = state.models.take(MODEL_PREVIEW_LIMIT)
+                        preview.forEachIndexed { index, model ->
                             // 自动获取的列表不给编辑入口（同供应商详情页）：点开一个
                             // 下次同步就会被覆盖的字段没有意义。
                             val editable = !key.settings.probeModels
@@ -429,20 +432,20 @@ fun KeyDetailScreen(
                                     { onCopyModelId(model.modelId) }
                                 },
                             )
-                            if (index != state.models.lastIndex) {
+                            if (index != preview.lastIndex) {
                                 AppDivider()
                             }
                         }
-                        // 收尾那一行是整屏模型页的唯一入口：分组、排序、搜索、能力面板
-                        // 和逐行增删改都在那一页，详情页这张卡只负责"看得见"。
-                        AppDivider()
-                        AppActionRow(
-                            text = stringResource(Res.string.detail_models_open_all),
-                            onClick = onOpenAllModels,
-                            modifier = Modifier.fillMaxWidth(),
-                            inset = false,
-                        )
                     }
+                    // 底部那一行是整屏模型页的唯一入口，预览不足三条时也给：外面只作
+                    // 名称参考，要看协议、上下文、能力或逐行增删改都得进那一页。
+                    // inset 用默认值（行自带 16dp），与它上面那些 ModelRow 的缩进同源。
+                    AppDivider()
+                    AppActionRow(
+                        text = stringResource(Res.string.detail_models_open_all),
+                        onClick = onOpenAllModels,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             }
 

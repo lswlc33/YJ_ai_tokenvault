@@ -442,6 +442,7 @@ fun VaultNavHost(
                             onCurlImport = { navigate(ImportRoute(route.id)) },
                             onManualAddKey = { navigate(KeyEditorRoute(route.id, 0L)) },
                             onOpenKey = { keyId -> navigate(KeyDetailRoute(route.id, keyId)) },
+                            onOpenKeyModels = { keyId -> navigate(KeyModelsRoute(route.id, keyId)) },
                             onProbeAll = vm::probeAll,
                             onRefreshKeyModels = { keyId ->
                                 // 返回值 false = 上一次刷新还在跑或锁定态。那一发压根没出去，
