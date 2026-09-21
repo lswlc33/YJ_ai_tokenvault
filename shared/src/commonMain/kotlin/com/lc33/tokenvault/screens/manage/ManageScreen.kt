@@ -8,8 +8,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.runtime.Composable
@@ -108,6 +116,11 @@ fun ManageScreen(
     onSort: (ProviderSort) -> Unit,
 ) {
     val scrollState = rememberAppTopBarScrollState()
+    val listState = rememberLazyListState()
+    // 搜索框跟着滚动收放（与整屏模型页同一口径）：往下滚就收，回到顶部再回来。分组筛选
+    // 条那排**不**跟着收——它说的是"现在筛的是哪个分组"，收掉就等于把用户正在用的筛选
+    // 藏起来。信号取"列表还能不能往上滚"，页面不去碰 MIUIX 的 scrollBehavior。
+    val searchVisible = !listState.canScrollBackward
     val tokens = LocalAppTokens.current
     val query = rememberAppTextFieldState()
     var showDeleteConfirm by remember { mutableStateOf(false) }
@@ -212,16 +225,21 @@ fun ManageScreen(
                     end = padding.calculateEndPadding(layoutDirection),
                 ),
         ) {
-            // 搜索与分组固定在顶部，只有 topBar 随滚动收起：把筛选条也滚走
-            // 会让"我刚才筛的是哪个分组"消失。
-            AppSearchField(
-                state = query,
-                hint = stringResource(Res.string.manage_search_hint),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = tokens.screenPadding, vertical = tokens.itemSpacing),
-                onValueChange = onQueryChange,
-            )
+            AnimatedVisibility(
+                visible = searchVisible,
+                // 与整屏模型页同一套时长：收快放慢，放回来时突然弹出来最刺眼。
+                enter = expandVertically(tween(220)) + fadeIn(tween(220)),
+                exit = shrinkVertically(tween(180)) + fadeOut(tween(120)),
+            ) {
+                AppSearchField(
+                    state = query,
+                    hint = stringResource(Res.string.manage_search_hint),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = tokens.screenPadding, vertical = tokens.itemSpacing),
+                    onValueChange = onQueryChange,
+                )
+            }
             // 一个分组都没有时这一排只有「全部」一枚——筛不筛都一样，白白占一行。
             // 用户建了第一个分组它才出现。
             if (state.groups.size > 1) {
@@ -233,6 +251,7 @@ fun ManageScreen(
             ProviderList(
                 state = state,
                 scrollState = scrollState,
+                listState = listState,
                 selecting = selecting,
                 bottomInset = padding.calculateBottomPadding(),
                 onOpenProvider = onOpenProvider,
@@ -357,6 +376,8 @@ private fun GroupPickerSheet(
 private fun ProviderList(
     state: ManageUiState,
     scrollState: com.lc33.tokenvault.ui.miuix.AppTopBarScrollState,
+    /** 由外层持有：搜索框要知道"列表还能不能往上滚"才决定自己收不收。 */
+    listState: LazyListState,
     selecting: Boolean,
     bottomInset: Dp,
     onOpenProvider: (Long) -> Unit,
@@ -393,6 +414,7 @@ private fun ProviderList(
     }
 
     LazyColumn(
+        state = listState,
         modifier = Modifier
             .fillMaxSize()
             .appTopBarScroll(scrollState),
