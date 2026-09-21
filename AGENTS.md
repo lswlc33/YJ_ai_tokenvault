@@ -55,7 +55,7 @@ CI runs `:app:testDebugUnitTest :app:lint :app:assembleDebugAndroidTest :app:ass
 - JUnit 4, `kotlin-test`, Turbine for flows, MockWebServer for HTTP; AndroidX/Room helpers for instrumented tests; `iosSimulatorArm64Test` on macOS.
 - Files are `<Subject>Test.kt` (e.g. `DefaultKeyPolicyTest.kt`); test methods use backticked Chinese names: ``fun `第一张自动成为默认`()``.
 - Pure packages must avoid `android`/`androidx`/`okhttp3` imports and `Clock.System` (inject a Clock instead); `sk-TEST…` literals are allowed only in test sources.
-- `app/src/test/java/com/lc33/tokenvault/ArchitectureRulesTest.kt` is the machine check for the layer rules above and runs in `pre-commit`; CI greps again as a second gate. It enforces: pure-package isolation, MIUIX import boundary, no `Window*` layers, no SQL/HTTP in `screens/`, no Chinese literals, no `AppTextButton` in page bodies, and that each position-indexed dropdown's `string-array` item count exactly matches its Kotlin enum/`OPTIONS` list (`color_scheme_modes`, `predictive_back_styles`, `predictive_back_exit_directions`, `auto_lock_options`, `clipboard_clear_options`). Fix the code, not the test.
+- `app/src/test/java/com/lc33/tokenvault/ArchitectureRulesTest.kt` is the machine check for the layer rules above and runs in `pre-commit`; CI greps again as a second gate. It enforces: pure-package isolation, MIUIX import boundary, no `Window*` layers, no SQL/HTTP in `screens/`, no Chinese literals, no `AppTextButton` in page bodies, and that each position-indexed dropdown's `string-array` item count exactly matches its Kotlin enum/`OPTIONS` list (`color_scheme_modes`, `predictive_back_styles`, `predictive_back_exit_directions`, `auto_lock_options`). Fix the code, not the test.
 
 ## Known Gotchas
 

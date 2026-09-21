@@ -455,7 +455,7 @@ class ProviderDetailViewModel constructor(
         if (_revealedAccount.value?.accountId != accountId) return
         val plain = revealedAccountPlain ?: return
         val secret = plain.password ?: plain.username ?: return
-        clipboard.copy(label, secret, SecureClipboard.DEFAULT_AUTO_CLEAR_SECONDS)
+        clipboard.copy(label, secret)
         _events.trySend(Event.Copied)
     }
 
@@ -531,7 +531,14 @@ class ProviderDetailViewModel constructor(
             accountCount = accountCount,
             balance = aggregateBalance.toUiMoney(),
             balanceFailed = aggregateBalance?.failed == true,
+            // 与列表页同一套取值口径：整家都挂时聚合快照带着原因，部分挂时从 Key 行里捞
+            // 第一个失败者的（见 UiMapping 里 ProviderSummary.toRow 的同一段注释）。
+            balanceErrorReason = aggregateBalance.failureReason()
+                ?: rows.firstNotNullOfOrNull { it.balanceErrorReason },
+            balanceErrorHint = aggregateBalance.failureHint()
+                ?: rows.firstNotNullOfOrNull { it.balanceErrorHint },
             balanceConfigured = balanceConfiguredOf(keyList),
+            balanceFailedKeyCount = failedBalanceKeyCountOf(keyList),
             balanceCheckedAt = aggregateBalance?.checkedAt,
             health = aggregateOf(rows),
             // 官网延迟只在**连通**时给：失败那次拿到的耗时说明不了任何事，

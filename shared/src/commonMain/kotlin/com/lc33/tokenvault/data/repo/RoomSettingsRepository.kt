@@ -5,7 +5,6 @@ import com.lc33.tokenvault.data.entity.AppSettingEntity
 import com.lc33.tokenvault.domain.AutoLockPolicy
 import com.lc33.tokenvault.domain.AutoLockTimeout
 import com.lc33.tokenvault.domain.AutoRefreshPolicy
-import com.lc33.tokenvault.domain.ClipboardClearPolicy
 import com.lc33.tokenvault.domain.DefaultProbeSettings
 import com.lc33.tokenvault.domain.HttpConcurrencyPolicy
 import com.lc33.tokenvault.domain.model.BalanceSnapshot
@@ -103,15 +102,6 @@ class RoomSettingsRepository constructor(
     override suspend fun setSniffClientProfile(enabled: Boolean) {
         dao.put(AppSettingEntity(key = KEY_SNIFF_CLIENT_PROFILE, value = enabled.toString()))
         auditChange(KEY_SNIFF_CLIENT_PROFILE)
-    }
-
-    override fun observeClipboardClearSeconds(): Flow<Int> = dao.observeAll()
-        .map { rows -> ClipboardClearPolicy.decode(rows.firstOrNull { it.key == KEY_CLIPBOARD_CLEAR }?.value) }
-        .distinctUntilChanged()
-
-    override suspend fun setClipboardClearSeconds(seconds: Int) {
-        dao.put(AppSettingEntity(key = KEY_CLIPBOARD_CLEAR, value = ClipboardClearPolicy.encode(seconds)))
-        auditChange(KEY_CLIPBOARD_CLEAR)
     }
 
     override fun observeUpdateChannel(): Flow<Int> = dao.observeAll()
@@ -335,8 +325,6 @@ class RoomSettingsRepository constructor(
         // 历史键 "httpProxy"（应用内代理）已随代理功能移除；老库里残留的行不再被读写。
 
         const val KEY_SNIFF_CLIENT_PROFILE = "sniffClientProfile"
-
-        const val KEY_CLIPBOARD_CLEAR = "clipboardClearSeconds"
 
         const val KEY_UPDATE_CHANNEL = "updateChannel"
 

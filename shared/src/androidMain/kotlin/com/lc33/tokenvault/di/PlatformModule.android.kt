@@ -57,7 +57,7 @@ actual val platformModule: Module = module {
     }
 
     single<SecureClipboard> {
-        AndroidSecureClipboard(appContext, get(named(Qualifiers.APP_SCOPE)), get())
+        AndroidSecureClipboard(appContext)
     }
 
     single<BiometricVault> {

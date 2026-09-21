@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lc33.tokenvault.crypto.zeroize
 import com.lc33.tokenvault.domain.AutoLockPolicy
-import com.lc33.tokenvault.domain.ClipboardClearPolicy
 import com.lc33.tokenvault.domain.PinPolicy
 import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.platform.AutoLocker
@@ -53,7 +52,7 @@ class SecurityViewModel constructor(
     private val settings: SettingsRepository,
     private val vault: BiometricVault,
     private val bootStore: BootStore,
-    // 这一页的四项设置写入（自动锁定时限 / 前台空闲 / 息屏锁定 / 剪贴板清除）本来裸跑在
+    // 这一页的三项设置写入（自动锁定时限 / 前台空闲 / 息屏锁定）本来裸跑在
     // `viewModelScope.launch` 里：Room `dao.put` 抛一次（磁盘满、探测并发撞 SQLITE_BUSY）就是
     // 杀进程，而同类页面全都走 [SettingsFailures.guard]。补上，别再留第三种写法。
     private val failures: SettingsFailures,
@@ -369,24 +368,6 @@ class SecurityViewModel constructor(
 
     fun onLockOnScreenOffChange(enabled: Boolean) {
         viewModelScope.launch { failures.guard { settings.setLockOnScreenOff(enabled) } }
-    }
-
-    // ------------------------------------------------------------------ 剪贴板自动清除
-
-    /**
-     * 剪贴板自动清除秒数的下拉下标。权威是 `app_settings.clipboardClearSeconds`（红线 31），
-     * 存秒数（`ClipboardClearPolicy`），这里转成下拉下标。初值给默认档。
-     */
-    val clipboardClearIndex: StateFlow<Int> = settings.observeClipboardClearSeconds()
-        .map { ClipboardClearPolicy.indexOf(it) }
-        .stateIn(
-            viewModelScope,
-            SharingStarted.Eagerly,
-            ClipboardClearPolicy.indexOf(ClipboardClearPolicy.DEFAULT_SECONDS),
-        )
-
-    fun onClipboardClearIndexChange(index: Int) {
-        viewModelScope.launch { failures.guard { settings.setClipboardClearSeconds(ClipboardClearPolicy.at(index)) } }
     }
 
     override fun onCleared() {

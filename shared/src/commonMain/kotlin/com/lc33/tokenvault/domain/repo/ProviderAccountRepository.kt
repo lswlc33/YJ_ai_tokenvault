@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.Flow
  * 这一版有 [add]、[observeByProvider]、[revealUsername] 与 [revealPassword]——它在 M4 文本
  * 导入落地时建立（导入需要写账号），回遮（展开看明文）在 2026-09-06 补齐以对齐红线 21。
  * **编辑 / 删除还没做**：账号目前能看（遮蔽串 + 展开明文）、能复制，但改不了、删不掉，
- * 将来补的时候再按红线 21 与密钥同等对待（30 秒回遮、剪贴板清除同一条路径）。
+ * 将来补的时候再按红线 21 与密钥同等对待（30 秒回遮）。
  */
 interface ProviderAccountRepository {
 

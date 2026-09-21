@@ -331,7 +331,7 @@ class KeyModelsViewModel constructor(
      */
     fun copyModelId(label: String, modelId: String) {
         if (modelId.isBlank()) return
-        clipboard.copy(label, modelId.toCharArray(), SecureClipboard.DEFAULT_AUTO_CLEAR_SECONDS)
+        clipboard.copy(label, modelId.toCharArray())
         _events.trySend(Event.Copied)
     }
 

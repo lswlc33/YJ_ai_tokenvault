@@ -10,7 +10,6 @@ import com.lc33.tokenvault.domain.repo.SettingsRepository
 import com.lc33.tokenvault.engine.AutoRefresher
 import com.lc33.tokenvault.engine.HttpConcurrencyApplier
 import com.lc33.tokenvault.platform.AutoLocker
-import com.lc33.tokenvault.platform.SecureClipboard
 import com.lc33.tokenvault.platform.VaultSession
 import com.lc33.tokenvault.ui.shell.AppRoot
 import kotlinx.coroutines.CoroutineScope
@@ -58,12 +57,6 @@ private fun initIosApp() {
     val autoLocker = koin.get<AutoLocker>()
     val settings = koin.get<SettingsRepository>()
     val appScope = koin.get<CoroutineScope>(named(Qualifiers.APP_SCOPE))
-
-    // 剪贴板：锁定那一刻会话要顺手清它（§7.5），所以在这里绑一次；同时补做上次进程被杀
-    // 时没来得及执行的自动清除（Android 端 MainActivity.onCreate 同一件事）。
-    val clipboard = koin.get<SecureClipboard>()
-    koin.get<VaultSession>().bindClipboard(clipboard)
-    clipboard.recoverOverdueClear()
 
     // 切后台/回前台驱动自动锁定（§7.4）。等价 Android 端的 ProcessLifecycleOwner 观察者。
     val center = NSNotificationCenter.defaultCenter

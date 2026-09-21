@@ -104,7 +104,7 @@
     <string name="settings_appearance">Appearance</string>
     <string name="settings_appearance_summary">Color scheme, corner style, language</string>
     <string name="settings_security">Security</string>
-    <string name="settings_security_summary">PIN, auto-lock, clipboard</string>
+    <string name="settings_security_summary">PIN, auto-lock, biometrics</string>
     <string name="settings_probe">Probe</string>
     <string name="settings_probe_summary">Levels, timing, rate limits, balance thresholds</string>
     <string name="settings_profiles">Client profiles</string>
@@ -224,9 +224,6 @@
     <string name="security_idle_lock">Lock when idle in the foreground</string>
     <string name="security_idle_lock_summary">Paused while a probe or backup is running, so it cannot interrupt a job in progress</string>
     <string name="security_lock_on_screen_off">Lock when the screen turns off</string>
-    <string name="security_section_leak">Leak surface</string>
-    <string name="security_clipboard_clear">Clear the clipboard after copying</string>
-    <string name="security_clipboard_clear_summary">Applies to keys, accounts and passwords alike</string>
     <string-array name="auto_lock_options">
         <item>Immediately</item>
         <item>After 30 seconds</item>
@@ -234,12 +231,7 @@
         <item>After 5 minutes</item>
         <item>Never</item>
     </string-array>
-    <string-array name="clipboard_clear_options">
-        <item>After 30 seconds</item>
-        <item>After 60 seconds</item>
-        <item>After 5 minutes</item>
-        <item>Never</item>
-    </string-array>    <!-- Probe settings -->
+    <!-- Probe settings -->
     <string name="probe_section_cost">Cost</string>
     <string name="probe_thresholds">Low-balance thresholds</string>
     <string name="probe_thresholds_summary">Per currency. Defaults: USD 5, CNY 30.</string>

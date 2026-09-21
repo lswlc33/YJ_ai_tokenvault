@@ -103,7 +103,7 @@
     <string name="settings_appearance">外观</string>
     <string name="settings_appearance_summary">配色模式、圆角风格、语言</string>
     <string name="settings_security">安全</string>
-    <string name="settings_security_summary">PIN、自动锁定、剪贴板</string>
+    <string name="settings_security_summary">PIN、自动锁定、生物识别</string>
     <string name="settings_probe">探测</string>
     <string name="settings_probe_summary">级别、时机、限流、余额阈值</string>
     <string name="settings_profiles">客户端预设</string>
@@ -220,9 +220,6 @@
     <string name="security_idle_lock">前台空闲时锁定</string>
     <string name="security_idle_lock_summary">探测或备份进行中会暂停计时，以免中断进行中的任务</string>
     <string name="security_lock_on_screen_off">屏幕关闭即锁定</string>
-    <string name="security_section_leak">泄漏面</string>
-    <string name="security_clipboard_clear">复制后自动清除剪贴板</string>
-    <string name="security_clipboard_clear_summary">密钥、账号与密码一律适用</string>
     <string-array name="auto_lock_options">
         <item>立即</item>
         <item>30 秒后</item>
@@ -230,12 +227,7 @@
         <item>5 分钟后</item>
         <item>从不</item>
     </string-array>
-    <string-array name="clipboard_clear_options">
-        <item>30 秒后</item>
-        <item>60 秒后</item>
-        <item>5 分钟后</item>
-        <item>从不</item>
-    </string-array>    <!-- Probe settings -->
+    <!-- Probe settings -->
     <string name="probe_section_cost">成本</string>
     <string name="probe_thresholds">余额低额阈值</string>
     <string name="probe_thresholds_summary">按币种配置。默认 USD 5、CNY 30。</string>

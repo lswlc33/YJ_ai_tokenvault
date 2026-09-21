@@ -61,8 +61,7 @@ actual val platformModule: Module = module {
 
     single<SecureClipboard> {
         object : SecureClipboard {
-            override fun copy(label: String, value: CharArray, autoClearSeconds: Int) = Unit
-            override fun clearNow() = Unit
+            override fun copy(label: String, value: CharArray) = Unit
             override fun read(): String? = null
         }
     }

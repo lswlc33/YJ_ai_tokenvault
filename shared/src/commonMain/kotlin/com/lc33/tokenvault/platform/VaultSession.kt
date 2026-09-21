@@ -79,21 +79,6 @@ class VaultSession(
     private var phase: LockPhase = LockPhase.Loading
 
     /**
-     * 剪贴板。锁定那一刻必须顺手清掉它（§7.5），而这一层没有别的办法知道它存在：
-     * `SecureClipboard` 的各平台实现要 `Context` / 系统 pasteboard，构造时机比会话晚，
-     * 放进构造函数会让 Koin 图出现环。所以由应用入口在启动时绑一次（见各端入口）。
-     *
-     * 未绑定（测试、JVM 假实现）时是 null，锁定照常进行。
-     */
-    @Volatile
-    private var clipboard: SecureClipboard? = null
-
-    /** 由应用入口调用；重复调用只是换个实现，没有副作用。 */
-    fun bindClipboard(clipboard: SecureClipboard) {
-        this.clipboard = clipboard
-    }
-
-    /**
      * boot 在**结构上**不可用的原因。非 null 时阶段一律是 [LockPhase.BootCorrupt]。
      *
      * 为什么要单独记一份而不是"让 [computePhase] 自己从文件里再判一次"：触发这一条的
@@ -457,12 +442,10 @@ class VaultSession(
     /**
      * 锁定：清零 DEK 与两个子密钥，**不关库**（§6.1 推论 1）。
      *
-     * 顺手清空剪贴板（§7.5）：复制过一次密钥之后，那条明文会一直躺在系统剪贴板里，
-     * 而"锁定"这个动作的语义就是"我不再持有这些秘密了"。只靠自动清除的时间窗兜不住
-     * 用户手动点"立即锁定"的情形——他锁库往往正是因为要把手机递出去。
+     * 锁定的语义是"我不再持有这些秘密了"，所以明文暂时都清掉。
      *
-     * [SecureClipboard] 由应用入口绑进来（见 [bindClipboard]）；没绑（JVM 测试、
-     * 会话被单独构造）时跳过，锁定本身不该因为剪贴板缺席而失败。
+     * 系统性说明：锁定这一步**不再清空系统剪贴板**（决策 none.md §7.5，移除自动清除机制
+     * 后一并去掉）。剪贴板里的内容由用户自行处理。
      */
     fun lock() = guard.withLock {
         dek?.zeroize()
@@ -474,7 +457,6 @@ class VaultSession(
         // 锁定即清空「已知明文清单」：脱敏器（红线 32 第一道）不该在锁上之后还记着
         // 上一把被展开过的密钥明文。
         knownSecrets.clear()
-        runCatching { clipboard?.clearNow() }
         phase = computePhase()
     }
 

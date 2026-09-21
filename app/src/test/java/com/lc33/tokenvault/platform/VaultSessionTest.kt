@@ -1,4 +1,4 @@
-﻿package com.lc33.tokenvault.platform
+package com.lc33.tokenvault.platform
 
 import com.lc33.tokenvault.crypto.DekEnvelope
 import com.lc33.tokenvault.crypto.FieldAad
@@ -474,7 +474,7 @@ class VaultSessionTest {
         assertEquals(UnlockResult.Success, s.unlockWithPin(pin.copyOf()))
     }
 
-    // ------------------------------------------------------------------ 引导清理与剪贴板（§7.5）
+    // ------------------------------------------------------------------ 引导清理（§7.5）
 
     @Test
     fun `重新引导会清掉上一轮的生物识别状态`() {
@@ -489,33 +489,10 @@ class VaultSessionTest {
     }
 
     @Test
-    fun `锁定会把剪贴板一起清掉`() {
-        val clipboard = RecordingClipboard()
-        session.bindClipboard(clipboard)
-        onboard()
-        clipboard.copy("openai", charArrayOf('s', 'k'), 60)
-        assertEquals("复制本身不该顺手清掉别的内容", 0, clipboard.clears)
-
-        session.lock()
-        assertEquals("锁定的语义就是我不再持有明文，§7.5", 1, clipboard.clears)
-    }
-
-    @Test
     fun `没绑剪贴板时锁定照常进行`() {
         onboard()
         session.lock()
         assertTrue(session.currentPhase() is LockPhase.Locked)
-    }
-
-    /** 只记"清了几次"的假剪贴板：这一层要测的是会话锁定时有没有去碰它，不是它怎么碰。 */
-    private class RecordingClipboard : SecureClipboard {
-        var clears = 0
-        override fun copy(label: String, value: CharArray, autoClearSeconds: Int) = Unit
-        override fun clearNow() {
-            clears++
-        }
-
-        override fun read(): String? = null
     }
 
     /**

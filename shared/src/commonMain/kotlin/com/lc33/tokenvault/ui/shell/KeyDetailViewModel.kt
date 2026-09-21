@@ -161,7 +161,7 @@ class KeyDetailViewModel constructor(
 
     fun copyRevealed(label: String) {
         val plain = revealedPlain ?: return
-        clipboard.copy(label, plain, SecureClipboard.DEFAULT_AUTO_CLEAR_SECONDS)
+        clipboard.copy(label, plain)
         // 复制是"看不见的动作"：不提示的话用户不知道到底复制成功没有。
         _events.trySend(Event.Copied)
     }
@@ -180,7 +180,7 @@ class KeyDetailViewModel constructor(
             } ?: return@launch
             try {
                 knownSecrets.add(plain)
-                clipboard.copy(label, plain, SecureClipboard.DEFAULT_AUTO_CLEAR_SECONDS)
+                clipboard.copy(label, plain)
                 _events.trySend(Event.Copied)
             } finally {
                 plain.zeroize()
@@ -191,14 +191,14 @@ class KeyDetailViewModel constructor(
     /** 长按连接信息里的 Base URL 复制。它不是秘密，不进脱敏清单，用完即弃。 */
     fun copyBaseUrl(label: String, url: String) {
         if (url.isBlank()) return
-        clipboard.copy(label, url.toCharArray(), SecureClipboard.DEFAULT_AUTO_CLEAR_SECONDS)
+        clipboard.copy(label, url.toCharArray())
         _events.trySend(Event.Copied)
     }
 
     /** 长按模型行复制模型 ID。仅在长按探测关闭时用（开启时长按留给探测）。 */
     fun copyModelId(label: String, modelId: String) {
         if (modelId.isBlank()) return
-        clipboard.copy(label, modelId.toCharArray(), SecureClipboard.DEFAULT_AUTO_CLEAR_SECONDS)
+        clipboard.copy(label, modelId.toCharArray())
         _events.trySend(Event.Copied)
     }
 

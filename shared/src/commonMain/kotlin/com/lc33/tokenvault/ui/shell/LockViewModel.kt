@@ -411,7 +411,7 @@ class LockViewModel constructor(
     fun onWipeAndStartOver() {
         runCatching { vault.disable() }
         bootStore.clear()
-        // 剪贴板与已知明文清单由 lock() 顺手清掉——这正是"抹干净"的一部分。
+        // 已知明文清单由 lock() 顺手清掉——这正是"抹干净"的一部分。
         session.lock()
         // refresh 而不是直接用 lock() 的阶段：它同时清掉会话钉住的结构性失败标记，
         // 而 boot 刚被删成 Missing，重算出来就是引导页。

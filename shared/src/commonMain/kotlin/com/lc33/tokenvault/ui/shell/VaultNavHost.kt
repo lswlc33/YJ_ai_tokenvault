@@ -732,7 +732,6 @@ fun VaultNavHost(
             val autoLockIndex by vm.autoLockIndex.collectAsStateWithLifecycle()
             val idleLock by vm.idleLock.collectAsStateWithLifecycle()
             val lockOnScreenOff by vm.lockOnScreenOff.collectAsStateWithLifecycle()
-            val clipboardClearIndex by vm.clipboardClearIndex.collectAsStateWithLifecycle()
             val biometricEnabled by vm.biometricEnabled.collectAsStateWithLifecycle()
             val biometricAvailable by vm.biometricAvailable.collectAsStateWithLifecycle()
             val biometricBusy by vm.biometricBusy.collectAsStateWithLifecycle()
@@ -750,14 +749,12 @@ fun VaultNavHost(
                 autoLockIndex = autoLockIndex,
                 idleLock = idleLock,
                 lockOnScreenOff = lockOnScreenOff,
-                clipboardClearIndex = clipboardClearIndex,
                 biometricEnabled = biometricEnabled,
                 biometricAvailable = biometricAvailable,
                 biometricBusy = biometricBusy,
                 onAutoLockIndexChange = vm::onAutoLockIndexChange,
                 onIdleLockChange = vm::onIdleLockChange,
                 onLockOnScreenOffChange = vm::onLockOnScreenOffChange,
-                onClipboardClearIndexChange = vm::onClipboardClearIndexChange,
                 onBiometricChange = { enabled ->
                     vm.onBiometricChange(
                         enabled,

@@ -93,16 +93,6 @@ interface SettingsRepository {
     suspend fun setSniffClientProfile(enabled: Boolean)
 
     /**
-     * 复制密钥/密码后多久自动清空剪贴板（§7.5、§13.4 安全设置页）。
-     *
-     * 秒数，`0` = 从不（[com.lc33.tokenvault.domain.ClipboardClearPolicy] 里就是这一档）。
-     * **没写过时发 60**（默认）。
-     */
-    fun observeClipboardClearSeconds(): Flow<Int>
-
-    suspend fun setClipboardClearSeconds(seconds: Int)
-
-    /**
      * 更新渠道（§13.4 更新页）。下标与 `update_channels` 数组对齐：0=正式版、1=nightly。
      *
      * 渠道只有固定两档、不随版本演进，所以这里存下标而非另造枚举（与

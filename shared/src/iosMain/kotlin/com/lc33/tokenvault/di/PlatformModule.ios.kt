@@ -26,7 +26,7 @@ actual val platformModule: Module = module {
 
     single<BootStore> { IosBootStore(IosBootStore.defaultDirectory()) }
 
-    single<SecureClipboard> { IosSecureClipboard(get(named(Qualifiers.APP_SCOPE)), get()) }
+    single<SecureClipboard> { IosSecureClipboard() }
 
     single<BiometricVault> { IosBiometricVault(get<VaultSession>()) }
 
