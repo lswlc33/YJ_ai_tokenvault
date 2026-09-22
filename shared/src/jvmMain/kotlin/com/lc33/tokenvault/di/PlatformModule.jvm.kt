@@ -41,17 +41,7 @@ actual val platformModule: Module = module {
                     }
                 },
             )
-            .addMigrations(
-                VaultDatabase.MIGRATION_1_2,
-                VaultDatabase.MIGRATION_2_3,
-                VaultDatabase.MIGRATION_3_4,
-                VaultDatabase.MIGRATION_4_5,
-                VaultDatabase.MIGRATION_5_6,
-                VaultDatabase.MIGRATION_6_7,
-                VaultDatabase.MIGRATION_7_8,
-                VaultDatabase.MIGRATION_8_9,
-                VaultDatabase.MIGRATION_9_10,
-            )
+            .addMigrations(*VaultDatabase.ALL_MIGRATIONS.toTypedArray())
             .build()
     }
 

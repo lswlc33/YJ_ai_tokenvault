@@ -560,7 +560,7 @@ class ProviderDetailViewModel constructor(
             host = providerHostOf(keyList),
             // 协议 = 这家所有模型的协议并集，和管理页 / 仪表盘同一个定义
             protocols = providerProtocolsOf(models),
-            colorIndex = color ?: 0,
+            colorIndex = color,
             pinned = pinned,
             groupId = groupId,
             keyCount = rows.size,

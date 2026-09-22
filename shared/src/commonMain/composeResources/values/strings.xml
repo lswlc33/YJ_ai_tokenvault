@@ -483,6 +483,7 @@
     <string name="editor_section_look">Appearance</string>
     <string name="editor_group">Group</string>
     <string name="editor_color">Colour</string>
+    <string name="editor_color_auto">Auto</string>
     <string name="editor_pinned">Pin to the top</string>
     <string name="editor_section_endpoint">Endpoint and protocols</string>
     <string name="editor_models_auto">Auto fetch</string>
@@ -937,19 +938,26 @@
     <string name="keymodels_probed_ago">Probed %1$s</string>
     <string name="keymodels_probed_ago_with_latency">Probed %1$s · %2$d ms</string>
 
-    <!-- Usage change report -->
-    <string name="usage_report_title">Usage trends</string>
-    <string name="usage_report_metric_balance">Balance</string>
-    <string name="usage_report_metric_usage">Usage</string>
-    <string name="usage_report_range_7">7 days</string>
-    <string name="usage_report_range_30">30 days</string>
-    <string name="usage_report_range_90">90 days</string>
-    <string name="usage_report_chart_empty">No balance history yet. Recording starts after the next balance check.</string>
-    <string name="usage_report_net_change">Net change</string>
-    <string name="usage_report_consumed">Consumed</string>
-    <string name="usage_report_unknown_provider">Deleted provider</string>
-    <string name="dashboard_report_title">Usage trends</string>
-    <string name="dashboard_report_summary">See balance growth and consumption trends per provider.</string>
-    <string name="settings_report">Usage report</string>
-    <string name="settings_report_summary">Balance growth and consumption trends, one line per provider.</string>
+    <!-- 趋势两页共用的窗口那一排（screens/report/TrendRangeChips） -->
+    <string name="trend_range_7">7 days</string>
+    <string name="trend_range_30">30 days</string>
+    <string name="trend_range_90">90 days</string>
+
+    <!-- Balance trend -->
+    <string name="balance_trend_title">Balance trend</string>
+    <string name="balance_trend_summary">Balance history, one line per provider.</string>
+    <string name="balance_trend_chart_empty">No balance history yet. Recording starts after the next balance check.</string>
+    <string name="balance_trend_net_change">Net change</string>
+    <string name="balance_trend_unknown_provider">Deleted provider</string>
+
+    <!-- Model changes -->
+    <string name="model_change_title">Model changes</string>
+    <string name="model_change_summary">Which providers added or dropped models.</string>
+    <string name="model_change_added">Added</string>
+    <string name="model_change_removed">Dropped</string>
+    <string name="model_change_counts">%1$d added / %2$d dropped</string>
+    <string name="model_change_show_more">%1$d more, tap to show</string>
+    <string name="model_change_empty_none">Nothing recorded yet. Recording starts after a key's model list refreshes successfully.</string>
+    <string name="model_change_empty_window">No model change in this window.</string>
+    <string name="model_change_footnote">Drops are only recorded from the first model-list refresh after this version; earlier additions come from when each model was first seen.</string>
 </resources>

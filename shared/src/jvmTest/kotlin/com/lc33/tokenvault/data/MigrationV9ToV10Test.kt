@@ -18,7 +18,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
- * v9 → v10 迁移：新增 `balance_history`（用量变化报告的数据源）。
+ * v9 → v10 迁移：新增 `balance_history`（余额趋势报告的数据源）。
  *
  * 造库方式与 [MigrationV8ToV9Test] 一致——用 Room 导出的 `schemas/9.json` 建表，而不是
  * 手写 DDL。这样"迁移漏了某个索引 / 列类型不符"这类事故会在 Room 打开库、拿实际 schema
@@ -38,7 +38,7 @@ class MigrationV9ToV10Test {
 
             val database = Room.databaseBuilder<VaultDatabase>(name = dbFile.absolutePath)
                 .setDriver(BundledSQLiteDriver())
-                .addMigrations(VaultDatabase.MIGRATION_9_10)
+                .addMigrations(*VaultDatabase.ALL_MIGRATIONS.toTypedArray())
                 .build()
 
             // 先走一次 DAO 触发懒打开与迁移（同 v8→v9 那条注释：build() 是懒的）。

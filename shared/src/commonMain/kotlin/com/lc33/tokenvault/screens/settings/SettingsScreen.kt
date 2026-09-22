@@ -20,8 +20,10 @@ import tokenvault.shared.generated.resources.settings_appearance
 import tokenvault.shared.generated.resources.settings_appearance_summary
 import tokenvault.shared.generated.resources.settings_data
 import tokenvault.shared.generated.resources.settings_data_summary
-import tokenvault.shared.generated.resources.settings_report
-import tokenvault.shared.generated.resources.settings_report_summary
+import tokenvault.shared.generated.resources.balance_trend_title
+import tokenvault.shared.generated.resources.balance_trend_summary
+import tokenvault.shared.generated.resources.model_change_title
+import tokenvault.shared.generated.resources.model_change_summary
 import tokenvault.shared.generated.resources.settings_log
 import tokenvault.shared.generated.resources.settings_log_summary
 import tokenvault.shared.generated.resources.settings_member_expiry
@@ -74,7 +76,8 @@ fun SettingsScreen(
     onOpenSecurity: () -> Unit,
     onOpenProbeSettings: () -> Unit,
     onOpenProfiles: () -> Unit,
-    onOpenReport: () -> Unit,
+    onOpenBalanceTrend: () -> Unit,
+    onOpenModelChange: () -> Unit,
     onOpenData: () -> Unit,
     onOpenLog: () -> Unit,
     onOpenSync: () -> Unit,
@@ -161,9 +164,14 @@ fun SettingsScreen(
                         onClick = onOpenProfiles,
                     )
                     AppArrowRow(
-                        title = stringResource(Res.string.settings_report),
-                        summary = stringResource(Res.string.settings_report_summary),
-                        onClick = onOpenReport,
+                        title = stringResource(Res.string.balance_trend_title),
+                        summary = stringResource(Res.string.balance_trend_summary),
+                        onClick = onOpenBalanceTrend,
+                    )
+                    AppArrowRow(
+                        title = stringResource(Res.string.model_change_title),
+                        summary = stringResource(Res.string.model_change_summary),
+                        onClick = onOpenModelChange,
                     )
                     AppArrowRow(
                         title = stringResource(Res.string.settings_data),

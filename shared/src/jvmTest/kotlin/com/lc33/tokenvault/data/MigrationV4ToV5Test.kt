@@ -26,9 +26,9 @@ import kotlinx.serialization.json.jsonPrimitive
  * 为什么不只留 androidTest 的那条：`VaultDatabaseMigrationTest` 是 instrumented 测试，
  * 没有设备时根本跑不到；这条让同一个迁移在每次 `:shared:jvmTest` 都被验一遍。
  *
- * **每加一条迁移，下面每个 `addMigrations(...)` 都要补到最新版本**：Room 打开时必须走得
- * 通"库当前版本 → `VERSION`"，少一环就是 `A migration from N to M was required but not
- * found`，红的还是这些老测试——看着像老迁移坏了，其实是链断了。
+ * 下面每个 `addMigrations(...)` 都取 [VaultDatabase.ALL_MIGRATIONS] 而不是各抄一份名单：
+ * Room 打开时必须走得通"库当前版本 → `VERSION`"，少一环就是 `A migration from N to M was
+ * required but not found`，而红的总是这些老测试——看着像老迁移坏了，其实是链断在中间某环。
  */
 class MigrationV4ToV5Test {
 
@@ -43,14 +43,7 @@ class MigrationV4ToV5Test {
             // 真实升级也是这样一路过来的，只测一跳会漏掉"5→6 在 4→5 之后还能不能跑"。
             val database = Room.databaseBuilder<VaultDatabase>(name = dbFile.absolutePath)
                 .setDriver(BundledSQLiteDriver())
-                .addMigrations(
-                    VaultDatabase.MIGRATION_4_5,
-                    VaultDatabase.MIGRATION_5_6,
-                    VaultDatabase.MIGRATION_6_7,
-                    VaultDatabase.MIGRATION_7_8,
-                    VaultDatabase.MIGRATION_8_9,
-                    VaultDatabase.MIGRATION_9_10,
-                )
+                .addMigrations(*VaultDatabase.ALL_MIGRATIONS.toTypedArray())
                 .build()
 
             val key = database.apiKeyDao().findRaw(1L)
@@ -82,13 +75,7 @@ class MigrationV4ToV5Test {
             createDatabase(dbFile, version = 5)
             val database = Room.databaseBuilder<VaultDatabase>(name = dbFile.absolutePath)
                 .setDriver(BundledSQLiteDriver())
-                .addMigrations(
-                    VaultDatabase.MIGRATION_5_6,
-                    VaultDatabase.MIGRATION_6_7,
-                    VaultDatabase.MIGRATION_7_8,
-                    VaultDatabase.MIGRATION_8_9,
-                    VaultDatabase.MIGRATION_9_10,
-                )
+                .addMigrations(*VaultDatabase.ALL_MIGRATIONS.toTypedArray())
                 .build()
 
             // 老日志（迁移前就写好的）三列是 null，不该被迁移搞坏。
@@ -125,12 +112,7 @@ class MigrationV4ToV5Test {
             createDatabase(dbFile, version = 6)
             val database = Room.databaseBuilder<VaultDatabase>(name = dbFile.absolutePath)
                 .setDriver(BundledSQLiteDriver())
-                .addMigrations(
-                    VaultDatabase.MIGRATION_6_7,
-                    VaultDatabase.MIGRATION_7_8,
-                    VaultDatabase.MIGRATION_8_9,
-                    VaultDatabase.MIGRATION_9_10,
-                )
+                .addMigrations(*VaultDatabase.ALL_MIGRATIONS.toTypedArray())
                 .build()
 
             // 老数据原样保留，新列按"默认关"落库——升级不该让老供应商突然开始被 ping。
@@ -175,11 +157,7 @@ class MigrationV4ToV5Test {
 
             val database = Room.databaseBuilder<VaultDatabase>(name = dbFile.absolutePath)
                 .setDriver(BundledSQLiteDriver())
-                .addMigrations(
-                    VaultDatabase.MIGRATION_7_8,
-                    VaultDatabase.MIGRATION_8_9,
-                    VaultDatabase.MIGRATION_9_10,
-                )
+                .addMigrations(*VaultDatabase.ALL_MIGRATIONS.toTypedArray())
                 .build()
 
             val left = database.modelDao().findAll().map { it.id }.sorted()
@@ -276,14 +254,7 @@ class MigrationV4ToV5Test {
 
             val database = Room.databaseBuilder<VaultDatabase>(name = dbFile.absolutePath)
                 .setDriver(BundledSQLiteDriver())
-                .addMigrations(
-                    VaultDatabase.MIGRATION_4_5,
-                    VaultDatabase.MIGRATION_5_6,
-                    VaultDatabase.MIGRATION_6_7,
-                    VaultDatabase.MIGRATION_7_8,
-                    VaultDatabase.MIGRATION_8_9,
-                    VaultDatabase.MIGRATION_9_10,
-                )
+                .addMigrations(*VaultDatabase.ALL_MIGRATIONS.toTypedArray())
                 .build()
 
             val settings = database.keySettingsDao()

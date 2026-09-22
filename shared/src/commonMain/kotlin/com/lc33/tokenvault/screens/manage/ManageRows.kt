@@ -58,15 +58,20 @@ private fun rowModifier(): Modifier = Modifier
     .fillMaxWidth()
     .padding(horizontal = LocalAppTokens.current.screenPadding)
 
-/** 色块 + 首字母。长列表里认行靠它，不承担任何状态语义。 */
+/**
+ * 色块 + 首字母。长列表里认行靠它，不承担任何状态语义。
+ *
+ * 颜色走 [ProviderPalette.colorFor]：手选过就用选的那个，没选过用按 id 生成的那个。
+ * 与余额趋势 / 模型变化上那家的线**同一个色**，用户才能把列表里认到的颜色直接对到图上。
+ */
 @Composable
-private fun ColorBadge(name: String, colorIndex: Int) {
+private fun ColorBadge(name: String, providerId: Long, colorIndex: Int?) {
     val palette = LocalProviderPalette.current
     Box(
         modifier = Modifier
             .size(36.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(palette.swatchFor(colorIndex)),
+            .background(palette.colorFor(providerId, colorIndex)),
         contentAlignment = Alignment.Center,
     ) {
         AppText(
@@ -100,7 +105,7 @@ internal fun ProviderRow(
             if (selecting) {
                 SelectionMark(selected)
             } else {
-                ColorBadge(row.name, row.colorIndex)
+                ColorBadge(row.name, row.id, row.colorIndex)
             }
             Column(modifier = Modifier.weight(1f)) {
                 Row(

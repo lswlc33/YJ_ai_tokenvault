@@ -67,9 +67,18 @@ data object GroupsRoute : VaultRoute
 @Serializable
 data object ProbeRunRoute : VaultRoute
 
-/** 用量变化报告：余额增长与消耗趋势，逐供应商折线。不主动展开在仪表盘，点击进入。 */
+/** 余额趋势报告：逐供应商的余额折线。不主动展开在仪表盘，点击进入。 */
 @Serializable
-data object UsageReportRoute : VaultRoute
+data object BalanceTrendRoute : VaultRoute
+
+/**
+ * 模型变化：哪几家站点上了哪些模型、又下了哪些。与余额趋势并列的第二个分析页。
+ *
+ * 数据源是 `model_changes` 那张流水表（v11 起），不是 `models` 的当前态——上游下架一个
+ * 模型时合并层是硬删，当前态反推不出"它曾经在"。
+ */
+@Serializable
+data object ModelChangeRoute : VaultRoute
 
 // ---------------------------------------------------------------- 设置下的二级页
 

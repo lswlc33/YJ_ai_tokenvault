@@ -222,7 +222,7 @@ class ModelsDevSpikeTest {
      * 只读副本：先 `copyTo` 到临时目录再打开，Room 跑迁移会写文件，不能碰备份原件。
      */
     @Test
-    fun `真库副本能迁到 v9 且一行数据都不掉`() {
+    fun `真库副本能迁到最新版且一行数据都不掉`() {
         if (System.getProperty("vaultSpike") != "true") {
             println("SPIKE skipped（加 -DvaultSpike=true 才真跑）")
             return
@@ -248,14 +248,14 @@ class ModelsDevSpikeTest {
                 name = copy.absolutePath,
             )
                 .setDriver(androidx.sqlite.driver.bundled.BundledSQLiteDriver())
-                .addMigrations(com.lc33.tokenvault.data.VaultDatabase.MIGRATION_8_9)
+                .addMigrations(*com.lc33.tokenvault.data.VaultDatabase.ALL_MIGRATIONS.toTypedArray())
                 .build()
             // 先走一次 DAO 才会真打开库、比对版本并跑迁移（build() 是懒的）。
             kotlinx.coroutines.runBlocking { database.modelCatalogDao().count() }
             database.close()
 
             val after = counts(copy)
-            assertEquals(userVersion(copy), 9, "user_version 没升到 9")
+            assertEquals(userVersion(copy), com.lc33.tokenvault.data.VaultDatabase.VERSION, "user_version 没升到最新版本")
             assertEquals(before["providers"], after["providers"], "迁移掉了供应商")
             assertEquals(before["api_keys"], after["api_keys"], "迁移掉了 Key")
             assertEquals(before["models"], after["models"], "迁移掉了模型行")

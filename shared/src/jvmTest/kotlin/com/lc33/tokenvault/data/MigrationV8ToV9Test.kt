@@ -41,7 +41,7 @@ class MigrationV8ToV9Test {
 
             val database = Room.databaseBuilder<VaultDatabase>(name = dbFile.absolutePath)
                 .setDriver(BundledSQLiteDriver())
-                .addMigrations(VaultDatabase.MIGRATION_8_9, VaultDatabase.MIGRATION_9_10)
+                .addMigrations(*VaultDatabase.ALL_MIGRATIONS.toTypedArray())
                 .build()
 
             // **先走一次 DAO 再看 schema**：`build()` 是懒的，Room 要到第一次真正取数时才
@@ -101,7 +101,7 @@ class MigrationV8ToV9Test {
 
             val database = Room.databaseBuilder<VaultDatabase>(name = dbFile.absolutePath)
                 .setDriver(BundledSQLiteDriver())
-                .addMigrations(VaultDatabase.MIGRATION_8_9, VaultDatabase.MIGRATION_9_10)
+                .addMigrations(*VaultDatabase.ALL_MIGRATIONS.toTypedArray())
                 .build()
 
             // 同一个模型的两条候选：原创那条 + 聚合站转售那条。DAO 把 canonical 排在前面，

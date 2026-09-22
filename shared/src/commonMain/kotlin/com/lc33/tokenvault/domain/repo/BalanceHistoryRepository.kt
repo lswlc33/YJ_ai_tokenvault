@@ -5,7 +5,7 @@ import com.lc33.tokenvault.domain.model.BalanceSnapshot
 import kotlinx.coroutines.flow.Flow
 
 /**
- * 余额历史仓库。用量变化报告的数据源，与 `api_keys` 上那份「最新快照」分开。
+ * 余额历史仓库。余额趋势报告的数据源，与 `api_keys` 上那份「最新快照」分开。
  *
  * 只有一条写路径 [record]：由 [com.lc33.tokenvault.engine.BalanceEngine] 在每次成功刷到
  * 余额后调用，内部按「与上一条相同就不写」去重（见 [com.lc33.tokenvault.balance.shouldRecordSample]），

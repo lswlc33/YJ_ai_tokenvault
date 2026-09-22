@@ -39,7 +39,8 @@ import com.lc33.tokenvault.screens.manage.ProviderEditorScreen
 import com.lc33.tokenvault.screens.model.BackupStatus
 import com.lc33.tokenvault.screens.model.UiRemoteBackup
 import com.lc33.tokenvault.screens.probe.ProbeRunScreen
-import com.lc33.tokenvault.screens.report.UsageReportScreen
+import com.lc33.tokenvault.screens.report.BalanceTrendScreen
+import com.lc33.tokenvault.screens.report.ModelChangeScreen
 import com.lc33.tokenvault.screens.settings.AboutScreen
 import com.lc33.tokenvault.screens.settings.AppearanceScreen
 import com.lc33.tokenvault.screens.settings.BalanceThresholdsScreen
@@ -244,7 +245,8 @@ fun VaultNavHost(
                 // 三个一级页平级，压在栈上会让返回语义变成"回到总览"。
                 onOpenManage = { pager.animateToPage(topLevelIndexOf(ManageRoute)) },
                 onOpenProbeDetail = { navigate(ProbeRunRoute) },
-                onOpenReport = { navigate(UsageReportRoute) },
+                onOpenBalanceTrend = { navigate(BalanceTrendRoute) },
+                onOpenModelChange = { navigate(ModelChangeRoute) },
                 balanceRefreshing = refreshingBalance,
                 onRefreshBalance = { vm.refreshBalance() },
                 onRefreshStatus = {
@@ -346,7 +348,8 @@ fun VaultNavHost(
                 onOpenSecurity = { navigate(SecurityRoute) },
                 onOpenProbeSettings = { navigate(ProbeSettingsRoute) },
                 onOpenProfiles = { navigate(ProfileListRoute) },
-                onOpenReport = { navigate(UsageReportRoute) },
+                onOpenBalanceTrend = { navigate(BalanceTrendRoute) },
+                onOpenModelChange = { navigate(ModelChangeRoute) },
                 onOpenData = { navigate(DataRoute) },
                 onOpenLog = { navigate(LogRoute) },
                 onOpenSync = { navigate(SyncRoute) },
@@ -1212,13 +1215,21 @@ fun VaultNavHost(
             )
         }
 
-            is UsageReportRoute -> {
-            val vm: UsageReportViewModel = koinViewModel()
+            is ModelChangeRoute -> {
+            val vm: ModelChangeViewModel = koinViewModel()
+            val changes by vm.state.collectAsStateWithLifecycle()
+            ModelChangeScreen(
+                state = changes,
+                onBack = back,
+                onSelectRange = vm::setRange,
+            )
+        }
+            is BalanceTrendRoute -> {
+            val vm: BalanceTrendViewModel = koinViewModel()
             val report by vm.state.collectAsStateWithLifecycle()
-            UsageReportScreen(
+            BalanceTrendScreen(
                 state = report,
                 onBack = back,
-                onSelectMetric = vm::setMetric,
                 onSelectRange = vm::setRange,
             )
         }

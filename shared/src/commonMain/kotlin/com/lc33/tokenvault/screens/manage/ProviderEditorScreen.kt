@@ -37,6 +37,7 @@ import com.lc33.tokenvault.ui.miuix.rememberAppTextFieldState
 import com.lc33.tokenvault.ui.miuix.rememberAppTopBarScrollState
 import com.lc33.tokenvault.ui.theme.LocalAppTokens
 import com.lc33.tokenvault.ui.theme.LocalStatusPalette
+import com.lc33.tokenvault.ui.theme.PROVIDER_AUTO_COLOR_INDEX
 import org.jetbrains.compose.resources.stringArrayResource
 import org.jetbrains.compose.resources.stringResource
 import tokenvault.shared.generated.resources.Res
@@ -44,6 +45,7 @@ import tokenvault.shared.generated.resources.back_cd
 import tokenvault.shared.generated.resources.dialog_cancel
 import tokenvault.shared.generated.resources.editor_url_err_scheme
 import tokenvault.shared.generated.resources.editor_color
+import tokenvault.shared.generated.resources.editor_color_auto
 import tokenvault.shared.generated.resources.editor_group
 import tokenvault.shared.generated.resources.editor_name
 import tokenvault.shared.generated.resources.editor_error_missing_name
@@ -80,7 +82,9 @@ fun ProviderEditorScreen(
     var showDiscard by remember { mutableStateOf(false) }
     // 颜色名与调色板按**下标**对齐，两边数量由架构测试比对（provider_colors ↔
     // PROVIDER_COLOR_COUNT）：少一项的表现是"选第 8 个颜色得到第 1 个"。
+    // 下拉里还多一项「自动」，它不在那个数组里（排在八个色之后），所以不影响这条对应关系。
     val colorNames = stringArrayResource(Res.array.provider_colors).toList()
+    val colorItems = colorNames + stringResource(Res.string.editor_color_auto)
 
     val name = rememberAppTextFieldState(draft.name)
     val note = rememberAppTextFieldState(draft.note)
@@ -222,12 +226,17 @@ fun ProviderEditorScreen(
                     )
                     AppIconDropdownRow(
                         title = stringResource(Res.string.editor_color),
-                        items = colorNames,
-                        selectedIndex = draft.colorIndex,
-                        onSelect = { onChange(draft.copy(colorIndex = it)) },
+                        items = colorItems,
+                        selectedIndex = draft.colorIndex ?: PROVIDER_AUTO_COLOR_INDEX,
+                        onSelect = { index ->
+                            // 「自动」那一档存 NULL，不存下标：库里"没选过"与"选了第一个蓝"
+                            // 必须是两件事，否则生成色永远接不上。
+                            onChange(draft.copy(colorIndex = index.takeIf { it != PROVIDER_AUTO_COLOR_INDEX }))
+                        },
                         itemLeading = { index, cellModifier ->
                             ProviderColorSwatch(
-                                index = index,
+                                index = index.takeIf { it != PROVIDER_AUTO_COLOR_INDEX },
+                                providerId = draft.id ?: 0L,
                                 modifier = cellModifier,
                                 size = 22.dp,
                             )

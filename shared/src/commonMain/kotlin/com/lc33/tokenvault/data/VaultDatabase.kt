@@ -15,6 +15,7 @@ import com.lc33.tokenvault.data.dao.ClientProfileDao
 import com.lc33.tokenvault.data.dao.GroupDao
 import com.lc33.tokenvault.data.dao.KeySettingsDao
 import com.lc33.tokenvault.data.dao.ModelCatalogDao
+import com.lc33.tokenvault.data.dao.ModelChangeDao
 import com.lc33.tokenvault.data.dao.ModelDao
 import com.lc33.tokenvault.data.dao.ModelVendorDao
 import com.lc33.tokenvault.data.dao.ProbeRunDao
@@ -28,6 +29,7 @@ import com.lc33.tokenvault.data.entity.ClientProfileEntity
 import com.lc33.tokenvault.data.entity.GroupEntity
 import com.lc33.tokenvault.data.entity.KeySettingsEntity
 import com.lc33.tokenvault.data.entity.ModelCatalogEntity
+import com.lc33.tokenvault.data.entity.ModelChangeEntity
 import com.lc33.tokenvault.data.entity.ModelEntity
 import com.lc33.tokenvault.data.entity.ModelVendorEntity
 import com.lc33.tokenvault.data.entity.ProbeRunEntity
@@ -49,6 +51,7 @@ import com.lc33.tokenvault.data.entity.ProviderEntity
         AuditLogEntity::class,
         AppSettingEntity::class,
         BalanceHistoryEntity::class,
+        ModelChangeEntity::class,
     ],
     version = VaultDatabase.VERSION,
     exportSchema = true,
@@ -69,9 +72,10 @@ abstract class VaultDatabase : RoomDatabase() {
     abstract fun auditLogDao(): AuditLogDao
     abstract fun appSettingDao(): AppSettingDao
     abstract fun balanceHistoryDao(): BalanceHistoryDao
+    abstract fun modelChangeDao(): ModelChangeDao
 
     companion object {
-        const val VERSION = 10
+        const val VERSION = 11
         const val FILE_NAME = "vault.db"
 
         val MIGRATION_1_2: Migration = object : Migration(1, 2) {
@@ -690,7 +694,7 @@ abstract class VaultDatabase : RoomDatabase() {
         }
 
         /**
-         * v10：新增 `balance_history` —— 用量变化报告的数据源。
+         * v10：新增 `balance_history` —— 余额趋势报告的数据源。
          *
          * **纯建表 + 两个索引，没有一列被删或改类型，也没有回填**：这是一张全新的表，
          * 老库里不存在，升级时自然是空的，之后每次成功刷余额（去重后）追加一行。
@@ -727,6 +731,80 @@ abstract class VaultDatabase : RoomDatabase() {
                 )
             }
         }
+
+        /**
+         * v10 → v11：新增 `model_changes`（「模型变化」页的数据源），并把供应商配色里那个
+         * 「从没动过的默认值」清成未选。
+         *
+         * **为什么这张表非建不可**：`models` 只存当前态，上游下架一个模型时合并层是硬删
+         * （红线 30），删完就没有任何地方还记得"它曾经在"。所以「下架」这件事只能从升级后
+         * 第一次成功刷新开始记；「新增」则可以从 `models.firstSeenAt` 回填出来——那正是
+         * 这一行第一次被看到的时刻，不回填的话这个页面上线后要先等一轮探测才有东西。
+         *
+         * 回填只取 `source = 'discovered'` 的行：手动录的那批 firstSeenAt 是"我打字的时刻"，
+         * 不是"站点上新的时刻"，混进来这个页面讲的就不是站点的事了。
+         *
+         * `providers.color = 0` 一并清成 NULL：编辑页颜色那行的默认值就是下标 0，用户没碰过
+         * 它也会存成 0（`ProviderDraftMapping` 整行回写），于是"手选过色"与"从没选过"在库里
+         * 长得一样，而界面上十家供应商全是一个蓝。生成色的前提是知道哪些是真没选过。
+         */
+        val MIGRATION_10_11: Migration = object : Migration(10, 11) {
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `model_changes` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `providerId` INTEGER NOT NULL,
+                        `keyId` INTEGER,
+                        `modelId` TEXT NOT NULL,
+                        `protocol` TEXT NOT NULL,
+                        `kind` TEXT NOT NULL,
+                        `at` INTEGER NOT NULL,
+                        FOREIGN KEY(`providerId`) REFERENCES `providers`(`id`)
+                            ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                connection.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_model_changes_providerId_at` " +
+                        "ON `model_changes` (`providerId`, `at`)",
+                )
+                connection.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_model_changes_at` ON `model_changes` (`at`)",
+                )
+                connection.execSQL(
+                    """
+                    INSERT INTO model_changes (providerId, keyId, modelId, protocol, kind, at)
+                    SELECT providerId, keyId, modelId, protocol, 'added', firstSeenAt
+                    FROM models WHERE source = 'discovered'
+                    """.trimIndent(),
+                )
+                connection.execSQL("UPDATE providers SET color = NULL WHERE color = 0")
+            }
+        }
+
+        /**
+         * 全部迁移，按版本顺序。
+         *
+         * 三个建库方（Android / iOS / JVM）和所有迁移测试都从这里取，而不是各自抄一遍名单。
+         * 以前加一条迁移要在四个地方各补一行，而漏掉哪一处的表现都**不是**"新迁移没跑"，
+         * 是老测试先红：`A migration from N to M was required but not found`——看着像老迁移
+         * 坏了，其实是链断在中间某一环。集中成一份名单之后，加迁移只改本文件一处。
+         *
+         * 声明在每条迁移之后：companion object 的属性按声明顺序初始化，放前面会拿到未初始化的值。
+         */
+        val ALL_MIGRATIONS: List<Migration> = listOf(
+            MIGRATION_1_2,
+            MIGRATION_2_3,
+            MIGRATION_3_4,
+            MIGRATION_4_5,
+            MIGRATION_5_6,
+            MIGRATION_6_7,
+            MIGRATION_7_8,
+            MIGRATION_8_9,
+            MIGRATION_9_10,
+            MIGRATION_10_11,
+        )
     }
 }
 

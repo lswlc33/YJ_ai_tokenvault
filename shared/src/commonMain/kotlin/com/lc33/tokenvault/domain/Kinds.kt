@@ -72,6 +72,26 @@ enum class ModelSource(val wireName: String) {
 }
 
 /**
+ * 一条模型变化事件的种类（`model_changes.kind`，「模型变化」页用它分「新增」与「下架」两段）。
+ *
+ * 只有 [fromWireName] 认不出的值才退成 [ADDED]：读路径拿到脏值时宁可把它当"多了一个模型"
+ * 也不要当"少了一个模型"——前者最坏是多列一行，后者是断言"这家不给了"，假断言更贵。
+ */
+enum class ModelChangeKind(val wireName: String) {
+    /** 这一轮模型列表里有、上一轮没有（或这家 Key 第一次见到它）。 */
+    ADDED("added"),
+
+    /** 这一轮模型列表里没有、而库里那条发现行被删掉了。 */
+    REMOVED("removed"),
+    ;
+
+    companion object {
+        fun fromWireName(value: String): ModelChangeKind =
+            entries.firstOrNull { it.wireName == value } ?: ADDED
+    }
+}
+
+/**
  * 探测级别（§8.3）。
  *
  * @param costsQuota 会不会花钱。**红线 36**：花钱的级别只能用户手动点，

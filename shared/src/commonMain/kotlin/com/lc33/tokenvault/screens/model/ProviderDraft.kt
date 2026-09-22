@@ -12,6 +12,7 @@ data class ProviderDraft(
      */
     val checkWebsite: Boolean = false,
     val groupIndex: Int = 0,
-    val colorIndex: Int = 0,
+    /** 手选颜色下标；**null = 「自动」**，用按 id 生成的身份色（见 `ProviderPalette.colorFor`）。 */
+    val colorIndex: Int? = null,
     val pinned: Boolean = false,
 )

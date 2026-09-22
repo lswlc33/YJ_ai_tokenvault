@@ -11,7 +11,7 @@ fun Provider.toDraft(groupIndex: Int): ProviderDraft = ProviderDraft(
     website = websiteUrl.orEmpty(),
     checkWebsite = checkWebsite,
     groupIndex = groupIndex,
-    colorIndex = color ?: 0,
+    colorIndex = color,
     pinned = pinned,
 )
 

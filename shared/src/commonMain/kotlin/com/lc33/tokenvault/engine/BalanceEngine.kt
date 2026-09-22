@@ -37,7 +37,7 @@ class BalanceEngine constructor(
     private val clientProfiles: ClientProfileRepository,
     private val engine: HttpEngine,
     private val audit: AuditLogRepository,
-    /** 余额历史。每次成功刷到金额后（去重）追加一条，喂用量变化报告。 */
+    /** 余额历史。每次成功刷到金额后（去重）追加一条，喂余额趋势报告。 */
     private val history: BalanceHistoryRepository,
     /**
      * 登记这一轮 reveal 出来的明文，供 [Redactor] 的第一道使用。

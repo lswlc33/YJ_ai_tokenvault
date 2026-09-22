@@ -12,11 +12,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * 用量变化报告聚合器：LOCF → 按天分桶 → 按 (供应商, 币种) 求和，以及余额/消耗两条线。
+ * 余额趋势聚合器：LOCF → 按天分桶 → 按 (供应商, 币种) 求和，产出逐供应商的余额线。
  *
  * 时区固定 UTC、时间戳按 UTC 日界构造，断言才可重复（不受跑测机器时区影响）。
  */
-class UsageReportAggregatorTest {
+class BalanceTrendAggregatorTest {
 
     private val zone = TimeZone.UTC
     private val today = LocalDate(2026, 1, 10)
@@ -29,7 +29,7 @@ class UsageReportAggregatorTest {
         dayStart(today.minus(daysAgo, DateTimeUnit.DAY)) + hour * HOUR
 
     private fun aggregate(samples: List<BalanceSample>, rangeDays: Int = 7) =
-        UsageReportAggregator.aggregate(samples, rangeDays, now, zone)
+        BalanceTrendAggregator.aggregate(samples, rangeDays, now, zone)
 
     @Test
     fun `空输入给空结果`() {
@@ -39,7 +39,7 @@ class UsageReportAggregatorTest {
     @Test
     fun `只有一个读数时不报变化`() {
         // 余额历史是从 v10 才开始攒的，报告上线的头几天每家基本都只有这一条。
-        // 一个点算不出"净变化 / 总消耗"，而 0.0 会被界面印成 `¥0.00`——那是在断言
+        // 一个点算不出"净变化"，而 0.0 会被界面印成 `¥0.00`——那是在断言
         // "这个区间一分没动"，与真相（只查到过一次）正好相反。所以必须是 null。
         val s = aggregate(
             listOf(
@@ -54,7 +54,6 @@ class UsageReportAggregatorTest {
         ).single()
         assertEquals(1, s.balancePoints.size)
         assertNull(s.netBalanceChange)
-        assertNull(s.totalConsumed)
     }
 
     @Test
@@ -80,29 +79,20 @@ class UsageReportAggregatorTest {
     }
 
     @Test
-    fun `没有已用字段时，消耗按余额跌幅累计，充值不计负`() {
+    fun `充值只体现在余额线上，不另算一条消耗线`() {
+        // 这个 App 观测不到"消耗了多少"：100→80 可能是用了 20，也可能别的什么，
+        // 80→120 是一次充值。能确证的只有余额本身，所以只有一条线。
         val samples = listOf(
             BalanceSample(providerId = 1, keyId = 1, amount = 100.0, currency = "USD", capturedAt = at(6)),
             BalanceSample(providerId = 1, keyId = 1, amount = 80.0, currency = "USD", capturedAt = at(3)),
             BalanceSample(providerId = 1, keyId = 1, amount = 120.0, currency = "USD", capturedAt = at(1)), // 充值
         )
         val s = aggregate(samples).single()
-        // 只有 100→80 那一跌算 20 消耗；80→120 是充值，记 0，不冲抵。
-        assertEquals(20.0, (s.totalConsumed ?: Double.NaN), EPS)
-        assertEquals(20.0, s.usagePoints.last().y, EPS)
-        // 净变化则体现充值：120 − 100 = +20。
+        assertEquals(7, s.balancePoints.size)
+        assertEquals(100.0, s.balancePoints.first().y, EPS)
+        assertEquals(120.0, s.balancePoints.last().y, EPS)
+        // 净变化体现充值：120 − 100 = +20。
         assertEquals(20.0, (s.netBalanceChange ?: Double.NaN), EPS)
-    }
-
-    @Test
-    fun `有已用字段时，消耗走已用增量而不是余额跌幅`() {
-        val samples = listOf(
-            BalanceSample(providerId = 1, keyId = 1, amount = 90.0, used = 10.0, currency = "USD", capturedAt = at(3)),
-            BalanceSample(providerId = 1, keyId = 1, amount = 70.0, used = 25.0, currency = "USD", capturedAt = at(1)),
-        )
-        val s = aggregate(samples).single()
-        // 已用 10→25 = 15，而余额跌幅是 90−70 = 20；优先已用增量。
-        assertEquals(15.0, (s.totalConsumed ?: Double.NaN), EPS)
     }
 
     @Test

@@ -30,8 +30,10 @@ import tokenvault.shared.generated.resources.dashboard_probe_never
 import tokenvault.shared.generated.resources.dashboard_probe_no_autolock
 import tokenvault.shared.generated.resources.dashboard_probe_running
 import tokenvault.shared.generated.resources.dashboard_probe_title
-import tokenvault.shared.generated.resources.dashboard_report_summary
-import tokenvault.shared.generated.resources.dashboard_report_title
+import tokenvault.shared.generated.resources.balance_trend_title
+import tokenvault.shared.generated.resources.balance_trend_summary
+import tokenvault.shared.generated.resources.model_change_title
+import tokenvault.shared.generated.resources.model_change_summary
 import tokenvault.shared.generated.resources.refresh_cd
 import com.lc33.tokenvault.screens.model.BalanceSummary
 import com.lc33.tokenvault.screens.model.ContentCounts
@@ -46,6 +48,7 @@ import com.lc33.tokenvault.ui.miuix.AppLinearProgress
 import com.lc33.tokenvault.ui.miuix.AppPreferenceGroup
 import com.lc33.tokenvault.ui.miuix.AppText
 import com.lc33.tokenvault.ui.miuix.AppActionRow
+import com.lc33.tokenvault.ui.miuix.AppArrowRow
 import com.lc33.tokenvault.ui.miuix.AppTextStyle
 import com.lc33.tokenvault.ui.miuix.appOnPrimaryColor
 import com.lc33.tokenvault.ui.miuix.appSecondaryTextColor
@@ -172,21 +175,26 @@ internal fun BalanceCard(
 }
 
 /**
- * 用量变化报告入口卡。整张卡可点，点进去看逐供应商的余额增长与消耗折线。
+ * 趋势两页的入口：余额趋势与模型变化。
  *
- * 只放一个入口、不在总览里摊开趋势：仪表盘是只读概览，折线图属于"想看才看"的分析内容，
- * 塞进首页会喧宾夺主（与探测明细"查看明细"同一条克制）。
+ * **一个组里两行**，不做两张大卡：这两页是并列的"想看才看"的分析内容，各摊一张卡会把
+ * 首页垫高两块，而缩成一行又会把第二页藏进第一页里。行标题就是页名，跳去哪一眼对得上。
  */
 @Composable
-internal fun ReportEntryCard(onOpenReport: () -> Unit) {
-    val tokens = LocalAppTokens.current
-    AppCard(modifier = cardModifier(), onClick = onOpenReport) {
-        CardTitle(stringResource(Res.string.dashboard_report_title))
-        AppText(
-            text = stringResource(Res.string.dashboard_report_summary),
-            style = AppTextStyle.Secondary,
-            color = appSecondaryTextColor,
-            modifier = Modifier.padding(top = tokens.itemSpacing),
+internal fun TrendEntryCard(
+    onOpenBalanceTrend: () -> Unit,
+    onOpenModelChange: () -> Unit,
+) {
+    AppPreferenceGroup(modifier = cardModifier(), inset = false) {
+        AppArrowRow(
+            title = stringResource(Res.string.balance_trend_title),
+            summary = stringResource(Res.string.balance_trend_summary),
+            onClick = onOpenBalanceTrend,
+        )
+        AppArrowRow(
+            title = stringResource(Res.string.model_change_title),
+            summary = stringResource(Res.string.model_change_summary),
+            onClick = onOpenModelChange,
         )
     }
 }

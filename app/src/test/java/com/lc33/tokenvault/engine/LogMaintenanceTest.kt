@@ -2,12 +2,15 @@ package com.lc33.tokenvault.engine
 
 import com.lc33.tokenvault.crypto.Redactor
 import com.lc33.tokenvault.data.entity.AuditLogEntity
+import com.lc33.tokenvault.data.entity.ModelChangeEntity
 import com.lc33.tokenvault.data.repo.FakeAppSettingDao
 import com.lc33.tokenvault.data.repo.FakeAuditLogDao
 import com.lc33.tokenvault.data.repo.FakeBalanceHistoryDao
+import com.lc33.tokenvault.data.repo.FakeModelChangeDao
 import com.lc33.tokenvault.data.repo.FakeProbeRunDao
 import com.lc33.tokenvault.data.repo.RoomAuditLogRepository
 import com.lc33.tokenvault.data.repo.RoomBalanceHistoryRepository
+import com.lc33.tokenvault.data.repo.RoomModelChangeRepository
 import com.lc33.tokenvault.data.repo.RoomProbeRunRepository
 import com.lc33.tokenvault.data.repo.RoomSettingsRepository
 import com.lc33.tokenvault.domain.model.LogRetention
@@ -49,6 +52,7 @@ class LogMaintenanceTest {
             repo,
             RoomProbeRunRepository(FakeProbeRunDao()),
             RoomBalanceHistoryRepository(FakeBalanceHistoryDao()) { now },
+            RoomModelChangeRepository(FakeModelChangeDao()),
             { now },
         ).run()
 
@@ -66,7 +70,8 @@ class LogMaintenanceTest {
         // probeRuns 用真仓库 + 假 DAO：条数上限那条路径也要被这条链走一遍。
         LogMaintenance(
             settings, repo, RoomProbeRunRepository(FakeProbeRunDao()),
-            RoomBalanceHistoryRepository(FakeBalanceHistoryDao()) { now }, { now },
+            RoomBalanceHistoryRepository(FakeBalanceHistoryDao()) { now },
+            RoomModelChangeRepository(FakeModelChangeDao()), { now },
         ).run()
 
         assertEquals(listOf("very old"), messages(repo))
@@ -84,9 +89,69 @@ class LogMaintenanceTest {
         // probeRuns 用真仓库 + 假 DAO：条数上限那条路径也要被这条链走一遍。
         LogMaintenance(
             settings, repo, RoomProbeRunRepository(FakeProbeRunDao()),
-            RoomBalanceHistoryRepository(FakeBalanceHistoryDao()) { now }, { now },
+            RoomBalanceHistoryRepository(FakeBalanceHistoryDao()) { now },
+            RoomModelChangeRepository(FakeModelChangeDao()), { now },
         ).run()
 
         assertEquals(listOf("twenty days"), messages(repo))
     }
+
+    /**
+     * 上下架流水的保留：一年之前的不留。
+     *
+     * 「模型变化」页最长只看 90 天，一年是留给"去年这时候上的新"还能查得到的余量。
+     */
+    @Test
+    fun `流水里一年之前的那批清掉`() = runTest {
+        val dao = FakeModelChangeDao()
+        dao.insertAll(
+            listOf(
+                change("over-a-year", now - 400 * day),
+                change("recent", now - 3 * day),
+            ),
+        )
+        LogMaintenance(
+            RoomSettingsRepository(FakeAppSettingDao()),
+            audit(FakeAuditLogDao()),
+            RoomProbeRunRepository(FakeProbeRunDao()),
+            RoomBalanceHistoryRepository(FakeBalanceHistoryDao()) { now },
+            RoomModelChangeRepository(dao),
+            { now },
+        ).run()
+
+        assertEquals(listOf("recent"), dao.rows.map { it.modelId })
+    }
+
+    /**
+     * 流水的条数上限，与天数各拦一类：一张有几百个模型的 Key 一年之内就能攒出几万行，
+     * 按时间裁拦不住它。留最新的（按 `at`、再按 `id`），删最老的。
+     *
+     * 5000 这个数写在这条断言里而不是引 `LogMaintenance` 的常量：那道上限是私有的，
+     * 而它一旦被改动，这条测试就该红一次让人去看一眼是不是真要改口径。
+     */
+    @Test
+    fun `流水超出条数上限时留最新的`() = runTest {
+        val dao = FakeModelChangeDao()
+        dao.insertAll((0..5000).map { index -> change("m$index", now - 2 * day) })
+        LogMaintenance(
+            RoomSettingsRepository(FakeAppSettingDao()),
+            audit(FakeAuditLogDao()),
+            RoomProbeRunRepository(FakeProbeRunDao()),
+            RoomBalanceHistoryRepository(FakeBalanceHistoryDao()) { now },
+            RoomModelChangeRepository(dao),
+            { now },
+        ).run()
+
+        assertEquals("多塞一条就该删掉最老那条", 5000L, dao.rows.size.toLong())
+        assertEquals("删的必须是最先写进去的那条", "m1", dao.rows.first().modelId)
+    }
+
+    private fun change(modelId: String, at: Long) = ModelChangeEntity(
+        providerId = 1,
+        keyId = 1,
+        modelId = modelId,
+        protocol = "chat",
+        kind = "added",
+        at = at,
+    )
 }

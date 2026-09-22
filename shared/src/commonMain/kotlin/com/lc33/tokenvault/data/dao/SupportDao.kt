@@ -12,6 +12,7 @@ import com.lc33.tokenvault.data.entity.AuditLogEntity
 import com.lc33.tokenvault.data.entity.BalanceHistoryEntity
 import com.lc33.tokenvault.data.entity.ClientProfileEntity
 import com.lc33.tokenvault.data.entity.ModelCatalogEntity
+import com.lc33.tokenvault.data.entity.ModelChangeEntity
 import com.lc33.tokenvault.data.entity.ModelEntity
 import com.lc33.tokenvault.data.entity.ModelVendorEntity
 import com.lc33.tokenvault.data.entity.ProbeRunEntity
@@ -393,13 +394,13 @@ interface ProbeRunDao {
 }
 
 /**
- * 余额历史（`balance_history`）。用量变化报告的唯一数据源。
+ * 余额历史（`balance_history`）。余额趋势报告的唯一数据源。
  *
  * 写路径只有 [insert]，且发生在 `RoomBalanceHistoryRepository.record` 去重之后
  * （同一把 Key 与上一条金额相同就不写）。[latestForKey] 就是那次去重要比对的上一条。
  *
  * 读路径 [observeAll] 按时间升序整表推给报告 ViewModel——聚合（按天分桶、跨 Key 求和）
- * 是纯函数的活，放在 `balance/UsageReportAggregator`，DAO 只管把行取全、别在 SQL 里算。
+ * 是纯函数的活，放在 `balance/BalanceTrendAggregator`，DAO 只管把行取全、别在 SQL 里算。
  * 表按「变化点」增长（去重）再加 [trimOlderThan] 的天数上限，量级远小于日志，整表读没有压力。
  */
 @Dao
@@ -430,6 +431,51 @@ interface BalanceHistoryDao {
 
     /** 清空（备份"覆盖恢复"用——与探测结果同类，恢复后历史从零重记）。 */
     @Query("DELETE FROM balance_history")
+    suspend fun clear()
+}
+
+/**
+ * 模型上下架事件（`model_changes`）。「模型变化」页的唯一数据源。
+ *
+ * 读路径只有 [observeAll] 一条：变化是"事件流"而不是"某一家的当前态"，按供应商或按时间
+ * 过滤都在纯函数 [com.lc33.tokenvault.catalog.ModelChangeSummary] 里做（页面只画不算），
+ * 所以这里不为每种查询各写一条 SQL。整表行数由 `LogMaintenance` 兜住上限，读回来不贵。
+ */
+@Dao
+interface ModelChangeDao {
+
+    @Insert
+    suspend fun insert(row: ModelChangeEntity): Long
+
+    /** 一轮合并成批写：新增几十上百个模型是常态，一条条 insert 会在这张表上打洞。 */
+    @Insert
+    suspend fun insertAll(rows: List<ModelChangeEntity>)
+
+    /** 整表按时间升序，页面按窗口取段、按站点分组都在聚合层做。 */
+    @Query("SELECT * FROM model_changes ORDER BY at, id")
+    fun observeAll(): Flow<List<ModelChangeEntity>>
+
+    @Query("SELECT COUNT(*) FROM model_changes")
+    suspend fun count(): Int
+
+    /** 按天数裁（`LogMaintenance` 调用）：只看得到近段时间的变化，更早的没有画的地方。 */
+    @Query("DELETE FROM model_changes WHERE at < :cutoff")
+    suspend fun trimOlderThan(cutoff: Long)
+
+    /**
+     * 条数上限：一张 445 个模型的 Key 首次抓取就是一次几百行，只按天裁兜不住反复上下架。
+     *
+     * SQL 写成一行拼接而不是三引号 + `trimIndent`：注解参数必须是编译期常量，
+     * `trimIndent()` 是函数调用，KSP 直接解不出 `@Query` 的值。
+     */
+    @Query(
+        "DELETE FROM model_changes WHERE id NOT IN (" +
+            "SELECT id FROM model_changes ORDER BY at DESC, id DESC LIMIT :max)",
+    )
+    suspend fun trimToCount(max: Int)
+
+    /** 清空（备份"覆盖恢复"用，与 `balance_history` 同一条规则）。 */
+    @Query("DELETE FROM model_changes")
     suspend fun clear()
 }
 

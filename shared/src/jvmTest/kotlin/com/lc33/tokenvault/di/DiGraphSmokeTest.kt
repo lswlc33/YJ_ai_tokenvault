@@ -52,7 +52,8 @@ import com.lc33.tokenvault.ui.shell.ProviderEditorViewModel
 import com.lc33.tokenvault.ui.shell.SecurityViewModel
 import com.lc33.tokenvault.ui.shell.SyncViewModel
 import com.lc33.tokenvault.ui.shell.UpdateViewModel
-import com.lc33.tokenvault.ui.shell.UsageReportViewModel
+import com.lc33.tokenvault.ui.shell.BalanceTrendViewModel
+import com.lc33.tokenvault.ui.shell.ModelChangeViewModel
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertNotNull
@@ -183,7 +184,8 @@ class DiGraphSmokeTest {
         assertNotNull(koin.get<SecurityViewModel>())
         assertNotNull(koin.get<SyncViewModel>())
         assertNotNull(koin.get<UpdateViewModel>())
-        assertNotNull(koin.get<UsageReportViewModel>())
+        assertNotNull(koin.get<BalanceTrendViewModel>())
+        assertNotNull(koin.get<ModelChangeViewModel>())
 
         // 带路由参数的：id 与"默认名模板"由调用方以 parametersOf 传入，
         // 这里的值只用于把构造走通（不查库，所以 1L 这种假 id 无副作用）。

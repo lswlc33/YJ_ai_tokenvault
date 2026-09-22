@@ -196,7 +196,7 @@ fun ProviderSummary.toRow(
         host = host,
         // 协议 chips 用 wireName：它稳定，而且这一排不是给人读的散文
         protocols = protocols,
-        colorIndex = provider.color ?: 0,
+        colorIndex = provider.color,
         pinned = provider.pinned,
         groupId = provider.groupId,
         keyCount = keyCount,

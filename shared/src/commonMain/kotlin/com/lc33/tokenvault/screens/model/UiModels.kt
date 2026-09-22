@@ -78,7 +78,13 @@ data class UiProviderRow(
      * 列表页的合集卡片不画协议——协议属于 Key，并成一排 chip 会被读成"这家支持这些"。
      */
     val protocols: List<String> = emptyList(),
-    val colorIndex: Int,
+    /**
+     * 手选颜色下标。**null = 没选过，用按 id 生成的身份色**（`ProviderPalette.colorFor`）。
+     *
+     * 库里这一列以前即使没选过也存着 0，而 0 就是"八个色块里的第一个蓝"，于是十几家
+     * 供应商全是一个色；v11 把那些没动过的 0 清成 NULL，生成色才接得上。
+     */
+    val colorIndex: Int? = null,
     val pinned: Boolean,
     val groupId: Long?,
     val keyCount: Int,

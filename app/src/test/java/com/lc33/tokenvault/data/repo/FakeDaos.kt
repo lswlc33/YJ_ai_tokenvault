@@ -11,6 +11,7 @@ import com.lc33.tokenvault.data.dao.BalanceHistoryDao
 import com.lc33.tokenvault.data.dao.ClientProfileDao
 import com.lc33.tokenvault.data.dao.GroupDao
 import com.lc33.tokenvault.data.dao.KeySettingsDao
+import com.lc33.tokenvault.data.dao.ModelChangeDao
 import com.lc33.tokenvault.data.dao.ModelDao
 import com.lc33.tokenvault.data.dao.ProbeRunDao
 import com.lc33.tokenvault.data.dao.ProviderAccountDao
@@ -23,6 +24,7 @@ import com.lc33.tokenvault.data.entity.BalanceHistoryEntity
 import com.lc33.tokenvault.data.entity.ClientProfileEntity
 import com.lc33.tokenvault.data.entity.GroupEntity
 import com.lc33.tokenvault.data.entity.KeySettingsEntity
+import com.lc33.tokenvault.data.entity.ModelChangeEntity
 import com.lc33.tokenvault.data.entity.ModelEntity
 import com.lc33.tokenvault.data.entity.ProbeRunEntity
 import com.lc33.tokenvault.data.entity.ProviderAccountEntity
@@ -814,3 +816,55 @@ internal class FakeBalanceHistoryDao : BalanceHistoryDao {
 
 
 
+
+/**
+ * `model_changes` 的假 DAO。
+ *
+ * 排序口径与真 DAO 一致（`at` 再 `id`）：`ModelChangeSummary` 那条"同一模型按最后一次事件
+ * 定性"的规则吃的就是这个顺序，这里排错了纯函数层的测试就会假绿。
+ */
+internal class FakeModelChangeDao : ModelChangeDao {
+    private val store = mutableListOf<ModelChangeEntity>()
+    private val revision = MutableStateFlow(0)
+    private var nextId = 1L
+
+    val rows: List<ModelChangeEntity> get() = store.toList()
+
+    override suspend fun insert(row: ModelChangeEntity): Long {
+        val id = nextId++
+        store += row.copy(id = id)
+        revision.value++
+        return id
+    }
+
+    override suspend fun insertAll(rows: List<ModelChangeEntity>) {
+        rows.forEach { insert(it) }
+    }
+
+    override fun observeAll(): Flow<List<ModelChangeEntity>> = revision.map {
+        store.sortedWith(compareBy({ it.at }, { it.id }))
+    }
+
+    override suspend fun count(): Int = store.size
+
+    override suspend fun trimOlderThan(cutoff: Long) {
+        store.removeAll { it.at < cutoff }
+        revision.value++
+    }
+
+    /** 与真 SQL 同口径：按 (`at`, `id`) 从新到旧留最新的 [max] 条。 */
+    override suspend fun trimToCount(max: Int) {
+        val keep = store
+            .sortedWith(compareByDescending<ModelChangeEntity> { it.at }.thenByDescending { it.id })
+            .take(max)
+            .map { it.id }
+            .toSet()
+        store.removeAll { it.id !in keep }
+        revision.value++
+    }
+
+    override suspend fun clear() {
+        store.clear()
+        revision.value++
+    }
+}

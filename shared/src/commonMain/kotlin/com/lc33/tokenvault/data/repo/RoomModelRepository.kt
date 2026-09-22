@@ -10,10 +10,13 @@ import com.lc33.tokenvault.domain.model.LogCategory
 import com.lc33.tokenvault.domain.model.LogLevel
 import com.lc33.tokenvault.domain.repo.AuditLogRepository
 import com.lc33.tokenvault.domain.repo.ModelCatalogRepository
+import com.lc33.tokenvault.domain.repo.ModelChangeRepository
 import com.lc33.tokenvault.domain.repo.ModelRepository
 import com.lc33.tokenvault.domain.repo.TransactionRunner
 import com.lc33.tokenvault.domain.repo.UndoableDeletion
+import com.lc33.tokenvault.probe.DeletedModelRow
 import com.lc33.tokenvault.probe.ModelMerger
+import com.lc33.tokenvault.probe.ModelMergeEvents
 import com.lc33.tokenvault.probe.NewDiscoveredModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -39,6 +42,16 @@ class RoomModelRepository constructor(
      * 里，直到下一次目录同步（最坏 7 天）才突然长出厂商和价格——那是用户眼里的 bug。
      */
     private val catalog: ModelCatalogRepository? = null,
+
+    /**
+     * 上下架流水。**可空**：没接时（老测试、只读场景）模型照常合并入库，只是「模型变化」页
+     * 不再长新行。
+     *
+     * 为什么在 [applyDiscovered] 里写而不是在探测引擎里写：这一轮改了什么只有这里说得清
+     * ——合并计划、本轮拉到的列表、库里原有的行三样都在同一个事务里，判据（见那段注释）
+     * 也全靠它们。挪到引擎就等于让调用方去猜"哪些删除是真的下架"。
+     */
+    private val changes: ModelChangeRepository? = null,
 ) : ModelRepository {
 
     override fun observeByProvider(providerId: Long): Flow<List<AiModel>> =
@@ -96,8 +109,10 @@ class RoomModelRepository constructor(
             val plan = ModelMerger.merge(existing, fetched, protocol)
             val stamp = now()
             val baseOrder = existingEntities.size
-            plan.toInsert.forEachIndexed { index, model ->
-                dao.insertIgnoring(
+            // `insertIgnoring` 撞唯一索引时回 -1（并发的一轮已经把它插了），那种情况下面
+            // 不能记"新增"——什么也没多出来。所以只把真正插进去的 modelId 挑出来。
+            val inserted = plan.toInsert.mapIndexed { index, model ->
+                val rowId = dao.insertIgnoring(
                     ModelEntity(
                         providerId = providerId,
                         keyId = keyId,
@@ -110,9 +125,27 @@ class RoomModelRepository constructor(
                         sortOrder = baseOrder + index,
                     ),
                 )
-            }
+                model.modelId.takeIf { rowId > 0L }
+            }.filterNotNull()
+            val deletedIds = plan.toDelete.toSet()
             plan.toTouch.forEach { dao.touchLastSeen(it, stamp) }
             plan.toDelete.forEach { dao.delete(it) }
+            // 流水与上面这批增删**同一个事务**：它们说的是同一件事的两面，分成两个事务就会
+            // 出现"行已经删了而流水没记上"的中间态。判据都在 [ModelMergeEvents] 里（纯函数）。
+            changes?.record(
+                ModelMergeEvents.of(
+                    providerId = providerId,
+                    keyId = keyId,
+                    protocol = protocol.wireName,
+                    insertedModelIds = inserted,
+                    deletedRows = existingEntities
+                        .filter { it.id in deletedIds }
+                        .map { DeletedModelRow(it.modelId, it.keyId, it.protocol, it.source) },
+                    listedModelIds = modelIds.toSet(),
+                    firstRoundForKey = existingEntities.isEmpty(),
+                    at = stamp,
+                ),
+            )
         }
         // 事务**外面**补目录：[ModelCatalogRepository.rekeyUnkeyedModelsOfKey] 要读
         // `model_catalog` 那张 7.8k 行的表，挂在同一个事务里会把事务时长从"几十次插入"

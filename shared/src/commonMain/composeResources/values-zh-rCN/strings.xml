@@ -469,6 +469,7 @@
     <string name="editor_section_look">外观</string>
     <string name="editor_group">分组</string>
     <string name="editor_color">色块</string>
+    <string name="editor_color_auto">自动</string>
     <string name="editor_pinned">置顶</string>
     <string name="editor_section_endpoint">端点与协议</string>
     <string name="editor_models_auto">自动获取</string>
@@ -903,19 +904,26 @@
     <string name="keymodels_probed_ago">%1$s探测过</string>
     <string name="keymodels_probed_ago_with_latency">%1$s探测过 · %2$d 毫秒</string>
 
-    <!-- 用量变化报告 -->
-    <string name="usage_report_title">用量变化</string>
-    <string name="usage_report_metric_balance">余额</string>
-    <string name="usage_report_metric_usage">用量</string>
-    <string name="usage_report_range_7">近 7 天</string>
-    <string name="usage_report_range_30">近 30 天</string>
-    <string name="usage_report_range_90">近 90 天</string>
-    <string name="usage_report_chart_empty">还没有余额历史。下次余额探测后开始记录。</string>
-    <string name="usage_report_net_change">区间净变化</string>
-    <string name="usage_report_consumed">区间消耗</string>
-    <string name="usage_report_unknown_provider">已删除的供应商</string>
-    <string name="dashboard_report_title">用量变化</string>
-    <string name="dashboard_report_summary">查看余额增长与消耗趋势，逐供应商折线。</string>
-    <string name="settings_report">用量变化报告</string>
-    <string name="settings_report_summary">余额增长与消耗趋势，逐供应商折线。</string>
+    <!-- 趋势两页共用的窗口那一排（screens/report/TrendRangeChips） -->
+    <string name="trend_range_7">近 7 天</string>
+    <string name="trend_range_30">近 30 天</string>
+    <string name="trend_range_90">近 90 天</string>
+
+    <!-- 余额趋势 -->
+    <string name="balance_trend_title">余额趋势</string>
+    <string name="balance_trend_summary">逐供应商的余额历史折线。</string>
+    <string name="balance_trend_chart_empty">还没有余额历史。下次余额探测后开始记录。</string>
+    <string name="balance_trend_net_change">区间净变化</string>
+    <string name="balance_trend_unknown_provider">已删除的供应商</string>
+
+    <!-- 模型变化 -->
+    <string name="model_change_title">模型变化</string>
+    <string name="model_change_summary">哪几家站点上了或下了哪些模型。</string>
+    <string name="model_change_added">新增</string>
+    <string name="model_change_removed">下架</string>
+    <string name="model_change_counts">新增 %1$d 个 · 下架 %2$d 个</string>
+    <string name="model_change_show_more">还有 %1$d 个，点开继续显示</string>
+    <string name="model_change_empty_none">还没有模型变化记录。某把密钥的模型列表成功刷新过一次之后才会开始记录。</string>
+    <string name="model_change_empty_window">这段时间里没有模型变化。</string>
+    <string name="model_change_footnote">下架只从升到本版之后的第一次模型列表刷新开始记录；此前的新增按每个模型第一次被看到的时间回填。</string>
 </resources>

@@ -275,7 +275,7 @@ data class ModelVendorEntity(
 )
 
 /**
- * 余额历史样本：一把 Key 每次余额发生变化就追加一行，喂给「用量变化报告」画折线。
+ * 余额历史样本：一把 Key 每次余额发生变化就追加一行，喂给「余额趋势」画折线。
  *
  * 与 `api_keys` 上那份「最新快照」列分工不同——那份只有当前值、每次探测覆盖写，
  * 画不出趋势；这张表按时间累积，是报告的唯一数据源。
@@ -313,6 +313,54 @@ data class BalanceHistoryEntity(
     val used: Double? = null,
     val currency: String? = null,
     val capturedAt: Long,
+)
+
+/**
+ * 模型上下架事件（`model_changes`）：「模型变化」页的唯一数据源。
+ *
+ * **为什么不能像余额那样从现表反推**：`models` 记的是"这家站点此刻认哪些模型"这个当前态，
+ * 而上游下架一个模型时 [com.lc33.tokenvault.probe.ModelMerger] 走的是硬删（红线 30），
+ * 行没了以后没有任何地方还留着"它曾经在"。所以变化只能在**发生的那一刻**记下来——
+ * 这张表就是那个时刻的落点，升级之前发生过多少次下架都查不回来了。
+ *
+ * **只记探测合并的结果，不记用户的手动增删**：手动那条说的是"我改了清单"，不是"站点上了
+ * 新模型"，混进来这个页面讲的就不是站点的事了（判据在 `RoomModelRepository.applyDiscovered`）。
+ *
+ * [keyId] 可空且**不挂外键**：`models.keyId` 本身就是可空列（旧数据迁移时可能没挂到 Key 上），
+ * 而且 Key 轮换很常见，为它抹掉这家的站点变化等于把页面清空——与 `balance_history` 同一条理由。
+ * [providerId] 保留 CASCADE：删掉整个供应商是明确、少见的动作，它的站点变化一起清掉才合理。
+ */
+@Entity(
+    tableName = "model_changes",
+    foreignKeys = [
+        ForeignKey(
+            entity = ProviderEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["providerId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [
+        Index(value = ["providerId", "at"]),
+        Index(value = ["at"]),
+    ],
+)
+data class ModelChangeEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val providerId: Long,
+
+    /** 哪把 Key 的列表里看到的。可空，且不挂外键（见类注释）。 */
+    val keyId: Long? = null,
+    val modelId: String,
+
+    /** 这一轮拉的是哪个协议的列表（`models.protocol` 同一个口径）。 */
+    val protocol: String,
+
+    /** `added` | `removed`，见 `ModelChangeKind`。 */
+    val kind: String,
+
+    /** 事件发生时间 = 这一轮合并的落库时刻。 */
+    val at: Long,
 )
 
 @Entity(tableName = "probe_runs")

@@ -14,6 +14,7 @@ import com.lc33.tokenvault.data.repo.RoomBalanceHistoryRepository
 import com.lc33.tokenvault.data.repo.RoomClientProfileRepository
 import com.lc33.tokenvault.data.repo.RoomGroupRepository
 import com.lc33.tokenvault.data.repo.RoomModelCatalogRepository
+import com.lc33.tokenvault.data.repo.RoomModelChangeRepository
 import com.lc33.tokenvault.data.repo.RoomModelRepository
 import com.lc33.tokenvault.data.repo.RoomProviderAccountRepository
 import com.lc33.tokenvault.data.repo.RoomProbeRunRepository
@@ -31,6 +32,7 @@ import com.lc33.tokenvault.domain.repo.ClientProfileRepository
 import com.lc33.tokenvault.domain.repo.GroupRepository
 import com.lc33.tokenvault.domain.repo.ImportWriter
 import com.lc33.tokenvault.domain.repo.ModelCatalogRepository
+import com.lc33.tokenvault.domain.repo.ModelChangeRepository
 import com.lc33.tokenvault.domain.repo.ModelRepository
 import com.lc33.tokenvault.domain.repo.ProviderAccountRepository
 import com.lc33.tokenvault.domain.repo.ProbeRunRepository
@@ -82,7 +84,8 @@ import com.lc33.tokenvault.ui.shell.ProviderEditorViewModel
 import com.lc33.tokenvault.ui.shell.SecurityViewModel
 import com.lc33.tokenvault.ui.shell.SyncViewModel
 import com.lc33.tokenvault.ui.shell.UpdateViewModel
-import com.lc33.tokenvault.ui.shell.UsageReportViewModel
+import com.lc33.tokenvault.ui.shell.BalanceTrendViewModel
+import com.lc33.tokenvault.ui.shell.ModelChangeViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -165,6 +168,7 @@ val coreModule = module {
     single { get<VaultDatabase>().auditLogDao() }
     single { get<VaultDatabase>().appSettingDao() }
     single { get<VaultDatabase>().balanceHistoryDao() }
+    single { get<VaultDatabase>().modelChangeDao() }
 
     // ------------------------------------------------------------------ 仓库
 
@@ -197,17 +201,18 @@ val coreModule = module {
     single<ModelRepository> {
         RoomModelRepository(
             dao = get(), transactions = get(), now = get(named(Qualifiers.NOW)),
-            audit = get(), restorer = get(), catalog = get(),
+            audit = get(), restorer = get(), catalog = get(), changes = get(),
         )
     }
     single<ClientProfileRepository> { RoomClientProfileRepository(get(), get()) }
     single<AuditLogRepository> { RoomAuditLogRepository(get(), get(), get(named(Qualifiers.NOW))) }
     single<ProbeRunRepository> { RoomProbeRunRepository(get()) }
     single<BalanceHistoryRepository> { RoomBalanceHistoryRepository(get(), get(named(Qualifiers.NOW))) }
+    single<ModelChangeRepository> { RoomModelChangeRepository(get()) }
     single {
         LogMaintenance(
             settings = get(), audit = get(), probeRuns = get(),
-            balanceHistory = get(), now = get(named(Qualifiers.NOW)),
+            balanceHistory = get(), modelChanges = get(), now = get(named(Qualifiers.NOW)),
         )
     }
 
@@ -353,5 +358,6 @@ val viewModelModule = module {
     viewModelOf(::SecurityViewModel)
     viewModelOf(::SyncViewModel)
     viewModelOf(::UpdateViewModel)
-    viewModelOf(::UsageReportViewModel)
+    viewModelOf(::BalanceTrendViewModel)
+    viewModelOf(::ModelChangeViewModel)
 }
